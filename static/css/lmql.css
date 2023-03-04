@@ -1,6 +1,21 @@
-h1>img {
-    width: 30pt;
-    height: 30pt;
+.title.is-1 {
+    font-size: 28pt;
+}
+
+@media only screen and (max-width: 420pt) {
+    .title.is-1 {
+        font-size: 20pt;
+    }
+
+    .title.is-1>img {
+        height: 18pt !important;
+    }
+}
+
+.title.is-1>img {
+    /* width: 30pt; */
+    width: auto;
+    height: 25pt;
     margin-right: 5pt;
     position: relative;
     top: 1pt;
