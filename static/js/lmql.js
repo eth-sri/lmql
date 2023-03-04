@@ -80,13 +80,58 @@ window.addEventListener('load', function() {
     let el = document.querySelectorAll("span.option[value='" + id + "']")[0]
     if (el) {
       el.click()
+    } else if (anchor.substring(1) == "screenshot") {
+      setScreenshotMode()
     }
   }
 })
 
+let screenshotMode = false;
+
+function setScreenshotMode() {
+  screenshotMode = true;
+  document.body.classList.add("screenshot-mode")
+
+  let clickDownY = null;
+  let clickTop = null;
+  let movingEl = null;
+  
+  document.querySelectorAll("anchor>label .multiline").forEach(e => {
+    // on left click position relative top -1pt
+    // on right click position relative top 1pt
+
+    e.addEventListener('mousedown', function(event) {
+      if (event.button == 0) {
+        clickDownY = event.clientY;
+        clickTop = parseInt(e.style.top || "0")
+        movingEl = e
+        event.stopPropagation()
+      }
+    })
+  })
+
+  document.body.addEventListener('mousemove', function(event) {
+    if (clickDownY) {
+      let delta = event.clientY - clickDownY;
+      movingEl.style.top = (clickTop + delta) + "pt"
+    }
+  })
+
+  document.body.addEventListener('mouseup', function(event) {
+    if (clickDownY) {
+      event.stopPropagation()
+      let delta = event.clientY - clickDownY;
+      movingEl.style.top = (clickTop + delta) + "pt"
+      clickDownY = null;
+      clickTop = null;
+      movingEl = null;
+    }
+  })
+}
+
 let activeAnchor = null;
 function hoverAnchor() {
-  if (activeAnchor) {
+  if (activeAnchor && !screenshotMode) {
     activeAnchor.classList.remove('hover')
   }
   activeAnchor = this;
@@ -97,13 +142,13 @@ function hoverAnchor() {
 window.addEventListener('load', function() {
   // only enable sticky hover on non-touch devices and not (@media only screen and (max-width: 320pt) {)
   if (!window.matchMedia("(hover: none)").matches && !window.matchMedia("(max-width: 320px)").matches) {
-    console.log("enabling sticky hover")
     document.querySelectorAll('anchor').forEach(e => e.addEventListener('mouseover', hoverAnchor))
   }
   document.body.addEventListener('click', function() {
     if (activeAnchor) {
       activeAnchor.classList.remove('hover')
     }
+    document.querySelectorAll('anchor').forEach(e => e.classList.remove('hover'))
   })
 })
 
