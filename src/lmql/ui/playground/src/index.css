@@ -1,0 +1,90 @@
+body {
+  margin: 0;
+  font-family: 'Open Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: 0pt;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: stretch;
+  height: 100vh;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+abc {
+  color: #3b3e4d;
+  color: #2d2d2d;
+  color: #7d7c7c;
+  color: #42bd69;
+}
+
+#root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: stretch;
+  align-items: stretch;
+  margin-right: 3pt;
+  
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  right: 0px;
+  bottom: 0px;
+}
+
+textarea {
+  flex: 1;
+  font-size: 8pt;
+  background-color: #020202;
+  color: #b2b2b2;
+  padding: 5pt;
+  margin-top: 5pt;
+  margin: 1pt;
+  outline: none;
+  border-radius: 1pt;
+  border-width: 0;
+}
+
+textarea:focus {
+  outline: 1pt solid #b2b2b2;
+}
+
+.panel .sidebar {
+  position: absolute;
+  top: 0;
+  right: 0pt;
+  height: 100%;
+  padding: 0;
+}
+
+h1 {
+  text-align: left;
+  font-weight: 400;
+  font-family: 'Open Sans', sans-serif;
+}
+
+p.note {
+  border-left: 4pt solid #b2b2b2;
+  padding: 5pt;
+}
+
+span.subtitle {
+  font-size: 8pt;
+  padding: 4pt;
+  width: 160pt;
+  opacity: 0.4;
+  line-height: 1.5em;
+}
+
+span.subtitle a {
+  color: #dfdada;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -1,0 +1,74 @@
+.graph-layout {
+    position: relative;
+}
+
+.graph-layout #decoder {
+    position: absolute;
+    top: 35pt;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border-radius: 0;
+    margin: 0;
+    display: block;
+    z-index: 2;
+}
+
+.graph-layout #decoder h2 {
+    position: absolute;
+    background-color: black;
+    height: 25pt;
+    display: flex;
+    align-items: center;
+    border-radius: 2pt;
+    padding: 0 5pt;
+    padding-bottom: 3pt;
+    top: 5pt;
+    left: 5pt;
+    z-index: 999;
+}
+
+.graph-layout .panel {
+    border: 0.5pt solid grey;
+    z-index: 3;
+
+    /* very light, broad box shadow */
+    box-shadow: 0 0 5pt 0pt rgba(255, 255, 255, 0.2);
+}
+
+.graph-layout #editor-panel {
+    position: absolute;
+    bottom: 5pt;
+    left: 5pt;
+    width: 550pt;
+    height: 500pt;
+    transform: scale(0.6);
+    transform-origin: bottom left;
+}
+
+.graph-layout #sidepanel {
+    position: absolute;
+    top: 40pt;
+    right: 5pt;
+    width: 40%;
+    height: 250pt;
+    transform: scale(0.75);
+    transform-origin: top right;
+}
+
+.graph-layout #inspector {
+    position: absolute;
+    bottom: 5pt;
+    right: 5pt;
+    width: 300pt;
+    height: 450pt;
+    transform: scale(0.75);
+    transform-origin: bottom right;
+}
+
+.graph-layout .panel.hidden,
+.graph-layout #inspector.hidden,
+.graph-layout #sidepanel.hidden {
+    width: 0pt;
+}
