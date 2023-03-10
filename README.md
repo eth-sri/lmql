@@ -18,31 +18,76 @@
     <a href="https://github.com/eth-sri/lmql/issues">Report Bug</a>
     <br/>
     <br/>
-    <i>Full Code Release Coming Soon</i>
   </p>
 </div>
 
-LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python. With only a few lines of LMQL code, users can express advanced, multi-part and tool-augmented LM queries, which then are optimized by the LMQL runtime to run efficiently as part of the LM decoding loop. To illustrate, consider the following LMQL program:
+LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python. With only a few lines of LMQL code, users can express advanced, multi-part and tool-augmented LM queries, which then are optimized by the LMQL runtime to run efficiently as part of the LM decoding loop.
 
 ![lmql-overview](https://user-images.githubusercontent.com/17903049/222918379-84a00b9a-1ef0-45bf-9384-15a20f2874f0.png)
+<center>Example of a simple LMQL program.</center>
 
-<p align="center">
-    <a href="https://lmql.ai">Explore More Examples »</a>
-</p>
 
-## About LMQL
+## Getting Started
 
-Large language models have demonstrated outstanding performance on a wide range of tasks such as question answering and code generation. On a high level, given an input, a language model can be used to automatically complete the sequence in a statistically-likely way. Based on this, users prompt these models with language instructions or examples, to implement a variety of downstream tasks. Advanced prompting methods can even imply interaction between the language model, a user, and external tools such as calculators. However, to obtain state-of-the-art performance or adapt language models for specific tasks, complex task- and model-specific programs have to be implemented, which may still require ad-hoc interaction.
+To install the latest version of LMQL run the following command with Python >=3.10 installed.
 
-Based on this, we present the novel idea of Language Model Programming (LMP). LMP generalizes language model prompting from pure text prompts to an intuitive combination of text prompting and scripting. Additionally, LMP allows constraints to be specified over the language model output. This enables easy adaption to many tasks, while abstracting language model internals and providing high-level semantics.
+```
+pip install lmql
+```
 
-To enable LMP, we implement LMQL (short for Language Model Query Language), which leverages the constraints and control flow from an LMP prompt to generate an efficient inference procedure that minimizes the number of expensive calls to the underlying language model.
+**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/). 
 
-We show that LMQL can capture a wide range of state-of-the-art prompting methods in an intuitive way, especially facilitating interactive flows that are challenging to implement with existing high-level APIs. Our evaluation shows that we retain or increase the accuracy on several downstream tasks, while also significantly reducing the required amount of computation or cost in the case of pay-to-use APIs.
+### Running LMQL Programs
 
-### Code Release and Stability
+After installation, you can launch the LMQL playground IDE with the following command:
 
-We plan to release the LMQL source code soon, together with a packaged release on PyPi. Until then, feel free to experiment with LMQL in the web-based <a href="https://lmql.ai/playground">Playground IDE</a>, which includes the fully-featured LMQL runtime and compiler.
+```
+lmql playground
+```
 
-The current version of LMQL should be considered as an alpha release. Please report bugs and feature requests as GitHub Issues.
+> Using the LMQL playground requires an installation of Node.js. If you are in a conda-managed environment you can install node.js via `conda install nodejs=14.20 -c conda-forge`. Otherwise, please see the offical Node.js website https://nodejs.org/en/download/ for instructions how to install it on your system.
 
+This launches a browser-based playground IDE, including a showcase of many exemplary LMQL programs. If the IDE does not launch automatically, go to `http://localhost:3000`.
+
+Alternatively, `lmql run` can be used to execute local `.lmql` files. Note that when using local HuggingFace Transformers models in the Playground IDE or via `lmql run`, you have to first launch an instance of the LMQL Inference API for the corresponding model via the command `lmql serve-model`.
+
+### Configuring OpenAI API Credentials
+
+If you want to use OpenAI models, you have to configure your API credentials. To do so, create a file `api.env` in the active working directory, with the following contents.
+
+```
+openai-org: <org identifier>
+openai-secret: <api secret>
+```
+
+For system-wide configuration, you can also create an `api.env` file at `$HOME/.lmql/api.env` or at the project root of your LMQL distribution (e.g. `src/` in a development copy).
+
+## Setting Up a Development Environment
+
+To setup a `conda` environment for local LMQL development with GPU support, run the following commands:
+
+```
+# prepare conda environment
+conda env create -f scripts/conda/requirements.yml -n lmql
+conda activate lmql
+
+# registers the `lmql` command in the current shell
+source scripts/activate-dev.sh
+```
+
+> **Operating System**: The GPU-enabled version of LMQL was tested to work on Ubuntu 22.04 with CUDA 12.0 and Windows 10 via WSL2 and CUDA 11.7. The no-GPU version (see below) was tested to work on Ubuntu 22.04 and macOS 13.2 Ventura or Windows 10 via WSL2.
+
+### Development without GPU
+
+This section outlines how to setup an LMQL development environment without local GPU support. Note that LMQL without local GPU support only supports the use of API-integrated models like `openai/text-davinci-003`. Please see the OpenAI API documentation (https://platform.openai.com/docs/models/gpt-3-5) to learn more about the set of available models. 
+
+To setup a `conda` environment for LMQL with GPU support, run the following commands:
+
+```
+# prepare conda environment
+conda env create -f scripts/conda/requirements-no-gpu.yml -n lmql-no-gpu
+conda activate lmql-no-gpu
+
+# registers the `lmql` command in the current shell
+source scripts/activate-dev.sh
+```

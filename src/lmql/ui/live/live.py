@@ -53,9 +53,6 @@ class LiveDebuggerOutputWriter:
         add_debugger_output(*args)
         self.message_log.append(args)
 
-        with open("debugger_state.pkl", "w") as f:
-            json.dump(self.message_log, f)
-    
     def add_compiler_output(self, code): 
         add_debugger_output("compiled-code", {
             "code": code

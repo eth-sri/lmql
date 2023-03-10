@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LMQL Web</title>
+    <!-- <script src="https://cdn.jsdelivr.net/pyodide/v0.21.3/full/pyodide.js"></script> -->
+    <!-- <script src="main.js"></script> -->
+    
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/editor/editor.main.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js"></script>
+    <script src="client.js"></script>
+    <style>
+        body {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: stretch;
+            overflow: hidden;
+        }
+        /* break lines in output */
+        pre {
+            white-space: pre-wrap;
+            font-size: 12pt;
+            overflow: auto;
+            flex: 1;
+            border: 1px solid #ccc;
+        }
+
+        .openai-form {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: stretch;
+            padding: 10pt 0pt;
+        }
+        .openai-form input {
+            flex: 1;
+            margin-top: 5pt;
+        }
+        .openai-form label {
+            color: #666;
+            min-width: 120pt;
+            text-align: right;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 10pt;
+        }
+        .openai-form input {
+            height: 20pt;
+            font-size: 14pt;
+        }
+        .openai-form div {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+    <!-- <button onclick="complete()" style="width: 200pt; height: 100pt; font-size: 20pt;">Complete</button> -->
+</head>
+<body>
+    <!-- textarea to input python code, disable auto spell checking -->
+    <!-- <textarea id="code" rows="10" cols="50" spellcheck="false" oninput="saveOnEdit()" style="font-size: 14pt;"></textarea> -->
+    <!-- use monaco editor for code -->
+    <div id="editor" style="width: 100%; height: 250pt"></div>
+    <button disabled onclick="run()" style="height: 30pt; font-size: 14pt;" id="run">Run</button>
+    <button disabled onclick="stop()" style="height: 30pt; font-size: 14pt;" id="stop">Stop</button>
+    <!-- output as line broken code -->
+    <div class="openai-form">
+        <div>
+            <label for="openai-secret">OpenAI Secret</label>
+            <input id="openai-secret" type="password"/>
+        </div>
+        <div>
+            <label for="openai-org">OpenAI Organization</label>
+            <input id="openai-org"/>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        initEditor();
+    </script>
+</body>
+</html>

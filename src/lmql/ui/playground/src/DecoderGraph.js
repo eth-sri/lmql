@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { LMQLProcess, RemoteProcessConnection } from './Configuration';
+import { LMQLProcess } from './Configuration';
 import { persistedState } from "./State"
 
 import cytoscape from "cytoscape"
 
 function layoutDecoderGraph(cy) {
     const rootNodes = cy.nodes().filter(n => n.indegree() == 0)
-    let x = 0
     let columnItems = new Map()
     let cellWidth = 90
     let cellHeight = 50
@@ -317,10 +316,8 @@ function initDecoderGraphCy(element) {
                 selector: 'node.compound, node.compound.active',
                 style: {
                     'color': '#d0caca',
-                    'font-size': '10px',
                     'shape': 'roundrectangle',
                     // text top center but inside node
-                    'border-width': 0,
                     'text-valign': 'top',
                     'text-halign': 'center',
                     'text-wrap': 'wrap',
@@ -397,7 +394,6 @@ export function DecoderGraph(props) {
     const [cyData, setCyData] = useState(null);
     const [rawGraphData, setRawGraphData] = useState(null);
     const cyRef = useRef(null)
-    const [activeNode, setActiveNode] = useState(null);
 
     props.fitTrigger && props.fitTrigger.addTriggerListener(() => cyRef.current.fit())
 
@@ -411,14 +407,14 @@ export function DecoderGraph(props) {
     }
 
     // listen for changes to persisted graph
-    const onPersistedGraphChange = (s) => {
+    const onPersistedGraphChange = React.useCallback((s) => {
         if (rawGraphData == s) {
             return
         }
         reset()
         setCyData(JSON.parse(s))
         setTimeout(() => cyRef.current.fit(), 0)
-    }
+    }, [])
 
     React.useEffect(() => {
         // restore previous graph data
@@ -491,7 +487,6 @@ export function DecoderGraph(props) {
         const cy = cyRef.current
         if (cy) {
             if (cyData) {
-                setActiveNode(null)
                 // cy.nodes().remove()
                 // cy.edges().remove()
 

@@ -1,0 +1,13 @@
+name: lmql-no-gpu
+dependencies:
+  - python=3.10
+  - pip
+  - conda-forge::nodejs=14.20
+  - pip:
+    - astunparse
+    - openai
+    - termcolor
+    - pydot
+    - transformers==4.25.1
+    - pandas
+    - accelerate

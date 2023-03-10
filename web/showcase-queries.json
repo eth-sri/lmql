@@ -1,0 +1,105 @@
+{
+    "precomputed/joke.json": {
+        "name": "Generating a Dad Joke",
+        "variables": ["JOKE", "PUNCHLINE"],
+        "anchors": {
+            "argmax": {
+                "type": "multiline",
+                "text": "<tt>argmax</tt> specifies the use of argmax decoding for this query, but LMQL also supports <tt>sample</tt> and <tt>beam</tt> search. Decoding parameters like <i>sampling temperature</i> can also be specified."
+            },
+            "[JOKE]": {
+                "type": "multiline",
+                "text": "Hole variables like <tt>[JOKE]</tt> are completed by the language model as shown in the output. LMQL automatically detects the end of the resulting sequence, relying on the constraints provided in the <tt>where</tt> clause."
+            },
+            "\"openai/text-davinci-003\"": {
+                "type": "multiline",
+                "text": "The <tt>from</tt> clause specifies the identifier of a text generation model from the <a href=\"https://huggingface.co/models\" target=\"_blank\">🤗&nbsp;Transformers model repository</a> or an OpenAI model like <tt>text-davinci-003</tt>."
+            },
+            "STOPS_AT": {
+                "type": "multiline",
+                "text": "As one of the supported built-in operations, <tt>STOPS_AT</tt> specifies a stopping phrase when decoding the provided variable."
+            },
+            "len(PUNCHLINE) &gt; 1": "LMQL supports high-level constraints, where the language runtime automatically derives token-level prediction masks and validates the produced sequence eagerly, i.e. as soon as the provided validation condition is definitively violated, decoding stops or is redirected to a different branch."
+        }
+    },
+    "precomputed/list.json": {
+        "name": "Control-Flow Guided Generation",
+        "variables": ["THING"],
+        "anchors": {
+            "<span class=\"lmql-kw\">for</span> i <span class=\"lmql-kw\">in</span> range(4):": {
+                "type": "multiline",
+                "text": "LMQL supports regular Python control-flow as part of the prompt clause, allowing users to control the generation process programmatically."
+            },
+            "THING <span class=\"lmql-kw\">in</span> set": {
+                "type": "multiline",
+                "text": "LMQL constraints like <tt>VAR in [...]</tt> can be used to enforce that the language model can only generate a fixed set of values for a variable."
+            }
+        }
+    },
+    "precomputed/calc.json": {
+        "name": "Arithmetic Evaluation",
+        "variables": ["REASON_OR_CALC", "EXPR", "RESULT"],
+        "truncate_output": 1700,
+        "anchors": {
+            "<span class=\"lmql-kw\">def</span> calc(expr):": "Users can define utility functions in standard Python. These can be used to augment the LM's reasoning capabilities, e.g. with respect to arithmetic evaluation.",
+            "calc(EXPR)": "When arithmetic evaluation is requested by the model, the <tt>calc</tt> function is called and the result is fed back to the model."
+        }
+    },
+    "precomputed/wiki.json": {
+        "name": "Interactive Wikipedia Search",
+        "variables": ["TERM", "ANSWER"],
+        "anchors": {
+            "<span class=\"lmql-kw\">async</span> <span class=\"lmql-kw\">def</span> wikipedia(q):": {
+                "type": "multiline",
+                "text": "LMQL also supports <tt>async</tt> functions, enabling users to query external (web) services during decoding."
+            },
+            "{result}": {
+                "type": "multiline",
+                "text": "The retrieved Wikipedia result can be integrated dynamically during decoding, providing the LM with additional context."
+            }
+        }
+    },
+    "precomputed/cot.json": {
+        "name": "Chain-Of-Thought Reasoning",
+        "variables": ["REASONING", "RESULT"],
+        "anchors": {
+            "\"\"\"Q: ": {
+                "type": "multiline",
+                "text": "Existing prompting schemes like <i>Chain-of-Thought</i> can easily be expressed as simple LMQL queries."
+            },
+            "<span class=\"lmql-kw\">assert</span> RESULT == <span class=\"lmql-str\">\"A\"</span>": {
+                "type": "multiline",
+                "text": "LMQL also support Python's <tt>assert</tt> to check the correctness of the generated output (e.g. for dataset evaluation)."
+            },
+            "RESULT <span class=\"lmql-kw\">in</span> [<span class=\"lmql-str\">\"A\"</span>, <span class=\"lmql-str\">\"B\"</span>, <span class=\"lmql-str\">\"C\"</span>, <span class=\"lmql-str\">\"D\"</span>, <span class=\"lmql-str\">\"E\"</span>, <span class=\"lmql-str\">\"F\"</span>]": {
+                "type": "multiline",
+                "text": "By constraining the final result variable <tt>RESULT</tt>, the LM's response can be parsed robustly."
+            }
+        }
+    },
+    "precomputed/meta.json": {
+        "variables": ["EXPERT", "ANSWER"],
+        "anchors": {
+            "<span class=\"lmql-kw\">beam</span>(n=2)": "LMQL's Scripted Beam Search decodes <tt>EXPERT</tt> and <tt>ANSWER</tt> jointly, exploring multiple possible answers.",
+            " expert_name = EXPERT.rstrip(<span class=\"lmql-str\">\".\\n\"</span>)": "LMQL supports arbitrary Python code in the prompt clause, enabling dynamic prompts and text processing.",
+            "{expert_name}": "The previously generated <tt>EXPERT</tt> name can be used as part of the follow up prompt."
+        }
+    },
+    "precomputed/distribution.json": {
+        "variables": ["ANALYSIS", "CLASSIFICATION"],
+        "anchors": {
+            "distribution": "The <tt>distribution</tt> clause can be used to compute a distribution over a fixed set of values, conditioned on the LM's analysis of the input."
+        },
+        "extra-output": "<span class='variable-value sync val2'><span class='badge'>CLASSIFICATION</span></span><div class=\"distribution\"><i>P(<b>CLASSIFICATION</b>) =</i><div>-  <b>positive</b> 0.9998711120293567<br/>        -  neutral      0.00012790777085508993<br/>        -  negative     9.801997880775052e-07</div></div>"
+    },
+    "precomputed/kv.json": {
+        "variables": ["REASONING", "OBJECT"],
+        "anchors": {
+            "# simple kv storage": "The utility functions invoked by the model, can also be used to mutate state during decoding. For example, here, <tt>assign</tt> and <tt>get</tt> implement a simple key-value storage.",
+            "\"\"\"In your reasoning you can use actions.": "In the prompt, we explicitly instruct the model to make use of the <tt>assign</tt> and <tt>get</tt> actions.",
+            "Q: Alice, Bob, and Claire are playing a": "After our action instructions, we provide the model with the actual reasoning task.",
+            "<span class=\"lmql-kw\">for</span> i <span class=\"lmql-kw\">in</span> range(32):": "During reasoning, we make sure to intercept any <tt>assign</tt> and <tt>get</tt> actions, and inject the corresponding return values on the fly."
+        },
+        "truncate_output": 740
+    }
+}

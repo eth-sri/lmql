@@ -1,8 +1,0 @@
-README.md
-pyproject.toml
-setup.cfg
-src/lmql/__init__.py
-src/lmql.egg-info/PKG-INFO
-src/lmql.egg-info/SOURCES.txt
-src/lmql.egg-info/dependency_links.txt
-src/lmql.egg-info/top_level.txt

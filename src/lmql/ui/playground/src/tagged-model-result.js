@@ -25,9 +25,11 @@ export function reconstructTaggedModelResult(nodes) {
           pool: n.data("pool"),
         })
       }
-      n.incomers().forEach(p => {
-        n = p
+      let next = n;
+      next.incomers().forEach(p => {
+        next = p
       })
+      n = next;
       if (n.incomers().length == 0) {
         text.push({
           text: n.data("seqtext"),

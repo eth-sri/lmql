@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="LMQL: A query language for programming (large) language models.">
+  <meta name="keywords" content="GPT-3, language models, LMQL, programming language, query language, ChatGPT">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+  
+  <!-- Primary Meta Tags -->
+  <title>LMQL: Programming Large Language Models</title>
+  <meta name="title" content="LMQL: Programming Large Language Models">
+  <meta name="description" content="A query language for programming (large) language models.">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lmql.ai/">
+  <meta property="og:title" content="LMQL: Programming Large Language Models">
+  <meta property="og:description" content="A query language for programming (large) language models.">
+  <meta property="og:image" content="https://lmql.ai/static/images/lmql-overview.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://lmql.ai/">
+  <meta property="twitter:title" content="LMQL: Programming Large Language Models">
+  <meta property="twitter:description" content="A query language for programming (large) language models.">
+  <meta property="twitter:image" content="https://lmql.ai/static/images/lmql-overview.png"">
+  
+  
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.svg">
+  <link rel="stylesheet" href="./static/css/val.gen.css">
+  <link rel="stylesheet" href="./static/css/lmql.css">
+  <link rel="stylesheet" href="./static/css/highlight.min.css">
+  <script src="https://kit.fontawesome.com/06bb68d804.js" crossorigin="anonymous"></script>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="./static/js/highlight.min.js"></script>
+  <script src="./static/js/lmql.js"></script>
+
+  <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "f7d2a6b1a0624c51ae4dab9a4239b77d"}'></script><!-- End Cloudflare Web Analytics -->
+</head>
+<body>
+
+  <section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <img src="static/images/lmql.svg"/> LMQL: Programming Large <nobr>Language Models</nobr></h1>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/luca">Luca Beurer-Kellner</a>,</span>
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/marc">Marc Fischer</a>,</span>
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/martin">Martin Vechev</a>,
+            </span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><a href="https://www.sri.inf.ethz.ch"><b>SRI</b>lab</a> @   ETH Zürich, Switzerland</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- PDF Link. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2212.06094"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                    <i class="fa-solid fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <!-- Live Demo. -->
+              <span class="link-block">
+                <a class="external-link button is-normal is-rounded is-dark" href="playground" target="_blank" id="playground-link">
+                  <span class="icon">
+                    <i class="fa-solid fa-terminal"></i>
+                  </span>
+                  <span class="stack">
+                    <span>Live Demo</span> 
+                    </span>
+                  </a>
+              </span>
+              <!-- Code Link. -->
+              <span class="link-block">
+                <a class="external-link button is-normal is-rounded is-dark" href="https://github.com/eth-sri/lmql">
+                  <span class="icon">
+                    <i class="fa-brands fa-github"></i>
+                  </span>
+                  <span class="stack">
+                    <span>Code</span> 
+                  </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <h2 class="subtitle has-text-centered">
+        <i>LMQL</i> is a query language for programming (large) language models.
+      </h2>
+      <div class="example-selector">
+        <div class="example-badges">
+          <%SAMPLES_LIST%>
+        </div>
+        <div class="select-bar">
+          <!-- <div class="select examples"> -->
+            <!-- <select id="select-example"> -->
+            <!-- </select> -->
+          <!-- </div> -->
+        </div>
+          <%SAMPLES%>
+    </div>
+    <div class="container is-max-desktop">
+      <span class="learn-more">
+        <i>Learn more about LMQL by hovering over <anchor>underlined</anchor> parts of the code.</i>
+      </span>
+    </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+        <p>
+        Large language models have demonstrated outstanding performance on a wide range of tasks such as question answering and code generation.
+        On a high level, given an input, a language model can be used to automatically complete the sequence in a statistically-likely way. Based on this, users prompt these models with language instructions or examples, to implement a variety of downstream tasks. Advanced prompting methods can even imply interaction between the language model, a user, and external tools such as calculators. However, to obtain state-of-the-art performance or adapt language models for specific tasks, complex task- and model-specific programs have to be implemented, which may still require ad-hoc interaction.
+        </p>
+        <p>
+        Based on this, we present the novel idea of Language Model Programming (LMP). LMP generalizes language model prompting from pure text prompts to an intuitive combination of text prompting and scripting. Additionally, LMP allows constraints to be specified over the language model output. This enables easy adaption to many tasks, while abstracting language model internals and providing high-level semantics.
+        </p>
+        <p>
+        To enable LMP, we implement LMQL (short for Language Model Query Language), which leverages the constraints and control flow from an LMP prompt to generate an efficient inference procedure that minimizes the number of expensive calls to the underlying language model.
+        </p>
+        <p>
+        We show that LMQL can capture a wide range of state-of-the-art prompting methods in an intuitive way, especially facilitating interactive flows that are challenging to implement with existing high-level APIs. Our evaluation shows that we retain or increase the accuracy on several downstream tasks, while also significantly reducing the required amount of computation or cost in the case of pay-to-use APIs.
+        </p>
+        </div>
+      </div>
+    </div>
+    <!--/ Abstract. -->
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+          <div class="column is-four-fifths">
+              <h2 class="title is-3">Experimental Results</h2>
+              
+              Compared to standard decoding using <a href="https://huggingface.co/docs/transformers/v4.18.0/en/main_classes/text_generation#transformers.generation_utils.GenerationMixin.generate" target="_blank">🤗&nbsp;Transformers' <tt>generate()</tt></a> function, LMQL allows for high-level control and requires less tokens to be processed.<br/>
+
+              <figure class="image">
+                  <img src="static/images/cot.svg"/>
+                  Chain-Of-Though reasoning with LMQL vs. standard decoding.<br/>
+              </figure>
+
+              <figure class="image" >
+                <img src="static/images/interactive.svg"/>
+                Query statistics of using LMQL for interactive language model querying vs. standard decoding.<br/>
+            </figure>
+            <span class="footnote">
+              *We estimate cost savings based on the current token price of $0.02/1K tokens of the <a href="https://openai.com/api/pricing" target="_blank">GPT-3 <tt>davinci</tt> model</a>.
+            </span>
+          </div>
+      </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+
+      <!-- Scripted Prompting -->
+      <div class="column">
+        <!-- <div class="content">
+          <figure class="image">
+            <img src="static/images/scripted-prompting.png" style="margin-top: 35pt"/> 
+          </figure>
+          <h2 class="title is-3">Scripted Prompting</h2>
+          <p>
+            LMQL allows control flow as part of the prompt clause, which can be used to implement scripted and interactive prompting mechanics (e.g. action-based interaction, tool augmentation, etc.).
+          </p>
+          <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video>
+        </div> -->
+        <div class="content">
+          <figure class="image">
+            <img src="static/images/decoder.png" style="width: 185pt; margin: auto;"/> 
+          </figure>
+          <h2 class="title is-3">Visual Debugger</h2>
+          <p>
+            LMQL also includes a <a href="playground">Playground IDE</a> for query development. This enables users to inspect the interpreter, validation result and model state at any point during generation, e.g. to inspect the different <a href="playground#translation">hypotheses explored during beam search.</a>
+          </p>
+          <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video> -->
+        </div>
+      </div>
+      <!--/ Visual Effects. -->
+
+      <!-- Eager, partial validation -->
+      <div class="column">
+        <div class="content">
+          <figure class="image"s>
+            <img src="static/images/eval-semantics.png"/> 
+          </figure>
+          <h2 class="title is-3">Validation and Token Masks</h2>
+          <p>
+            To enable fast validation and constrained decoding, LMQL implements novel, partial evaluation semantics. Given a set of high-level constraints, the language runtime automatically derives token-level prediction masks and validates the produced sequence eagerly, i.e. as soon as the provided validation condition is definitively violated, decoding stops or is redirected to a different branch. This framework can easily be extended by external tools such as parsers.
+          </p>
+          <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video> -->
+        </div>
+      </div>
+      
+      <!-- Frontend/Backend. -->
+      <div class="column">
+        <div class="content">
+          <figure class="image">
+            <img src="static/images/backend.png" style="width: 135pt; margin: auto;"/> 
+          </figure>
+          <h2 class="title is-3">Frontend/Backend separation</h2>
+          <p>
+            LMQL provides a high-level frontend to interact with language models, making query code portable and model-agnostic.
+            This is achieved by abstracting over model-specific implementation details like batching, decoding and tokenization.
+          </p>
+          <p>
+            The actual language model runs out-of-process or even remotely, allowing for easy development and quick prototyping.
+          </p>
+        </div>
+      </div>
+      <!--/ Visual Effects. -->
+    </div>
+  </div>
+</section>
+
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>
+@article{beurer2022prompting,
+  title={Prompting Is Programming: A Query Language For Large Language Models},
+  author={Beurer-Kellner, Luca and Fischer, Marc and Vechev, Martin},
+  journal={arXiv preprint arXiv:2212.06094},
+  year={2022}
+}
+    </code></pre>
+  </div>
+</section>
+
+
+<div class="custom-footer">
+Template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.
+</div>
+
+</body>
+</html>

@@ -17,14 +17,23 @@ def get_openai_secret():
     elif "LMQL_OPENAI_SECRET" in os.environ and "LMQL_OPENAI_ORG" in os.environ:
         return os.environ["LMQL_OPENAI_SECRET"], os.environ["LMQL_OPENAI_ORG"]
     else:
-        if not os.path.exists(os.path.join(ROOT_DIR, "api.env")):
-            raise FileNotFoundError("""api.env not found in project root. Please create a file of the following format:
+        search_paths = [
+            os.path.join(ROOT_DIR, "api.env"),
+            os.path.join(os.getcwd(), "api.env"),
+            os.path.join(os.getenv("HOME"), ".lmql", "api.env")
+        ]
+        
+        if not any(os.path.exists(p) for p in search_paths):
+            m = """api.env not found in any of the following locations:\n\n{}\n\n To use OpenAI models you need to create an api.env file with the following contents:
         openai-secret: <your openai secret>
         openai-org: <your openai org>
-        """)
+        """.format("\n".join(" - " + p for p in search_paths))
+            raise FileNotFoundError(m)
+
+        valid_paths = [p for p in search_paths if os.path.exists(p)]
 
         # get openai secret from file
-        with open(os.path.join(ROOT_DIR, "api.env"), "r") as f:
+        with open(valid_paths[0], "r") as f:
             for line in f:
                 if line.startswith("openai-secret: "):
                     openai_secret = line.split("openai-secret: ")[1].strip()

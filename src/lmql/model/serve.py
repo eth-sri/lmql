@@ -30,12 +30,11 @@ class InferenceServerState:
     tokenizer_descriptor : str
     dtype: str
 
+    queue: Queue
+    tokenize_queue: Queue
+    all_results_queue : Queue
+    
     sample_count: int = 0
-    
-    queue: Queue = MPQueue()
-    tokenize_queue: Queue = MPQueue()
-    
-    all_results_queue = MPQueue()
     client_results_queues: Dict[str,Queue] = field(default_factory=dict)
     
     exit: bool = False
@@ -127,22 +126,30 @@ class ModelProcessor:
         self.requests_cached = 0
         self.last_report = time.time()
         self.last_request_count = 0
+        
+        try:
+            self.nvidia_logging = subprocess.Popen(["nvidia-smi"], stdout=subprocess.PIPE).wait() == 0
+        except:
+            self.nvidia_logging = False
 
     def shutdown(self):
         self.state.exit = True
     
     def __del__(self):
-        self.cache.close()
+        if self.cache is not None:
+            self.cache.close()
         
     def print_stats(self):
-        # nvidia-smi -i=$CUDA_VISIBLE_DEVICES --query-gpu=name,memory.used,memory.total,utilization.gpu --format=csv,noheader
-        visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", None)
-        cmds = ["nvidia-smi"]
-        if visible_devices is not None:
-            cmds.append("-i={}".format(visible_devices))
-        cmds += ["--query-gpu=name,memory.used,memory.total,utilization.gpu", "--format=csv,noheader"]
-        output = [l.split(", ") for l in subprocess.check_output(cmds).decode("utf-8").split("\n") if l.strip() != ""]
-        gpu_usage = ["GPU {} {}, util {}".format(i, row[1] + "/" + row[2], row[3]) for i, row in enumerate(output)]
+        if self.nvidia_logging:
+            visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+            cmds = ["nvidia-smi"]
+            if visible_devices is not None:
+                cmds.append("-i={}".format(visible_devices))
+            cmds += ["--query-gpu=name,memory.used,memory.total,utilization.gpu", "--format=csv,noheader"]
+            output = [l.split(", ") for l in subprocess.check_output(cmds).decode("utf-8").split("\n") if l.strip() != ""]
+            gpu_usage = ["GPU {} {}, util {}".format(i, row[1] + "/" + row[2], row[3]) for i, row in enumerate(output)]
+        else:
+            gpu_usage = ["GPU monitoring not available on non-CUDA systems"]
         
         print(" " * 100, end="\r")
         # fancy unicode based terminal spinner
@@ -441,12 +448,19 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
+    manager = multiprocessing.Manager()
+    
     # prepare configuration
     model_descriptor = args.model
     tokenizer_descriptor = args.tokenizer
     if tokenizer_descriptor is None:
         tokenizer_descriptor = model_descriptor
-    state = InferenceServerState(model_descriptor, tokenizer_descriptor, args.dtype)
+    state = InferenceServerState(model_descriptor, 
+                                 tokenizer_descriptor, 
+                                 args.dtype, 
+                                 queue=manager.Queue(), 
+                                 tokenize_queue=manager.Queue(),
+                                 all_results_queue=manager.Queue())
 
     # run model in separate process
     processor = ModelProcessor(state, cuda=args.cuda, cache=args.cache)

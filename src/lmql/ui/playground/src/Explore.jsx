@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import {queries} from "./queries";
-import exploreIcon from "./explore.svg"
 import { persistedState, trackingState } from "./State";
 
 export const PromptPopup = styled.div`
@@ -280,9 +279,9 @@ const TypingContainer = styled.span`
 
 
 function TypedText() {
-  let [text, setText] = useState("Welcome To LMQL");
+  const text = "Welcome To LMQL";
+  const speed = 50;
   let [index, setIndex] = useState(window.textWasTyped ? text.length : 0);
-  let [speed, setSpeed] = useState(50);
   let [isTyping, setIsTyping] = useState(!window.textWasTyped);
 
   useEffect(() => {
@@ -298,13 +297,6 @@ function TypedText() {
     }
   })
 
-  function type(text, speed) {
-    setText(text);
-    setIndex(0);
-    setSpeed(speed);
-    setIsTyping(true);
-  }
-
   return <TypingContainer>
     {text.substring(0, index)}
     <span className="cursor"></span>
@@ -316,7 +308,7 @@ function BasicHighlighted(props) {
 
   const keywords = ["argmax", "where", "from", "and", "or", "not", "sample", "beam_search"];
   // split into words (also split on ()\t\n)
-  const words = s.split(/(\s+|[\(\)\t])/g);
+  const words = s.split(/(\s+|[()\t])/g);
   const result = words.map((w,i) => {
     if (keywords.includes(w.toLowerCase())) {
       return <span key={w + i} className="keyword">{w}</span>
@@ -399,12 +391,12 @@ export function Explore() {
           <Description>
             LMQL is a query language for large language models. This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below, demonstrating <i>constrained model use</i>, <i>control-flow guided generation</i>, and tool-augmented LLMs.
           </Description>
-          <a className="close" onClick={() => ExploreState.setVisibility(false)}>
+          <span className="close" onClick={() => ExploreState.setVisibility(false)}>
             &times;
-          </a>
+          </span>
           {queries.map(c => 
             <>
-            <h2 key={c.category} key={c.category}>{c.category}</h2>
+            <h2 key={c.category}>{c.category}</h2>
             <div key={c.category + "-div"}>
             {c.queries.map((q,i) => <Tile key={c.category + "-" + i} onClick={() => onClickTile(q)}>
               {/* {q.state && <div className="badge">PRECOMPUTED</div>} */}

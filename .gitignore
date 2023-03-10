@@ -1,2 +1,12 @@
 dist
 *__pycache__*
+**/*_compiled.py
+src/lmql.egg-info
+src/lmql.egg-info/*
+debugger_state.pkl
+api.env
+**/api.env
+.env
+web-deploy
+web/index.html
+**/node_modules/*

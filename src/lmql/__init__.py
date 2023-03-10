@@ -1,10 +1,12 @@
+import lmql.version as version_info
+
 """
 lmql.
 
 A query language for language models.
 """
 
-__version__ = "0.1.0"
+__version__ = version_info.version
 __author__ = 'Luca Beurer-Kellner, Marc Fischer and Mark Mueller'
 __email__ = "luca.beurer-kellner@inf.ethz.ch"
 __license__ = "MIT"
@@ -91,7 +93,6 @@ async def run_file(filepath, output_writer=None, force_model=None, *args):
     return await module.query(**kwargs)
 
 async def run(code, output_writer=None):
-    print("run code", code)
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(code)

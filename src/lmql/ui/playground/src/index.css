@@ -83,7 +83,7 @@ span.subtitle {
   line-height: 1.5em;
 }
 
-span.subtitle a {
+span.subtitle a, span.subtitle .link {
   color: #dfdada;
   text-decoration: underline;
   cursor: pointer;

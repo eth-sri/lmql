@@ -4,24 +4,17 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsFillHddNetworkFill, BsArrowRightCircle, BsCheckSquare, BsFileArrowDownFill, BsLayoutWtf, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsFileBarGraph, BsGear } from 'react-icons/bs';
+import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsFileArrowDownFill, BsLayoutWtf, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
-import spinner from "./spinner.svg"
 import exploreIcon from "./explore.svg"
 import { ExploreState, Explore, PromptPopup, Dialog } from './Explore'
 import { persistedState, trackingState } from "./State"
-import { configuration, LMQLProcess, isLocalMode, isLocalModeCapable, setLMQLDistribution } from './Configuration';
+import { configuration, LMQLProcess, isLocalMode} from './Configuration';
 import { ValidationGraph } from "./ValidationGraph";
 import { DataListView } from "./DataListView";
 
 import {reconstructTaggedModelResult} from "./tagged-model-result"
-
-const Spinner = styled.img.attrs(props => ({ src: spinner }))`
-  width: 24pt;
-  height: 24pt;
-  transform: scale(0.8);
-`
 
 const ExploreIc = styled.img.attrs(props => ({ src: exploreIcon }))`
   width: 8pt;
@@ -178,7 +171,7 @@ function TokenCountIndicator() {
 
   const format_cost = (c, precision) => {
     c = c.toFixed(precision)
-    if (c == (0).toFixed(precision))
+    if (c === (0).toFixed(precision))
       return "<$" + (Math.pow(10, -precision)).toFixed(precision);
     return "$" + c;
   }
@@ -200,7 +193,7 @@ function TokenCountIndicator() {
   useEffect(() => {
     let interval = window.setInterval(() => {
       setStats(s => {
-        if (s == null || Object.keys(s).length == 0) {
+        if (s == null || Object.keys(s).length === 0) {
           return {}
         } else {
           return {
@@ -217,7 +210,7 @@ function TokenCountIndicator() {
 
   useEffect(() => {
     const onStatus = s => {
-      if (s.status == "idle") {
+      if (s.status === "idle") {
         setStats(s => ({ ...s, _end: Date.now() }))
       }
     }
@@ -251,7 +244,6 @@ function TokenCountIndicator() {
   }, [])
 
   let text = ""
-  let compact = ""
   let tokenCount = 0;
   let model = ""
   let steps = 1;
@@ -267,8 +259,6 @@ function TokenCountIndicator() {
     const toFirstUpper = k => k.charAt(0).toUpperCase() + k.slice(1)
     text = `Tokens: ${tokenCount}, ${otherKeys.map(k => `${toFirstUpper(k)}: ${stats[k]}`).join(", ")}`
 
-    compact = `Consumed Tokens: ${tokenCount}`
-
     // time elapsed
     if (stats._start) {
       const end = stats._end || stats._now || Date.now();
@@ -280,7 +270,6 @@ function TokenCountIndicator() {
     if (model.includes("openai")) {
       text += ` Est. Cost ${cost_estimate(model, tokenCount / 1000, 4)}`
     }
-    compact += `\nEst. Cost ${cost_estimate(model, tokenCount / 1000, 4)}`
   }
 
   return <TokenCountDiv>
@@ -288,20 +277,20 @@ function TokenCountIndicator() {
   </TokenCountDiv>
 }
 
-const PlotContainer = styled.div`
-  flex: 1;
-  padding: 10pt;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: stretch;
+// const PlotContainer = styled.div`
+//   flex: 1;
+//   padding: 10pt;
+//   position: relative;
+//   display: flex;
+//   flex-direction: column;
+//   align-items: stretch;
+//   justify-content: stretch;
 
-  svg.main-svg {
-    border-radius: 5pt;
-    overflow: hidden;
-  }
-`
+//   svg.main-svg {
+//     border-radius: 5pt;
+//     overflow: hidden;
+//   }
+// `
 
 
 // function StatisticsPanelContent(props) {
@@ -387,13 +376,7 @@ function EditorPanel(props) {
   props.status = props.processState
   props.processState = props.status.status
 
-  const [editorRef, setEditorRef] = useState({ current: null });
-
   function handleEditorDidMount(editor, monaco) {
-    if (editor) {
-      setEditorRef({ current: editor });
-    }
-
     ResizeObservers.addResizeListener(() => editor.layout({}))
 
     registerLmqlLanguage(monaco);
@@ -446,7 +429,6 @@ function EditorPanel(props) {
         <FancyButton className='green' onClick={props.onRun} disabled={props.processState != "idle" && props.processState != "secret-missing"}>
           {props.processState == "running" ? <>Running...</> : <>&#x25B6; Run</>}
         </FancyButton>
-        {/* load spinner svg */}
         <StopButton onClick={() => {
           LMQLProcess.kill()
         }} disabled={props.processState != "running"}>
@@ -503,27 +485,6 @@ const IconButton = styled.button`
   }
 
   border-radius: 5pt;
-`
-
-const TopBarIconButton = styled(IconButton)`
-  background-color: transparent;
-  color: #2a2929;
-  width: auto;
-  display: flex;
-  align-items: center;
-  flex-direction: row;
-  padding-right: 9pt;
-  padding-left: 9pt;
-  margin: 4pt 3pt 4pt 0pt;
-
-  svg {
-    position: relative;
-    top: 1pt;
-  }
-
-  :hover {
-    background-color: #dcd9d9;
-  }
 `
 
 const ToolbarIconButton = styled(IconButton)`
@@ -848,13 +809,15 @@ const ExpandButton = styled.button`
 function ModelResultContent(props) {
   const scrollRef = useRef(null)
 
+  let mostLikelyNode = props.mostLikelyNode ? props.mostLikelyNode.data("id") : null
+
   // on changes to props.mostLikelyNode scroll down to end of scroll view
   useEffect(() => {
     if (props.trackMostLikly) {
       let scroll = scrollRef.current
       scroll.scrollTop = scroll.scrollHeight
     }
-  }, [props.mostLikelyNode ? props.mostLikelyNode.data("id") : null, props.trackMostLikly])
+  }, [mostLikelyNode, props.trackMostLikly])
 
 
   let modelResult = null;
@@ -939,7 +902,7 @@ function ModelResultContent(props) {
     })}
     {countedResults.length == 0 && <CenterBox>
       <h2>No Selection</h2>
-      <span className="subtitle">Select a node in the Decoding Graph to see more details or <a onClick={() => trackingState.setTrackMostLikely(true)}>"Show Latest"</a>.</span>
+      <span className="subtitle">Select a node in the Decoding Graph to see more details or <span className="link" onClick={() => trackingState.setTrackMostLikely(true)}>Show Latest</span>.</span>
     </CenterBox>}
   </ModelResultText>
 }
@@ -1293,7 +1256,7 @@ function InspectorPane(props) {
 function SidePanel(props) {
   const stretch = props.stretch ?? false;
   const defaultClass = stretch ? 'stretch' : '';
-  const [clearTrigger, setClearTrigger] = useState(new TriggerState());
+  const clearTrigger = useState(new TriggerState())[0];
   const [clearOnRun, setClearOnRun] = useState(true);
   const [perVariableColor, setPerVariableColor] = useState(true);
 
@@ -1323,7 +1286,7 @@ function SidePanel(props) {
         clearTrigger.trigger();
       }
     })
-  }, [])
+  }, [clearTrigger, clearOnRun])
 
   const titles = {
     "output": "Output",
@@ -1448,64 +1411,6 @@ const FancyButton = styled.button`
   }
 `
 
-const ActionButton = styled.button`
-  border: 1pt solid #39aa5d;
-  /* border: none; */
-  border-radius: 3pt;
-  margin-right: 2pt;
-  /* background-color: #5db779; */
-  /* nice green gradient */
-  background-image: linear-gradient(to bottom, #5db779, #39aa5d);
-  cursor: pointer;
-  color: white;
-  font-size: 11pt;
-  font-weight: bold;
-  min-width: 60pt;;
-  height: 28pt;
-  padding: 5pt 15pt;
-  height: 30pt;
-  /* animate box shadow color */
-  transition: box-shadow 0.1s ease-in-out;
-
-  &.blue {
-    border-color: #8e98ea;
-    background-color: white;
-    background: none;
-    color: #3d4370;
-
-    &:hover {
-      background: none;
-      background-color: #daddff;
-    }
-  }
-
-  :last-child {
-    margin-right: 0pt;
-  }
-
-  // hover highlight
-  &:hover {
-    // slightly darker than background
-    background-image: linear-gradient(to bottom, #3db665, #2a9a4f);
-  }
-
-  // click highlight
-  &:active {
-    // slightly darker than hover
-    background-image: linear-gradient(to bottom, #2a9a4f, #3db665);
-  }
-
-  &:disabled {
-    /* much darker shade */
-    opacity: 0.3;
-  }
-
-  &:hover:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-`
-
 // Action button derivative with red color
 const StopButton = styled(FancyButton)`
   border-color: #ff0000;
@@ -1572,166 +1477,6 @@ const ToolbarSpacer = styled.div`
   display: inline;
 `
 
-const Token = styled.span`
-  background-color: #333;
-  display: inline-block;
-  height: 2.2em;
-  min-width: 1em;
-  width: auto;
-  padding-left: 0.5em;
-
-  // vertically centered
-  line-height: 2.2em;
-  // render white space
-  white-space: pre;
-
-  border-radius: 5pt;
-  margin-left: 0.5pt;
-
-  // every other token, slightly darker
-  &:nth-child(2n) {
-    background-color: #444;
-  }
-
-  // make tokens fade in and move in from left
-  animation: token-fade-in 0.2s ease-in-out;
-  @keyframes token-fade-in {
-    0% {
-      opacity: 0;
-    }
-    100% {
-      opacity: 1;
-    }
-  }
-`
-
-const TokenStream = styled.div`
-  display: block;
-  position: relative;
-  // do not wrap
-  white-space: nowrap;
-  
-  overflow-x: auto;
-  overflow-y: hidden;
-  
-  /* on hover show scrollbar */
-  &:hover {
-    &::-webkit-scrollbar {
-      opacity: 1;
-    }
-  }
-
-  // set scrollback background to bg
-  &::-webkit-scrollbar {
-    opacity: 0;
-  }
-`
-
-const TokenStreamTitle = styled.h2`
-  // always position at top left of container
-  background-color: grey;
-  border-radius: 5pt;
-  display: block;
-  margin: 0;
-  padding: 0;
-  line-height: 25pt;
-  padding-right:4pt;
-  margin-right: 4pt;
-  padding-left: 4pt;
-  font-size: 0.8em;
-  text-align: left;
-  height: 25pt;
-
-  user-select: none;
-  cursor: default;
-`
-
-const DecoderHeadDiv = styled.div`
-  display: flex;
-  flex-direction: row;
-  margin: 10pt 0;
-  position: relative;
-`
-
-const TokenStreamButton = styled.button`
-  border: none;
-  outline: none;
-  cursor: pointer;
-  color: white;
-  background-color: #47CF73;
-  font-size: 0.8em;
-  position: absolute;
-  top: 11.5pt;
-  transform: translateY(-50%);
-
-  right: 0;
-  border-radius: 5pt;
-
-  // hover highlight
-  &:hover {
-    background-color: #42bd69;
-  }
-  // click highlight
-  &:active {
-    background-color: #3db665;
-  }
-`
-
-function animateScrollTo(target, element) {
-  // animate html element scroll to target
-  const scroll = element.scrollLeft;
-  const delta = target - scroll;
-  const duration = 500;
-  const start = performance.now();
-
-  // use random integer animation id
-  let animationId = Math.floor(Math.random() * 1000000000);
-  element.animationId = animationId;
-
-  const step = (timestamp) => {
-    const progress = (timestamp - start) / duration;
-    element.scrollLeft = scroll + delta * progress;
-    if (progress < 1 && element.animationId === animationId) {
-      window.requestAnimationFrame(step);
-    }
-  }
-  window.requestAnimationFrame(step);
-}
-
-function DecoderHead(props) {
-  const ref = useRef(null);
-  const [atEnd, setAtEnd] = useState(true);
-
-  let tokenSequence = props.tokens.join('|');
-
-  // on update of tokens or atEnd, scroll to end if atEnd
-  useEffect(() => {
-    if (atEnd) {
-      let target = ref.current.scrollWidth;
-      // animate scroll to end with react
-      animateScrollTo(target, ref.current);
-    }
-  }, [tokenSequence]);
-
-  const handleScroll = (event) => {
-    // if at end, stay at end
-    if (event.target.scrollLeft + event.target.clientWidth >= event.target.scrollWidth) {
-      setAtEnd(true);
-    } else {
-      setAtEnd(false);
-    }
-  }
-
-  const tokens = props.tokens
-  return <DecoderHeadDiv>
-    <TokenStreamTitle>JOKE</TokenStreamTitle>
-    <TokenStream ref={ref} onScroll={handleScroll}>
-      {tokens.map((token, i) => <Token key={i}>{token}</Token>)}
-    </TokenStream>
-    {atEnd ? null : <TokenStreamButton onClick={() => animateScrollTo(ref.current.scrollWidth, ref.current)}>Go to end &#x27A1; </TokenStreamButton>}
-  </DecoderHeadDiv>
-}
-
 class TriggerState {
   constructor(listener = null) {
     this.listener = listener;
@@ -1749,7 +1494,7 @@ class TriggerState {
 }
 
 function DecoderPanel(props) {
-  const [fitTrigger, setFitTrigger] = useState(new TriggerState());
+  const fitTrigger = useState(new TriggerState())[0];
   const [eagerLayout, setEagerLayout] = useState(false);
 
   const derivedNodeFeatures = (data) => {
@@ -1824,8 +1569,6 @@ function StatusLight(props) {
     label: 'Disconnected',
   }, props.connectionState);
 
-  const toFirstUpper = k => k.charAt(0).toUpperCase() + k.slice(1)
-
   let label = props.status || props.label;
   if (label == "idle" || label == "secret-missing") {
     label = "Ready"
@@ -1854,10 +1597,6 @@ function StatusLight(props) {
     {label != "" && <StatusCircle style={{ backgroundColor: statusColor }} className={!props.connected ? "pulsing" : ""} />}
     <span style={{ color: statusColor, marginRight: "10pt" }}>{label}</span>
   </StatusLightContainer>
-}
-
-const DEFAULT_DATA = {
-
 }
 
 const Commit = styled.div`
@@ -1956,16 +1695,17 @@ function OpenAICredentials() {
       <h1>OpenAI Credentials</h1>
       <Explainer>
         <p>
-          To run your own queries in the LMQL playground, you have to provide your OpenAI API key. The key will only be stored in your browser's <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage" target="_blank">local storage</a>. You can find your API key in the <a href="https://beta.openai.com/account/api-keys" target="_blank">OpenAI dashboard</a>.<br />
+          To run your own queries in the LMQL playground, you have to provide your OpenAI API key. The key will only be stored in your browser's <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage" target="_blank" rel="noreferrer">local storage</a>. You can find your API key in the <a href="https://beta.openai.com/account/api-keys" target="_blank" rel="noreferrer">OpenAI dashboard</a>.<br />
         </p>
         <p className='note'>
-          <b>Note:</b> LMQL will use your API key to execute completion requests on your behalf. This will result in charges on your OpenAI account. Please make sure you understand the <a href="https://beta.openai.com/pricing" target="_blank">OpenAI pricing model</a> before using LMQL. <i>LMQL does not take responsibility for any charges incurred by executing queries on this site.</i>
+          <b>Note:</b> LMQL will use your API key to execute completion requests on your behalf. This will result in charges on your OpenAI account. Please make sure you understand the <a href="https://beta.openai.com/pricing" target="_blank" rel="noreferrer">OpenAI pricing model</a> before using LMQL. <i>LMQL does not take responsibility for any charges incurred by executing queries on this site.</i>
         </p>
         <form onSubmit={onSave}>
           <label>OpenAI API Secret</label><br />
           <input type="password" placeholder="API Secret" id="openai-api-key" onChange={(e) => setSecret(e.target.value)} value={secret} />
           {secret.length > 0 && <button onClick={(e) => { e.preventDefault(); setSecret("") }}>Clear</button>}
         </form>
+        
       </Explainer>
       <div>
         <FancyButton className='blue' onClick={onSave}>
@@ -2232,16 +1972,17 @@ class App extends React.Component {
               </li>}
               {configuration.DEV_MODE && <li onClick={() => this.onExportState()}><BsFileArrowDownFill/> Export State
               </li>}
-              <LMQLInstanceSwitch/>
               <li>
-                <a href="anonymized" disabled target="_blank"><BsGithub/>LMQL on Github</a>
+                <a href="https://github.com/eth-sri/lmql" disabled target="_blank" rel="noreferrer"><BsGithub/>LMQL on Github</a>
               </li>
               <span>
                 LMQL {this.state.buildInfo.commit} 
                 {(configuration.BROWSER_MODE && !isLocalMode()) && <> In-Browser</>}
                 {isLocalMode() && <> Self-Hosted</>}
-                <br/>
-                Build on {this.state.buildInfo.date}
+                {this.state.buildInfo.date != "-" ? <>
+                  <br/>
+                  Build on {this.state.buildInfo.date}
+                </> : null}
               </span>
             </TopBarMenu>
           </ToggleButton>
@@ -2260,17 +2001,5 @@ class App extends React.Component {
     );
   }
 }
-
-function LMQLInstanceSwitch() {
-  if (!isLocalModeCapable()) {
-    return null;
-  }
-  
-  return <li onClick={() => setLMQLDistribution(isLocalMode() ? "remote" : "browser")}>
-    {!isLocalMode() && <><BsFillHddNetworkFill/> Use self-hosted LMQL</>}
-    {isLocalMode() && <><BsFillHddNetworkFill/> Use In-Browser LMQL</>}
-  </li>
-}
-
 
 export default App;

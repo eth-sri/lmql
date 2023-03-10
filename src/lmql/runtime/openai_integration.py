@@ -900,6 +900,9 @@ class HFModelStatsAdapter:
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
 def openai_model(model_identifier):
+    # make sure openai org and secret are available
+    import lmql.runtime.openai_secret
+    
     class ServedModelInterfaceCls:
         def __init__(self) -> None:
             self.model_identifier = model_identifier
