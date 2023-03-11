@@ -30,6 +30,8 @@ def topk(a, k:int, sorted: bool = False, axis=-1):
     return values, idx
 
 def multinomial(logprobs, num_samples=1):
+    if num_samples == 0:
+        return np.array([], dtype=np.int64), np.array([], dtype=np.float32)
     # renormalize logprobs
     logprobs = logprobs - np.log(np.exp(logprobs).sum())
     probs = np.exp(logprobs)

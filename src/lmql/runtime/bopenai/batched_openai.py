@@ -168,6 +168,20 @@ class ResponseStream:
                     self.stats.tokens += len(c["logprobs"]["tokens"])
                     assert c is not None
                     self.slices[index].digest(c)
+                    
+                    if c["finish_reason"] == "stop":
+                        # "<|endoftext|>", "<|endoftext|>", 0.0
+                        self.slices[index].digest({
+                            "text": "<|endoftext|>",
+                            "logprobs": {
+                                "text_offset": [0],
+                                "token_logprobs": [0.0],
+                                "tokens": ["<|endoftext|>"],
+                                "top_logprobs": [{"<|endoftext|>": 0.0}]
+                            }
+                        })
+                    
+                    # logprobs.tokens, text, logprobs.token_logprobs
             for c in self.slices:
                 c.finish()
         except Exception as e:
