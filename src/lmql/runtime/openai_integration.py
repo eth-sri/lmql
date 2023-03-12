@@ -442,7 +442,7 @@ class DclibOpenAiModel(DcModel):
                 full_logits = np.ones(self.model.tokenizer.vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
                 full_logits[next_token] = np.finfo(np.float32).min
-                assert np.all(full_logits < next_token_score), "next token score is not the highest"
+                assert kwargs.get("temperature", 1.0) != 0.0 or np.all(full_logits < next_token_score), "next token score is not the highest"
 
                 # retroactively apply logits mask to logits
                 mask = completion.logit_mask_or_fixed_id
