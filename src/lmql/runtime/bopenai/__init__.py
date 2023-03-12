@@ -74,9 +74,6 @@ class Completion:
 
     @staticmethod
     async def create(*args, **kwargs):
-        openai.api_key = api_key
-        openai.organization = organization
-
         global _api
         if _api is None:
             _api = AsyncOpenAIAPI()

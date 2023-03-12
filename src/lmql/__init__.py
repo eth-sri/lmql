@@ -14,12 +14,14 @@ __license__ = "MIT"
 from lmql.language.compiler import LMQLCompiler
 import lmql.runtime.lmql_runtime as lmql_runtime
 import tempfile
-from lmql.runtime.prompt_interpreter import DebuggerOutputWriter
+from lmql.runtime.prompt_interpreter import DebuggerOutputWriter, StreamingOutputWriter
 from lmql.runtime.model_registry import LMQLModelRegistry
+import inspect
 
 import os
 
 silent = DebuggerOutputWriter()
+stream = StreamingOutputWriter()
 model_registry = LMQLModelRegistry
 
 def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
@@ -97,5 +99,47 @@ async def run(code, output_writer=None):
     with open(temp_lmql_file, "w") as f:
         f.write(code)
     
-    os.chdir(os.path.join(os.path.dirname(__file__), "../../"))
+    os.chdir(os.path.join(os.path.dirname(__file__), "../../")) 
     return await run_file(temp_lmql_file, output_writer=output_writer)
+
+def query(fct):
+    code = fct.__doc__.strip()
+    
+    # print("parsing query as")
+    # print(code)
+    
+    temp_lmql_file = tempfile.mktemp(suffix=".lmql")
+    with open(temp_lmql_file, "w") as f:
+        f.write(code)
+    module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
+    
+    assert inspect.iscoroutinefunction(fct), f"@lmql.query {fct.__name__} must be declared async."
+    
+    argnames = inspect.getfullargspec(fct).args
+    
+    args_of_query = [a for a in inspect.getfullargspec(module.query.fct).args if a != "context"]
+    # print code of module.query.fct
+    for a in argnames:
+        if a not in args_of_query:
+            print(f"warning: @lmql.query {fct.__name__} has an argument '{a}' that is not used in the query.")
+    missing = []
+    for a in args_of_query:
+        if a not in argnames:
+            missing.append(a)
+    missing = ", ".join([f"'{m}'" for m in missing])
+    assert missing == "", f"@lmql.query {fct.__name__} has input argument(s) {missing}, that are not declared as function parameters."
+    
+    async def wrapper(*args, **kwargs):
+        assert len(args) == len(argnames), f"@lmql.query {fct.__name__} expects {len(argnames)} positional arguments, but got {len(args)}."
+        for name, value in zip(argnames, args):
+            if a in args_of_query:
+                kwargs[name] = value
+        
+        if "output_writer" in kwargs:
+            module.query.output_writer = kwargs["output_writer"]
+            del kwargs["output_writer"]
+        else:
+            module.query.output_writer = silent
+        return await module.query(**kwargs)
+    
+    return wrapper

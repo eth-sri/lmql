@@ -9,13 +9,13 @@ import lmql.version as version_info
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def cmd_serve_model():
-    """emoji:🏄‍♂️ Serve a 🤗 Transformers model via the LMQL inference API"""
+    """emoji:🏄 Serve a 🤗 Transformers model via the LMQL inference API"""
     os.chdir(project_root)
     os.system("python -m lmql.model.serve " + " ".join(sys.argv[2:]))
 
 def cmd_run():
     """
-    emoji:🏃‍♂️ run a LMQL script (e.g. "lmql run latest/hello.lmql")
+    emoji:🏃 run a LMQL script (e.g. "lmql run latest/hello.lmql")
     """
     import asyncio
 
@@ -68,7 +68,7 @@ Alternatively, you can find instructions for installing node.js on your system o
 
 def cmd_playground():
     """
-    emoji:🧑‍💻 runs LMQL in development mode (hot-reloading python and debugger implementation)
+    emoji:💻 runs LMQL in development mode (hot-reloading python and debugger implementation)
     """
     ensure_node_install()
     

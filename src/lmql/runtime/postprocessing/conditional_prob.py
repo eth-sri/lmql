@@ -96,7 +96,7 @@ class ConditionalDistributionPostprocessor:
             results = [results]
 
         # check if distribution is required
-        if not any(r is not None and r.distribution_variable is not None for r in results):
+        if not any(r is not None and hasattr(r, "distribution_variable") and r.distribution_variable is not None for r in results):
             return results
 
         if len(results) > 1:

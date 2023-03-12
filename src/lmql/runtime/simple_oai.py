@@ -50,13 +50,14 @@ class concurrent:
         self.task.cancel()
 
 async def complete(**kwargs):
+    from lmql.runtime.openai_secret import openai_secret, openai_org
+    
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
 
     async with CapacitySemaphore(num_prompts * max_tokens):
-        from lmql.runtime.openai_secret import openai_secret, openai_org
         
         current_chunk = ""
         stream_start = time.time()

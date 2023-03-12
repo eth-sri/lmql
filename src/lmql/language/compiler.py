@@ -131,6 +131,16 @@ class NameTransformer(ast.NodeTransformer):
     def visit_Name(self, node):
         return self.name_transformer(node)
 
+class ReturnStatementTransformer(ast.NodeTransformer):
+    def __init__(self, query):
+        self.query = query
+    
+    def transform(self):
+        self.query.prompt = [self.visit(p) for p in self.query.prompt]
+
+    def visit_Return(self, node):
+        return ast.parse("yield ('result', " + astunparse.unparse(node.value).strip() + ")")
+
 class WhereClauseTransformation():
     def __init__(self, query: LMQLQuery):
         self.query = query
@@ -304,7 +314,8 @@ class CompilerTransformations:
         self.transformations = [
             QueryStringTransformation,
             WhereClauseTransformation,
-            DecodeClauseTransformation
+            DecodeClauseTransformation,
+            ReturnStatementTransformer
         ]
     
     def transform(self, query):
