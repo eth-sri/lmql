@@ -11,6 +11,7 @@ from lmql.ops.ops import lmql_operation_registry
 from lmql.language.qstrings import qstring_to_stmts, TemplateVariable
 from lmql.language.validator import LMQLValidator, LMQLValidationError
 from lmql.language.fragment_parser import LMQLDecoderConfiguration, LMQLQuery, LanguageFragmentParser, FragmentParserError
+from lmql.runtime.model_registry import model_name_aliases
 
 class PromptScope(ast.NodeVisitor):
     def scope(self, query: LMQLQuery):
@@ -18,7 +19,8 @@ class PromptScope(ast.NodeVisitor):
         self.defined_vars = set()
 
         # collect set of global query template variables
-        self.template_variables = list()
+        self.free_vars = set()
+        self.written_vars = set()
 
         for p in query.prompt: self.visit(p)
 
@@ -30,16 +32,30 @@ class PromptScope(ast.NodeVisitor):
 
         # capture set of defined vars
         declared_template_vars = [v.name for v in qstring_to_stmts(qstring) if type(v) is TemplateVariable]
-        for v in declared_template_vars: self.defined_vars.add(v)
+        for v in declared_template_vars: 
+            self.defined_vars.add(v)
+            self.written_vars.add(v)
+            if v in self.free_vars: self.free_vars.remove(v)
 
         used_template_vars = [v[1:-1] for v in re.findall("\{[A-z0-9]+\}", qstring)]
         for v in used_template_vars:
-            if v not in self.defined_vars and v not in self.template_variables: 
-                self.template_variables.append(v)
+            if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
+                self.free_vars.add(v)
 
         return super().visit_Constant(node)
 
-    def visit_Name(self, node):
+    def visit_Name(self, node: ast.Name):
+        name = str(node.id)
+        
+        if type(node.ctx) is ast.Store:
+            self.written_vars.add(name)
+            if name in self.free_vars:
+                self.free_vars.remove(name)
+            
+        if type(node.ctx) is ast.Load:
+            if name not in self.free_vars and name not in self.written_vars:
+                self.free_vars.add(name)
+        
         return True
 
 class QueryStringTransformation(ast.NodeTransformer):
@@ -422,14 +438,19 @@ class LMQLCompiler:
             transformations = CompilerTransformations()
             transformations.transform(q)
 
+            model_name = astunparse.unparse(q.from_ast).strip()
+            model_name = model_name_aliases.get(model_name, model_name)
+            if model_name[1:-1] in model_name_aliases.keys():
+                model_name = "'" + model_name_aliases[model_name[1:-1]] + "'"
+
             # resulting code
             code = None
 
             # generate function that runs query
-            with PythonFunctionWriter("query", output_file, list(scope.template_variables) + ["context"], 
+            with PythonFunctionWriter("query", output_file, list(scope.free_vars) + ["context"], 
                 q.prologue, decorators=["lmql.query"]) as writer:
                 
-                writer.add(f"context.set_model({astunparse.unparse(q.from_ast).strip()})")
+                writer.add(f"context.set_model({model_name})")
                 writer.add(f"context.set_decoder({astunparse.unparse(q.decode.method).strip()}, {unparse_list(q.decode.decoding_args)})")
                 writer.add("# where")
                 writer.add(q.where)

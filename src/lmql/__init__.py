@@ -1,4 +1,5 @@
 import lmql.version as version_info
+from lmql.runtime.lmql_runtime import LMQLInputVariableScope
 
 """
 lmql.
@@ -21,7 +22,7 @@ import inspect
 import os
 
 silent = DebuggerOutputWriter()
-stream = StreamingOutputWriter()
+stream = StreamingOutputWriter
 model_registry = LMQLModelRegistry
 
 def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
@@ -101,12 +102,13 @@ async def run(code, output_writer=None):
     
     os.chdir(os.path.join(os.path.dirname(__file__), "../../")) 
     return await run_file(temp_lmql_file, output_writer=output_writer)
-
+        
 def query(fct):
-    code = fct.__doc__.strip()
+    import inspect
     
-    # print("parsing query as")
-    # print(code)
+    calling_frame = inspect.stack()[1]
+    scope = LMQLInputVariableScope(fct, calling_frame)
+    code = fct.__doc__.strip()
     
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
@@ -122,18 +124,17 @@ def query(fct):
     for a in argnames:
         if a not in args_of_query:
             print(f"warning: @lmql.query {fct.__name__} has an argument '{a}' that is not used in the query.")
-    missing = []
-    for a in args_of_query:
-        if a not in argnames:
-            missing.append(a)
-    missing = ", ".join([f"'{m}'" for m in missing])
-    assert missing == "", f"@lmql.query {fct.__name__} has input argument(s) {missing}, that are not declared as function parameters."
     
     async def wrapper(*args, **kwargs):
         assert len(args) == len(argnames), f"@lmql.query {fct.__name__} expects {len(argnames)} positional arguments, but got {len(args)}."
+        captured_variables = set(args_of_query)
         for name, value in zip(argnames, args):
             if a in args_of_query:
                 kwargs[name] = value
+                captured_variables.remove(name)
+    
+        for v in captured_variables:
+            kwargs[v] = scope.resolve(v)
         
         if "output_writer" in kwargs:
             module.query.output_writer = kwargs["output_writer"]

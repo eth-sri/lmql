@@ -1,5 +1,9 @@
 class LMQLModelRegistry: pass
 
+model_name_aliases = {
+    "chatgpt": "openai/gpt-3.5-turbo"
+}
+
 LMQLModelRegistry.registry = {}
 # instance of model clients in this process
 LMQLModelRegistry.clients = {}

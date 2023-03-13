@@ -63,7 +63,6 @@ class CompletionResult:
     continuation_type: str
     logit_mask_or_fixed_id: Optional[Union[np.ndarray, int]] = None
 
-
 @dataclass
 class CompletionCall:
     mode: str
@@ -264,7 +263,12 @@ class DclibOpenAiModel(DcModel):
         if self.model_args.get("chatty_openai", False):
             print("Completion with", kwargs)
 
-        return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs)))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
+        return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
+    
+    async def tokenize_list(self, tokens: List[str]):
+        if len(tokens) > 0 and type(tokens[0]) is str:
+            return [[t[0]] for t in await self.model.tokenize(tokens)]
+        return tokens
     
     async def _complete(self, completion_call: Union[CompletionCall, List[CompletionCall]], **kwargs):
         if type(completion_call) is list:
@@ -431,13 +435,14 @@ class DclibOpenAiModel(DcModel):
                     continue
 
                 # get sampled token and score
-                next_token = self.model.tokenizer(complete_data["logprobs"]["tokens"])["input_ids"][0]
+                next_token = complete_data["logprobs"]["tokens"][0]
                 next_token_score = complete_data["logprobs"]["token_logprobs"]
                 
                 probs = sorted(list(complete_data["logprobs"]["top_logprobs"].items()))
                 logprobs = [p[1] for p in probs]
                 tokens = [p[0] for p in probs]
-                token_ids = np.array([self.model.tokenizer(t)["input_ids"][0] for t in tokens], dtype=np.int64)
+                prob_tokens = await self.tokenize_list(tokens)
+                token_ids = np.array(prob_tokens, dtype=np.int64).reshape(-1)
 
                 full_logits = np.ones(self.model.tokenizer.vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
@@ -492,6 +497,8 @@ class DclibOpenAiModel(DcModel):
         """
         assert k <= 5, "The OpenAI API only supports topk probabilities with k <= 5"
         assert k >= 1, "topk_continuations() requires k >= 1"
+        
+        assert not "turbo" in self.model_identifier, f"Chat API models do not support topk_continuations which is required for the requested decoding algorithm, use 'sample' or 'argmax' instead."
 
         kwargs = {**self.model_args, **kwargs}
         kwargs.update({"temperature": 0.0})
@@ -523,7 +530,7 @@ class DclibOpenAiModel(DcModel):
                     continue
 
                 # get sampled token and score
-                next_token = self.model.tokenizer(complete_data["logprobs"]["tokens"])["input_ids"][0]
+                next_token = complete_data["logprobs"]["tokens"][0]
                 next_token_score = complete_data["logprobs"]["token_logprobs"]
                 
                 probs = sorted(list(complete_data["logprobs"]["top_logprobs"].items()), key=lambda x: x[1], reverse=True)

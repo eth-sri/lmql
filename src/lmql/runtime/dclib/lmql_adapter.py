@@ -162,7 +162,7 @@ class QueryDcLibAdapter:
         decoder_args["dcmodel"] = dcmodel
         dc.set_truncation_threshold(dcmodel.truncation_threshold)
 
-        step_budget = decoder_args.get("step_budget", 400)
+        step_budget = decoder_args.get("step_budget", 1024)
         
         async def debug_out(decoder_step):
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:

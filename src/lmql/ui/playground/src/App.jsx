@@ -185,6 +185,8 @@ function TokenCountIndicator() {
       return `${format_cost(k_tokens * 0.0005, precision)}`
     } else if (model.includes("text-curie")) {
       return `${format_cost(k_tokens * 0.002, precision)}`
+    } else if (model.includes("turbo")) {
+      return `${format_cost(k_tokens * 0.002, precision)}`
     } else {
       return ""
     }

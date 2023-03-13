@@ -10,6 +10,10 @@ lmql_operation_registry = {}
 # @LMQLOp('function_name') decorator
 def LMQLOp(name):
     def class_transformer(cls):
+        if type(name) is list:
+            for n in name:
+                lmql_operation_registry[n] = f"lmql.{cls.__name__}"
+            return cls
         lmql_operation_registry[name] = f"lmql.{cls.__name__}"
         return cls
     return class_transformer
@@ -750,7 +754,7 @@ class StartsWithOp(Node):
     #             return "fin"
     #         return "var"
 
-@LMQLOp("STOPS_AT")
+@LMQLOp(["STOPS_AT", "stops_at"])
 class StopAtOp(Node):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

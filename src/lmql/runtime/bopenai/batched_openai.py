@@ -9,7 +9,7 @@ import os
 import time
 from functools import total_ordering
 
-from ..simple_oai import complete, OpenAIRateLimitError, Capacity
+from .openai_api import complete, OpenAIRateLimitError, Capacity
 
 class EmptyStreamError(Exception): pass
 
@@ -70,22 +70,29 @@ class Batcher:
             buckets.setdefault(identifier, []).append(t)
         
         for bucket in buckets.values():
-            prompts = [t["prompt"] for t in bucket]
-            futures = [t["future"] for t in bucket]
-            request_ids = [t["request_id"] for t in bucket]
-
-            # construct request arguments
-            request_args = bucket[0].copy()
-            del request_args["future"]
-            
-            request_args["prompt"] = prompts
-            request_args["futures"] = futures
-            request_args["request_id"] = request_ids
-            request_args["stream"] = True
-
-            self.queued_requests.append(request_args)
+            if "turbo" in bucket[0]["model"]:
+                for t in bucket:
+                    self.queued_requests.append(make_request_args([t]))
+                continue
+            self.queued_requests.append(make_request_args(bucket))
         
         self.tasks = []
+
+def make_request_args(tasks):
+    prompts = [t["prompt"] for t in tasks]
+    futures = [t["future"] for t in tasks]
+    request_ids = [t["request_id"] for t in tasks]
+
+    # construct request arguments
+    request_args = tasks[0].copy()
+    del request_args["future"]
+    
+    request_args["prompt"] = prompts
+    request_args["futures"] = futures
+    request_args["request_id"] = request_ids
+    request_args["stream"] = True
+
+    return request_args
 
 @dataclass
 class Stats:
@@ -227,21 +234,21 @@ class response_buffer_slice:
             return response_buffer_slice(self.buffer, self.lower + i.start)
         assert False, f"response_buffer_slice.__getitem__({i}) not supported. Use async get() instead."
 
-async def async_buffer(iterator, eager=False):
+async def async_buffer(iterator, eager=False, tokenizer=None):
     if type(iterator) is list:
         # wrap already buffered data as response_buffer
-        return response_buffer(None, iterator)
+        return response_buffer(None, iterator, tokenizer=tokenizer)
 
     if eager:
         data = []
         async for i in iterator: data.append(i)
-        return response_buffer(None, data)
+        return response_buffer(None, data, tokenizer=tokenizer)
     else:
         if type(iterator) is ResponseStreamSlice:
             iterator = aiter(iterator)
-        return response_buffer(iterator)
+        return response_buffer(iterator, tokenizer=tokenizer)
 class response_buffer:
-    def __init__(self, iterator, fixed_data=None):
+    def __init__(self, iterator, fixed_data=None, tokenizer=None):
         self.iterator = iterator
 
         self.text = ""
@@ -256,8 +263,13 @@ class response_buffer:
         if fixed_data is not None:
             self.fixed = True
             self._append(fixed_data)
+            self.tokenizer = None
         else:
             self.fixed = False
+            # when provided, convert ["logprobs"]["tokens"] to token IDs automatically
+            self.tokenizer = tokenizer
+            assert self.tokenizer is not None, f"response_buffer: tokenizer must be provided when using non-fixed data"
+            
 
     def __str__(self) -> str:
         return "<response_buffer num_tokens={} iterator={}>".format(self.num_tokens, self.iterator)
@@ -299,7 +311,10 @@ class response_buffer:
     async def get(self, i):
         while self.num_tokens <= i and self.iterator is not None:
             try:
-                self._append(await anext(self.iterator))
+                chunk = await anext(self.iterator)
+                chunk["logprobs"]["tokens"] = await self.tokenizer(chunk["logprobs"]["tokens"])
+                # self.tokenizer(data["logprobs"]["tokens"])
+                self._append(chunk)
             except StopAsyncIteration:
                 break
         if i >= self.num_tokens:
@@ -346,7 +361,7 @@ class ResponseStreamSliceIterator:
         recovery_kwargs = self.slice.kwargs.copy()
         # reconstruct the prompt by tokenizing the consumed tokens
         if len(self.consumed_tokens) > 0:
-            prompt = await self.slice.stream.scheduler.tokenizer(self.consumed_tokens)
+            prompt = self.consumed_tokens
             recovery_kwargs["prompt"] = [t[0] for t in prompt]
         
         # issue new completion call
@@ -579,9 +594,11 @@ class AsyncOpenAIAPI:
                         res = await self._create(**kwargs)
                         break
                     except Exception as e:
+                        if type(e) is AssertionError:
+                            raise e
                         self.stats.errors += 1
                         retries -= 1            
-                        print("Failed to call to call complete endpoint", type(e), e)
+                        print("Failed to call complete endpoint", type(e), e)
                         await asyncio.sleep(0.5)
                         if retries <= 0: raise e
                         if type(e) is TimeoutError or type(e) is OpenAIRateLimitError:
