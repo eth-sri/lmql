@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsFileArrowDownFill, BsLayoutWtf, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear } from 'react-icons/bs';
+import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsFileArrowDownFill, BsLayoutWtf, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
@@ -41,7 +41,7 @@ const ContentContainer = styled.div`
   
   color: white;
   flex: 1;
-  height: 100%;
+  height: calc(100% - 40pt);
   width: 100%;
 `;
 
@@ -59,6 +59,9 @@ const Panel = styled.div.attrs(props => ({ className: "panel" }))`
   // animate width and opacity change
   transition: width 0.1s, opacity 0.1s, padding 0.1s;
   overflow: hidden;
+
+  /* light box shadow */
+  box-shadow: 0 0 20px 0px #0000004f;
 
   // contained h2
   & > h2 {
@@ -452,6 +455,17 @@ const Row = styled.div`
   flex-direction: row;
   margin-bottom: 3pt;
   height: calc(50% - 20pt - 4pt);
+  
+  &.simple-mode.simple {
+    flex: 1;
+    height: calc(100% - 40pt);
+  }
+
+  &.simple-mode:not(.simple) {
+    height: 0pt;
+    border: 1pt solid red;
+    display: none;
+  }
 `
 
 const IconButton = styled.button`
@@ -561,7 +575,6 @@ const ModelResultText = styled.div`
   line-height: 1.6em;
   white-space: pre-wrap;
   overflow-y: auto;
-  max-height: 100%;
 
   &::-webkit-scrollbar {
     width: 0px;
@@ -642,6 +655,23 @@ const ModelResultText = styled.div`
   div .variable.v5 { background-color: #ff8935; }
   div .variable.v4 { background-color: #ffa600; }
   div .variable.v1 { background-color: #dca709; }
+`
+
+const TypingIndicator = styled.span`
+  display: inline-block;
+  width: 8pt;
+  height: 12pt;
+  position: relative;
+  top: 3.5pt;
+  left: 2pt;
+  background-color: #d7d5d5;
+  animation: typing 1s infinite;
+
+  @keyframes typing {
+    0% { opacity: 0.2; }
+    50% { opacity: 1; }
+    100% { opacity: 0.2; }
+  }
 `
 
 class Truncated extends React.Component {
@@ -763,6 +793,11 @@ class Truncated extends React.Component {
 
       elements.push(<span key={i + "_segment-" + c.content} className={(c.variable != "__prompt__" ? "variable " : "") + c.variableClassName}>{segmentContent}</span>)
     }
+
+    if (this.props.typing && this.props.processStatus == "running") {
+      // use unicode block letter
+      elements.push(<TypingIndicator/>)
+    }
     
     return <>{elements}</>
   }
@@ -810,7 +845,6 @@ const ExpandButton = styled.button`
 
 function ModelResultContent(props) {
   const scrollRef = useRef(null)
-
   let mostLikelyNode = props.mostLikelyNode ? props.mostLikelyNode.data("id") : null
 
   // on changes to props.mostLikelyNode scroll down to end of scroll view
@@ -820,7 +854,6 @@ function ModelResultContent(props) {
       scroll.scrollTop = scroll.scrollHeight
     }
   }, [mostLikelyNode, props.trackMostLikly])
-
 
   let modelResult = null;
   if (props.trackMostLikly) {
@@ -899,14 +932,24 @@ function ModelResultContent(props) {
             {r.node.data("seqlogprob").toFixed(4)}
           </span>
         </h3>}
-        <Truncated tokens={r.tokens} typing={useTypingAnimation}/>
+        <Truncated tokens={r.tokens} typing={useTypingAnimation} processStatus={props.processStatus}></Truncated>
       </div>
     })}
-    {countedResults.length == 0 && <CenterBox>
-      <h2>No Selection</h2>
-      <span className="subtitle">Select a node in the Decoding Graph to see more details or <span className="link" onClick={() => trackingState.setTrackMostLikely(true)}>Show Latest</span>.</span>
-    </CenterBox>}
+    {countedResults.length == 0 && <EmptyModelResult trackMostLikly={props.trackMostLikly} processStatus={props.processStatus}></EmptyModelResult>}
   </ModelResultText>
+}
+
+function EmptyModelResult(props) {
+  if (props.processStatus == "running" && props.trackMostLikly) {
+    return <CenterBox>
+      <h2>Waiting for first tokens...</h2>
+    </CenterBox>
+  } else {
+    return <CenterBox>
+      <h2>No Selection</h2>
+      <span className="subtitle">Select a node in the Decoding Graph to see more details or <span className="link" onClick={() => trackingState.setTrackMostLikely(true)}>Show Latest</span>.</span> 
+    </CenterBox>
+  }
 }
 
 const OutputText = styled.textarea`
@@ -1255,6 +1298,76 @@ function InspectorPane(props) {
   );
 }
 
+const LMQLSpinnerDiv = styled.div`
+  &.lmql-spinner {
+    font-size: 24pt;
+    font-weight: bold;
+    line-height: 1.5;
+    background-color: #5e5e5e !important;
+    border: 0.5pt solid #212B3B;
+    width: 25pt;
+    position: absolute;
+    height: 16pt;
+    max-height: 24pt;
+    border-radius: 2pt;
+    opacity: 1.0;
+    display: block;
+    padding: 0;
+    flex: 0;
+    transform: scale(0.7);
+  }
+
+  /* both parts pulse with an amplitude offset */
+  .pt1 {
+    color: #dd8787;
+    animation: pulse 1s infinite;
+    position: absolute;
+    top: -6pt;
+    left: 2pt;
+  } 
+  .pt2 {
+    color: white;
+    font-size: 12pt;
+    position: absolute;
+    top: -2.5pt;
+    right: 2pt;
+    animation: pulse 1s infinite;
+    animation-delay: 0.5s;
+  }
+  
+  .pt3 {
+    position: absolute;
+    bottom: -5pt;
+    right: 0pt;
+    border: 5pt solid #5e5e5e;
+    border-top-color: transparent;
+    border-left-color: transparent;
+    border-bottom-color: transparent;
+  }
+
+  /* the animation */
+  @keyframes pulse {
+    0% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.5;
+    }
+  }
+`
+
+function LMQLSpinner() {
+  return <LMQLSpinnerDiv className="lmql-spinner">
+    <span className='pt1'>*</span>
+    <span className='pt2'>&gt;</span>
+    <span className='pt3'></span>
+  </LMQLSpinnerDiv>
+}
+
+
 function SidePanel(props) {
   const stretch = props.stretch ?? false;
   const defaultClass = stretch ? 'stretch' : '';
@@ -1262,10 +1375,11 @@ function SidePanel(props) {
   const [clearOnRun, setClearOnRun] = useState(true);
   const [perVariableColor, setPerVariableColor] = useState(true);
 
-  const [trackMostLikly, setTrackMostLiklyInternal] = useState(false)
+  const [trackMostLikly, setTrackMostLiklyInternal] = useState(window.localStorage.getItem("trackMostLikely") === "true");
   trackingState.setTrackMostLikely = setTrackMostLiklyInternal
   const setTrackMostLikly = (value) => {
     setTrackMostLiklyInternal(value)
+    window.localStorage.setItem("trackMostLikely", value)
     if (!value && props.mostLikelyNode) {
       trackingState.setSelectedNode(props.mostLikelyNode)
     }
@@ -1314,11 +1428,14 @@ function SidePanel(props) {
         {sidepanel == 'model' && <>
           <ToolbarSpacer />
           <CheckableToolbarIconButton checked={perVariableColor} onClick={() => setPerVariableColor(!perVariableColor)}>
-            Repeated Variable Colors
+            Color By Variable
           </CheckableToolbarIconButton>
-          <CheckableToolbarIconButton checked={trackMostLikly} onClick={() => setTrackMostLikly(!trackMostLikly)}>
-            Show Latest
-          </CheckableToolbarIconButton>
+          
+          {props.simpleMode &&
+            <CheckableToolbarIconButton checked={trackMostLikly} onClick={() => setTrackMostLikly(!trackMostLikly)}>
+              Show Latest
+            </CheckableToolbarIconButton>
+          }
         </>}
       </h2>
       <OutputPanelContent style={{ display: sidepanel === 'output' ? 'block' : 'none' }} clearTrigger={clearTrigger} />
@@ -1327,8 +1444,9 @@ function SidePanel(props) {
         selectedNodes={props.selectedNodes}
         perVariableColor={perVariableColor}
         mostLikelyNode={props.mostLikelyNode}
-        trackMostLikly={trackMostLikly}
+        trackMostLikly={trackMostLikly || !props.simpleMode}
         onTrackLatest={() => setTrackMostLikly(true)}
+        processStatus={props.processStatus}
       />
       {/* <StatisticsPanelContent style={{display: sidepanel === 'stats' ? 'flex' : 'none'}}/> */}
 
@@ -1625,6 +1743,12 @@ const ToggleButton = styled.button`
   padding: 5pt 7pt;
   border-radius: 4pt;
 
+  span {
+    position: relative;
+    top: -1.5pt;
+    margin-left: 4pt;
+  }
+
   :hover {
     background-color: #0000002E;
   }
@@ -1809,8 +1933,16 @@ class App extends React.Component {
       status: LMQLProcess.status,
       processState: "init",
       graphLayout: false,
-      topMenuOpen: false
+      topMenuOpen: false,
+      // true by default, false if local storage is set
+      simpleMode: window.localStorage.getItem("simple-mode") != "false",
     }
+  }
+
+  setSimpleMode(simpleMode) {
+    window.localStorage.setItem("simple-mode", simpleMode);
+    ResizeObservers.notify();
+    this.setState({ simpleMode });
   }
 
   setSelectedNodeInfo(selectedNodeInfo) {
@@ -1889,6 +2021,9 @@ class App extends React.Component {
     LMQLProcess.addStatusListener(this.onStatus.bind(this))
 
     BUILD_INFO.addListener(this.setBuildInfo.bind(this))
+
+    // when document browser scale is changed
+    window.addEventListener("resize", ResizeObservers.notify)
   }
 
   componentWillUnmount() {
@@ -1950,6 +2085,8 @@ class App extends React.Component {
       this.state.selectedNodeTrigger.trigger(n)
     };
 
+    const simpleModeClassName = this.state.simpleMode ? "" : "simple-mode";
+
     return (
       <ContentContainer className={this.state.graphLayout ? 'graph-layout' : ''}>
         <Toolbar>
@@ -1961,8 +2098,14 @@ class App extends React.Component {
           <Spacer />
           {/* show tooltip with build time */}
           {/* trigger button */}
-          <ToggleButton onClick={() => this.setGraphLayout(!this.state.graphLayout)} toggled={this.state.graphLayout}>
+          {/* <ToggleButton onClick={() => this.setGraphLayout(!this.state.graphLayout)} toggled={this.state.graphLayout}>
             <BsLayoutWtf size={14} />
+          </ToggleButton> */}
+          <ToggleButton onClick={() => this.setSimpleMode(!this.state.simpleMode)} toggled={this.state.simpleMode}>
+            <BsGridFill size={14} />
+            <span>
+              Advanced Mode
+            </span>
           </ToggleButton>
           {/* settings button */}
           <Commit>{this.state.buildInfo.commit}</Commit>
@@ -1989,11 +2132,11 @@ class App extends React.Component {
             </TopBarMenu>
           </ToggleButton>
         </Toolbar>
-        <Row>
+        <Row className={simpleModeClassName + " simple"}>
           <EditorPanel onRun={this.onRun.bind(this)} processState={this.state.status} connectionState={this.state.status} />
-          <SidePanel selectedNodeInfo={this.state.selectedNodeInfo} selectedNode={this.state.selectedNode} selectedNodes={this.state.selectedNodes} mostLikelyNode={this.state.mostLikelyNode} />
+          <SidePanel selectedNodeInfo={this.state.selectedNodeInfo} selectedNode={this.state.selectedNode} selectedNodes={this.state.selectedNodes} mostLikelyNode={this.state.mostLikelyNode} processStatus={this.state.processState} simpleMode={this.state.simpleMode}/>
         </Row>
-        <Row style={{ flex: 1 }}>
+        <Row style={{ flex: 1 }} className={simpleModeClassName}>
           <DecoderPanel onSelectNode={this.onSelectNode.bind(this)} onMostLiklyNode={this.onMostLiklyNode.bind(this)} selectedNodeTrigger={this.state.selectedNodeTrigger} />
           <InspectorPane nodeInfo={this.state.selectedNodeInfo}></InspectorPane>
         </Row>

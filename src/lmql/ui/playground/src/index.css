@@ -60,7 +60,7 @@ textarea:focus {
   position: absolute;
   top: 0;
   right: 0pt;
-  height: 100%;
+  /* height: 100%; */
   padding: 0;
 }
 
@@ -88,3 +88,23 @@ span.subtitle a, span.subtitle .link {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* 
+#root {
+  margin: 100pt;
+}
+
+#sidepanel {
+  background-color: white;
+  border: 1pt solid #b2b2b2;
+  color: black;
+}
+
+#sidepanel h2 {
+  color: black;
+}
+
+#sidepanel button {
+  color: black;
+  background-color: #b2b2b2;
+} */
