@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsFileArrowDownFill, BsLayoutWtf, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
+import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
@@ -1298,74 +1298,74 @@ function InspectorPane(props) {
   );
 }
 
-const LMQLSpinnerDiv = styled.div`
-  &.lmql-spinner {
-    font-size: 24pt;
-    font-weight: bold;
-    line-height: 1.5;
-    background-color: #5e5e5e !important;
-    border: 0.5pt solid #212B3B;
-    width: 25pt;
-    position: absolute;
-    height: 16pt;
-    max-height: 24pt;
-    border-radius: 2pt;
-    opacity: 1.0;
-    display: block;
-    padding: 0;
-    flex: 0;
-    transform: scale(0.7);
-  }
+// const LMQLSpinnerDiv = styled.div`
+//   &.lmql-spinner {
+//     font-size: 24pt;
+//     font-weight: bold;
+//     line-height: 1.5;
+//     background-color: #5e5e5e !important;
+//     border: 0.5pt solid #212B3B;
+//     width: 25pt;
+//     position: absolute;
+//     height: 16pt;
+//     max-height: 24pt;
+//     border-radius: 2pt;
+//     opacity: 1.0;
+//     display: block;
+//     padding: 0;
+//     flex: 0;
+//     transform: scale(0.7);
+//   }
 
-  /* both parts pulse with an amplitude offset */
-  .pt1 {
-    color: #dd8787;
-    animation: pulse 1s infinite;
-    position: absolute;
-    top: -6pt;
-    left: 2pt;
-  } 
-  .pt2 {
-    color: white;
-    font-size: 12pt;
-    position: absolute;
-    top: -2.5pt;
-    right: 2pt;
-    animation: pulse 1s infinite;
-    animation-delay: 0.5s;
-  }
+//   /* both parts pulse with an amplitude offset */
+//   .pt1 {
+//     color: #dd8787;
+//     animation: pulse 1s infinite;
+//     position: absolute;
+//     top: -6pt;
+//     left: 2pt;
+//   } 
+//   .pt2 {
+//     color: white;
+//     font-size: 12pt;
+//     position: absolute;
+//     top: -2.5pt;
+//     right: 2pt;
+//     animation: pulse 1s infinite;
+//     animation-delay: 0.5s;
+//   }
   
-  .pt3 {
-    position: absolute;
-    bottom: -5pt;
-    right: 0pt;
-    border: 5pt solid #5e5e5e;
-    border-top-color: transparent;
-    border-left-color: transparent;
-    border-bottom-color: transparent;
-  }
+//   .pt3 {
+//     position: absolute;
+//     bottom: -5pt;
+//     right: 0pt;
+//     border: 5pt solid #5e5e5e;
+//     border-top-color: transparent;
+//     border-left-color: transparent;
+//     border-bottom-color: transparent;
+//   }
 
-  /* the animation */
-  @keyframes pulse {
-    0% {
-      opacity: 0.5;
-    }
-    50% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0.5;
-    }
-  }
-`
+//   /* the animation */
+//   @keyframes pulse {
+//     0% {
+//       opacity: 0.5;
+//     }
+//     50% {
+//       opacity: 1;
+//     }
+//     100% {
+//       opacity: 0.5;
+//     }
+//   }
+// `
 
-function LMQLSpinner() {
-  return <LMQLSpinnerDiv className="lmql-spinner">
-    <span className='pt1'>*</span>
-    <span className='pt2'>&gt;</span>
-    <span className='pt3'></span>
-  </LMQLSpinnerDiv>
-}
+// function LMQLSpinner() {
+//   return <LMQLSpinnerDiv className="lmql-spinner">
+//     <span className='pt1'>*</span>
+//     <span className='pt2'>&gt;</span>
+//     <span className='pt3'></span>
+//   </LMQLSpinnerDiv>
+// }
 
 
 function SidePanel(props) {
