@@ -25,14 +25,32 @@ def get_js_tokenizer(model_identifier):
             return js.convert_tokens_to_string_gpt(to_js(tokens))
 
         def tokenize(self, s):
-            return js.tokenize_gpt_toks(s).to_py()
+            unpack = False
+            if type(s) is not list:
+                s = [s]
+                unpack = True
+            tokens = [js.tokenize_gpt_toks(se).to_py() for se in s]
+            
+            if unpack:
+                return tokens[0]
+            else:
+                return tokens
          
         def decode(self, input_ids):
             # set typed array type of input_ids to int
             return str(js.detokenize_gpt(to_js([int(i) for i in input_ids])))
 
         def __call__(self, s: str):
-            return {"input_ids": [int(v) for v in js.tokenize_gpt(s)]}
+            unpack = False
+            if type(s) is not list:
+                s = [s]
+                unpack = True
+            input_ids = [[int(v) for v in js.tokenize_gpt(se)] for se in s]
+            
+            if unpack:
+                return {"input_ids": input_ids[0]}
+            else:
+                return {"input_ids": input_ids}
     
     return JSBridgedTokenizer()
 
