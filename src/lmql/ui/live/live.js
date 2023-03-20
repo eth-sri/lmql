@@ -66,6 +66,18 @@ io.on('connection', s => {
       })
     }
   })
+
+  s.on('app-input', request => {
+    let text = request.text
+    let pid = request.pid
+    let process = running_processes[pid]
+    if (process) {
+      console.log("app-input: sending text to process with PID", pid)
+      process.stdin.write(text)
+      // emulate enter
+      process.stdin.write("\r")
+    }
+  })
 });
 
 app.get('/', (req, res) => {

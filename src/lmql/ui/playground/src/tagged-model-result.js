@@ -39,6 +39,7 @@ export function reconstructTaggedModelResult(nodes) {
         break;
       }
     }
+    
     // concat text in reverse
     let tokens = text.reverse()
     let current_variable = "__prompt__";
@@ -53,6 +54,7 @@ export function reconstructTaggedModelResult(nodes) {
         t.pool = ""
       }
       let v = t.variable
+
       if (v.includes(":before")) {
         v = "__prompt__"
       }
@@ -63,17 +65,56 @@ export function reconstructTaggedModelResult(nodes) {
       }
 
       if (v != current_variable) {
-        result.push({ variable: current_variable, content: accumulated_text })
+        result.push({ variable: current_variable, content: accumulated_text})
         accumulated_text = ""
       }
       current_variable = v
       accumulated_text += t.text
     })
     result.push({ variable: current_variable, content: accumulated_text })
+
+    result = chunk_by_tags(result)
+
     results.push({
       tokens: result,
       node: node
     })
   }
   return results;
+}
+
+function chunk_by_tags(s) {
+  let current_tag = undefined;
+  
+  if (!s.reduce((a, b) => a || b.content.includes("<lmql:"), true)) {
+    return s
+  }
+
+  return s.flatMap(s => {
+    let results = []
+    let current_segment = ""
+    let content = s.content
+    let i = 0
+    while (i < content.length) {
+      if (content.substr(i).startsWith("<lmql:")) {
+        if (current_segment.length > 0) {
+          results.push({ variable: s.variable, content: current_segment, tag: current_tag })
+        }
+        current_segment = ""
+        let start = i
+        while (i < content.length && !content.substr(i).startsWith("/>")) {
+          i++
+        }
+        i += 2
+        let tag = content.substr(start, i - start)
+        results.push({ variable: "__tag__", content: tag, tag: null })
+        current_tag = tag.replace("<lmql:", "").replace("/>", "").trim()
+        continue
+      }
+      current_segment += content[i]
+      i++
+    }
+    results.push({ variable: s.variable, content: current_segment, tag: current_tag })
+    return results
+  })
 }

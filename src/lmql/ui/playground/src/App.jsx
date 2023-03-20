@@ -606,6 +606,57 @@ const ModelResultText = styled.div`
     opacity: 0.95;
   }
   
+  div .tag {
+    display: block;
+    text-align: center;
+    font-size: 8pt;
+    color: #5c5c5c;
+    padding: 0;
+    margin: 0;
+    display: none;
+  }
+
+  div .variable.eos {
+    display: inline;
+    margin: 0pt;
+    position: relative;
+    left: calc(50% - 15pt);
+    top: 10pt;
+    opacity: 0.5;
+  }
+
+  div .tag-system {
+    display: block;
+    text-align: center;
+    background-color: #ffffff13;
+    border-radius: 8pt;
+    font-size: 12pt;
+    margin-top: 10pt;
+    margin-bottom: 10pt;
+    color: #c0c0c0;
+  }
+
+  div .tag-assistant {
+    display: block;
+    margin-left: 30%;
+    width: 65%;
+
+    border-radius: 8pt;
+    overflow: hidden;
+    padding: 4pt;
+  }
+
+  div .tag-user {
+    display: block;
+    margin-left: 32%;
+    position: relative;
+    border: 1pt solid #5c5c5c;
+    border-radius: 8pt;
+    padding: 4pt;
+    margin-bottom: 2pt;
+    margin-top: 5pt;
+  }
+  
   &>div>span:first-child {
     margin-left: 0pt;
     padding-left: 0pt;
@@ -646,8 +697,8 @@ const ModelResultText = styled.div`
     margin-right: 0;
   }
 
-  div .variable.v8 { background-color: #6b77ff; }
-  div .variable.v0 { background-color: #bc67ed; }
+  div .variable.v0 { background-color: #6b77ff; }
+  div .variable.v8 { background-color: #bc67ed; }
   div .variable.v7 { background-color: #f055cf; }
   div .variable.v2 { background-color: #ff4baa; }
   div .variable.v6 { background-color: #ff5482; }
@@ -687,8 +738,8 @@ class Truncated extends React.Component {
 
   componentDidMount() {
     this.stepper = setInterval(() => {
-      this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 2 }))
-    }, 20)
+      this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 4 }))
+    }, 10)
   }
 
   componentWillUnmount() {
@@ -771,7 +822,9 @@ class Truncated extends React.Component {
     let elements = []
     let characterCount = 0
 
-    for (let i = 0; i < tokens.length && (characterCount < this.state.typingOffset || !this.props.typing); i++) {
+    const isIncludedIndex = (i) => i < tokens.length && (characterCount < this.state.typingOffset || !this.props.typing)
+
+    for (let i = 0; isIncludedIndex(i); i++) {
       let c = tokens[i]
       let content = c.content
       
@@ -791,13 +844,18 @@ class Truncated extends React.Component {
         </span>}
       </>
 
-      elements.push(<span key={i + "_segment-" + c.content} className={(c.variable != "__prompt__" ? "variable " : "") + c.variableClassName}>{segmentContent}</span>)
+      elements.push(<span key={i + "_segment-" + c.content} className={(c.variable != "__prompt__" ? "variable " : "") + c.variableClassName}>
+        {segmentContent}
+        {!isIncludedIndex(i+1) && this.props.typing && this.props.processStatus == "running" && <TypingIndicator/>}
+      </span>)
     }
 
-    if (this.props.typing && this.props.processStatus == "running") {
-      // use unicode block letter
-      elements.push(<TypingIndicator/>)
-    }
+
+    // if (this.props.typing && this.props.processStatus == "running") {
+    //   // use unicode block letter
+    //   console.log(elements)
+    //   elements.push(<TypingIndicator/>)
+    // }
     
     return <>{elements}</>
   }
@@ -876,9 +934,19 @@ function ModelResultContent(props) {
       }
 
       if (segment.variable == "__prompt__") {
+        if (segment.content == "\\n") {
+          continue;
+        }
         result.push({
-          variableClassName: "prompt",
+          variableClassName: "prompt" + " tag-" + segment.tag,
           variable: segment.variable,
+          content: segment.content
+        })
+        continue;
+      } else if (segment.variable == "__tag__") {
+        result.push({
+          variableClassName: "tag",
+          variable: "__prompt__",
           content: segment.content
         })
         continue;
@@ -890,6 +958,14 @@ function ModelResultContent(props) {
       } else {
         variableCountIds[baseVariableName] = varCounter
         varCounter += 1;
+      }
+
+      if (segment.tag) {
+        variableClassName += " tag-" + segment.tag
+      }
+
+      if (segment.variable == "<eos>") {
+        variableClassName += " eos"
       }
 
       result.push({

@@ -36,13 +36,123 @@ def get_js_tokenizer(model_identifier):
     
     return JSBridgedTokenizer()
 
+global special_token_mappings
+special_token_mappings = {}
+global reverse_special_token_mappings
+reverse_special_token_mappings = {}
+
+class LMQLTokenizer:
+    def __init__(self, tokenizer_impl):
+        self.tokenizer_impl = tokenizer_impl
+
+    @property
+    def vocab_size(self):
+        return self.tokenizer_impl.vocab_size
+
+    @property
+    def bos_token_id(self):
+        return self.tokenizer_impl.bos_token_id
+    
+    @property
+    def eos_token_id(self):
+        return self.tokenizer_impl.eos_token_id
+
+    @property
+    def vocab(self):
+        return self.tokenizer_impl.vocab
+
+    def convert_tokens_to_string(self, tokens):
+        return self.tokenizer_impl.convert_tokens_to_string(tokens)
+
+    def tokenize(self, s):
+        tokens = []
+        for s in self.chunk_out_by_tags(s, tokenize=False):
+            if s.startswith("lmql:"):
+                tokens.append(s)
+            else:
+                tokens += self.tokenizer_impl.tokenize(s)
+        return tokens
+        
+    def decode(self, input_ids):
+        s = ""
+        for chunk in self.chunk_out_by_special_ids(input_ids):
+            if type(chunk) is str:
+                s += chunk
+            else:
+                s += self.tokenizer_impl.decode(chunk)
+        return s
+
+    def __call__(self, s: str):
+        input_ids = []
+        unpack = False
+        if type(s) is not list:
+            s = [s]
+            unpack = True
+
+        for seq in s:
+            chunk_input_ids = []
+            for chunk in self.chunk_out_by_tags(seq):
+                if type(chunk) is int:
+                    chunk_input_ids.append(chunk)
+                else:
+                    chunk_input_ids += self.tokenizer_impl(chunk)["input_ids"]
+            input_ids.append(chunk_input_ids)
+        
+        if unpack:
+            return {"input_ids": input_ids[0]}
+        else:
+            return {"input_ids": input_ids}
+    
+    def special_token_id(self, identifier):
+        global special_token_mappings
+        global reverse_special_token_mappings
+        
+        if identifier not in special_token_mappings:
+            if len(special_token_mappings) == 0:
+                # offset vocabulary IDs by at least the next decimal power of 10
+                offset = 10 ** (len(str(self.vocab_size)))
+                special_token_mappings[identifier] = offset
+                reverse_special_token_mappings[offset] = identifier
+            else:
+                next_id = max(special_token_mappings.values()) + 1
+                special_token_mappings[identifier] = next_id
+                reverse_special_token_mappings[next_id] = identifier
+        return special_token_mappings[identifier]
+    
+    def chunk_out_by_special_ids(self, input_ids, tokenize=True):
+        global reverse_special_token_mappings
+        c = []
+        for i in input_ids:
+            if i in reverse_special_token_mappings.keys():
+                if len(c) > 0:
+                    yield c
+                c = []
+                yield "<" + reverse_special_token_mappings[i] + "/>"
+            else:
+                c.append(i)
+        yield c
+    
+    def chunk_out_by_tags(self, s, tokenize=True):
+        # filter out all special tokens <lmql:.../>
+        import re
+        segments = []
+        offset = 0
+        for m in re.finditer(r"<lmql:(.*?)\/>", s):
+            segments.append(s[offset:m.start()])
+            if tokenize:
+                segments.append(self.special_token_id("lmql:" + m.group(1)))
+            else:
+                segments.append("lmql:" + m.group(1))
+            offset = m.end()
+        segments.append(s[offset:])
+        return segments
 
 def load_tokenizer(model_identifier):
     import os
 
     # check environment of USE_JS_TOKENIZER
     if "LMQL_BROWSER" in os.environ:
-        return get_js_tokenizer(model_identifier)
+        return LMQLTokenizer(get_js_tokenizer(model_identifier))
 
     from transformers import AutoTokenizer
     import torch
@@ -58,13 +168,13 @@ def load_tokenizer(model_identifier):
 
     if cache_path.exists():
         with open(cache_path, "rb") as f:
-            return pickle.load(f)
+            return LMQLTokenizer(pickle.load(f))
     else:
         from transformers import AutoTokenizer
         t = AutoTokenizer.from_pretrained(model_identifier)
         with open(cache_path, "wb") as f:
             pickle.dump(t, f)
-        return t
+        return LMQLTokenizer(t)
 
 if __name__ == "__main__":
     import sys

@@ -248,6 +248,17 @@ class LanguageFragmentParser:
                 self.state = "distribution"
                 return
             
+            # if last token is NAME and current is str
+            if len(self.query.prompt_str) > 0 and self.query.prompt_str[-1].type == tokenize.NAME and \
+                tok.type == tokenize.STRING:
+                last_tok = self.query.prompt_str[-1]
+                try:
+                    untokenized = tokenize.untokenize([last_tok, tok]).split(last_tok.string)[1]
+                    if not untokenized.startswith(" "):
+                        # print("merge name and tok", last_tok, tok)
+                        self.query.prompt_str.pop(-1)
+                except:
+                    pass
             self.query.prompt_str += [tok]
         elif self.state == "from":
             if is_keyword(tok, "WHERE"):

@@ -28,7 +28,6 @@ class LMQLInputVariableScope:
             return self.builtins[name]
         else:
             assert False, "Failed to resolve variable '" + name + "' in @lmql.query " + str(self.fct)
-            return None
 
 class LMQLQueryFunction:
     def __init__(self, fct, postprocessors, scope):
@@ -69,6 +68,9 @@ class LMQLQueryFunction:
         interpreter.print_stats()
 
         return results
+
+def tag(t):
+    return f"<lmql:{t}/>"
 
 def query(group_by=None):
     postprocessors = []

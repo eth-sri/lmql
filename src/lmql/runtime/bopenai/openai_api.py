@@ -12,8 +12,6 @@ import asyncio
 
 from lmql.runtime.tokenizer import load_tokenizer
 
-# from openai_secret import openai_secret, openai_org
-
 class OpenAIStreamError(Exception): pass
 class OpenAIRateLimitError(OpenAIStreamError): pass
 
@@ -64,8 +62,7 @@ def tokenize(text):
     global tokenizer
     if tokenizer is None:
         tokenizer = load_tokenizer("gpt2")
-        
-    return tokenizer.encode(text)
+    return tokenizer(text)["input_ids"]
 
 def detokenize(input_ids):
     global tokenizer
@@ -82,6 +79,19 @@ def detokenize(input_ids):
         
     return tokenizer.decode(input_ids)
 
+def tagged_segments(s):
+    import re
+    segments = []
+    current_tag = None
+    offset = 0
+    for m in re.finditer(r"<lmql:(.*?)\/>", s):
+        if m.start() - offset > 0:
+            segments.append({"tag": current_tag, "text": s[offset:m.start()]})
+        current_tag = m.group(1)
+        offset = m.end()
+    segments.append({"tag": current_tag, "text": s[offset:]})
+    return segments
+
 async def chat_api(**kwargs):
     from lmql.runtime.openai_secret import openai_secret, openai_org
     global stream_semaphore
@@ -93,7 +103,6 @@ async def chat_api(**kwargs):
         
 
     # transform prompt into chat API format
-    messages = []
     prompt_ids = kwargs["prompt"]
     kwargs["prompt"] = [detokenize(p) for p in kwargs["prompt"]]
     
@@ -122,11 +131,24 @@ async def chat_api(**kwargs):
     
     assert len(kwargs["prompt"]) == 1, f"chat API models do not support batched processing"
     
-    # print({"role": "user", "content": kwargs["prompt"][0]})
-    messages.append({
-        "role": "user", 
-        "content": kwargs["prompt"][0]
-    })
+    messages = []
+    for s in tagged_segments(kwargs["prompt"][0]):
+        role = "user"
+        tag = s["tag"]
+        if tag == "system":
+            role = "system"
+        elif tag == "assistant":
+            role = "assistant"
+        elif tag == "user":
+            role = "user"
+        else:
+            print(f"warning: {tag} is not a valid tag for the OpenAI chat API. Please use one of :system, :user or :assistant.")
+        
+        messages.append({
+            "role": role, 
+            "content": s["text"]
+        })
+    
     del kwargs["prompt"]
     kwargs["messages"] = messages
     
@@ -205,7 +227,7 @@ async def chat_api(**kwargs):
                                 delta = c["delta"]
                                 # skip non-content annotations for now
                                 if not "content" in delta:
-                                    if len(delta) == 0: # {} indicates 
+                                    if len(delta) == 0: # {} indicates end of stream
                                         choices.append({
                                             "text": "",
                                             "index": c["index"],
