@@ -94,7 +94,7 @@ where
 from lmql.demo import gsm8k_samples
 
 def calc(expr):
-      expr = re.sub(r"[^0-9\+\-*/\(\)\.]", "", expr)
+      expr = re.sub(r"[^0-9\+\\-*/\(\)\.]", "", expr)
       return eval(expr)
 
 argmax(openai_chunksize=64, max_len=2048)

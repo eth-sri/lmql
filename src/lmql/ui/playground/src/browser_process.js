@@ -227,7 +227,11 @@ export class BrowserProcessConnection {
 
     // on change in org persist contents
     setSecret(secret) {
-        localStorage.setItem("openai-secret", secret);
+        if (secret.startsWith("transient-")) {
+            secret = secret.substring("transient-".length)
+        } else {
+            localStorage.setItem("openai-secret", secret);
+        }
         this.secret = secret;
         this.hasSecret = this.secret != "";
         console.log("Setting OpenAI secret in browser process", secret, "secret")

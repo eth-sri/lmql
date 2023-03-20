@@ -1796,6 +1796,29 @@ function OpenAICredentials() {
         OpenAICredentialsState.setOpen(true);
       }
     }
+    // try to read transient secret from #anchor
+    window.unsalt_key = function(k) {
+      // base 64 decode
+      k = atob(k)
+      return k.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ salt.charCodeAt(i % salt.length))).join("")
+    }
+    window.salt_key = function(k) {
+      let salted = k.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ salt.charCodeAt(i % salt.length))).map(c => c.charCodeAt(0))
+      // base 64 encode
+      salted = btoa(String.fromCharCode(...salted))
+      return salted
+    }
+
+    const anchor = window.location.hash;
+    const salt = "lmql-transient-secret-1237u23"
+    if (anchor.startsWith("#key=")) {
+      if (LMQLProcess.setSecret) {
+        const secret = window.unsalt_key(anchor.slice(5))
+        console.log("set transient OpenAI secret to", secret)
+        LMQLProcess.setSecret(secret);
+      }
+    }
+
     LMQLProcess.on("status", onStatus);
     return () => {
       LMQLProcess.remove("status", onStatus);
@@ -1935,7 +1958,7 @@ class App extends React.Component {
       graphLayout: false,
       topMenuOpen: false,
       // true by default, false if local storage is set
-      simpleMode: window.localStorage.getItem("simple-mode") != "false",
+      simpleMode: window.localStorage.getItem("simple-mode") == "true",
     }
   }
 

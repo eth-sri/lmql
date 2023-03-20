@@ -13,6 +13,7 @@ cp index.html ../web-deploy/
 cp static/images/lmql.svg ../web-deploy/lmql.svg
 # copy static content
 cp -r static ../web-deploy/
+cp -r try ../web-deploy/
 
 echo "📦  Building playground..."
 # create playground destination
