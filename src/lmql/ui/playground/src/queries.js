@@ -173,7 +173,7 @@ argmax(n=1, openai_chunksize=128, max_len=2048, step_budget=4*2048)
       else:
          break
    """Therefore at the end of the game, Alice has the[OBJECT]"""
-   assert "purple ball" in OBJECT
+   assert "blue ball." in OBJECT
 from 
    "openai/text-davinci-003"
 where
