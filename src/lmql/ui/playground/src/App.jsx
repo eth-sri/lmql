@@ -1174,7 +1174,7 @@ function ModelResultContent(props) {
 
 function TextInput(props) {
   const [value, setValue] = useState("")
-  const [enabledState, setEnabledState] = ["waiting", props.setEnabledState]
+  const [enabledState, setEnabledState] = [props.enabledState, props.setEnabledState]
   const textareaRef = useRef(null)
 
   // use Enter for send and Shift+Enter for newline
