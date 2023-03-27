@@ -7,17 +7,23 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 from livelib import LiveApp, live, add_debugger_output
 import json
 import numpy as np
+import asyncio
 
 class LiveDebuggerOutputWriter:
-    def __init__(self):
+    def __init__(self, web):
         self.message_log = []
         self.records_graph = True
+        self.web = web
 
     def add_decoder_state(self, graph_dict):
         add_debugger_output("decoder-graph-state", graph_dict)
     
     def report_model_stats(self, **kwargs):
         add_debugger_output("openai-token-count", kwargs)
+        
+    async def input(self, *args):
+        add_debugger_output("stdin-request", {})
+        return await LiveApp.ainput(*args, web=self.web)
 
     def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
         from lmql.utils.graph import CytoscapeGraphWriter
@@ -59,14 +65,14 @@ class LiveDebuggerOutputWriter:
         })
 
 @live()
-async def lmql(code, *args):
+async def lmql(code, *args, web=False):
     import lmql
-
+    
     if code.startswith("./"):
         with open(code) as f:
             code = f.read()
 
-    output_writer = LiveDebuggerOutputWriter()
+    output_writer = LiveDebuggerOutputWriter(web=web)
 
     result = await lmql.run(code, output_writer=output_writer)
 

@@ -1,14 +1,15 @@
 import asyncio
 import js
 from pyodide.ffi import to_js
+import json
 
 class EndStream: pass
 
 class PostRequest:
-    def __init__(self, url, headers, json):
+    def __init__(self, url, headers, payload):
         self.url = url
         self.headers = headers
-        self.json = json
+        self.payload = payload
 
         self.queue = asyncio.Queue()
         self.content = self
@@ -19,7 +20,7 @@ class PostRequest:
             else: 
                 self.queue.put_nowait(data.encode("utf-8"))
 
-        self.completion_task = js.openai_completion_create(to_js(json), data_handler)
+        self.completion_task = js.openai_completion_create(url, json.dumps(payload), data_handler)
 
     def close(self):
         self.completion_task.cancel()

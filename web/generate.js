@@ -255,6 +255,7 @@ function Query(q, showcase_info, id, i) {
     }
 
     const template = `
+<div class="query-container">
 <div id="${id}" class="side-by-side ${i == 0 ? 'first' : ''}">
     <div class="query">
         <h3>
@@ -272,6 +273,7 @@ ${code_formatted}
         ${model_output}
         <span class='legend'>Highlighted text is model output.</span>
     </div>
+</div>
 </div>`
     return template
 }

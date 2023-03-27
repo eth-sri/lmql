@@ -434,14 +434,14 @@ function EditorPanel(props) {
         <FancyButton className='green' onClick={props.onRun} disabled={props.processState != "idle" && props.processState != "secret-missing"}>
           {props.processState == "running" ? <>Running...</> : <>&#x25B6; Run</>}
         </FancyButton>
+        {/* status light for connection status */}
+        <StatusLight connectionState={props.status} />
         <StopButton onClick={() => {
           LMQLProcess.kill()
         }} disabled={props.processState != "running"}>
           {/* utf8 stop square */}
           <i>&#x25A0;</i> Stop
         </StopButton>
-        {/* status light for connection status */}
-        <StatusLight connectionState={props.status} />
         {/* <Spacer></Spacer> */}
         <TokenCountIndicator />
       </ButtonGroup>
@@ -576,6 +576,11 @@ const ModelResultText = styled.div`
   white-space: pre-wrap;
   overflow-y: auto;
 
+  &.chat-mode {
+    padding-bottom: 50pt;
+  }
+
+
   &::-webkit-scrollbar {
     width: 0px;
   }
@@ -604,6 +609,58 @@ const ModelResultText = styled.div`
 
   div .prompt {
     opacity: 0.95;
+  }
+  
+  div .tag {
+    display: block;
+    text-align: center;
+    font-size: 8pt;
+    color: #5c5c5c;
+    padding: 0;
+    margin: 0;
+    display: none;
+  }
+
+  &.chat-mode .variable.eos {
+    display: inline;
+    margin: 0pt;
+    position: relative;
+    left: calc(50% - 15pt);
+    top: 10pt;
+    opacity: 0.5;
+  }
+
+  div .tag-system {
+    display: block;
+    text-align: center;
+    background-color: #ffffff13;
+    border-radius: 8pt;
+    font-size: 12pt;
+    margin-top: 10pt;
+    margin-bottom: 10pt;
+    color: #c0c0c0;
+  }
+
+  div .tag-assistant {
+    display: inline-block;
+    width: 65%;
+    border: 1pt solid #5c5c5c;
+    margin-top: 5pt;
+
+    border-radius: 8pt;
+    overflow: hidden;
+    padding: 4pt;
+  }
+
+  div .tag-user {
+    display: block;
+    margin-left: 32%;
+    position: relative;
+    border: 1pt solid #5c5c5c;
+    border-radius: 8pt;
+    padding: 4pt;
+    margin-bottom: 2pt;
+    margin-top: 5pt;
   }
   
   &>div>span:first-child {
@@ -646,8 +703,8 @@ const ModelResultText = styled.div`
     margin-right: 0;
   }
 
-  div .variable.v8 { background-color: #6b77ff; }
-  div .variable.v0 { background-color: #bc67ed; }
+  div .variable.v0 { background-color: #6b77ff; }
+  div .variable.v8 { background-color: #bc67ed; }
   div .variable.v7 { background-color: #f055cf; }
   div .variable.v2 { background-color: #ff4baa; }
   div .variable.v6 { background-color: #ff5482; }
@@ -655,6 +712,58 @@ const ModelResultText = styled.div`
   div .variable.v5 { background-color: #ff8935; }
   div .variable.v4 { background-color: #ffa600; }
   div .variable.v1 { background-color: #dca709; }
+
+  .chat-input {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: ${bg} !important;
+    border-top: 1pt solid #5c5c5c;
+    box-shadow: 0pt 0pt 10pt 0pt rgba(0, 0, 0, 0.5);
+    padding: 5pt;
+    padding-top: 18pt;
+    display: flex;
+  }
+
+  .chat-input h3 {
+    position: absolute;
+    top: 0;
+    left: 8pt; 
+    font-size: 8pt;
+    text-transform: uppercase;
+    margin: 0;
+    padding: 0;
+    margin-right: 10pt;
+    color: rgb(184, 179, 179);
+  }
+
+  .chat-input button {
+    margin-left: 5pt;
+  }
+
+  .chat-input textarea {
+    display: block;
+    border-radius: 2pt;
+    flex: 1;
+    max-height: 100pt;
+    min-height: 20pt;
+    font-size: 12pt;
+    border-radius: 4pt;
+    /* outline radius */
+    outline: 0pt solid transparent;
+    border: 2pt solid transparent;
+    
+    &:focus {
+      border: 2pt solid #6b77ff;
+      background-color: rgba(255, 255, 255, 0.1);
+      /* radius of outline */
+    }
+  }
+
+  .chat-input.disabled {
+    opacity: 0.2;
+  }
 `
 
 const TypingIndicator = styled.span`
@@ -687,8 +796,8 @@ class Truncated extends React.Component {
 
   componentDidMount() {
     this.stepper = setInterval(() => {
-      this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 2 }))
-    }, 20)
+      this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 4 }))
+    }, 10)
   }
 
   componentWillUnmount() {
@@ -771,7 +880,9 @@ class Truncated extends React.Component {
     let elements = []
     let characterCount = 0
 
-    for (let i = 0; i < tokens.length && (characterCount < this.state.typingOffset || !this.props.typing); i++) {
+    const isIncludedIndex = (i) => i < tokens.length && (characterCount < this.state.typingOffset || !this.props.typing)
+
+    for (let i = 0; isIncludedIndex(i); i++) {
       let c = tokens[i]
       let content = c.content
       
@@ -791,13 +902,18 @@ class Truncated extends React.Component {
         </span>}
       </>
 
-      elements.push(<span key={i + "_segment-" + c.content} className={(c.variable != "__prompt__" ? "variable " : "") + c.variableClassName}>{segmentContent}</span>)
+      elements.push(<span key={i + "_segment-" + c.content} className={(c.variable != "__prompt__" ? "variable " : "") + c.variableClassName}>
+        {segmentContent}
+        {!isIncludedIndex(i+1) && this.props.typing && this.props.processStatus == "running" && <TypingIndicator/>}
+      </span>)
     }
 
-    if (this.props.typing && this.props.processStatus == "running") {
-      // use unicode block letter
-      elements.push(<TypingIndicator/>)
-    }
+
+    // if (this.props.typing && this.props.processStatus == "running") {
+    //   // use unicode block letter
+    //   console.log(elements)
+    //   elements.push(<TypingIndicator/>)
+    // }
     
     return <>{elements}</>
   }
@@ -861,6 +977,7 @@ function ModelResultContent(props) {
   } else {
     modelResult = reconstructTaggedModelResult(props.selectedNodes);
   }
+  let chatMode = modelResult.reduce((acc, r) => acc || r.tokens.reduce((acc, t) => acc || t.tag, false), false)
 
   let countedResults = []
   let variableCountIds = {}
@@ -876,9 +993,19 @@ function ModelResultContent(props) {
       }
 
       if (segment.variable == "__prompt__") {
+        if (segment.content == "\\n" || segment.content.trim() == "") {
+          continue;
+        }
         result.push({
-          variableClassName: "prompt",
+          variableClassName: "prompt" + " tag-" + segment.tag,
           variable: segment.variable,
+          content: segment.content
+        })
+        continue;
+      } else if (segment.variable == "__tag__") {
+        result.push({
+          variableClassName: "tag",
+          variable: "__prompt__",
           content: segment.content
         })
         continue;
@@ -890,6 +1017,14 @@ function ModelResultContent(props) {
       } else {
         variableCountIds[baseVariableName] = varCounter
         varCounter += 1;
+      }
+
+      if (segment.tag) {
+        variableClassName += " tag-" + segment.tag
+      }
+
+      if (segment.variable == "<eos>") {
+        variableClassName += " eos"
       }
 
       result.push({
@@ -920,7 +1055,7 @@ function ModelResultContent(props) {
 
   const useTypingAnimation = countedResults.length == 1 && props.trackMostLikly;
 
-  return <ModelResultText style={props.style} onDoubleClick={onDoubleClick} ref={scrollRef}>
+  return <ModelResultText style={props.style} onDoubleClick={onDoubleClick} ref={scrollRef} className={chatMode ? "chat-mode" : ""}>
     {countedResults.map((r, i) => {
       return <div key={"result" + i}>
         {countedResults.length > 1 && <h3>
@@ -936,7 +1071,64 @@ function ModelResultContent(props) {
       </div>
     })}
     {countedResults.length == 0 && <EmptyModelResult trackMostLikly={props.trackMostLikly} processStatus={props.processStatus}></EmptyModelResult>}
+    <TextInput/>
   </ModelResultText>
+}
+
+function TextInput() {
+  const [value, setValue] = useState("")
+  const [enabledState, setEnabledState] = useState("waiting")
+  const textareaRef = useRef(null)
+
+  useEffect(() => {
+    const renderer = {
+      add_result: (data) => {
+        if (data.type == "stdin-request") {
+          setEnabledState("waiting")
+          window.setTimeout(() => {
+            textareaRef.current.focus()
+          }, 50)
+        }
+      },
+      clear_results: () => setEnabledState("hidden"),
+    };
+
+    LMQLProcess.on("render", renderer)
+    return () => {
+      LMQLProcess.remove("render", renderer)
+    }
+  }, [])
+
+  // use Enter for send and Shift+Enter for newline
+  const onKeyDown = (e) => {
+    if (e.key == "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      if (value.length > 0) {
+        LMQLProcess.sendInput(value)
+        setValue("")
+        setEnabledState("disabled")
+      }
+    }
+  }
+
+  if (enabledState == "hidden") {
+    return null;
+  }
+
+  return <div className={"chat-input" + (enabledState == "disabled" ? " disabled" : "")}>
+    <h3>Input</h3>
+    <textarea type="text" value={value} onChange={(e) => setValue(e.target.value)} ref={textareaRef} disabled={enabledState == "disabled"} onKeyDown={onKeyDown}></textarea>
+    <FancyButton onClick={() => {
+      if (enabledState == "disabled") {
+        return;
+      }
+      if (value.length > 0) {
+        LMQLProcess.sendInput(value)
+        setValue("")
+        setEnabledState("disabled")
+      }
+    }} disabled={enabledState == "disabled"}>Send</FancyButton>
+  </div>
 }
 
 function EmptyModelResult(props) {
@@ -1496,15 +1688,17 @@ const ButtonGroup = styled.div`
 
 const FancyButton = styled.button`
   /* blue purpleish button gardient */
-  background-color: #3d4370;
-  border: 1pt solid #3d4370;
-  padding: 5pt 10pt;
+  background-color: #6b77ff;
+  border: 0pt solid #6b77ff;
+  padding: 8pt 10pt;
+  font-size: 10pt;
   border-radius: 3pt;
   font-weight: bold;
   color: white;
 
   :hover {
-    border: 1pt solid #8e98ea;
+    /* border: 1pt solid #8e98ea; */
+    background-color: #4e5378;
     cursor: pointer;
   }
 
@@ -1513,7 +1707,7 @@ const FancyButton = styled.button`
     border-color: #5db779;
 
     :hover {
-      border-color: #6cdb8f;
+      background-color: #458a5b;
     }
 
     &:disabled {
@@ -1545,12 +1739,12 @@ const StopButton = styled(FancyButton)`
   margin-right: 0;
   position: relative;
   bottom: 0.5pt;
-  text-decoration: underline;
   padding: 4pt !important;
 
   // hover highlight
   &:hover {
     // slightly darker than background
+    text-decoration: underline;
     background: none;
     background-color: transparent;
     color:white;
@@ -1572,11 +1766,6 @@ const StopButton = styled(FancyButton)`
     background-color: transparent;
     cursor: default;
     border: none;
-  }
-
-  i {
-    position: relative;
-    bottom: 1pt;
   }
 
   &.light {

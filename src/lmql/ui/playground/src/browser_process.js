@@ -225,6 +225,10 @@ export class BrowserProcessConnection {
         this.processWorker.postMessage({func: "live", args: browser_args});
     }
 
+    sendInput(data) {
+        this.processWorker.postMessage({func: "send_input", args: data});
+    }
+
     // on change in org persist contents
     setSecret(secret) {
         if (secret.startsWith("transient-")) {

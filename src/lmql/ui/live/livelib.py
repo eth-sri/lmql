@@ -1,6 +1,7 @@
 import sys
 import json
 import asyncio
+import inspect
 
 def send(*args):
     print(*args)
@@ -35,6 +36,26 @@ class LiveApp:
         return asyncio.run(LiveApp.async_cli())
 
     @staticmethod
+    async def ainput(string: str = "", web=False) -> str:
+        # on the web, we do not have stdin and use a custom input mechanism
+        if web:
+            fut = asyncio.get_event_loop().create_future()
+            LiveApp.stdin_queue.put_nowait(fut)
+            return await fut
+        return (await asyncio.get_event_loop().run_in_executor(
+                None, sys.stdin.readline)).rstrip("\n")
+
+    @staticmethod
+    async def send_input(data):
+        try:
+            print("stdin queue is of size {}".format(LiveApp.stdin_queue.qsize()))
+            fut = LiveApp.stdin_queue.get_nowait()
+            print("got fut", fut, "setting result", data)
+            fut.set_result(data)
+        except asyncio.QueueEmpty:
+            raise Exception("No input request pending")
+
+    @staticmethod
     async def async_cli(args=None):
         if args is None:
             args = sys.argv
@@ -61,12 +82,19 @@ class LiveApp:
         else:
             endpoint = LiveApp.endpoint[args[1]]
             input = json.loads(args[2])
-            args = json.loads(args[3])
+            endpoint_args = json.loads(args[3])
             
-            result = await endpoint.fct(input, *args)
+            # check if fct has kwarg web
+            if args[0] == "web" and "web" in inspect.signature(endpoint.fct).parameters:
+                kwargs = {"web": True}
+            else:
+                kwargs = {}
+            
+            result = await endpoint.fct(input, *endpoint_args, **kwargs)
             if result is not None: print(result)
 
 LiveApp.endpoint = {}
+LiveApp.stdin_queue = asyncio.Queue()
 LiveApp.interrupt = False
 
 class Int64JSONEncoder(json.JSONEncoder):

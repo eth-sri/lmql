@@ -137,6 +137,13 @@ export class RemoteProcessConnection {
         }
     }
 
+    sendInput(data) {
+        this.socket.emit('app-input', {
+            pid: this.remotePid,
+            text: data
+        })
+    }
+
     onAppError(error) {
         this.logToConsole(error)
         // this.statusListeners.forEach(listener => {

@@ -430,7 +430,10 @@ class DclibOpenAiModel(DcModel):
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
                     full_logits = np.ones(self.model.tokenizer.vocab_size) * np.finfo(np.float32).min
-                    full_logits[next_token] = next_token_score
+                    if next_token < len(full_logits):
+                        full_logits[next_token] = next_token_score
+                    # else: 
+                    #  next_token is a special token, which is not in the vocab
                     logits.append(full_logits)
                     continue
 

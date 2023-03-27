@@ -37,10 +37,22 @@ class PromptScope(ast.NodeVisitor):
             self.written_vars.add(v)
             if v in self.free_vars: self.free_vars.remove(v)
 
-        used_template_vars = [v[1:-1] for v in re.findall("\{[A-z0-9]+\}", qstring)]
-        for v in used_template_vars:
-            if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
-                self.free_vars.add(v)
+        # capture set of format vars
+        used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}]+\}", qstring)]
+        for v in used_fstring_expr:
+            if v.startswith(":"):
+                continue
+            parsed = ast.parse(v).body[0].value
+            self.visit(parsed)
+            
+            # if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
+            #     self.free_vars.add(v)
+                
+        template_tags = [v[1:-1] for v in re.findall("\{:[A-z0-9]+\}", qstring)]
+        for tt in template_tags:
+            qstring = qstring.replace(f"{{{tt}}}", f"{{lmql.tag('{tt[1:]}')}}")
+        
+        node.value = qstring
 
         return super().visit_Constant(node)
 
@@ -290,21 +302,10 @@ def get_builtin_name(node, plain_python=False):
         return None
     n = node.id
     
-    mapped_builtins = {
-        "SELECT": "lmql.SelectOp",
-        "len": "lmql.LenOp",
-        "raw_constant": "lmql.RawValueOp"
-    }
-    builtins = set(["ENTITIES"])
-
-    if n in builtins or n.upper() in builtins: 
-        return "lmql." + n.lower()
-    elif n in mapped_builtins.keys() and not plain_python:
-        return mapped_builtins[n]
-    elif n in lmql_operation_registry.keys() and not plain_python:
+    if n in lmql_operation_registry.keys():
         return lmql_operation_registry[n]
-    else:
-        return None
+    
+    return None
 
 class DecodeClauseTransformation:
     def __init__(self, query):

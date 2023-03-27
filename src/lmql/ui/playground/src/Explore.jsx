@@ -255,10 +255,10 @@ const TypingContainer = styled.span`
     transform-origin: top middle;
     font-size: 25pt;
     height: 15pt;
-    background-color: black;
+    background-color: #313131;
     width: 1pt;
     position: relative;
-    left: 3pt;
+    left: 6pt;
     content: " ";
     overflow: hidden;
     display: inline-block;

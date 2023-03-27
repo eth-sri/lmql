@@ -130,6 +130,28 @@ cli
 }
 self["live"] = live;
 
+async function send_input(s) {
+    const code = `
+import lmql.ui.live.live as lmql_live
+async def send_input(s):
+    try:
+        print("input", s)
+        r = await lmql_live.LiveApp.send_input(s)
+        print("done with", r)
+        return r
+    except Exception as e:
+        print(e)
+send_input
+`;
+    const send_input_fct = await pyodide.runPythonAsync(code);
+    try {
+        await send_input_fct(pyodide.toPy(s))
+    } catch (e) {
+        console.error("Error sending input", e)
+    }
+}
+self["send_input"] = send_input;
+
 async function set_interrupt_buffer(buffer) {
     if (pyodide) {
         pyodide.setInterruptBuffer(buffer);

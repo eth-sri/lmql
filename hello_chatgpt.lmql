@@ -1,0 +1,9 @@
+argmax(openai_chunksize=1024)
+    """{:system}You are a helpful question-answering system.
+    {:user} What is the circumference of the earth?
+    {:assistant}[ANSWER]
+    {:user} When was this discovered?
+    {:assistant}[ANSWER]
+    """
+from 
+    "chatgpt"
