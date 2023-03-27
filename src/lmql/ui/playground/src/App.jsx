@@ -997,7 +997,7 @@ function ModelResultContent(props) {
           continue;
         }
         result.push({
-          variableClassName: "prompt" + " tag-" + segment.tag,
+          variableClassName: "prompt tag-" + segment.tag,
           variable: segment.variable,
           content: segment.content
         })
