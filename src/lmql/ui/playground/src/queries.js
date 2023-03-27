@@ -222,7 +222,7 @@ distribution
       queries: [
          {
             name: "🗣️ Chatbot",
-            description: "Build a chatbot using interaction querying.",
+            description: "Build a chatbot using interactive querying.",
             code: `argmax 
    "{:system} You are a marketing chatbot for the language model query language (LMQL)."
    for i in range(10):

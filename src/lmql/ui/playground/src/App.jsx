@@ -382,7 +382,11 @@ function EditorPanel(props) {
   props.processState = props.status.status
 
   function handleEditorDidMount(editor, monaco) {
-    ResizeObservers.addResizeListener(() => editor.layout({}))
+    ResizeObservers.addResizeListener(() => {
+      editor.layout({})
+      let fontSize = window.innerWidth < 700 ? 10 : 16
+      editor.updateOptions({ "fontSize": fontSize })
+    })
 
     registerLmqlLanguage(monaco);
     import('./editor/theme.json')
@@ -400,6 +404,8 @@ function EditorPanel(props) {
       persistedState.setItem("lmql-editor-contents", editor.getValue())
     })
   }
+  
+  let fontSize = window.innerWidth < 800 ? 10 : 16
 
   return (
     <Panel className='stretch max-width-50' id='editor-panel' style={{
@@ -416,7 +422,7 @@ function EditorPanel(props) {
           // no line numbers
           lineNumbers: "off",
           // font size 14pt
-          fontSize: 16,
+          fontSize: fontSize,
           // line wrap
           wordWrap: "on",
           // tabs are spaces
@@ -455,7 +461,7 @@ const Row = styled.div`
   flex-direction: row;
   margin-bottom: 3pt;
   height: calc(50% - 20pt - 4pt);
-  
+
   &.simple-mode.simple {
     flex: 1;
     height: calc(100% - 40pt);
@@ -466,6 +472,28 @@ const Row = styled.div`
     border: 1pt solid red;
     display: none;
   }
+
+  /* if screen < 320pt */
+  @media (max-width: 40em) {
+    &.simple-mode {
+      flex-direction: column;
+      height: calc(100%);
+      padding: 0;
+    }
+
+    &.simple-mode.simple .panel {
+      flex: 1;
+      margin: 0;
+      margin-top: 1pt;
+      width: calc(100% - 10pt);
+      border-radius: 0;
+      font-size: 0.8em;
+      /* special case for with-sidebar */
+      &.with-sidebar {
+        width: calc(100% - 15pt - 27.5pt);
+      }
+    }
+
 `
 
 const IconButton = styled.button`
@@ -647,7 +675,7 @@ const ModelResultText = styled.div`
     text-align: center;
     background-color: #ffffff13;
     border-radius: 8pt;
-    font-size: 12pt;
+    font-size: 90%;
     margin-top: 10pt;
     margin-bottom: 10pt;
     color: #c0c0c0;
@@ -1611,7 +1639,7 @@ function SidePanel(props) {
 
   const [sidepanel, setSidepanel] = useState("model");
   const setSidepanelTo = (panel) => {
-    if (sidepanel === panel) {
+    if (sidepanel === panel && props.simpleMode) {
       setSidepanel(null);
     } else {
       setSidepanel(panel);
@@ -1730,7 +1758,7 @@ const FancyButton = styled.button`
 
   :hover {
     /* border: 1pt solid #8e98ea; */
-    background-color: #4e5378;
+    background-color: #a5acfa;
     cursor: pointer;
   }
 
@@ -1753,6 +1781,17 @@ const FancyButton = styled.button`
         border-color: transparent;
         color: #ffffff44;
       }
+    }
+  }
+
+  @media (max-width: 40em) {
+    &.in-toolbar {
+      position: absolute;
+      bottom: 20pt;
+      right: 20pt;
+      z-index: 999;
+
+      box-shadow: 0 0 40pt 0pt #100f1f44;
     }
   }
 `
@@ -2338,14 +2377,14 @@ class App extends React.Component {
             <img src="/lmql.svg" alt="LMQL Logo"/>  
             LMQL Playground
           </Title>
-          {configuration.DEMO_MODE && <FancyButton onClick={() => ExploreState.setVisibility(true)}><ExploreIc /> Explore LMQL</FancyButton>}
+          {configuration.DEMO_MODE && <FancyButton className="in-toolbar" onClick={() => ExploreState.setVisibility(true)}><ExploreIc/> Explore LMQL</FancyButton>}
           <Spacer />
           {/* show tooltip with build time */}
           {/* trigger button */}
           {/* <ToggleButton onClick={() => this.setGraphLayout(!this.state.graphLayout)} toggled={this.state.graphLayout}>
             <BsLayoutWtf size={14} />
           </ToggleButton> */}
-          <ToggleButton onClick={() => this.setSimpleMode(!this.state.simpleMode)} toggled={this.state.simpleMode}>
+          <ToggleButton onClick={() => this.setSimpleMode(!this.state.simpleMode)} toggled={this.state.simpleMode} className="hidden-on-small">
             <BsGridFill size={14} />
             <span>
               Advanced Mode

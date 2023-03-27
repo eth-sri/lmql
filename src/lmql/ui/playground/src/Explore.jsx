@@ -86,6 +86,7 @@ const ExploreDialog = styled(Dialog)`
     overflow-y: auto;
     position: relative;
     padding: 10pt;
+    padding-bottom: 80pt;
   }
 
   /* very light white to grey grdient */
@@ -409,7 +410,8 @@ export function Explore() {
           )}
           <h2 key="read-paper">Read the Paper</h2>
           <CiteBox key="cite">
-          Beurer-Kellner, Luca, Marc Fischer, and Martin Vechev. "Prompting Is Programming: A Query Language For Large Language Models." arXiv preprint arXiv:2212.06094 (2022).
+          Beurer-Kellner, Luca, Marc Fischer, and Martin Vechev. "Prompting Is Programming: A Query Language For Large Language Models." 
+          <a target="_blank" rel="noreferrer" href="https://arxiv.org/pdf/2212.06094">arXiv preprint arXiv:2212.06094</a> (2022).
           </CiteBox>
         </ExploreDialog>
     </PromptPopup>

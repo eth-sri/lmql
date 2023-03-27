@@ -89,6 +89,12 @@ span.subtitle a, span.subtitle .link {
   cursor: pointer;
 }
 
+@media (max-width: 40em) {
+  .hidden-on-small {
+    display: none;
+  }
+}
+
 /* 
 #root {
   margin: 100pt;

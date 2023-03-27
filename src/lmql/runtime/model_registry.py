@@ -1,7 +1,8 @@
 class LMQLModelRegistry: pass
 
 model_name_aliases = {
-    "chatgpt": "openai/gpt-3.5-turbo"
+    "chatgpt": "openai/gpt-3.5-turbo",
+    "gpt-4": "openai/gpt-4",
 }
 
 LMQLModelRegistry.registry = {}

@@ -50,7 +50,7 @@ class concurrent:
         self.task.cancel()
 
 async def complete(**kwargs):
-    if kwargs["model"].startswith("gpt-3.5-turbo"):
+    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
         async for r in chat_api(**kwargs): yield r
     else:
         async for r in completion_api(**kwargs): yield r
