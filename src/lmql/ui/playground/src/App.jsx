@@ -43,6 +43,11 @@ const ContentContainer = styled.div`
   flex: 1;
   height: calc(100% - 40pt);
   width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 `;
 
 const Panel = styled.div.attrs(props => ({ className: "panel" }))`
@@ -376,7 +381,15 @@ function TokenCountIndicator() {
 //   }
 // }
 
+const EditorContainer = styled.div`
+  flex: 1;
+  overflow: hidden;
+  height: auto;
+`
+
 function EditorPanel(props) {
+  const editorContainer = useRef(null);
+  
   props = Object.assign({
     onRun: () => { },
   }, props);
@@ -386,9 +399,13 @@ function EditorPanel(props) {
 
   function handleEditorDidMount(editor, monaco) {
     ResizeObservers.addResizeListener(() => {
-      editor.layout({})
+      console.log("editor relayout")
       let fontSize = window.innerWidth < 700 ? 10 : 16
       editor.updateOptions({ "fontSize": fontSize })
+      console.log(editorContainer.current.offsetHeight);
+      window.setTimeout(() => {
+        editor.layout()
+      }, 100)
     })
 
     registerLmqlLanguage(monaco);
@@ -400,6 +417,8 @@ function EditorPanel(props) {
     
     persistedState.on("lmql-editor-contents", (contents) => {
       if (editor.getValue() == contents) return;
+      let fontSize = window.innerWidth < 700 ? 10 : 16
+      editor.updateOptions({ "fontSize": fontSize })
       editor.setValue(contents)
     });
     
@@ -408,13 +427,14 @@ function EditorPanel(props) {
     })
   }
   
-  let fontSize = window.innerWidth < 800 ? 10 : 16
+  let fontSize = window.innerWidth < 700 ? 10 : 16
 
   return (
     <Panel className='stretch max-width-50' id='editor-panel' style={{
       display: "flex",
     }}>
       <h2>Query</h2>
+      <EditorContainer ref={editorContainer}>
       <Editor
         defaultValue={persistedState.getItem("lmql-editor-contents") || ""}
         theme="vs-dark"
@@ -439,6 +459,7 @@ function EditorPanel(props) {
         style={{ maxHeight: "80%" }}
         onMount={handleEditorDidMount}
       />
+      </EditorContainer>
       <ButtonGroup>
         <FancyButton className='green' onClick={props.onRun} disabled={props.processState != "idle" && props.processState != "secret-missing"}>
           {props.processState == "running" ? <>Running...</> : <>&#x25B6; Run</>}
@@ -1251,11 +1272,16 @@ function CompiledCodePanelContent(props) {
   }, []);
 
   const handleEditorDidMount = (editor, monaco) => {
-    ResizeObservers.addResizeListener(() => editor.layout({}))
+    ResizeObservers.addResizeListener(() => {
+      window.setTimeout(() => {
+        editor.layout()
+      }, 100)
+    })
   }
 
   return <CompiledCodeEditorContainer {...props}>
-    <Editor
+  <EditorContainer style={{height: "100%"}}>
+  <Editor
       defaultValue={compiledCode}
       theme="vs-dark"
       value={compiledCode}
@@ -1271,6 +1297,7 @@ function CompiledCodePanelContent(props) {
       defaultLanguage="python"
       onMount={handleEditorDidMount}
     />
+  </EditorContainer>  
   </CompiledCodeEditorContainer>
 }
 
@@ -1751,7 +1778,6 @@ const ButtonGroup = styled.div`
   padding-left: 2pt;
   flex-direction: row;
   justify-content: flex-start;
-  flex: 1;
   z-index: 1;
   
   /* position: absolute;
