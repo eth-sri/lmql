@@ -969,7 +969,7 @@ class Truncated extends React.Component {
 
       elements.push(<span key={i + "_segment-" + c.content} className={(c.variable != "__prompt__" ? "variable " : "") + c.variableClassName}>
         {segmentContent}
-        {!isIncludedIndex(i+1) && this.props.typing && this.props.processStatus == "running" && <TypingIndicator/>}
+        {!isIncludedIndex(i+1) && this.props.typing && this.props.processStatus == "running" && this.props.waitingForInput !== "waiting" && <TypingIndicator/>}
       </span>)
     }
 
@@ -1161,7 +1161,7 @@ function ModelResultContent(props) {
             {r.node.data("seqlogprob").toFixed(4)}
           </span>
         </h3>}
-        <Truncated tokens={r.tokens} typing={useTypingAnimation} processStatus={props.processStatus}></Truncated>
+        <Truncated tokens={r.tokens} typing={useTypingAnimation} processStatus={props.processStatus} waitingForInput={waitingForInput}></Truncated>
         {chatMode && props.processStatus !== "running" && <div className="system-message">To interact with the model, press 'Run' and type your message.</div>}
         {chatMode && props.processStatus === "running" && waitingForInput === "waiting" && <div className="system-message">Type your message below and press Enter.</div>}
       </div>

@@ -48,9 +48,7 @@ class LiveApp:
     @staticmethod
     async def send_input(data):
         try:
-            print("stdin queue is of size {}".format(LiveApp.stdin_queue.qsize()))
             fut = LiveApp.stdin_queue.get_nowait()
-            print("got fut", fut, "setting result", data)
             fut.set_result(data)
         except asyncio.QueueEmpty:
             raise Exception("No input request pending")

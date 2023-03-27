@@ -135,9 +135,7 @@ async function send_input(s) {
 import lmql.ui.live.live as lmql_live
 async def send_input(s):
     try:
-        print("input", s)
         r = await lmql_live.LiveApp.send_input(s)
-        print("done with", r)
         return r
     except Exception as e:
         print(e)
