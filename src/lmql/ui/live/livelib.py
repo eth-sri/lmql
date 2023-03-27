@@ -31,9 +31,6 @@ class LiveApp:
     def kill():
         LiveApp.interrupt = True
 
-    @staticmethod
-    def cli():
-        return asyncio.run(LiveApp.async_cli())
 
     @staticmethod
     async def ainput(string: str = "", web=False) -> str:
@@ -52,6 +49,10 @@ class LiveApp:
             fut.set_result(data)
         except asyncio.QueueEmpty:
             raise Exception("No input request pending")
+    
+    @staticmethod
+    def cli():
+        return asyncio.run(LiveApp.async_cli())
 
     @staticmethod
     async def async_cli(args=None):

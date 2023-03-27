@@ -809,10 +809,16 @@ class OptimisticChunkBasedOpenAIModel:
         self.num_calls = 0
 
     async def tokenize(self, *args, **kwargs):
+        def task():
+            return self.tokenizer.encode(*args, **kwargs)
+        return await asyncio.get_event_loop().run_in_executor(None, task)
         return self.tokenizer.tokenize(*args, **kwargs)
     
     async def detokenize(self, *args, **kwargs):
-        return self.tokenizer.decode(*args, **kwargs)
+        def task():
+            return self.tokenizer.decode(*args, **kwargs)
+        return await asyncio.get_event_loop().run_in_executor(None, task)
+        # return self.tokenizer.decode(*args, **kwargs)
 
     def _complete(self, input_ids, temperature=0, logprobs=1):
         assert len(input_ids) == 1, f"openai model only supports batch size of 1 with logit masks, provided {len(input_ids)}."

@@ -11,7 +11,6 @@ import asyncio
 
 class LiveDebuggerOutputWriter:
     def __init__(self, web):
-        self.message_log = []
         self.records_graph = True
         self.web = web
 
@@ -27,7 +26,7 @@ class LiveDebuggerOutputWriter:
 
     def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
         from lmql.utils.graph import CytoscapeGraphWriter
-
+        
         def node_data(op):
             result = "-"
             if trace is not None and op in trace:
@@ -57,8 +56,7 @@ class LiveDebuggerOutputWriter:
             "where": writer.graph.to_json()
         })
         add_debugger_output(*args)
-        self.message_log.append(args)
-
+        
     def add_compiler_output(self, code): 
         add_debugger_output("compiled-code", {
             "code": code

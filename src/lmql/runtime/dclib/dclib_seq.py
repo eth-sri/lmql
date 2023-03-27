@@ -162,13 +162,32 @@ class DecoderSequence:
     def num_tokens(self):
         return len(self.input_ids) - self.prompt_len
 
+    async def detokenized(self, name):
+        async def seqtext_provider():
+            return str([await get_tokenizer().decode(self.input_ids[1:])][0])
+        async def text_provider():
+            return str([await get_tokenizer().decode(self.input_ids[-1:])])[2:-2]
+        providers = {
+            "seqtext": seqtext_provider,
+            "text": text_provider
+        }
+        
+        if not hasattr(self, "tokenizer_cache"):
+            self.tokenizer_cache = {}
+        if name not in self.tokenizer_cache:
+            assert name in providers, f"Unknown tokenizer cache provider {name}"
+            self.tokenizer_cache[name] = await providers[name]()
+        
+        return self.tokenizer_cache[name]
+
     async def json(self):
-        seqtext = str([await get_tokenizer().decode(self.input_ids[1:])][0]),
-        text = str([await get_tokenizer().decode(self.input_ids[-1:])])[2:-2],
+        seqtext = await self.detokenized("seqtext")
+        text = await self.detokenized("text")
         if self.epsilon_node: text = [""]
         root = False
         if self.predecessor is None:
-            text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
+            text = self.detokenized("seqtext")
+            # text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
             root = True
 
         return {
@@ -398,11 +417,12 @@ class DeterministicDecoderSequence(DecoderSequence):
         return True if len(self.next_ids) == 0 else False
 
     async def json(self):
-        seqtext = str([await get_tokenizer().decode(self.input_ids[1:])][0]),
-        text = str([await get_tokenizer().decode(self.input_ids[-1:])])[2:-2],
+        seqtext = await self.detokenized("seqtext")
+        text = await self.detokenized("text")
         root = False
         if self.predecessor is None:
-            text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
+            text = self.detokenized("seqtext")
+            # text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
             root = True
         
         return {
