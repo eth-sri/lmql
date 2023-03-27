@@ -409,7 +409,7 @@ export function Explore() {
           )}
           <h2 key="read-paper">Read the Paper</h2>
           <CiteBox key="cite">
-          Anonymous Authors
+          Beurer-Kellner, Luca, Marc Fischer, and Martin Vechev. "Prompting Is Programming: A Query Language For Large Language Models." arXiv preprint arXiv:2212.06094 (2022).
           </CiteBox>
         </ExploreDialog>
     </PromptPopup>
