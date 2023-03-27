@@ -151,11 +151,3 @@ window.addEventListener('load', function() {
     document.querySelectorAll('anchor').forEach(e => e.classList.remove('hover'))
   })
 })
-
-// check for local dev
-window.addEventListener('load', function() {
-  // check localhost
-  if (window.location.hostname == 'localhost' || window.location.hostname == '127.0.0.1') {
-    document.querySelector("#playground-link").href = "http://localhost:3000"
-  }
-})

@@ -15,6 +15,9 @@ async def argmax(prompt_ids: np.ndarray, n=1, max_len=2048, **kwargs):
     done = dc.seqs()
     
     step = 0
+    
+    # provide early first result to user
+    yield h
 
     while len(h) > 0:
         h = h.extend(await model.argmax(h))

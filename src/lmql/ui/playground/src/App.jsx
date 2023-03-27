@@ -580,6 +580,18 @@ const ModelResultText = styled.div`
     padding-bottom: 50pt;
   }
 
+  &.chat-mode .system-message {
+    text-align: center;
+    display: block;
+    font-size: 8pt;
+    color: #adadad;
+    margin-top: 10pt;
+  }
+
+  .system-message {
+    display: none;
+  }
+
 
   &::-webkit-scrollbar {
     width: 0px;
@@ -962,6 +974,11 @@ const ExpandButton = styled.button`
 function ModelResultContent(props) {
   const scrollRef = useRef(null)
   let mostLikelyNode = props.mostLikelyNode ? props.mostLikelyNode.data("id") : null
+  const [waitingForInput, setWaitingForInput] = useState("hidden")
+
+  const setInputState = React.useCallback((waiting) => {
+    setWaitingForInput("disabled")
+  })
 
   // on changes to props.mostLikelyNode scroll down to end of scroll view
   useEffect(() => {
@@ -970,6 +987,30 @@ function ModelResultContent(props) {
       scroll.scrollTop = scroll.scrollHeight
     }
   }, [mostLikelyNode, props.trackMostLikly])
+
+  // monitor if LMQLProcess asks for input
+  useEffect(() => {
+    const renderer = {
+      add_result: (data) => {
+        if (data.type == "stdin-request") {
+          setWaitingForInput("waiting")
+        }
+      },
+      clear_results: () => setWaitingForInput("hidden"),
+    };
+
+    LMQLProcess.on("render", renderer)
+    return () => {
+      LMQLProcess.remove("render", renderer)
+    }
+  }, [])
+
+  // when props.processStatus changes from "running", clear waiting for input
+  useEffect(() => {
+    if (props.processStatus != "running") {
+      setWaitingForInput("hidden")
+    }
+  }, [props.processStatus])
 
   let modelResult = null;
   if (props.trackMostLikly) {
@@ -1068,36 +1109,18 @@ function ModelResultContent(props) {
           </span>
         </h3>}
         <Truncated tokens={r.tokens} typing={useTypingAnimation} processStatus={props.processStatus}></Truncated>
+        {chatMode && props.processStatus !== "running" && <div className="system-message">To interact with the model, press 'Run' and type your message.</div>}
       </div>
     })}
     {countedResults.length == 0 && <EmptyModelResult trackMostLikly={props.trackMostLikly} processStatus={props.processStatus}></EmptyModelResult>}
-    <TextInput/>
+    <TextInput enabledState={waitingForInput} setEnabledState={setInputState}></TextInput>
   </ModelResultText>
 }
 
-function TextInput() {
+function TextInput(props) {
   const [value, setValue] = useState("")
-  const [enabledState, setEnabledState] = useState("waiting")
+  const [enabledState, setEnabledState] = [props.enabledState, props.setEnabledState]
   const textareaRef = useRef(null)
-
-  useEffect(() => {
-    const renderer = {
-      add_result: (data) => {
-        if (data.type == "stdin-request") {
-          setEnabledState("waiting")
-          window.setTimeout(() => {
-            textareaRef.current.focus()
-          }, 50)
-        }
-      },
-      clear_results: () => setEnabledState("hidden"),
-    };
-
-    LMQLProcess.on("render", renderer)
-    return () => {
-      LMQLProcess.remove("render", renderer)
-    }
-  }, [])
 
   // use Enter for send and Shift+Enter for newline
   const onKeyDown = (e) => {
@@ -1110,6 +1133,15 @@ function TextInput() {
       }
     }
   }
+
+  // on change of enabledState
+  useEffect(() => {
+    if (enabledState == "waiting") {
+      window.setTimeout(() => {
+        textareaRef.current.focus()
+      }, 50)
+    }
+  }, [enabledState])
 
   if (enabledState == "hidden") {
     return null;
