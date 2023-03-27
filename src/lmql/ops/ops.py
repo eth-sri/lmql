@@ -271,6 +271,7 @@ class WordsOp(Node):
     def final(self, x, operands=None, result=None, **kwargs):
         return x[0]
 
+@LMQLOp("len")
 class LenOp(Node):
     def forward(self, x):
         if x is None: return None

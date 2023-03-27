@@ -17,7 +17,6 @@ import lmql.runtime.lmql_runtime as lmql_runtime
 import tempfile
 from lmql.runtime.prompt_interpreter import DebuggerOutputWriter, StreamingOutputWriter
 from lmql.runtime.model_registry import LMQLModelRegistry
-import inspect
 
 import os
 

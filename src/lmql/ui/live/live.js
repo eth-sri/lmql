@@ -72,10 +72,9 @@ io.on('connection', s => {
     let pid = request.pid
     let process = running_processes[pid]
     if (process) {
-      console.log("app-input: sending text to process with PID", pid)
+      console.log("app-input: sending text to process with PID", pid, text)
       process.stdin.write(text)
-      // emulate enter
-      process.stdin.write("\r")
+      process.stdin.write("\n")
     }
   })
 });

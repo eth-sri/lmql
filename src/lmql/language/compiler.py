@@ -37,10 +37,16 @@ class PromptScope(ast.NodeVisitor):
             self.written_vars.add(v)
             if v in self.free_vars: self.free_vars.remove(v)
 
-        used_template_vars = [v[1:-1] for v in re.findall("\{[A-z0-9]+\}", qstring)]
-        for v in used_template_vars:
-            if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
-                self.free_vars.add(v)
+        # capture set of format vars
+        used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}]+\}", qstring)]
+        for v in used_fstring_expr:
+            if v.startswith(":"):
+                continue
+            parsed = ast.parse(v).body[0].value
+            self.visit(parsed)
+            
+            # if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
+            #     self.free_vars.add(v)
                 
         template_tags = [v[1:-1] for v in re.findall("\{:[A-z0-9]+\}", qstring)]
         for tt in template_tags:
@@ -296,11 +302,9 @@ def get_builtin_name(node, plain_python=False):
         return None
     n = node.id
     
-    mapped_builtins = {
-        "input": "context.input"
-    }
-    if n in mapped_builtins:
-        return mapped_builtins[n]
+    if n in lmql_operation_registry.keys():
+        return lmql_operation_registry[n]
+    
     return None
 
 class DecodeClauseTransformation:

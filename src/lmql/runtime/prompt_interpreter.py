@@ -803,6 +803,10 @@ class PromptInterpreter(LMQLRuntime):
         print("billable tokens: {}".format(client.billable_tokens))
 
     async def run(self, fct, *args, **kwargs):
+        # intercept symbol table entry for input
+        if "input" in kwargs.keys() and kwargs["input"] == input:
+            kwargs["input"] = self.input
+        
         root_head = HypothesisHead(InterpretationHead(fct, None, args = args, kwargs=kwargs), self)
         pool = HypothesesBasedHeadPool(self, root_head)
         return await pool.run()
@@ -814,6 +818,13 @@ class PromptInterpreter(LMQLRuntime):
     def set_distribution(self, distribution_variable, values):
         self.distribution_variable = distribution_variable
         self.distribution_values = values
+
+    async def input(self, *args):
+        """Uses the output_writer input() implementation if available."""
+        if hasattr(self.output_writer, "input"):
+            return await self.output_writer.input(*args)
+        else:
+            return input(*args)
 
     def set_model(self, model):
         if self.force_model:
