@@ -4,7 +4,7 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
+import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
@@ -817,11 +817,12 @@ const ModelResultText = styled.div`
     border-radius: 4pt;
     /* outline radius */
     outline: 0pt solid transparent;
-    border: 2pt solid transparent;
+    border: 1pt solid transparent;
+    background-color: rgba(255, 255, 255, 0.1);
     
     &:focus {
-      border: 2pt solid #6b77ff;
-      background-color: rgba(255, 255, 255, 0.1);
+      border: 1pt solid #6b77ff;
+      box-shadow: 0pt 0pt 10pt 0pt rgba(112, 126, 250, 0.095);
       /* radius of outline */
     }
   }
@@ -1173,7 +1174,7 @@ function ModelResultContent(props) {
 
 function TextInput(props) {
   const [value, setValue] = useState("")
-  const [enabledState, setEnabledState] = [props.enabledState, props.setEnabledState]
+  const [enabledState, setEnabledState] = ["waiting", props.setEnabledState]
   const textareaRef = useRef(null)
 
   // use Enter for send and Shift+Enter for newline
@@ -1213,7 +1214,9 @@ function TextInput(props) {
         setValue("")
         setEnabledState("disabled")
       }
-    }} disabled={enabledState == "disabled"}>Send</FancyButton>
+    }} disabled={enabledState == "disabled"}>
+    <BsSendFill/>
+    </FancyButton>
   </div>
 }
 
