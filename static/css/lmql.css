@@ -556,3 +556,7 @@ figure img {
 .screenshot-mode .side-by-side h3>a {
     display: none;
 }
+
+.query-container {
+    padding: 40pt;
+}
