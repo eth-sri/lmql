@@ -190,6 +190,9 @@ function TokenCountIndicator() {
       return `${format_cost(k_tokens * 0.002, precision)}`
     } else if (model.includes("turbo")) {
       return `${format_cost(k_tokens * 0.002, precision)}`
+    } else if (model.includes("gpt-4")) {
+      // todo this is an estimate, as prompt tokens count less
+      return `${format_cost(k_tokens * 0.06, precision)}`
     } else {
       return ""
     }
@@ -612,6 +615,7 @@ const ModelResultText = styled.div`
     text-align: center;
     display: block;
     font-size: 8pt;
+    background-color: transparent !important;
     color: #adadad;
     margin-top: 10pt;
   }
@@ -1138,9 +1142,10 @@ function ModelResultContent(props) {
         </h3>}
         <Truncated tokens={r.tokens} typing={useTypingAnimation} processStatus={props.processStatus}></Truncated>
         {chatMode && props.processStatus !== "running" && <div className="system-message">To interact with the model, press 'Run' and type your message.</div>}
+        {chatMode && props.processStatus === "running" && waitingForInput === "waiting" && <div className="system-message">Type your message below and press Enter.</div>}
       </div>
     })}
-    {countedResults.length == 0 && <EmptyModelResult trackMostLikly={props.trackMostLikly} processStatus={props.processStatus}></EmptyModelResult>}
+    {countedResults.length == 0 && <EmptyModelResult firstInput={waitingForInput === "waiting"} trackMostLikly={props.trackMostLikly} processStatus={props.processStatus}></EmptyModelResult>}
     <TextInput enabledState={waitingForInput} setEnabledState={setInputState}></TextInput>
   </ModelResultText>
 }
@@ -1194,7 +1199,13 @@ function TextInput(props) {
 function EmptyModelResult(props) {
   if (props.processStatus == "running" && props.trackMostLikly) {
     return <CenterBox>
-      <h2>Waiting for first tokens...</h2>
+      {props.firstInput ? <h2>
+        Interactive Mode<br/>
+        <span className="subtitle">Type your message below and and press Enter to send.</span>
+      </h2> : <h2>
+      <LMQLSpinner/>
+      Waiting for first tokens...
+      </h2>}
     </CenterBox>
   } else {
     return <CenterBox>
@@ -1550,74 +1561,77 @@ function InspectorPane(props) {
   );
 }
 
-// const LMQLSpinnerDiv = styled.div`
-//   &.lmql-spinner {
-//     font-size: 24pt;
-//     font-weight: bold;
-//     line-height: 1.5;
-//     background-color: #5e5e5e !important;
-//     border: 0.5pt solid #212B3B;
-//     width: 25pt;
-//     position: absolute;
-//     height: 16pt;
-//     max-height: 24pt;
-//     border-radius: 2pt;
-//     opacity: 1.0;
-//     display: block;
-//     padding: 0;
-//     flex: 0;
-//     transform: scale(0.7);
-//   }
+const LMQLSpinnerDiv = styled.div`
+  &.lmql-spinner {
+    font-size: 24pt;
+    font-weight: bold;
+    line-height: 1.5;
+    background-color: #353535 !important;
+    border: 0.5pt solid #212B3B;
+    width: 25pt;
+    position: absolute;
+    height: 16pt;
+    max-height: 24pt;
+    border-radius: 2pt;
+    opacity: 1.0;
+    display: block;
+    padding: 0;
+    flex: 0;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%) scale(0.7);
+    margin-bottom: 10pt;
+  }
 
-//   /* both parts pulse with an amplitude offset */
-//   .pt1 {
-//     color: #dd8787;
-//     animation: pulse 1s infinite;
-//     position: absolute;
-//     top: -6pt;
-//     left: 2pt;
-//   } 
-//   .pt2 {
-//     color: white;
-//     font-size: 12pt;
-//     position: absolute;
-//     top: -2.5pt;
-//     right: 2pt;
-//     animation: pulse 1s infinite;
-//     animation-delay: 0.5s;
-//   }
+  /* both parts pulse with an amplitude offset */
+  .pt1 {
+    color: white;
+    animation: pulse 2s infinite;
+    position: absolute;
+    top: -6pt;
+    left: 2pt;
+  } 
+  .pt2 {
+    color: white;
+    font-size: 12pt;
+    position: absolute;
+    top: -2.5pt;
+    right: 2pt;
+    animation: pulse 2s infinite;
+    animation-delay: 1s;
+  }
   
-//   .pt3 {
-//     position: absolute;
-//     bottom: -5pt;
-//     right: 0pt;
-//     border: 5pt solid #5e5e5e;
-//     border-top-color: transparent;
-//     border-left-color: transparent;
-//     border-bottom-color: transparent;
-//   }
+  .pt3 {
+    position: absolute;
+    bottom: -5pt;
+    right: 0pt;
+    border: 5pt solid #353535;
+    border-top-color: transparent;
+    border-left-color: transparent;
+    border-bottom-color: transparent;
+  }
 
-//   /* the animation */
-//   @keyframes pulse {
-//     0% {
-//       opacity: 0.5;
-//     }
-//     50% {
-//       opacity: 1;
-//     }
-//     100% {
-//       opacity: 0.5;
-//     }
-//   }
-// `
+  /* the animation */
+  @keyframes pulse {
+    0% {
+      opacity: 0.1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+    100% {
+      opacity: 0.1;
+    }
+  }
+`
 
-// function LMQLSpinner() {
-//   return <LMQLSpinnerDiv className="lmql-spinner">
-//     <span className='pt1'>*</span>
-//     <span className='pt2'>&gt;</span>
-//     <span className='pt3'></span>
-//   </LMQLSpinnerDiv>
-// }
+function LMQLSpinner() {
+  return <LMQLSpinnerDiv className="lmql-spinner">
+    <span className='pt1'>*</span>
+    <span className='pt2'>&gt;</span>
+    <span className='pt3'></span>
+  </LMQLSpinnerDiv>
+}
 
 
 function SidePanel(props) {

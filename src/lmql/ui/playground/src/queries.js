@@ -202,8 +202,8 @@ where
             state: 'precomputed/translation.json'
          },
          {
-            name: "📊 Conditional Distributions",
-            description: "LM classification by conditional distributions.",
+            name: "📊 Distributions",
+            description: "Classification via LM-based conditional distributions.",
             code: `argmax
    """Review: We had a great stay. Hiking in the mountains was fabulous and the food is really good.\\n
    Q: What is the underlying sentiment of this review and why?\\n
