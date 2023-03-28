@@ -639,13 +639,6 @@ function CheckableToolbarIconButton(props) {
 
 function OutputPanelContent(props) {
   const [output, setOutput] = useState("Client ready.\n");
-  const [_, _setHasError] = useState(false);
-  // connect hasError to global errorState
-  useEffect(() => {
-    const l = s => _setHasError(s)
-    errorState.addListener(l)
-    return () => errorState.removeListener(l)
-  }, [])
 
   const onConsoleOut = data => {
     let newOutput = ""
