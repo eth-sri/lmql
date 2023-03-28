@@ -342,6 +342,7 @@ anchor .dot::after {
 }
 
 anchor.hover .dot::after, anchor:hover .dot::after {
+    animation-delay: 0.0s !important;
     transform: translate(-50%, -50%) scale(1.0);
 }
 
