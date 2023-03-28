@@ -186,14 +186,14 @@ class DecoderSequence:
         if self.epsilon_node: text = [""]
         root = False
         if self.predecessor is None:
-            text = self.detokenized("seqtext")
+            text = await self.detokenized("seqtext")
             # text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
             root = True
 
         return {
             "seq_id": self.id,
             # "input_ids": self.input_ids.tolist(),
-            "text": text,
+            "text": [text],
             "seqtext": seqtext,
             "root": root,
             "logprob": self.logprobs[-1],
@@ -421,14 +421,14 @@ class DeterministicDecoderSequence(DecoderSequence):
         text = await self.detokenized("text")
         root = False
         if self.predecessor is None:
-            text = self.detokenized("seqtext")
+            text = await self.detokenized("seqtext")
             # text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
             root = True
         
         return {
             "seq_id": self.id,
             # "input_ids": self.input_ids.tolist(),
-            "text": text,
+            "text": [text],
             "seqtext": seqtext,
             "root": root,
             "logprob": self.logprobs[-1],

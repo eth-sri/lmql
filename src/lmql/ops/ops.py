@@ -282,8 +282,25 @@ class LenOp(Node):
         if type(v) is list or type(v) is tuple:
             return len(v)
         else:
+            assert type(v) is str, "len() can only be applied to strings, lists, or tuples"
+            if NextToken not in v:
+                return len(v)
             v = strip_next_token(v)
-            return len(v) + 1
+            
+            len_masks = []
+            all = "∅"
+            l = 1
+            while True:
+                tmask = tset(charlen=l)
+                all = tmask.union(all)
+                # if 'all' encompasses all possible tokens, then we have enumerated all possible lengths
+                if len(all) == VocabularyMatcher.instance().vocab_size:
+                    break
+                if len(tmask) > 0:
+                    len_masks.append((tmask, len(v) + l))
+                l += 1
+            
+            return fmap(*len_masks)
 
     def final(self, x, operands=None, result=None, **kwargs):
         return x[0]

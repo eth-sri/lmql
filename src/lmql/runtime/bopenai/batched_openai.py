@@ -579,6 +579,11 @@ class AsyncOpenAIAPI:
         
         return res
 
+    def is_definitive_error(self, e):
+        if "logit biases, but can provide at most" in str(e):
+            return True
+        return False
+
     async def complete_request_worker(self, queue: asyncio.Queue):
         while True:
             kwargs = await queue.get()
@@ -598,9 +603,10 @@ class AsyncOpenAIAPI:
                             raise e
                         self.stats.errors += 1
                         retries -= 1            
-                        print("Failed to call complete endpoint", type(e), e)
+                        print("Failed to call complete endpoint", type(e), e, flush=True)
                         await asyncio.sleep(0.5)
-                        if retries <= 0: raise e
+                        if retries <= 0 or self.is_definitive_error(e):
+                            raise e
                         if type(e) is TimeoutError or type(e) is OpenAIRateLimitError:
                             t = (2.0 * random.random()) ** (self.maximum_retries - retries)
                             print("Backing off for", t , "seconds")
@@ -631,6 +637,10 @@ class AsyncOpenAIAPI:
             print("re-trying request id", request_id)
         
         kwargs = {"future": result_fut, "request_id": request_id, **kwargs}
+        
+        if "logit_bias" in kwargs and len(kwargs["logit_bias"]) > 300:
+            print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints.")
+            kwargs["logit_bias"] = {t:b for t,b in list(kwargs["logit_bias"].items())[0:300]}
 
         assert kwargs.get("echo", False), f"bopenai requires echo=True for to enable proper error recovery. Please handle proper prompt removal in client code."
 

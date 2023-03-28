@@ -153,6 +153,7 @@ const Sidebar = styled.div.attrs(props => ({ className: "sidebar" }))`
   flex-direction: column;
   align-items: center;
   padding-top: 3pt;
+  height: 100%;
 `
 
 const TokenCountDiv = styled.div`

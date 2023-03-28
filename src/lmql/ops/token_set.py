@@ -26,6 +26,8 @@ class VocabularyMatcher:
         # TODO: this should be more complete
         self.space_repr = self.tokenizer.tokenize(" ")[0]
         self.nl_repr = self.tokenizer.tokenize("\n")[0]
+        
+        self.token_lengths = None
 
     @property
     def eos_token_id(self):
@@ -50,9 +52,11 @@ class VocabularyMatcher:
     def vocab_size(self):
         return len(self.vocab)
 
-    def make_mask(self, tokens=None, regex=None, minus=None, prefix=False, exact=False):
+    def make_mask(self, tokens=None, regex=None, minus=None, prefix=False, exact=False, charlen=None):
         if tokens is not None:
             mask = self._make_mask_from_tokens(tokens, prefix, exact=exact)
+        elif charlen is not None:
+            mask = self._make_mask_from_char_length(charlen)
         else:
             assert regex is not None, "TokenSetConcrete: either tokens or regex must be set."
             assert not prefix, "TokenSetConcrete: prefix is not supported for regex."
@@ -76,6 +80,15 @@ class VocabularyMatcher:
                 mask[id] = True
 
         return mask
+
+    def _make_mask_from_char_length(self, length):
+        if self.token_lengths is None:
+            token_lengths = np.zeros([self.vocab_size], dtype=np.int32)
+            for id, subtoken in self.vocab.items():
+                token_lengths[id] = len(subtoken)
+            self.token_lengths = token_lengths
+        
+        return self.token_lengths == length
 
     def _make_mask_from_tokens(self, tokens, prefix, exact=False):
         mask = np.zeros([self.vocab_size], dtype=np.bool_)
@@ -162,6 +175,13 @@ class TokenSetConcrete:
             else:
                 TokenSetConcrete.cache[key] = super(TokenSetConcrete, cls).__new__(cls)
                 return TokenSetConcrete.cache[key]
+        elif "charlen" in kwargs.keys():
+            key = "charlen:" + str(kwargs["charlen"])
+            if key in TokenSetConcrete.cache.keys():
+                return TokenSetConcrete.cache[key]
+            else:
+                TokenSetConcrete.cache[key] = super(TokenSetConcrete, cls).__new__(cls)
+                return TokenSetConcrete.cache[key]
         else:
             tokens = kwargs.get("tokens", args[0])
             assert tokens is not None
@@ -177,13 +197,13 @@ class TokenSetConcrete:
                 TokenSetConcrete.cache[t] = super(TokenSetConcrete, cls).__new__(cls)
                 return TokenSetConcrete.cache[t]
 
-    def __init__(self, tokens=None, minus=False, mask=None, regex=None, prefix=False, exact=False):
+    def __init__(self, tokens=None, minus=False, mask=None, regex=None, prefix=False, exact=False, charlen=None):
         VocabularyMatcher.ensure_ready()
 
         if mask is not None:
             self.mask = mask.copy()
         else: 
-            self.mask = VocabularyMatcher.instance().make_mask(tokens=tokens, regex=regex, minus=minus, prefix=prefix, exact=exact)
+            self.mask = VocabularyMatcher.instance().make_mask(tokens=tokens, regex=regex, minus=minus, prefix=prefix, exact=exact, charlen=charlen)
 
         self._token_str = None
         # for TokenSetSymbolic compatibility
@@ -387,7 +407,9 @@ def union(p1, p2):
 
     return p1.union(p2)
 
-def tset(*tokens, regex=False, prefix=False, exact=False):
+def tset(*tokens, regex=False, prefix=False, exact=False, charlen=None):
+    if charlen is not None:
+        return TokenSet(charlen=charlen)
     if regex:
         assert len(tokens) == 1, "cannot create a TokenSet from multiple regexes."
         return TokenSet(regex=tokens[0])

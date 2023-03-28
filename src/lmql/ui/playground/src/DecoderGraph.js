@@ -509,11 +509,20 @@ export function DecoderGraph(props) {
                     if (!label) {
                         return ""
                     }
-                    label = label.replace(/ /g, "\u23b5")
-                    if (label.length > 20) {
-                        return label.substring(0, 20) + "..."
+                    if (label == "") {
+                        // epsilon
+                        return "\u03b5"
                     }
-                    return label
+                    try {
+                        label = label.replace(/ /g, "\u23b5")
+                        if (label.length > 20) {
+                            return label.substring(0, 20) + "..."
+                        }
+                        return label
+                    } catch (e) {
+                        console.error("error with label", label)
+                        return "<error>"
+                    }
                 }
 
                 // transform nodes and edges
