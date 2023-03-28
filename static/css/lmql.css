@@ -85,8 +85,18 @@ div.secondary {
     background-color: #24272D;
     border: 0.5pt solid grey;
     position: relative;
-    z-index: 8;
     /* very slight box shadow */
+}
+
+.side-by-side .query:before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    border-radius: 4pt;
     box-shadow: 0pt 0pt 40pt 0pt rgba(0, 0, 0, 0.4);
 }
 
@@ -109,6 +119,10 @@ div.secondary {
     flex-direction: row;
     align-items: stretch;
     margin-bottom: 0pt;
+}
+
+.side-by-side.compact {
+    align-items: flex-start;
 }
 
 .side-by-side code, .side-by-side pre {
@@ -171,7 +185,7 @@ div.secondary {
     font-size: 10pt;
 }
 
-.variable-value span.badge {
+.badge, .variable-value span.badge {
     display: inline-block;
     background-color: rgba(0, 0, 0, 0.397);
     margin-left: 1pt;
@@ -263,9 +277,8 @@ anchor:hover {
 }
 
 anchor.hover label, anchor:hover label {
-    display: block;
-    transition-delay: 500ms;
-    transition: opacity 0.25s;
+    visibility: visible;
+    pointer-events: auto;
     opacity: 1.0;
     z-index: 2000;
 }
@@ -286,6 +299,33 @@ anchor .dot {
 
     transition: transform 0.25s, opacity 0.25s;
 }
+
+.selected .dot {
+    opacity: 0.0;
+    animation: fadeIn 0.25s;
+    animation-fill-mode: forwards;
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0.0;
+    }
+    100% {
+        opacity: 1.0;
+    }
+}
+
+.selected anchor.anchor-0 .dot { animation-delay: 0.05s; }
+.selected anchor.anchor-1 .dot { animation-delay: 0.1s; }
+.selected anchor.anchor-2 .dot { animation-delay: 0.15s; }
+.selected anchor.anchor-3 .dot { animation-delay: 0.2s; }
+.selected anchor.anchor-4 .dot { animation-delay: 0.25s; }
+.selected anchor.anchor-5 .dot { animation-delay: 0.3s; }
+.selected anchor.anchor-6 .dot { animation-delay: 0.35s; }
+.selected anchor.anchor-7 .dot { animation-delay: 0.4s; }
+.selected anchor.anchor-8 .dot { animation-delay: 0.45s; }
+.selected anchor.anchor-9 .dot { animation-delay: 0.5s; }
+.selected anchor.anchor-10 .dot { animation-delay: 0.55s; }
 
 anchor .dot::after {
     border-radius: 50%;
@@ -310,12 +350,13 @@ anchor.hover .dot, anchor:hover .dot {
 }
 
 anchor label {
-    display: none;
+    visibility: hidden;
+    pointer-events:none;
     font-family: "Google Sans", sans-serif;
     
     transition-delay: 500ms;
     transition: opacity 0.25s;
-    opacity: 0.2;
+    opacity: 0.0;
     
     z-index: 10;
 
@@ -329,12 +370,13 @@ anchor label {
     color: grey;
     font-weight: normal;
     background-color: transparent;
+    transition: opacity 0.25s;
 
     /* border: 0.5pt solid grey; */
 }
 
 /* popup labels on smaller screens */
-@media only screen and (max-width: 1000pt) {
+@media only screen and (max-width: 1100pt) {
     anchor {
         position: relative;
     }
@@ -356,6 +398,7 @@ anchor label {
         min-width: 220pt;
         border-right: none;
         height: auto;
+        display: inline-block;
     }
 
     anchor label .bridge {
@@ -463,7 +506,7 @@ span.option {
     display: inline-block;
     margin: 2pt;
     margin-top: 4pt;
-    border-radius: 5pt;
+    border-radius: 2pt;
     border: 1pt solid rgba(0, 0, 0, 0.199);
 }
 
@@ -474,14 +517,12 @@ span.option {
 span.option:hover {
     border: 1pt solid rgb(143, 143, 143);
     background-color: rgb(212, 206, 206);
-    border-radius: 5pt;
     cursor: pointer;
 }
 
 span.option.active {
     border: 1pt solid rgb(35, 35, 138);
     background-color: rgb(209, 204, 232);
-    border-radius: 5pt;
 }
 
 .custom-footer {
@@ -559,4 +600,71 @@ figure img {
 
 .query-container {
     padding: 40pt;
+}
+
+.chat .tag {
+    display: none;
+}
+
+.chat .tag-user {
+    position: relative;
+    margin-left: 10%;
+}
+
+.prompt.tag-system {
+    width: 90%;
+    display: block;
+    text-align: center;
+    font-size: 10pt;
+    color: grey;
+    border: none;
+    margin: auto;
+}
+
+.chat .prompt, .chat .variable {
+    padding: 4pt;
+    border-radius: 4pt;
+}
+
+.chat .prompt.tag-user {
+    display: block;
+    margin-top: 4pt;
+    border: 1pt solid grey;
+    width: 90%;
+    background-color: rgb(227, 227, 227);
+}
+
+.chat .variable {
+    margin-top: 4pt;
+    display: block;
+    border: 1pt solid grey;
+    width: 90%;
+    padding: 4pt;
+    background-color: rgba(107, 119, 255, 1.0);
+    color: white;
+}
+
+button.next {
+    border: none;
+    background: transparent;
+    display: inline-block;
+    margin: 0;
+    text-align: left;
+    margin-left: -5pt;
+    margin-top: 2pt;
+    color: hsl(204, 86%, 53%);
+    
+    display: none;
+}
+
+button.next:hover {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+button.next:after {
+    /* use unicode double angled */
+    content: "\00BB";
+    font-size: 10pt;
+    margin-left: 2pt;
 }
