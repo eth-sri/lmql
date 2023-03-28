@@ -80,3 +80,19 @@ export const trackingState = {
   setTrackMostLikely: () => { },
   setSelectedNode: () => { },
 }
+
+export const errorState = {
+  addListener: listener => {
+    errorState.listeners.push(listener);
+  },
+  listeners: [],
+  error: null,
+  setError: (e) => { 
+    errorState.error = e;
+    errorState.listeners.forEach(l => l(e));
+  },
+  removeListener: (listener) => {
+    errorState.listeners = errorState.listeners.filter(l => l !== listener);
+  },
+  showErrorOutput: () => { },
+}

@@ -277,7 +277,7 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
             # follow context
             follow_program_variables: ProgramState = self.program_variables.copy()
             follow_program_variables.set(self.current_variable, text + str(NextToken), scores=self.current_variable_scores, diff=diff_text, montonicity="inc")
-            
+
             # digest token with where expr
             valid, is_final, trace = digest(where,
                 context=program_variables,

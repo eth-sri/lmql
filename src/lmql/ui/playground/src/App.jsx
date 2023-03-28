@@ -4,12 +4,12 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsArrowRightCircle, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
+import { BsSquare, BsFillExclamationSquareFill, BsArrowRightCircle, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
 import { ExploreState, Explore, PromptPopup, Dialog } from './Explore'
-import { persistedState, trackingState } from "./State"
+import { errorState, persistedState, trackingState } from "./State"
 import { configuration, LMQLProcess, isLocalMode} from './Configuration';
 import { ValidationGraph } from "./ValidationGraph";
 import { DataListView } from "./DataListView";
@@ -473,11 +473,57 @@ function EditorPanel(props) {
           {/* utf8 stop square */}
           <i>&#x25A0;</i> Stop
         </StopButton>
+        <ErrorIndicator/>
         {/* <Spacer></Spacer> */}
         <TokenCountIndicator />
       </ButtonGroup>
     </Panel>
   );
+}
+
+const ButtonErrorIndicator = styled.button`
+  background: none;
+  border: none;
+  color: #dda7a7;
+  font-weight: bold;
+  border-radius: 5pt;
+  font-size: 8pt;
+  display: inline-block;
+  padding: 4pt;
+
+  :hover {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  svg {
+    margin-right: 4pt;
+    position: relative;
+    top: 1pt;
+    color: #a23a3a;
+  }
+`
+
+function ErrorIndicator() {
+  const [hasError, _setHasError] = useState(false);
+  // connect hasError to global errorState
+  useEffect(() => {
+    const l = s => _setHasError(s)
+    errorState.addListener(l)
+    return () => errorState.removeListener(l)
+  }, [])
+
+  const onClick = () => {
+    errorState.setError(false);
+    errorState.showErrorOutput()
+  }
+
+  if (!hasError) return null;
+
+  return <ButtonErrorIndicator onClick={onClick}>
+    <BsFillExclamationSquareFill/>
+    Check Output
+  </ButtonErrorIndicator>
 }
 
 const Row = styled.div`
@@ -593,22 +639,37 @@ function CheckableToolbarIconButton(props) {
 
 function OutputPanelContent(props) {
   const [output, setOutput] = useState("Client ready.\n");
+  const [hasError, _setHasError] = useState(false);
+  // connect hasError to global errorState
+  useEffect(() => {
+    const l = s => _setHasError(s)
+    errorState.addListener(l)
+    return () => errorState.removeListener(l)
+  }, [])
 
   const onConsoleOut = data => {
+    let newOutput = ""
     if (typeof data === 'string') {
-      setOutput(s => s + data);
+      newOutput = data
     } else {
-      setOutput(s => s + JSON.stringify(data, null, 2));
+      newOutput = JSON.stringify(data, null, 2);
     }
+    /* console.lo(newOutput) */
+    if (newOutput.toLowerCase().includes("error") || newOutput.toLowerCase().includes("exception")) {
+      errorState.setError(true)
+    }
+    setOutput(s => s + newOutput);
   };
 
   // on mount
   useEffect(() => LMQLProcess.addConsoleListener(onConsoleOut))
+
   // on unmount
   useEffect(() => () => LMQLProcess.remove("console", onConsoleOut))
 
   props.clearTrigger.addTriggerListener(() => {
     setOutput("");
+    errorState.setError(false);
   })
 
   props = Object.assign({}, props)
@@ -783,12 +844,13 @@ const ModelResultText = styled.div`
     position: absolute;
     bottom: 0;
     left: 0;
-    right: 0;
+    right: 35pt;
     background-color: ${bg} !important;
     border-top: 1pt solid #5c5c5c;
     box-shadow: 0pt 0pt 10pt 0pt rgba(0, 0, 0, 0.5);
     padding: 5pt;
-    padding-top: 18pt;
+    /* padding-top: 18pt; */
+    padding-right: 7.5pt;
     display: flex;
   }
 
@@ -1204,8 +1266,7 @@ function TextInput(props) {
   }
 
   return <div className={"chat-input" + (enabledState == "disabled" ? " disabled" : "")}>
-    <h3>Input</h3>
-    <textarea type="text" value={value} onChange={(e) => setValue(e.target.value)} ref={textareaRef} disabled={enabledState == "disabled"} onKeyDown={onKeyDown}></textarea>
+    <textarea placeholder="Input" type="text" value={value} onChange={(e) => setValue(e.target.value)} ref={textareaRef} disabled={enabledState == "disabled"} onKeyDown={onKeyDown}></textarea>
     <FancyButton onClick={() => {
       if (enabledState == "disabled") {
         return;
@@ -1689,6 +1750,11 @@ function SidePanel(props) {
     } else {
       setSidepanel(panel);
     }
+  }
+
+  // when click "Check Output" change the sidepanel to output
+  errorState.showErrorOutput = () => {
+    setSidepanel("output")
   }
 
   const visible = sidepanel != null;
