@@ -180,10 +180,18 @@ function Query(q, showcase_info, id, i) {
                 console.error(`Anchor ${k} not found in code`)
             }
             if (label.type === "multiline") {
-                code_formatted = code_formatted.replace(k, `<anchor>${k}<label><div class="multiline">${label.text}</div><div class="bridge"></div></label><div class="dot"></div></anchor>`)
+                code_formatted = code_formatted.replace(k, `<anchor>${k}<label><div class="multiline">${label.text}</div><div class="bridge"></div>
+                </label><div class="dot"></div></anchor>`)
             } else {
-                code_formatted = code_formatted.replace(k, `<anchor>${k}<label><div class="multiline">${label}</div><div class="bridge"></div></label><div class="dot"></div></anchor>`)
+                code_formatted = code_formatted.replace(k, `<anchor>${k}<label><div class="multiline">${label}</div><div class="bridge"></div>
+                </label><div class="dot"></div></anchor>`)
             }
+        })
+
+        // scan code_formatted via regex for <anchor> and replace with <anchor class="anchor-1">...</anchor>
+        let j = 0;
+        code_formatted = code_formatted.replaceAll(/<anchor>/g, (match, p1) => {
+            return `<anchor class="anchor-${++j}">`
         })
     }
 
@@ -251,11 +259,17 @@ function Query(q, showcase_info, id, i) {
     }
 
     if (showcase_info["extra-output"]) {
+        if (showcase_info["extra-output"].startsWith("<clear/>")) {
+            model_output = ""
+            showcase_info["extra-output"] = showcase_info["extra-output"].substring("<clear/>".length)
+        }
         model_output += showcase_info["extra-output"]
     }
 
+    const compactClass = showcase_info["compact"] ? " compact" : ""
+
     const template = `
-<div id="${id}" class="side-by-side ${i == 0 ? 'first' : ''}">
+<div id="${id}" class="side-by-side${compactClass} ${i == 0 ? 'first' : ''}">
     <div class="query">
         <h3>
             LMQL

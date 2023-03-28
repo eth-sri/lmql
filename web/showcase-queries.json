@@ -101,5 +101,25 @@
             "<span class=\"lmql-kw\">for</span> i <span class=\"lmql-kw\">in</span> range(32):": "During reasoning, we make sure to intercept any <tt>assign</tt> and <tt>get</tt> actions, and inject the corresponding return values on the fly."
         },
         "truncate_output": 740
+    },
+    "precomputed/chat.json": {
+        "name": "Chatbot",
+        "variables": ["JOKE", "PUNCHLINE"],
+        "compact": true,
+        "anchors": {
+            "{:system}": {
+                "type": "multiline",
+                "text": "The prompt clause can contain special marker tokens like <tt>{:system}</tt> or <tt>{:user}</tt>, to mark parts of the prompt with different roles (e.g. required for Chat models)."
+            },
+            "await input()": {
+                "type": "multiline",
+                "text": "The prompt clause can also contain I/O code like <tt>await input()</tt>, enables interactive queries, integrating user input during query execution, e.g. for chatbot-like interfaces."
+            },
+            "\"chatgpt\"": {
+                "type": "multiline",
+                "text": "LMQL also supports <a href=\"https://platform.openai.com/docs/guides/chat\" target=\"_blank\">OpenAI Chat models</a>, including ChatGPT and GPT-4."
+            }
+        },
+        "extra-output": "<clear/><div class=\"chat\"><span class=\"tag\"><span class=\"content\">&lt;lmql:system/&gt;</span></span><span class=\"prompt tag-system\"><span class=\"content\"> You are a marketing chatbot for the language model query language (LMQL).</span></span><span class=\"tag\"><span class=\"content\">&lt;lmql:user/&gt;</span></span><span class=\"prompt tag-user\"><span class=\"content\"> What is the best way to interact with LLMs?</span></span><span class=\"tag\"><span class=\"content\">&lt;lmql:assistant/&gt;</span></span><span class=\"variable v0 tag-assistant\"><span class=\"badge\">ANSWER</span><span class=\"content\"> The best way to interact with LLMs (Language Model Models) is through a query language like LMQL. LMQL allows you to easily and efficiently query large language models and retrieve the information you need. With LMQL, you can specify the input text, the output format, and the model you want to use , all in a single query. This makes it easy to integrate LLMs into your applications and workflows, and to get the most out of these powerful language models. Additionally, LMQL provides a standardized way of interacting with LLMs, which makes it easier for developers and data scientists to collaborate and share their work .</span></span></div>"
     }
 }
