@@ -315,17 +315,17 @@ anchor .dot {
     }
 }
 
-.selected anchor.anchor-0 .dot { animation-delay: 0.05s; }
-.selected anchor.anchor-1 .dot { animation-delay: 0.1s; }
-.selected anchor.anchor-2 .dot { animation-delay: 0.15s; }
-.selected anchor.anchor-3 .dot { animation-delay: 0.2s; }
-.selected anchor.anchor-4 .dot { animation-delay: 0.25s; }
-.selected anchor.anchor-5 .dot { animation-delay: 0.3s; }
-.selected anchor.anchor-6 .dot { animation-delay: 0.35s; }
-.selected anchor.anchor-7 .dot { animation-delay: 0.4s; }
-.selected anchor.anchor-8 .dot { animation-delay: 0.45s; }
-.selected anchor.anchor-9 .dot { animation-delay: 0.5s; }
-.selected anchor.anchor-10 .dot { animation-delay: 0.55s; }
+.selected anchor.anchor-0 .dot { animation-delay: 0.0s; }
+.selected anchor.anchor-1 .dot { animation-delay: 0.0s; }
+.selected anchor.anchor-2 .dot { animation-delay: 0.3s; }
+.selected anchor.anchor-3 .dot { animation-delay: 0.4s; }
+.selected anchor.anchor-4 .dot { animation-delay: 0.5s; }
+.selected anchor.anchor-5 .dot { animation-delay: 0.6s; }
+.selected anchor.anchor-6 .dot { animation-delay: 0.7s; }
+.selected anchor.anchor-7 .dot { animation-delay: 0.8s; }
+.selected anchor.anchor-8 .dot { animation-delay: 0.9s; }
+.selected anchor.anchor-9 .dot { animation-delay: 1.0s; }
+.selected anchor.anchor-10 .dot { animation-delay: 1.1s; }
 
 anchor .dot::after {
     border-radius: 50%;
@@ -377,7 +377,7 @@ anchor label {
 }
 
 /* popup labels on smaller screens */
-@media only screen and (max-width: 1100pt) {
+@media only screen and (max-width: 1070pt) {
     anchor {
         position: relative;
     }
