@@ -314,4 +314,10 @@ const index_html = fs.readFileSync("index.template.html")
 let index_html_output = index_html.toString().replace("<%SAMPLES%>", q_text)
 let query_options = queries.map((q,i) => `<span class="option ${i==0?'active':''}" value="${q.id}">${q.name}</span>`).join("\n")
 index_html_output = index_html_output.replace("<%SAMPLES_LIST%>", query_options)
+// last update date and hour+minute Zurich time
+const now = new Date()
+const formatted = new Date().toLocaleString('en-US', { timeZone: 'Europe/Zurich', weekday: 'short', month: 'short', day: 'numeric' , hour: 'numeric', minute: 'numeric' })
+const timezone = now.toLocaleString('en-US', { timeZoneName: 'short' }).split(' ').pop()
+index_html_output = index_html_output.replace("<%LAST_UPDATED%>.", formatted + " (" + timezone + ")")
+
 fs.writeFileSync("index.html", index_html_output)
