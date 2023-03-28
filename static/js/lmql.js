@@ -77,7 +77,7 @@ window.addEventListener('load', function() {
     window.location.hash = id
     let that = this;
 
-    if (!window.matchMedia("(max-width: 1100pt)").matches) {
+    if (!window.matchMedia("(max-width: 1070pt)").matches) {
       window.setTimeout(function() {
         // find first <anchor> in example element
         let anchor = document.querySelector('#' + selected).querySelectorAll('anchor')[0]
