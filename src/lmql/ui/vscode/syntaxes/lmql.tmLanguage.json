@@ -1,0 +1,30 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "lmql-code",
+	"patterns": [
+		{
+			"include": "source.python#comments"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#template_variables"
+		},
+		{
+			"include": "source.python#statement"
+		},
+		{
+			"include": "source.python#expression"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.lmql",
+				"match": "\\b(BEAM|beam|ARGMAX|argmax|SAMPLE|BEST_K|best_k|BEAM_VAR|beam_var|VAR|var|sample|FROM|from|WHERE|where|DISTRIBUTION|distribution)\\b"
+			}]
+		}
+	},
+	"scopeName": "source.lmql"
+}

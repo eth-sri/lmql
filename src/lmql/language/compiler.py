@@ -410,6 +410,21 @@ class LMQLModule(object):
 def unparse_list(ast_elements):
     return ", ".join([astunparse.unparse(e).strip() for e in ast_elements])
 
+def preprocess_text(lmql_code):
+    if lmql_code.startswith("lmql"):
+        lmql_code = lmql_code[4:]
+    while lmql_code.startswith("\n") or lmql_code.startswith(" "):
+        if lmql_code.startswith("\n"):
+            lmql_code = lmql_code[1:]
+            break
+        else:
+            lmql_code = lmql_code[1:]
+    
+    # remove common indent
+    lines = lmql_code.split("\n")
+    common_indent = min([len(l) - len(l.lstrip()) for l in lines if len(l.strip()) > 0])
+    return "\n".join([l[common_indent:] for l in lines])
+
 class LMQLCompiler:
     def __init__(self):
         pass
@@ -419,8 +434,8 @@ class LMQLCompiler:
             # parse file
             with open(filepath) as f:
                 contents = f.read()
-            lmql_code = contents
-            buf = StringIO(contents)
+            lmql_code = preprocess_text(contents)
+            buf = StringIO(lmql_code)
             parser = LanguageFragmentParser()
             q = parser.parse(buf.readline)
 

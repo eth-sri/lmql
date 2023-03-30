@@ -102,8 +102,18 @@ async def run(code, output_writer=None):
     os.chdir(os.path.join(os.path.dirname(__file__), "../../")) 
     return await run_file(temp_lmql_file, output_writer=output_writer)
         
+def _query_from_string(s):
+    temp_lmql_file = tempfile.mktemp(suffix=".lmql")
+    with open(temp_lmql_file, "w") as f:
+        f.write(s)
+    module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
+    return module.query
+        
 def query(fct):
     import inspect
+    
+    # support for lmql.query(<query string>)
+    if type(fct) is str: return _query_from_string(fct)
     
     calling_frame = inspect.stack()[1]
     scope = LMQLInputVariableScope(fct, calling_frame)

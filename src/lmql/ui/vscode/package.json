@@ -1,0 +1,42 @@
+{
+  "name": "lmql",
+  "displayName": "Language Model Query Language (LMQL)",
+  "description": "Language Model Query Language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.76.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "lmql",
+      "aliases": ["Language Model Query Language", "lmql"],
+      "extensions": [".lmql"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "lmql",
+      "scopeName": "source.lmql",
+      "path": "./syntaxes/lmql.tmLanguage.json"
+      },
+      {
+        "path": "./syntaxes/pylmql.json",
+        "scopeName": "pylmql.injection",
+        "injectTo": ["source.python"]
+      },
+      {
+        "path": "./syntaxes/lmql.qstring.json",
+        "scopeName": "lmql.qstring.injection",
+        "injectTo": [
+          "source.python",
+          "source.lmql"
+        ]
+      }
+    ]
+  },
+  "repository": "https://github.com/eth-sri/lmql",
+  "homepage": "https://lmql.ai",
+  "bugs": "https://github.com/eth-sri/lmql/issues"
+}

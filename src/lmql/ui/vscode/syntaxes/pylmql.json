@@ -1,0 +1,31 @@
+{
+    "scopeName": "pylmql.injection",
+    "injectionSelector": "L:source.python",
+    "patterns": [
+        {
+            "name": "comment.inline-lmql",
+            "begin": "\\'\\'\\'lmql",
+            "end": "[\\s]*\\'\\'\\'$",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.string.begin.python"
+                }
+            },
+            "endCaptures": {
+                "1": {
+                    "name": "punctuation.definition.string.end.python"
+                }
+            },
+            "contentName": "keyword.operator",
+            "patterns": [
+                {
+                    "include": "source.lmql"
+                },
+                {
+                    "match": "\\'\\'\\'lmql",
+                    "name": "keyword"
+                }
+            ]
+        }
+    ]
+}
