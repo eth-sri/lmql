@@ -77,7 +77,7 @@ window.addEventListener('load', function() {
     if (id == "joke") {
       // remove hash
       if (window.location.hash != "") {
-        window.location.hash = ""
+        history.pushState('', document.title, window.location.pathname);
       }
     } else {
       window.location.hash = id
