@@ -74,7 +74,9 @@ window.addEventListener('load', function() {
     // set anchor
     let id = selected.substr("precomputed-".length)
     id = id.substr(0, id.length-"-json".length)
-    window.location.hash = id
+    if (id != "joke") {
+      window.location.hash = id
+    }
     let that = this;
 
     if (!window.matchMedia("(max-width: 1070pt)").matches) {
