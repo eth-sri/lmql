@@ -74,7 +74,12 @@ window.addEventListener('load', function() {
     // set anchor
     let id = selected.substr("precomputed-".length)
     id = id.substr(0, id.length-"-json".length)
-    if (id != "joke") {
+    if (id == "joke") {
+      // remove hash
+      if (window.location.hash != "") {
+        window.location.hash = ""
+      }
+    } else {
       window.location.hash = id
     }
     let that = this;
