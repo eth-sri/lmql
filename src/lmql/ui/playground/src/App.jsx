@@ -9,17 +9,12 @@ import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
 import { ExploreState, Explore, PromptPopup, Dialog } from './Explore'
-import { errorState, persistedState, trackingState} from "./State"
+import { errorState, persistedState, trackingState, displayState} from "./State"
 import { configuration, LMQLProcess, isLocalMode} from './Configuration';
 import { ValidationGraph } from "./ValidationGraph";
 import { DataListView } from "./DataListView";
 
 import {reconstructTaggedModelResult} from "./tagged-model-result"
-
-const displayState = {
-  mode: window.location.hash.startsWith("#embed") ? "embed" : "playground",
-  embedFile: null
-}
 
 const ExploreIc = styled.img.attrs(props => ({ src: exploreIcon }))`
   width: 8pt;
@@ -2416,30 +2411,6 @@ class App extends React.Component {
   }
 
   componentDidMount() {
-    // check for snippet or embed
-    let snippet = window.location.hash.substr(1)
-    if (snippet) {
-      let file = null;
-      /* check for embed= or snippet= */
-      if (snippet.startsWith("embed=")) {
-        file = snippet.substr(6)
-      } else if (snippet.startsWith("snippet=")) {
-        file = snippet.substr(8)
-      }
-      window.history.pushState('', document.title, window.location.pathname);
-    
-      /* load file as JSON */
-      if (file) {
-        fetch(file).then(r => r.text()).then(data => {
-          if (data) {
-            displayState.embedFile = file
-            persistedState.load(data)
-          }
-        })
-      }
-    }
-        
-
     LMQLProcess.addConsoleListener(console.log)
     LMQLProcess.on("status", s => this.setStatus(s))
     LMQLProcess.addRenderer(this)

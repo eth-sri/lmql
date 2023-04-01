@@ -1,3 +1,8 @@
+export const displayState = {
+  mode: window.location.hash.startsWith("#embed") ? "embed" : "playground",
+  embedFile: null
+}
+
 class PersistedState {
     constructor() {
       this.items = {}
@@ -17,6 +22,29 @@ class PersistedState {
       Object.keys(this.items).forEach(key => {
         this.items[key] = window.localStorage.getItem(key);
       })
+
+      // check for snippet or embed
+      let snippet = window.location.hash.substr(1)
+      if (snippet) {
+        let file = null;
+        /* check for embed= or snippet= */
+        if (snippet.startsWith("embed=")) {
+          file = snippet.substr(6)
+        } else if (snippet.startsWith("snippet=")) {
+          file = snippet.substr(8)
+        }
+        window.history.pushState('', document.title, window.location.pathname);
+      
+        /* load file as JSON */
+        if (file) {
+          fetch(file).then(r => r.text()).then(data => {
+            if (data) {
+              displayState.embedFile = file
+              this.load(data)
+            }
+          })
+        }
+      }
     }
 
     load(data) {

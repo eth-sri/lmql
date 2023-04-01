@@ -27,7 +27,7 @@ jobs:
     - uses: actions/upload-artifact@v1
       with:
         name: DocumentationHTML
-        path: docs/build/
+        path: docs/build/html/doc-snippets
     - name: Prepare Node.js environment
       uses: actions/setup-node@v3
       with:
@@ -36,7 +36,7 @@ jobs:
       name: Restore docs/build/html
       with:
         name: DocumentationHTML
-        path: docs/build/
+        path: docs/build/html/doc-snippets
     - name: Build web/ and In-Browser LMQL Distribution
       run: cd web && bash deploy.sh
     
