@@ -16,10 +16,27 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Sphinx Build
+      # You may pin to the exact commit or the version.
+      # uses: ammaraskar/sphinx-action@8b4f60114d7fd1faeba1a712269168508d4750d2
+      uses: ammaraskar/sphinx-action@0.4
+    - name: Clean permissions
+      # You may pin to the exact commit or the version.
+      # uses: main-quest/actions.clean-permissions@c8603ac2fddde3426082da840e0baff43a6505af
+      uses: main-quest/actions.clean-permissions@v1.0.4
+    - uses: actions/upload-artifact@v1
+      with:
+        name: DocumentationHTML
+        path: docs/build/
     - name: Prepare Node.js environment
       uses: actions/setup-node@v3
       with:
         node-version: 19.x
+    - uses: actions/download-artifact@v3
+      name: Restore docs/build/html
+      with:
+        name: DocumentationHTML
+        path: docs/build/
     - name: Build web/ and In-Browser LMQL Distribution
       run: cd web && bash deploy.sh
     

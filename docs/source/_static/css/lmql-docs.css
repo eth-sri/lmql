@@ -1,0 +1,40 @@
+.highlight.lmql {
+    border: 1pt solid rgb(212, 212, 212);
+    position: relative;
+}
+
+.highlight.lmql iframe {
+    background-color: var(--pst-color-background);
+}
+
+.highlight.lmql.playground {
+    border: none;
+}
+
+.highlight.lmql pre {
+    border: none;
+}
+
+.highlight pre {
+    padding-top: 20pt !important;
+    padding-bottom: 20pt !important;
+}
+
+.highlight.lmql button {
+    background: transparent;
+    border: none;
+
+    text-align: right;
+    font-size: 0.8em;
+    font-weight: regular;
+    padding: 0;
+    position: absolute;
+    top: 5pt;
+    right: 5pt;
+    color: var(--pst-color-link);
+}
+
+.highlight.lmql button:hover {
+    cursor: pointer;
+    text-decoration: underline;
+}

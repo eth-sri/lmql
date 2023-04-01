@@ -26,6 +26,11 @@ popd
 # copy playground
 cp -r ../src/lmql/ui/playground/build/* ../web-deploy/playground/
 
+# copy documentation snippets
+pushd ../docs
+cp -r build/html/doc-snippets ../web-deploy/playground/doc-snippets
+popd
+
 echo "📦  Packaging LMQL for In-Browser use..."
 echo $(pwd)
 pushd browser-build

@@ -4,17 +4,22 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsFillExclamationSquareFill, BsArrowRightCircle, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
+import { BsSquare, BsFillExclamationSquareFill, BsBoxArrowUpRight, BsArrowRightCircle, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
 import { ExploreState, Explore, PromptPopup, Dialog } from './Explore'
-import { errorState, persistedState, trackingState } from "./State"
+import { errorState, persistedState, trackingState} from "./State"
 import { configuration, LMQLProcess, isLocalMode} from './Configuration';
 import { ValidationGraph } from "./ValidationGraph";
 import { DataListView } from "./DataListView";
 
 import {reconstructTaggedModelResult} from "./tagged-model-result"
+
+const displayState = {
+  mode: window.location.hash.startsWith("#embed") ? "embed" : "playground",
+  embedFile: null
+}
 
 const ExploreIc = styled.img.attrs(props => ({ src: exploreIcon }))`
   width: 8pt;
@@ -400,10 +405,8 @@ function EditorPanel(props) {
 
   function handleEditorDidMount(editor, monaco) {
     ResizeObservers.addResizeListener(() => {
-      console.log("editor relayout")
       let fontSize = window.innerWidth < 700 ? 10 : 16
       editor.updateOptions({ "fontSize": fontSize })
-      console.log(editorContainer.current.offsetHeight);
       window.setTimeout(() => {
         editor.layout()
       }, 100)
@@ -429,6 +432,7 @@ function EditorPanel(props) {
   }
   
   let fontSize = window.innerWidth < 700 ? 10 : 16
+  if (displayState.mode == "embed") fontSize = 10
 
   return (
     <Panel className='stretch max-width-50' id='editor-panel' style={{
@@ -1807,6 +1811,9 @@ function SidePanel(props) {
       {/* <StatisticsPanelContent style={{display: sidepanel === 'stats' ? 'flex' : 'none'}}/> */}
 
       <Sidebar>
+        {displayState.mode == "embed" && displayState.embedFile && <IconButton onClick={() => window.open(window.location.href.split('#')[0] + "#snippet=" + displayState.embedFile, "_blank")}>
+          <BsBoxArrowUpRight size={16} />
+        </IconButton>}
         <IconButton onClick={() => setSidepanelTo('model')} className={sidepanel === 'model' ? 'active' : ''}>
           <BsFillChatLeftTextFill size={16} />
         </IconButton>
@@ -1821,6 +1828,10 @@ function SidePanel(props) {
         {/* <IconButton onClick={() => setSidepanelTo('stats')} className={sidepanel === 'stats' ? 'active' : ''}>
           <BsFileBarGraph size={16}/>
         </IconButton> */}
+        <ToolbarSpacer/>
+        {displayState.mode == "embed" && <IconButton className="bottom" onClick={() => OpenAICredentialsState.setOpen(true)}>
+          <BsGear size={16} />
+        </IconButton>}
       </Sidebar>
     </Panel>
   );
@@ -1832,6 +1843,10 @@ const Toolbar = styled.div`
   justify-content: flex-start;
   align-items: center;
   margin-bottom: 0pt;
+
+  .bottom {
+    margin-top: 40pt;
+  }
 `
 
 const ButtonGroup = styled.div`
@@ -2203,7 +2218,7 @@ function OpenAICredentials() {
 
   return <PromptPopup>
     <div className="click-handler" onClick={() => OpenAICredentialsState.setOpen(false)}/>
-    <Dialog>
+    <Dialog style={{transform: "scale(" + (displayState.mode == "embed" ? 0.8 : 1) + ")"}}>
       <h1>OpenAI Credentials</h1>
       <Explainer>
         <p>
@@ -2401,6 +2416,30 @@ class App extends React.Component {
   }
 
   componentDidMount() {
+    // check for snippet or embed
+    let snippet = window.location.hash.substr(1)
+    if (snippet) {
+      let file = null;
+      /* check for embed= or snippet= */
+      if (snippet.startsWith("embed=")) {
+        file = snippet.substr(6)
+      } else if (snippet.startsWith("snippet=")) {
+        file = snippet.substr(8)
+      }
+      window.history.pushState('', document.title, window.location.pathname);
+    
+      /* load file as JSON */
+      if (file) {
+        fetch(file).then(r => r.text()).then(data => {
+          if (data) {
+            displayState.embedFile = file
+            persistedState.load(data)
+          }
+        })
+      }
+    }
+        
+
     LMQLProcess.addConsoleListener(console.log)
     LMQLProcess.on("status", s => this.setStatus(s))
     LMQLProcess.addRenderer(this)
@@ -2475,7 +2514,7 @@ class App extends React.Component {
 
     return (
       <ContentContainer className={this.state.graphLayout ? 'graph-layout' : ''}>
-        <Toolbar>
+        {displayState.mode != "embed" && <Toolbar>
           <Title>
             <img src="/lmql.svg" alt="LMQL Logo"/>  
             LMQL Playground
@@ -2517,7 +2556,7 @@ class App extends React.Component {
               </span>
             </TopBarMenu>
           </ToggleButton>
-        </Toolbar>
+        </Toolbar>}
         <Row className={simpleModeClassName + " simple"}>
           <EditorPanel onRun={this.onRun.bind(this)} processState={this.state.status} connectionState={this.state.status} />
           <SidePanel selectedNodeInfo={this.state.selectedNodeInfo} selectedNode={this.state.selectedNode} selectedNodes={this.state.selectedNodes} mostLikelyNode={this.state.mostLikelyNode} processStatus={this.state.processState} simpleMode={this.state.simpleMode}/>
@@ -2527,7 +2566,7 @@ class App extends React.Component {
           <InspectorPane nodeInfo={this.state.selectedNodeInfo}></InspectorPane>
         </Row>
         <OpenAICredentials />
-        {configuration.DEMO_MODE && <Explore />}
+        {configuration.DEMO_MODE && displayState.mode != "embed" && <Explore />}
       </ContentContainer>
     );
   }

@@ -1,3 +1,9 @@
+import os
+import sys
+
+# include ./_ext in path
+sys.path.insert(0, os.path.abspath('_ext'))
+
 # Configuration file for the Sphinx documentation builder.
 
 # -- Project information
@@ -17,7 +23,8 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
-    "myst_parser"
+    "myst_parser",
+    "lmql_snippets"
 ]
 
 source_suffix = {
