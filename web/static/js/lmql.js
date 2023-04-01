@@ -186,3 +186,24 @@ function nextAnchor(el) {
   el = findParent(el, 'side-by-side').querySelector('.anchor-' + (n+1))
   hoverAnchor.call(el, null)
 }
+
+function replay(element) {
+  // reload contents of <img> tag
+  let object = element.parentElement.querySelector('object')
+  object.contentDocument.location.reload(true);
+}
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    const square = entry.target.querySelector('.square');
+
+    if (entry.isIntersecting) {
+      replay(document.getElementById('decoding-animation'))
+    }
+  });
+});
+
+window.addEventListener('load', function() {
+  console.log(document.getElementById('decoding-animation'))
+  observer.observe(document.getElementById('decoding-animation'))
+})
