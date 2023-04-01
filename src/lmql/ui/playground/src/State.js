@@ -33,10 +33,11 @@ class PersistedState {
         } else if (snippet.startsWith("snippet=")) {
           file = snippet.substr(8)
         }
-        window.history.pushState('', document.title, window.location.pathname);
+        // window.history.pushState('', document.title, window.location.pathname);
       
         /* load file as JSON */
         if (file) {
+          console.log("loading snippet from", file)
           fetch(file).then(r => r.text()).then(data => {
             if (data) {
               displayState.embedFile = file
