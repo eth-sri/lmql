@@ -18,6 +18,7 @@ LMQL is a research project by the `Secure,  Reliable, and Intelligent Systems La
 
 .. lmql::
     name::hello
+    # this sample was updated
     argmax
         """A list of good dad jokes. A indicates the punchline
         Q: How does a penguin build its house?

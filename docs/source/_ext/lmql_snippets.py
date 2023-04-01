@@ -8,7 +8,7 @@ from pygments.formatters import HtmlFormatter
 import os
 import json
 
-PLAYGROUND_URL = "http://localhost:3000/"
+PLAYGROUND_URL = "https://lbeurerkellner.github.io/green-gold-dachshund-web/playground/"
 
 class LmqlLexer(PythonLexer):
     EXTRA_KEYWORDS = set((
