@@ -6,7 +6,7 @@ To install the latest version of LMQL run the following command with Python >=3.
 pip install lmql
 ```
 
-**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/). 
+**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. [https://pytorch.org/get-started/locally/]()). 
 
 ## Running LMQL Programs
 
