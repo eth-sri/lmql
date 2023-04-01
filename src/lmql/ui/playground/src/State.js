@@ -1,5 +1,21 @@
+function getSnippet(allow_snippet=true) {
+  const url = window.location.href
+  if (url.indexOf('?') === -1) {
+    return null
+  }
+  const parameters = url.split('?')[1]
+  if (parameters.startsWith('embed=')) {
+    return parameters.substr(6)
+  } else if (parameters.startsWith('snippet=') && allow_snippet) {
+    return parameters.substr(8)
+  } else {
+    return null
+  }
+}
+
 export const displayState = {
-  mode: window.location.hash.startsWith("#embed") ? "embed" : "playground",
+  // if ?embed, mode = embed, else playground
+  mode: getSnippet(false) ? 'embed' : 'playground',
   embedFile: null
 }
 
@@ -24,27 +40,17 @@ class PersistedState {
       })
 
       // check for snippet or embed
-      let snippet = window.location.hash.substr(1)
-      if (snippet) {
-        let file = null;
-        /* check for embed= or snippet= */
-        if (snippet.startsWith("embed=")) {
-          file = snippet.substr(6)
-        } else if (snippet.startsWith("snippet=")) {
-          file = snippet.substr(8)
-        }
-        // window.history.pushState('', document.title, window.location.pathname);
-      
-        /* load file as JSON */
-        if (file) {
-          console.log("loading snippet from", file)
-          fetch(file).then(r => r.text()).then(data => {
-            if (data) {
-              displayState.embedFile = file
-              this.load(data)
-            }
-          })
-        }
+      let snippetFile = getSnippet()
+      if (snippetFile) {
+        console.log("loading snippet from", snippetFile)
+        fetch(snippetFile).then(r => r.text()).then(data => {
+          // remove ? from url
+          window.history.replaceState({}, document.title, window.location.pathname);
+          if (data) {
+            displayState.embedFile = snippetFile
+            this.load(data)
+          }
+        })
       }
     }
 

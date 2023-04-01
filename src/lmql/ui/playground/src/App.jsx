@@ -1806,7 +1806,7 @@ function SidePanel(props) {
       {/* <StatisticsPanelContent style={{display: sidepanel === 'stats' ? 'flex' : 'none'}}/> */}
 
       <Sidebar>
-        {displayState.mode == "embed" && displayState.embedFile && <IconButton onClick={() => window.open(window.location.href.split('#')[0] + "#snippet=" + displayState.embedFile, "_blank")}>
+        {displayState.mode == "embed" && displayState.embedFile && <IconButton onClick={() => window.open(window.location.href.split('?')[0] + "?snippet=" + displayState.embedFile, "_blank")}>
           <BsBoxArrowUpRight size={16} />
         </IconButton>}
         <IconButton onClick={() => setSidepanelTo('model')} className={sidepanel === 'model' ? 'active' : ''}>
