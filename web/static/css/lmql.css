@@ -1014,3 +1014,13 @@ section.is-dark {
     margin-top: 50pt;
     text-align: left;
 }
+
+h2.is-3 {
+    font-size: 15pt !important;
+}
+
+p.is-left-aligned {
+    display: block;
+    font-size: 12pt;
+    text-align: justify !important;
+}

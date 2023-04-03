@@ -6,7 +6,7 @@ For instance, let's say we want to generate a packing list. One way to do this w
 
 ```{lmql}
   
-name:: list
+name::list
 sample(temperature=0.8)
    "A few things not to forget when going to the sea (not travelling): \n"
    "[LIST]"
@@ -28,7 +28,7 @@ To address this, we can provide a more rigid prompt template, where we already p
 
 ```{lmql}
 
-name::list-cfg 
+name::list-multi
 sample(temperature=0.8)
    "A list of things not to forget when going to the sea (not travelling): \n"
    "-[THING]"

@@ -165,6 +165,9 @@
           To run LMQL locally, read the <span><a href="https://docs.lmql.ai/en/latest/quickstart.html">Getting Started</a></span> section of the documentation.
         </div>
       </div>
+      <p style="margin: auto; margin-top: -10pt; text-align: center; font-size: 0.9em;">
+        This is an early relase of LMQL and we welcome your feedback and contributions.<br/> Reach out via our <a href="https://discord.gg/7eJP4fcyNT">Community Discord</a>, <a href="https://github.com/eth-sri/lmql/issues">GitHub Issues</a>, or <a href="https://twitter.com/lmqllang">Twitter</a>.
+      </p>
     </div>
   </div>
 </section>
@@ -193,7 +196,7 @@
             LMQL generalizes natural language prompting, making it more expressive while remaining accessible. For this, LMQL builds on top of Python, allowing users to express <b>natural language prompts that also contain code</b>. The resulting queries can be directly executed on language models like OpenAI's GPT models. <b>Fixed answer templates and intermediate instructions</b> allow the user to steer the LLM's reasoning process.
           </p>
           <p>
-            <a>
+            <a href="https://docs.lmql.ai/en/latest/language/scripted_prompts.html">
               Learn more about Scripting <i style="margin-left: 2pt;" class="fa fa-arrow-right"></i>
             </a>
           </p>
@@ -260,7 +263,11 @@
         <div class="content" style="text-align: left;">
           <h2 class="title is-3">Output Constraints</h2>
           <p>
-            In LMQL, users can specify high-level, logical constraints over the language model output. The LMQL runtime then automatically translates these constraints into token-level prediction masks, which can be applied eagearly to the model distribution during text generation. In contrast to existing approaches, LMQL can therefore enforce many constraints strictly, making it impossible for the model to generate content that does not satisfy the requirements. This simplifies the integration of language models with automated computer systems, as current models often output results in varying formats that can be hard to process for other systems.
+            In LMQL, users can specify <b>high-level, logical constraints</b> over the language model output. These constraints are then <b>automatically converted into token-level prediction masks</b>, which can be enforced eagearly during text generation. This allows to <b>enforce many constraints strictly</b>, making it impossible for the model to generate content that does not satisfy the requirements. This <b>simplifies multi-part prompting and integration</b>, as it provides better guarantees about the output format.
+          </p>
+          <p>
+          <a href="https://docs.lmql.ai/en/latest/language/constraints.html">
+              Learn more about Constraints <i style="margin-left: 2pt;" class="fa fa-arrow-right"></i>
           </a>
           </p>
           <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
@@ -294,11 +301,11 @@
         </div> -->
         <div class="content">
           <figure class="image">
-            <img src="static/images/decoder.png" style="width: 185pt; margin: auto;"/> 
+            <img src="static/images/decoder.png" style="height: 10em; width: auto;"/> 
           </figure>
-          <h2 class="title is-3">Visual Debugger</h2>
+          <h2 class="title is-3">Playground and Debugger</h2>
           <p>
-            LMQL also includes a <a href="playground">Playground IDE</a> for query development. This enables users to inspect the interpreter, validation result and model state at any point during generation, e.g. to inspect the different <a href="playground#translation">hypotheses explored during beam search.</a>
+            LMQL includes a <a href="playground">Playground IDE</a> for query development. This enables users to <b>inspect the interpreter state, validation result and model results at any point during generation</b>, e.g. to inspect the different <a href="playground#translation">hypotheses explored during beam search.</a>
           </p>
           <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
             <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
@@ -312,11 +319,11 @@
       <div class="column">
         <div class="content">
           <figure class="image"s>
-            <img src="static/images/eval-semantics.png"/> 
+            <img src="static/images/eval-semantics.png" style="height: 10em; width: auto;"/> 
           </figure>
-          <h2 class="title is-3">Validation and Token Masks</h2>
-          <p>
-            To enable fast validation and constrained decoding, LMQL implements novel, partial evaluation semantics. Given a set of high-level constraints, the language runtime automatically derives token-level prediction masks and validates the produced sequence eagerly, i.e. as soon as the provided validation condition is definitively violated, decoding stops or is redirected to a different branch. This framework can easily be extended by external tools such as parsers.
+          <h2 class="title is-3">Efficiency</h2>
+          <p class="is-left-aligned">
+            Using novel, partial evaluation semantics, <b>LMQL evalutes and controls the LM decoding process on a token level</b>, leading to a significant efficiency gains over existing approaches. Compared with 🤗&nbsp;Transformers' <tt>generate()</tt>, LMQL can <b>save up to 80% in consumed tokens</b> by optimizing multi-part prompts end-to-end, while remaining a <b>high-level, declarative language</b>.
           </p>
           <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
             <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
@@ -329,15 +336,14 @@
       <div class="column">
         <div class="content">
           <figure class="image">
-            <img src="static/images/backend.png" style="width: 135pt; margin: auto;"/> 
+            <img src="static/images/backend.png" style="height: 10em; width: auto;"/> 
           </figure>
-          <h2 class="title is-3">Frontend/Backend separation</h2>
+          <h2 class="title is-3">Frontend/Backend Separation</h2>
           <p>
-            LMQL provides a high-level frontend to interact with language models, making query code portable and model-agnostic.
-            This is achieved by abstracting over model-specific implementation details like batching, decoding and tokenization.
+            LMQL provides a high-level frontend to interact with language models, making <b>query code portable and model-agnostic</b>. This is achieved by abstracting over model-specific implementation details like batching, decoding and tokenization.
           </p>
           <p>
-            The actual language model runs out-of-process or even remotely, allowing for easy development and quick prototyping.
+            The actual language <b>model runs out-of-process or even remotely</b>, allowing for easy development and quick prototyping.
           </p>
         </div>
       </div>
@@ -346,18 +352,17 @@
   </div>
 </section>
 
-
 <section class="section is-dark">
   <div class="container is-max-desktop">
     <!-- Abstract. -->
     <div class="columns is-centered has-text-centered">
       <div class="column" style="font-size: 10pt;">
-        <b class="title is-5 has-text-left" style="font-size: 12pt; text-align: left;display: block; margin: 0; color: rgb(85, 83, 83); margin-bottom: 4pt;">Read The Paper</b>
+        <b class="title is-5 has-text-left" style="font-size: 12pt; text-align: left;display: block; margin: 0; color: rgb(85, 83, 83); margin-bottom: 4pt;">Read The Research Paper</b>
         <h5 class="title is-4 has-text-left" style="margin-bottom: 2pt;">Prompting Is Programming: A Query Language For Large Language Models
         </h5>
-        <!-- <i style="text-align: left; display: block;">
-          Accepted at <a href="http://pldi23.sigplan.org/">PLDI'23</a>.<br/><br/>
-        </i> -->
+        <i style="text-align: left; display: block;">
+          Accepted at <a href="http://pldi23.sigplan.org/">PLDI'23</a>.<br/>
+        </i>
         <div class="content has-text-justified">
         <div class="authors">
           <div class="is-size-5 publication-authors">
