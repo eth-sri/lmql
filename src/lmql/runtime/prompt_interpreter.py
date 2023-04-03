@@ -740,7 +740,7 @@ class HypothesesBasedHeadPool:
                     head_result += [h.query_head.result for h in matching_done_interpreter_heads]
                 else:
                     print("warning: decoder designates head as done, but according to prompt interpreter it has not been completed yet:", await decoder_head.text(), "\n Did you specify a maximum length that has been exceeded?")
-                    print(decoder_head.user_data, self.heads)
+                    # print(decoder_head.user_data, self.heads)
         else:
             # otherwise use all heads that are .done
             for h in self.heads_done:

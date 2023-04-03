@@ -28,6 +28,36 @@ Unfortunately, the OpenAI API Completions and Chat API are severely limited in t
 
 * The **OpenAI Chat API does not provide any way to mask tokens or obtain the token distribution (ChatGPT, GPT-4)**. Simple constraints can still be enforced, as the LMQL runtime optimizes them to fit the OpenAI API. However, more complex constraints may not be enforceable. In these cases, LMQL will print a error message to the console. As a workaround users may then adjust their constraints to fit these API limitations. Scripted prompting, intermediate instructions and simple constraints are still supported.
 
+### Configuring OpenAI API Credentials
+
+If you want to use OpenAI models, you have to configure your API credentials. To do so you can either define the `OPENAI_API_KEY` enviornment variable or create a file `api.env` in the active working directory, with the following contents.
+
+```
+openai-org: <org identifier>
+openai-secret: <api secret>
+```
+
+For system-wide configuration, you can also create an `api.env` file at `$HOME/.lmql/api.env` or at the project root of your LMQL distribution (e.g. `src/` in a development copy).
+
+### Configuring Speculative OpenAI API Use
+
+To integrate the OpenAI API with LMQL, we rely on speculative prediction, where LMQL applies token masking and stopping conditions less eagerly, to save API calls. 
+
+To achieve this, output is generated in chunks, where each chunk is verified to satisfy the constraints before generation continues. The chunk size can be configured by passing `openai_chunksize` parameter in the decoding clause like so:
+
+```{lmql}
+name::chunksize
+
+argmax(openai_chunksize=128)
+    "The quick brown fox jumps over the[COMPLETION]"
+from
+    "openai/text-ada-001"
+where
+    STOPS_AT(COMPLETION, ".")
+```
+
+By default, the chunk size is set to 32. This value is chosen based on the consideration, that a very large chunk size means that LMQL potentially has to discard many generated tokens (which is expensive), if a constraint is violated early on. However, if a query has few or only stopping phrase constraints, a larger chunk size may be beneficial for overall query cost. In general, if a query requires multiple long, uninterrupted sequences to be generated without imposing many constraints, a larger chunk size is recommended.
+
 ## 🤗 Transformers Models
 
 LMQL also support locally-hosted models via [🤗 Transformers](https://huggingface.co/transformers). This includes all models that are available via the [🤗 Transformers Model Hub](https://huggingface.co/models) and conform to the AutoModelForCausalLM API. Examples include `gpt2` or `facebook/opt-30B`.

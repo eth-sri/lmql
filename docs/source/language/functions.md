@@ -1,7 +1,7 @@
-# Queries That Call Functions 
+# External Functions and Tools
 
-LMQL extends Python and can thus queries can incorporate arbitrary Python code including function calls.
-In the simple example below we ask the model for a simple math problem and then use pythons `eval` function to evaluate the solution.
+LMQL extends Python and thus query code can incorporate arbitrary Python constructs including function calls.
+For instance, below, we ask the model for a simple math problem and then use Python's `eval` function to evaluate the solution.
 
 ```{lmql}
 name::simple_math
@@ -16,6 +16,8 @@ where
 ```
 
 ```model-output
+A simple math problem for addition (without solution, without words):
+7 + 8 = 15
 ```
 
 
@@ -39,7 +41,7 @@ def calc(expr):
       expr = re.sub(r"[^0-9+\-*/().]", "", expr)
       return eval(expr)
 
-argmax
+argmax(openai_chunksize=128, max_len=2048)
       QUESTION = "Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?"
       # few shot samples
       "{gsm8k_samples()}"
@@ -60,6 +62,14 @@ where
       STOPS_AT(REASON_OR_CALC, "<<") and
       STOPS_AT(EXPR, "=") and
       STOPS_AT(REASON_OR_CALC, "So the answer")
+```
+```model-output
+Q: Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?
+Let's think step by step.
+Josh bought the house for $80,000 and put in $50,000 in repairs.
+The value of the house increased by 150%, so the new value of the house is $80,000 + 150% of $80,000 = << 80,000 + (80,000*1.5) = 200000.0>>$200,000.
+The profit Josh made is the difference between the new value of the house and the amount he spent on it, which is $200,000 - $80,000 - $50,000 = << 200,000 - 80,000 - 50,000 = 70000>>$70,000.
+So the answer is $70,000.
 ```
 
 ## Beyond Calculators
@@ -87,6 +97,14 @@ from
 where
    STOPS_AT(TERM, "'")
 ```
+```model-output
+Q: From which countries did the Norse originate?
+Action: Let's search Wikipedia for the term 'Norse'.
+Result: Norse is a demonym for Norsemen, a Medieval North Germanic ethnolinguistic group ancestral to modern Scandinavians, defined as speakers of Old Norse from about the 9th to the 13th centuries.
+Norse may also refer to:
+
+Final Answer: The Norse originated from North Germanic countries, including Denmark, Norway, Sweden, and Iceland.
+```
 
 LMQL can also access the state of the surrounding python interpreter. To showcase this, we show how to use the `assign` and `get` functions to store and retrieve values in a simple key-value store.
 
@@ -107,6 +125,7 @@ argmax(n=1, openai_chunksize=128, max_len=2048, step_budget=4*2048)
    `get("Alice") # result: "banana"`
    Always tail calls with " # result". Using these actions, let's solve the following question.
    
+   Q: Alice, Bob, and Claire are playing a game. At the start of the game, they are each holding a ball: Alice has a black ball, Bob has a brown ball, and Claire has a blue ball. \n\nAs the game progresses, pairs of players trade balls. First, Bob and Claire swap balls. Then, Alice and Bob swap balls. Finally, Claire and Bob swap balls. At the end of the game, what ball does Alice have?
    A: Let's think step by step.\n"""
    for i in range(32):
       "[REASONING]"
@@ -124,9 +143,33 @@ where
    STOPS_AT(REASONING, "# result") and STOPS_AT(REASONING, "Therefore, ") and
    STOPS_AT(OBJECT, ".") and STOPS_AT(OBJECT, ",")            
 ```
+```model-output
+(...)
+A: Let's think step by step
 
+At the start of the game:
+`assign("Alice", "black") # result {Alice: "black"}`
+`assign("Bob", "brown") # result {Bob: "brown"}`
+`assign("Claire", "blue") # result {Claire: "blue"}`
 
+After Bob and Claire swap balls:
+`assign("Bob", "blue") # result {Bob: "blue"}`
+`assign("Claire", "brown") # result {Claire: "brown"}`
 
+After Alice and Bob swap balls:
+`assign("Alice", "blue") # result {Alice: "blue"}`
+`assign("Bob", "black") # result {Bob: "black"}`
+
+After Claire and Bob swap balls:
+`assign("Claire", "black") # result {Claire: "black"}`
+`assign("Bob", "brown") # result {Bob: "brown"}`
+
+At the end of the game, Alice has a blue ball:
+`get("Alice") # result blue`
+Therefore at the end of the game, Alice has the blue ball.
+```
+
+As shown in the example above, the `assign` and `get` functions can be used to store and retrieve values in a simple key-value store. The model is merely instructed to make use of these functions in its reasoning. The query then implements logic to intercept any function use and insert the result of the function call into the reasoning. This allows the model to incorporate the state of the key-value store into its reasoning.
 
 
 

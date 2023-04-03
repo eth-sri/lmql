@@ -52,12 +52,13 @@ Contents
 
 .. toctree::
    :maxdepth: 1
-   :caption: 📖 LMQL Language
+   :caption: 📖 LMQL Language 
    
    language/scripted_prompts.md
    language/constraints.md
    language/decoders.md
    language/models.md
+   language/functions.md
    
 .. toctree::
     :maxdepth: 1
