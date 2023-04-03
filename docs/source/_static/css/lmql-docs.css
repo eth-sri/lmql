@@ -146,3 +146,15 @@
     /* break lines */
     white-space: break-spaces !important;
 }
+
+.highlight-model-output {
+    padding-left: 5pt;
+    padding-right: 5pt;
+    z-index: -1;
+}
+
+.highlight-model-output .highlight pre {
+    background-color: #E4E4E4;
+    position: relative;
+    top: -12pt;
+}
