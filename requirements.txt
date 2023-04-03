@@ -5,4 +5,3 @@ pydot
 transformers==4.25.1
 pandas
 accelerate
-Pygments
