@@ -1,34 +1,36 @@
 # Getting Started
 
-To install the latest version of LMQL run the following command with Python >=3.10 installed.
+## 1. Installation
 
-```
-pip install lmql
-```
+To get started with LMQL, you can either [install LMQL locally](installation) or use the web-based [Playground IDE](https://lmql.ai/playground), which does not require any local installation.
 
-**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. [https://pytorch.org/get-started/locally/]()). 
+For the use of self-hosted models via [🤗 Transformers](https://huggingface.co/transformers), you have to install LMQL locally.
 
-## Running LMQL Programs
+## 2. Writing Your First Query
 
-After installation, you can launch the LMQL playground IDE with the following command:
+A very simple *Hello World* LMQL query looks like this:
 
-```
-lmql playground
-```
+```{lmql}
 
-> Using the LMQL playground requires an installation of Node.js. If you are in a conda-managed environment you can install node.js via `conda install nodejs=14.20 -c conda-forge`. Otherwise, please see the offical Node.js website https://nodejs.org/en/download/ for instructions how to install it on your system.
-
-This launches a browser-based playground IDE, including a showcase of many exemplary LMQL programs. If the IDE does not launch automatically, go to `http://localhost:3000`.
-
-Alternatively, `lmql run` can be used to execute local `.lmql` files. Note that when using local HuggingFace Transformers models in the Playground IDE or via `lmql run`, you have to first launch an instance of the LMQL Inference API for the corresponding model via the command `lmql serve-model`.
-
-### Configuring OpenAI API Credentials
-
-If you want to use OpenAI models, you have to configure your API credentials. To do so, create a file `api.env` in the active working directory, with the following contents.
-
-```
-openai-org: <org identifier>
-openai-secret: <api secret>
+name::hello
+argmax "Hello[WHO]" from "openai/text-ada-001" where len(WHO) < 10
 ```
 
-For system-wide configuration, you can also create an `api.env` file at `$HOME/.lmql/api.env` or at the project root of your LMQL distribution (e.g. `src/` in a development copy).
+We can identify different *clauses* in this program:
+
+* **Decoder Clause** `argmax`: Here, you specify the decoding algorithm to use for text generation. In this case we use argmax decoding. This means the model always greedily chooses the most likely token in each decoding step. To learn more about the different supported decoding algorithms, please see [Decoders](./language/decoders.md).
+
+* **Prompt Clause** `"Hello[WHO]"`: In this part of the program, you specify your prompt. Template variables like `[WHO]` are automatically completed by the model. Apart from simple textual prompts, LMQL also support multi-part and scripted prompts. To learn more, see [Scripted Prompting](./language/scripted_prompts.md).
+
+* **Model Clause** `from "openai/text-ada-001"`: Here, you specify what model you want to use for text generation. Currently, LMQL supports [OpenAI models](https://platform.openai.com/docs/models), like GPT-3.5 variants, ChatGPT, and GPT-4, as well as self-hosted models via [🤗 Transformers](https://huggingface.co/transformers). For more details, please see [Models](./language/models.md).
+
+* **Constraint Clause** `where len(WHO) < 10`: In this part of the query, users can specify logical, high-level constraints on the output. LMQL uses novel evaluation sematnics for these constraints, to automatically translate character-level constraints like `len(WHO) < 10` to (sub)token masks, that can be eagerly enforced during text generation. To learn more, see [Constraints](./language/constraints.md).
+
+This is only a brief overview of LMQL's core feature set. To learn more consider reading any of the referenced chapters or the [LMQL research paper](https://arxiv.org/pdf/2212.06094).
+
+
+## 3. Enjoy
+
+These basic steps should get you started with LMQL. If you need more inspiration before writing your own queries, you can explore the examples included with the [Playground IDE](https://lmql.ai/playground) or showcased on the [LMQL Website](https://lmql.ai/).
+
+If you have any questions and or requests for documentation, please feel to free to reach out to us via our [Community Discord](https://discord.com/invite/7eJP4fcyNT), [GitHub Issues](https://github.com/eth-sri/lmql/issues), or [Twitter](https://twitter.com/lmqllang).

@@ -357,11 +357,12 @@ class DcModel:
 
             next_token_ids = []
             for i in range(len(logits)):
-                probs = logits[i].exp()
+                probs = np.exp(logits[i])
                 num_possible = (probs > 0).sum()
                 next_token_ids.append(np.random.choice(vocab_size, size=max(num_samples, num_possible), p=probs, replace=False))
+            next_token_ids = np.stack(next_token_ids, axis=0)
 
-            next_token_scores = logits.gather(-1, next_token_ids)
+            next_token_scores = np.take_along_axis(logits, next_token_ids.reshape(-1,1), axis=-1)
 
             return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=raw_logits[i]) for i,s in enumerate(seqs)]
         
