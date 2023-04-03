@@ -2,3 +2,4 @@ myst-parser
 pydata-sphinx-theme==0.13.1
 sphinx_book_theme
 nbsphinx==0.9.1
+IPython
