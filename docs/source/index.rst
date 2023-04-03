@@ -37,6 +37,14 @@ To get started, check out the :doc:`quickstart`. We provide the following resour
           </div> 
           To run LMQL locally, read the <span><a href="quickstart.html">Installation Instructions</a> section of the documentation</span>.
         </div>
+        <div class="column getting-started">
+          <h2>Community</h2>
+          <a href="https://discord.gg/7eJP4fcyNT">
+            Discord Server
+          </a>
+          <a href="https://twitter.com/lmqllang">Twitter</a>
+          <a href="mailto:hello@lmql.ai">E-Mail</a>
+        </div>
       </div>
     </div>
 
@@ -67,7 +75,12 @@ Contents
     python/python.ipynb
     python/langchain.ipynb
    
-.. toctree:
+.. toctree::
     :maxdepth: 2
-    :caption: Development
+    :caption: 💬 Contribute
+    
+
     dev-setup
+    Discord <https://discord.gg/7eJP4fcyNT>
+    GitHub Issues <https://github.com/eth-sri/lmql/issues>
+    E-Mail <mailto:hello@lmql.ai>

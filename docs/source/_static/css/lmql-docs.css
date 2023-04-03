@@ -40,7 +40,7 @@
 }
 
 .getting-started-options {
-    margin: 0 auto;
+    margin: 0 0;
     max-width: 800px;
     padding: 0 1rem;
 }
@@ -50,12 +50,12 @@
 }
 
 .getting-started {
-    width: 220pt;
+    width: 170pt;
     max-width: calc(100% - 20pt);
     font-size: 0.85em;
     border: 0.5 pt solid grey;
     padding: 5pt;
-    margin: 20pt 5pt;
+    margin: 5pt 4pt;
     border: 0.5pt solid rgb(193, 190, 190);
     
     border-radius: 2pt;
