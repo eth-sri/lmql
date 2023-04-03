@@ -8,7 +8,7 @@
   <p align="center">
     A query language for programming (large) language models.
     <br />
-    <a href="https://arxiv.org/pdf/2212.06094"><strong>Read The Paper »</strong></a>
+    <a href="https://docs.lmql.ai"><strong>Documentation »</strong></a>
     <br />
     <br />
     <a href="https://lmql.ai">Explore Examples</a>
