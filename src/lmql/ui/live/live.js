@@ -153,6 +153,11 @@ function run_app(app_name, app_input, app_arguments, socket) {
     // run "python live.py endpoints" and get output lines as array
     // console.log(" >", `python live.py ${app_name} ${app_input_as_json}`);
     
+    if (!app_input) {
+      socket.emit("app-exit", `Error: Cannot run app with empty input\n`)
+      return;
+    }
+
     const live_process = spawn('python', ['live.py', app_name, app_input_as_json, app_arguments_as_json]);
     // app input escape all double quotes as twice
     let input = app_input.replace(/"/g, '\\"');

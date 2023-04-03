@@ -1,5 +1,16 @@
 var openPlaygroundElement = null;
 
+function getPlaygroundUrl() {
+    const host = window.location.host;
+    if (host === "docs.lmql.ai") {
+        return "https://lmql.ai/playground";
+    } else if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
+        return "http://localhost:3000/playground";
+    } else {
+        return "https://lbeurerkellner.github.io/green-gold-dachshund-web/playground";
+    }
+}
+
 function closePlaygroundSnippet() {
     if (openPlaygroundElement) {
         openPlaygroundElement.innerHTML = openPlaygroundElement.originalHTML;
@@ -9,16 +20,18 @@ function closePlaygroundSnippet() {
     }
 }
 
-function openPlaygroundSnippet(link, snippet, playground_url) {
+function openPlaygroundSnippet(link, snippet) {
     closePlaygroundSnippet();
+
+    const playground = getPlaygroundUrl();
+    console.log("playground url: " + playground);
 
     // this is a that was clicked, replace parent div with iframe (temporarily)
     const container = link.parentElement;
     container.classList.add('playground');
     const iframe = document.createElement('iframe');
     iframe.src = ""
-    iframe.src = playground_url + '?embed=' + snippet + ".json"
-    console.log(iframe.src);
+    iframe.src = playground + '?embed=' + snippet + ".json"
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';

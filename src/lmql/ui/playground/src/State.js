@@ -44,6 +44,7 @@ class PersistedState {
       if (snippetFile) {
         console.log("loading snippet from", snippetFile)
         fetch(snippetFile).then(r => r.text()).then(data => {
+          console.log(data)
           // remove ? from url
           window.history.replaceState({}, document.title, window.location.pathname);
           if (data) {

@@ -9,8 +9,7 @@ sys.path.insert(0, os.path.abspath('_ext'))
 # -- Project information
 
 project = 'LMQL'
-copyright = '2023, LMQL Lang'
-author = 'LMQL Lang'
+copyright = '2023, LMQL Language Team'
 
 release = '0.1'
 version = '0.1.0'

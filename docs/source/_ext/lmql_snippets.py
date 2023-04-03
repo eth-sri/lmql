@@ -8,9 +8,6 @@ from pygments.formatters import HtmlFormatter
 import os
 import json
 
-PLAYGROUND_URL = "https://lbeurerkellner.github.io/green-gold-dachshund-web/playground"
-# PLAYGROUND_URL = "http://localhost:3000"
-
 class LmqlLexer(PythonLexer):
     EXTRA_KEYWORDS = set((
         "BEAM",
@@ -70,7 +67,8 @@ class LmqlSnippet(Directive):
 
         # create output
         paragraph_node = nodes.paragraph()
-        prefix = """<button href onclick="openPlaygroundSnippet(this, 'doc-snippets/{}', '{}')">Open In Playground</button>""".format(snippet_id, PLAYGROUND_URL)
+        print([code], flush=True) 
+        prefix = """<button href onclick="openPlaygroundSnippet(this, 'doc-snippets/{}')">Open In Playground</button>""".format(snippet_id)
 
         code = highlight(code, LmqlLexer(), HtmlFormatter(cssclass="highlight lmql"))
         code = code.replace("""<div class="highlight lmql">""", """<div class="highlight lmql">""" + prefix)
@@ -81,7 +79,11 @@ class LmqlSnippet(Directive):
 
         with open(snippet_path, "w") as f:
             playground_data = {
-                "lmql-editor-contents": original_code
+                "lmql-editor-contents": original_code.strip(),
+                "decoder-graph": json.dumps({
+                    "nodes": [],
+                    "edges": []
+                })
             }
             f.write(json.dumps(playground_data))
 

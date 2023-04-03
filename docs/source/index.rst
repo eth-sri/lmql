@@ -34,7 +34,7 @@ For smaller experiments, you can also use the web-based `LMQL Playground <lmql.a
 
         <div class="column getting-started">
           <h2>Run Locally</h2>
-          <div class="cmd">
+          <div class="cmd"> 
               pip install lmql
           </div> 
           To run LMQL locally, read the <span><a href="quickstart.html">Getting Started</a></span> section of the documentation.
@@ -49,5 +49,6 @@ Contents
     :maxdepth: 2
 
     quickstart
-    dev-setup
+    language/index.md
     python/index.rst
+    dev-setup

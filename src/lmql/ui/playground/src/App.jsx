@@ -1085,6 +1085,8 @@ function ModelResultContent(props) {
   let mostLikelyNode = props.mostLikelyNode ? props.mostLikelyNode.data("id") : null
   const [waitingForInput, setWaitingForInput] = useState("hidden")
 
+  const hasAnyOutput = mostLikelyNode != null
+
   const setInputState = React.useCallback((waiting) => {
     setWaitingForInput("disabled")
   })
@@ -1222,7 +1224,7 @@ function ModelResultContent(props) {
         {chatMode && props.processStatus === "running" && waitingForInput === "waiting" && <div className="system-message">Type your message below and press Enter.</div>}
       </div>
     })}
-    {countedResults.length == 0 && <EmptyModelResult firstInput={waitingForInput === "waiting"} trackMostLikly={props.trackMostLikly} processStatus={props.processStatus}></EmptyModelResult>}
+    {countedResults.length == 0 && <EmptyModelResult firstInput={waitingForInput === "waiting"} hasAnyOutput={hasAnyOutput} trackMostLikly={props.trackMostLikly} processStatus={props.processStatus}></EmptyModelResult>}
     <TextInput enabledState={waitingForInput} setEnabledState={setInputState}></TextInput>
   </ModelResultText>
 }
@@ -1284,6 +1286,10 @@ function EmptyModelResult(props) {
       <LMQLSpinner/>
       Waiting for first tokens...
       </h2>}
+    </CenterBox>
+  } else if (!props.hasAnyOutput) {
+    return <CenterBox>
+      <span className="subtitle">Press 'Run' to see model output.</span> 
     </CenterBox>
   } else {
     return <CenterBox>
