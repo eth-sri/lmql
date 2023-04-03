@@ -1,0 +1,57 @@
+# Models
+
+LMQL is a high-level, front-end language for text generation. This means that LMQL is not specific to any particular text generation model. Instead, we support a wide range of text generation models on the backend, including [OpenAI models](https://platform.openai.com/docs/models), as well as self-hosted models via [🤗 Transformers](https://huggingface.co/transformers).
+
+Due to the modular design of LMQL, it is easy to add support for new models and backends. If you would like to propose or add support for a new model API or inference engine, please reach out to us via our [Community Discord](https://discord.com/invite/7eJP4fcyNT) or via [hello@lmql.ai](mailto:hello@lmql.ai).
+
+## OpenAI Models
+
+In general, LMQL supports all models available via the OpenAI Completions or OpenAI Chat API, e.g., GPT-3.5 variants, ChatGPT, and GPT-4.
+
+Specifically, we have tested the following models, with the corresponding model identifier to be used in the LMQL `from` clause:
+
+* `openai/text-ada-001`
+* `openai/text-curie-001`
+* `openai/text-babbage-001`
+* `openai/text-davinci-00[1-3]`
+
+* `openai/gpt-3.5-turbo` also available as `chatgpt`
+* `openai/gpt-4` also available as `gpt-4`
+
+### OpenAI API Limitations
+
+Unfortunately, the OpenAI API Completions and Chat API are severely limited in terms of token masking and the availability of the token distribution per predicted token. LMQL tries to leverage these APIs as much as possible, but there are some limitations that we have to work around and may affect users:
+
+* The **OpenAI Completion API limits the number of possible logit biases to 300**. This means, if your constraints induce token masks that are larger than 300 tokens, LMQL will automatically truncate the token mask to the first 300 tokens. This may lead to unexpected behavior, e.g., model performance may be worse than expected as the masking. In cases where the 300 biases limit is exceeded, LMQL prints a warning message to the console, indicating the number of biases that were truncated.
+
+* The **OpenAI Completions API only provides the top-5 logprobs per predicted token**. This means that decoding algorithms that explore e.g. the top-n probabilities to make decisions like beam search, are limited to a branching factor of 5.
+
+* The **OpenAI Chat API does not provide any way to mask tokens or obtain the token distribution (ChatGPT, GPT-4)**. Simple constraints can still be enforced, as the LMQL runtime optimizes them to fit the OpenAI API. However, more complex constraints may not be enforceable. In these cases, LMQL will print a error message to the console. As a workaround users may then adjust their constraints to fit these API limitations. Scripted prompting, intermediate instructions and simple constraints are still supported.
+
+## 🤗 Transformers Models
+
+LMQL also support locally-hosted models via [🤗 Transformers](https://huggingface.co/transformers). This includes all models that are available via the [🤗 Transformers Model Hub](https://huggingface.co/models) and conform to the AutoModelForCausalLM API. Examples include `gpt2` or `facebook/opt-30B`.
+
+The API limitations mentioned above do not apply to locally-hosted models, as the LMQL runtime can leverage the full power of the 🤗 Transformers API and access the full token distribution, enforcing token masks of arbitrary size.
+
+### Running LMQL with 🤗 Transformers
+
+To speed-up turnaround time during query development, LMQL supports a two process architecture. One process (long-running) loads the model and provides a simple inference API, and the other process (short-lived) executes the LMQL query. This architecture is particularly useful for locally-hosted models, as the model loading time can be quite long.
+
+To start a model serving process, e.g. for the `gpt2-medium` model, run the following command:
+
+```bash
+lmql serve-model gpt2-medium --cuda
+```
+
+> `--cuda` will load the model on the GPU, if available. If multiple GPUs are available, the model will be distributed across all GPUs. To run with CPU inference, omit the `--cuda` flag.
+
+This exposes the LMQL inference API on port 8080. When serving a model remotely, make sure to tunnel/forward the port to your client machine.
+
+Now, when executing an LMQL query in the playground or via the CLI, you can simply specify e.g. `gpt2-medium`, and the runtime will automatically connect to the model server running on port 8080 to obtain model predictions.
+
+#### Running The Playground Remotely
+
+If you would like to run the LMQL Playground itself remotely (e.g. for latency reasons), you can do so using a similar port forwarding/tunnel setup as described above. For this, make sure you client browser has access to the Playground server ports `3000` and `3004`.
+
+

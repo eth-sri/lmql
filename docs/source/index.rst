@@ -11,8 +11,7 @@ LMQL is a research project by the `Secure,  Reliable, and Intelligent Systems La
 Quick Start
 -----------
 
-To get started locally, check out the :doc:`quickstart` section. 
-For smaller experiments, you can also use the web-based `LMQL Playground <lmql.ai/playground/>`_.
+To get started, check out the :doc:`quickstart`. We provide the following resources and options to get started with LMQL:
 
 .. raw:: html
 
@@ -23,8 +22,11 @@ For smaller experiments, you can also use the web-based `LMQL Playground <lmql.a
           <a class="primary" href="https://lmql.ai/playground">
             Playground IDE
           </a>
+          <a href="quickstart.html">
+            🚀 Getting Started Guide
+          </a>
           <a href="https://github.com/eth-sri/lmql">
-            GitHub Repo 
+            GitHub Repo
           </a>
         </div>
 
@@ -33,7 +35,7 @@ For smaller experiments, you can also use the web-based `LMQL Playground <lmql.a
           <div class="cmd"> 
               pip install lmql
           </div> 
-          To run LMQL locally, read the <span><a href="quickstart.html">Getting Started</a></span> section of the documentation.
+          To run LMQL locally, read the <span><a href="quickstart.html">Installation Instructions</a> section of the documentation</span>.
         </div>
       </div>
     </div>
@@ -45,6 +47,7 @@ Contents
   :maxdepth: 1
 
   quickstart
+  installation
   Playground IDE <https://lmql.ai/playground>
 
 .. toctree::
@@ -53,6 +56,8 @@ Contents
    
    language/scripted_prompts.md
    language/constraints.md
+   language/decoders.md
+   language/models.md
    
 .. toctree::
     :maxdepth: 1
