@@ -25,6 +25,7 @@ where
 LMQL allows to specify that a variable should be a choice from a set of possible values. This can be rephrased as the variable being within a  set of possible values, i.e. `THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])` in the following example
 
 ```{lmql}
+name::set
 sample(temperature=0.8)
    "A list of things not to forget when going to the sea (not travelling): \n"
    "- Sunglasses \n"
@@ -35,6 +36,7 @@ from
 where
    THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])
 ```
+
 ```model-output
 A list of things not to forget when going to the sea (not travelling): ⏎
 - Sunglasses ⏎
@@ -48,6 +50,7 @@ A list of things not to forget when going to the sea (not travelling): ⏎
 Similar to Python the `len` function can be used to refer to the length of a variable and can thus be used to add constraints on it's length.
 
 ```{lmql}
+name::length
 argmax
    "Hello [NAME]"
 from
@@ -55,6 +58,7 @@ from
 where
     len(NAME) <> 3
 ```
+
 ```model-output
 Hello ⏎
 ⏎
