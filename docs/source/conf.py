@@ -45,6 +45,12 @@ templates_path = ['_templates']
 
 html_theme = 'sphinx_book_theme'
 
+html_favicon = "_static/images/lmql.svg"
+html_title = ""
+html_theme_options = {
+    "home_page_in_toc": True,
+}
+
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
 

@@ -29,7 +29,8 @@ class LMQLInputVariableScope:
         elif name in self.builtins.keys():
             return self.builtins[name]
         else:
-            assert False, "Failed to resolve variable '" + name + "' in @lmql.query " + str(self.fct)
+            return None
+            # assert False, "Failed to resolve variable '" + name + "' in @lmql.query " + str(self.fct)
 
 @dataclass
 class FunctionContext:

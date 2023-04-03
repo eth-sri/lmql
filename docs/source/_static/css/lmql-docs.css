@@ -176,8 +176,8 @@ html[data-theme="dark"] .highlight-model-output {
     background: transparent;
 }
 
-html[data-theme="dark"] .highlight-model-output .highlight {
-    background: transparent;
+.highlight-model-output .highlight, html[data-theme="dark"] .highlight-model-output .highlight {
+    background: transparent !important;
 }
 
 html[data-theme="dark"] .highlight-model-output .highlight pre {
@@ -187,8 +187,9 @@ html[data-theme="dark"] .highlight-model-output .highlight pre {
 
 
 .highlight-model-output .highlight pre {
-    background-color: #E4E4E4;
+    background-color: #fbfbfb;
     position: relative;
     top: -12pt;
     border-color: rgb(223, 219, 219);
+    white-space: break-spaces !important;
 }
