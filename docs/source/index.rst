@@ -11,7 +11,10 @@ LMQL is a research project by the `Secure,  Reliable, and Intelligent Systems La
 Quick Start
 -----------
 
-To get started, check out the :doc:`quickstart`. We provide the following resources and options to get started with LMQL:
+To get started with LMQL, check out the :doc:`quickstart` guide.
+
+
+We also provide the following resources to get started with LMQL:
 
 .. raw:: html
 
@@ -40,10 +43,14 @@ To get started, check out the :doc:`quickstart`. We provide the following resour
         <div class="column getting-started">
           <h2>Community</h2>
           <a href="https://discord.gg/7eJP4fcyNT">
-            Discord Server
+            💬 Discord Server
           </a>
-          <a href="https://twitter.com/lmqllang">Twitter</a>
-          <a href="mailto:hello@lmql.ai">E-Mail</a>
+          <a href="https://twitter.com/lmqllang">
+            🐥 Twitter
+          </a>
+          <a href="mailto:hello@lmql.ai">
+            ✉️ E-Mail
+          </a>
         </div>
       </div>
     </div>
@@ -70,16 +77,15 @@ Contents
    
 .. toctree::
     :maxdepth: 1
-    :caption: 🔗 Python Interoperability
+    :caption: 🔗 Python Integration
     
     python/python.ipynb
     python/langchain.ipynb
    
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
     :caption: 💬 Contribute
     
-
     dev-setup
     Discord <https://discord.gg/7eJP4fcyNT>
     GitHub Issues <https://github.com/eth-sri/lmql/issues>
