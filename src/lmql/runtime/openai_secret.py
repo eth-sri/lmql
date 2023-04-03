@@ -29,6 +29,8 @@ def get_openai_secret():
             m = """api.env not found in any of the following locations:\n\n{}\n\n To use OpenAI models you need to create an api.env file with the following contents:
         openai-secret: <your openai secret>
         openai-org: <your openai org>
+        
+        Alternatively, you may just define the environment variable OPENAI_API_KEY=sk-...
         """.format("\n".join(" - " + p for p in search_paths))
             raise FileNotFoundError(m)
 
