@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "sample(temperature=0.8)\n   \"A few things not to forget when going to the sea (not travelling): \\n\"\n   \"[LIST]\"\nfrom\n   'openai/text-ada-001'", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
