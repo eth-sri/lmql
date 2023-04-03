@@ -12,64 +12,42 @@ which then are optimized by the LMQL runtime to run efficiently as part of the L
 
 LMQL is a research project by the `Secure,  Reliable, and Intelligent Systems Lab <https://www.sri.inf.ethz.ch/>`_ at ETH Zürich.
 
+Quick Start
+-----------
 
-.. links
-.. `Open Food Facts database <https://world.openfoodfacts.org/>`_
+To get started locally, check out the :doc:`quickstart` section. 
+For smaller experiments, you can also use the web-based `LMQL Playground <lmql.ai/playground/>`_:
 
-.. lmql::
-    name::hello
-    # this sample was updated
-    argmax
-        """A list of good dad jokes. A indicates the punchline
-        Q: How does a penguin build its house?
-        A: Igloos it together.
-        Q: Which knight invented King Arthur's Round Table?
-        A: Sir Cumference.
-        Q:[JOKE]
-        A:[PUNCHLINE]"""
-    from
-        "openai/text-davinci-003"
-    where
-        len(JOKE) < 120 and 
-        STOPS_AT(JOKE, "?") and 
-        STOPS_AT(PUNCHLINE, "\n") and 
-        len(PUNCHLINE) > 1
+.. raw:: html
 
-.. lmql::
-    name::chat
-    argmax 
-        "{:system} You are a marketing chatbot for the language model query language (LMQL)."
-        for i in range(10):
-            "{:user} {await input()}"
-            "{:assistant} [ANSWER]"
-    from
-        "chatgpt"
+    <div class="getting-started-options">
+      <div class="columns is-getting-started">
+        <div class="column getting-started">
+          <h2>Explore LMQL</h2>
+          <a class="primary" href="https://lmql.ai/playground">
+            Playground IDE
+          </a>
+          <a href="https://github.com/eth-sri/lmql">
+            GitHub Repo 
+          </a>
+        </div>
 
-.. code-block:: python
-    
-    def test(): pass
+        <div class="column getting-started">
+          <h2>Run Locally</h2>
+          <div class="cmd">
+              pip install lmql
+          </div> 
+          To run LMQL locally, read the <span><a href="quickstart.html">Getting Started</a></span> section of the documentation.
+        </div>
+      </div>
+    </div>
 
-Test 
+Contents
+--------
 
-.. Quick Start
-.. -----------
+.. toctree::
+    :maxdepth: 2
 
-.. To get started, check out the :doc:`quickstart` section. 
-
-.. For smaller experiments, you can also use the web-based `LMQL Playground <lmql.ai/playground/>`_.
-
-.. .. raw:: html
-
-..     <embed>
-..         <iframe src="https://lmql.ai/playground" width="100%" height="450pt"></iframe>
-..     </embed>
-
-.. Test
-
-.. Contents
-.. --------
-
-.. .. toctree::
-
-   quickstart
-   dev-setup
+    quickstart
+    dev-setup
+    python/index.rst

@@ -16,6 +16,8 @@ def get_openai_secret():
         return openai_secret, openai_org
     elif "LMQL_OPENAI_SECRET" in os.environ and "LMQL_OPENAI_ORG" in os.environ:
         return os.environ["LMQL_OPENAI_SECRET"], os.environ["LMQL_OPENAI_ORG"]
+    elif "OPENAI_API_KEY" in os.environ:
+        return os.environ["OPENAI_API_KEY"], ""
     else:
         search_paths = [
             os.path.join(ROOT_DIR, "api.env"),

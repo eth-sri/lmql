@@ -8,7 +8,8 @@ from pygments.formatters import HtmlFormatter
 import os
 import json
 
-PLAYGROUND_URL = "https://lbeurerkellner.github.io/green-gold-dachshund-web/playground/"
+PLAYGROUND_URL = "https://lbeurerkellner.github.io/green-gold-dachshund-web/playground"
+# PLAYGROUND_URL = "http://localhost:3000"
 
 class LmqlLexer(PythonLexer):
     EXTRA_KEYWORDS = set((
@@ -69,8 +70,7 @@ class LmqlSnippet(Directive):
 
         # create output
         paragraph_node = nodes.paragraph()
-        # prefix = f"""<a href='{PLAYGROUND_URL + "#snippet=docs-snippets/" + snippet_id}'>Open In Playground</a>""".format(name)
-        prefix = """<button href onclick="openPlaygroundSnippet(this, 'docs-snippets/{}', '{}')">Open In Playground</button>""".format(snippet_id, PLAYGROUND_URL)
+        prefix = """<button href onclick="openPlaygroundSnippet(this, 'doc-snippets/{}', '{}')">Open In Playground</button>""".format(snippet_id, PLAYGROUND_URL)
 
         code = highlight(code, LmqlLexer(), HtmlFormatter(cssclass="highlight lmql"))
         code = code.replace("""<div class="highlight lmql">""", """<div class="highlight lmql">""" + prefix)

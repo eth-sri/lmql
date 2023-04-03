@@ -15,13 +15,12 @@ __license__ = "MIT"
 from lmql.language.compiler import LMQLCompiler
 import lmql.runtime.lmql_runtime as lmql_runtime
 import tempfile
-from lmql.runtime.prompt_interpreter import DebuggerOutputWriter, StreamingOutputWriter
+from lmql.runtime.output_writer import silent, stream
 from lmql.runtime.model_registry import LMQLModelRegistry
+from lmql.runtime.lmql_runtime import LMQLQueryFunction, FunctionContext
 
 import os
 
-silent = DebuggerOutputWriter()
-stream = StreamingOutputWriter
 model_registry = LMQLModelRegistry
 
 def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
@@ -134,22 +133,7 @@ def query(fct):
         if a not in args_of_query:
             print(f"warning: @lmql.query {fct.__name__} has an argument '{a}' that is not used in the query.")
     
-    async def wrapper(*args, **kwargs):
-        assert len(args) == len(argnames), f"@lmql.query {fct.__name__} expects {len(argnames)} positional arguments, but got {len(args)}."
-        captured_variables = set(args_of_query)
-        for name, value in zip(argnames, args):
-            if a in args_of_query:
-                kwargs[name] = value
-                captured_variables.remove(name)
+    # set the function context of the query based on the function context of the decorated function
+    module.query.function_context = FunctionContext(argnames, args_of_query, scope)
     
-        for v in captured_variables:
-            kwargs[v] = scope.resolve(v)
-        
-        if "output_writer" in kwargs:
-            module.query.output_writer = kwargs["output_writer"]
-            del kwargs["output_writer"]
-        else:
-            module.query.output_writer = silent
-        return await module.query(**kwargs)
-    
-    return wrapper
+    return module.query

@@ -550,6 +550,9 @@ class AsyncOpenAIAPI:
         self.complete_api_worker.cancel()
         for worker in self.complete_request_workers:
             worker.cancel()
+        loop = asyncio.get_event_loop()
+        while not all([t.done() for t in (self.complete_request_workers + [self.complete_api_worker])]):
+            loop._run_once()
 
     async def api_complete_worker(self, queue):
         while True:
@@ -586,10 +589,10 @@ class AsyncOpenAIAPI:
 
     async def complete_request_worker(self, queue: asyncio.Queue):
         while True:
-            kwargs = await queue.get()
-            futures = kwargs.pop("futures")
-            request_ids = kwargs.pop("request_id")
             try:
+                kwargs = await queue.get()
+                futures = kwargs.pop("futures")
+                request_ids = kwargs.pop("request_id")
                 retries = self.maximum_retries
                 while True:
                     try:
@@ -611,6 +614,8 @@ class AsyncOpenAIAPI:
                             t = (2.0 * random.random()) ** (self.maximum_retries - retries)
                             print("Backing off for", t , "seconds")
                             await asyncio.sleep(t)
+            except asyncio.CancelledError:
+                return
             except Exception as e:
                 print("error", type(e))
                 for future in futures:

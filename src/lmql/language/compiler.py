@@ -385,10 +385,11 @@ class PythonFunctionWriter:
             self.write(f"{self.indent} {line}\n")
 
 class LMQLModule(object):
-    def __init__(self, compiled_file, lmql_code=None):
+    def __init__(self, compiled_file, lmql_code=None, output_variables=None):
         self.compiled_file = compiled_file
         self._code = None
         self.lmql_code = lmql_code
+        self.output_variables = output_variables or []
 
     def load(self):
         sys.path.append(os.path.dirname(self.compiled_file))
@@ -461,10 +462,11 @@ class LMQLCompiler:
 
             # resulting code
             code = None
+            output_variables = "output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
 
             # generate function that runs query
             with PythonFunctionWriter("query", output_file, list(scope.free_vars) + ["context"], 
-                q.prologue, decorators=["lmql.query"]) as writer:
+                q.prologue, decorators=["lmql.query"], decorators_args=[output_variables]) as writer:
                 
                 writer.add(f"context.set_model({model_name})")
                 writer.add(f"context.set_decoder({astunparse.unparse(q.decode.method).strip()}, {unparse_list(q.decode.decoding_args)})")
@@ -479,9 +481,7 @@ class LMQLCompiler:
                 
                 writer.add(f"yield ('result', context.get_return_value())")
 
-                code = writer.in_memory_contents
-
-            return LMQLModule(output_file, lmql_code=lmql_code)
+            return LMQLModule(output_file, lmql_code=lmql_code, output_variables=[v for v in scope.defined_vars])
         except FragmentParserError as e:
             sys.stderr.write("error: " + str(e) + "\n")
 

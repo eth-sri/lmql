@@ -141,6 +141,8 @@ async def chat_api(**kwargs):
             role = "assistant"
         elif tag == "user":
             role = "user"
+        elif tag is None:
+            role = "user"
         else:
             print(f"warning: {tag} is not a valid tag for the OpenAI chat API. Please use one of :system, :user or :assistant.")
         

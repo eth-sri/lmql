@@ -24,7 +24,8 @@ extensions = [
     'sphinx.ext.autosummary',
     'sphinx.ext.intersphinx',
     "myst_parser",
-    "lmql_snippets"
+    "lmql_snippets",
+    "nbsphinx"
 ]
 
 source_suffix = {

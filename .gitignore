@@ -10,6 +10,7 @@ api.env
 web-deploy
 web/index.html
 **/node_modules/*
+**/.DS_Store
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks

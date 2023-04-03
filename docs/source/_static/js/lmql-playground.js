@@ -16,7 +16,8 @@ function openPlaygroundSnippet(link, snippet, playground_url) {
     const container = link.parentElement;
     container.classList.add('playground');
     const iframe = document.createElement('iframe');
-    iframe.src = playground_url + '#embed=' + snippet + ".json"
+    iframe.src = ""
+    iframe.src = playground_url + '?embed=' + snippet + ".json"
     console.log(iframe.src);
     iframe.style.width = '100%';
     iframe.style.height = '100%';

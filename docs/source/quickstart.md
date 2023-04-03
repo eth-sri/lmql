@@ -22,7 +22,7 @@ This launches a browser-based playground IDE, including a showcase of many exemp
 
 Alternatively, `lmql run` can be used to execute local `.lmql` files. Note that when using local HuggingFace Transformers models in the Playground IDE or via `lmql run`, you have to first launch an instance of the LMQL Inference API for the corresponding model via the command `lmql serve-model`.
 
-## Configuring OpenAI API Credentials
+### Configuring OpenAI API Credentials
 
 If you want to use OpenAI models, you have to configure your API credentials. To do so, create a file `api.env` in the active working directory, with the following contents.
 

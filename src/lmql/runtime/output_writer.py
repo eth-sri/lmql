@@ -52,3 +52,6 @@ class StreamingOutputWriter:
             print(f"{prompt}\n", end="\r")
             
     def add_compiler_output(self, code): pass
+
+silent = DebuggerOutputWriter()
+stream = StreamingOutputWriter
