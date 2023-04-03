@@ -20,6 +20,8 @@ jobs:
       # You may pin to the exact commit or the version.
       # uses: ammaraskar/sphinx-action@8b4f60114d7fd1faeba1a712269168508d4750d2
       uses: ammaraskar/sphinx-action@0.4
+      with:
+        pre-build-command: "apt-get update -y && apt-get install -y pandoc"
     - name: Clean permissions
       # You may pin to the exact commit or the version.
       # uses: main-quest/actions.clean-permissions@c8603ac2fddde3426082da840e0baff43a6505af
