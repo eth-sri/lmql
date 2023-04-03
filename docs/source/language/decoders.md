@@ -49,4 +49,4 @@ Among other things, this view allows you to track the decoding process, active h
 
 * `max_len: int` - The maximum length of the generated sequence. If not specified, the default value of `max_len` is `512`. Note if the maximum length is reached, the LMQL runtime will throw an error if the query has not yet come to a valid result, according to the provided `where` clause.
 
-* `openai_chunksize: int` - The chunksize parameter for OpenAI's `Completion` API. If not specified, the default value of `openai_chunksize` is `64`. See also the description of this parameter in the [Models](models.md#configuring-speculative-openai-api-use) chapter.
+* `openai_chunksize: int` - The chunksize parameter for OpenAI's `Completion` API. If not specified, the default value of `openai_chunksize` is `32`. See also the description of this parameter in the [Models](models.md#configuring-speculative-openai-api-use) chapter.

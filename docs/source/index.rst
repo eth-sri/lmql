@@ -28,8 +28,8 @@ We also provide the following resources to get started with LMQL:
           <a href="quickstart.html">
             🚀 Getting Started Guide
           </a>
-          <a href="https://github.com/eth-sri/lmql">
-            GitHub Repo
+          <a href="https://lmql.ai">
+            🖼️ Examples Gallery
           </a>
         </div>
 
