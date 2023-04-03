@@ -1,2 +1,3 @@
 include src/lmql/ui/*
 exclude src/lmql/ui/playground/node_modules/*
+exclude web
