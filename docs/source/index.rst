@@ -16,7 +16,7 @@ Quick Start
 -----------
 
 To get started locally, check out the :doc:`quickstart` section. 
-For smaller experiments, you can also use the web-based `LMQL Playground <lmql.ai/playground/>`_:
+For smaller experiments, you can also use the web-based `LMQL Playground <lmql.ai/playground/>`_.
 
 .. raw:: html
 

@@ -6,4 +6,5 @@ To learn more about the LMQL language, please refer one of the following chaptor
 :maxdepth: 1
 
 scripted_prompts.md
+constraints.md
 ```

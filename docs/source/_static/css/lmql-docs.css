@@ -147,14 +147,48 @@
     white-space: break-spaces !important;
 }
 
+.highlight-model-output::before {
+    content: "Model Output";
+    position: absolute;
+    top: -10pt;
+    font-size: 9pt;
+    text-transform: uppercase;
+    left: 0pt;
+    z-index: 2;
+    width: 100%;
+    text-align: center;
+    color: grey;
+}
+
 .highlight-model-output {
+    position: relative;
     padding-left: 5pt;
     padding-right: 5pt;
     z-index: -1;
+    font-size: 0.95em;
 }
+
+html[data-theme="dark"] .highlight-model-output::before {
+    color: rgb(143, 143, 143);
+}
+
+html[data-theme="dark"] .highlight-model-output {
+    background: transparent;
+}
+
+html[data-theme="dark"] .highlight-model-output .highlight {
+    background: transparent;
+}
+
+html[data-theme="dark"] .highlight-model-output .highlight pre {
+    background-color: rgb(30, 30, 30);
+    border-color: rgb(68, 68, 68);
+}
+
 
 .highlight-model-output .highlight pre {
     background-color: #E4E4E4;
     position: relative;
     top: -12pt;
+    border-color: rgb(223, 219, 219);
 }
