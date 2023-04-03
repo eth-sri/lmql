@@ -1,4 +1,4 @@
 include src/lmql/ui/*
 exclude src/lmql/ui/playground/node_modules/*
 exclude web/*
-exclude sr/lmql/ui/vscode/*
+exclude src/lmql/ui/vscode/*
