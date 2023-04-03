@@ -1,4 +1,4 @@
-# LMQL Language
+# 📖 LMQL Language
 
 To learn more about the LMQL language, please refer one of the following chaptors.
 

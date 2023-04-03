@@ -1,8 +1,4 @@
-.. note::
-
-    **This is only a preview/placeholder for LMQL's documentation. The full documentation will be available on official launch.**
-
-Welcome to LMQL!
+Welcome to LMQL
 ===================================
 
 **LMQL** (Language Model Query Language) is a programming language for large language model interaction. 
@@ -46,9 +42,26 @@ Contents
 --------
 
 .. toctree::
-    :maxdepth: 2
+  :maxdepth: 1
 
-    quickstart
-    language/index.md
-    python/index.rst
+  quickstart
+  Playground IDE <https://lmql.ai/playground>
+
+.. toctree::
+   :maxdepth: 1
+   :caption: 📖 LMQL Language
+   
+   language/scripted_prompts.md
+   language/constraints.md
+   
+.. toctree::
+    :maxdepth: 1
+    :caption: 🔗 Python Interoperability
+    
+    python/python.ipynb
+    python/langchain.ipynb
+   
+.. toctree:
+    :maxdepth: 2
+    :caption: Development
     dev-setup

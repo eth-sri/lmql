@@ -16,8 +16,19 @@ function closePlaygroundSnippet() {
         openPlaygroundElement.innerHTML = openPlaygroundElement.originalHTML;
         openPlaygroundElement.classList.remove('playground');
         openPlaygroundElement.style.height = 'auto';
-        openPlaygroundElement = null;
-    }
+
+        // show model output div if it exists
+        let next = openPlaygroundElement.nextElementSibling;
+        while(next.tagName !== 'DIV' && next) {
+            next = next.nextElementSibling;
+        }
+
+        if (next.classList.contains('highlight-model-output')) {
+            next.style.display = 'block';
+        }
+
+            openPlaygroundElement = null;
+        }
 }
 
 function openPlaygroundSnippet(link, snippet) {
@@ -41,6 +52,16 @@ function openPlaygroundSnippet(link, snippet) {
     container.innerHTML = '';
     container.style.height = height + 'px';
     container.appendChild(iframe);
+
+    // hide the model output div if it exists
+    let next = container.nextElementSibling;
+    while(next.tagName !== 'DIV' && next) {
+        next = next.nextElementSibling;
+    }
+
+    if (next.classList.contains('highlight-model-output')) {
+        next.style.display = 'none';
+    }
 
     openPlaygroundElement = container;
 }
