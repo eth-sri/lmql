@@ -7,4 +7,5 @@ To learn more about the LMQL language, please refer one of the following chaptor
 
 scripted_prompts.md
 constraints.md
+functions.md
 ```
