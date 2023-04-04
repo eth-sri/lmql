@@ -249,7 +249,13 @@ class WordsOp(Node):
     def forward(self, x):
         if x is None: return None
         if x == "": return []
-        return [w for w in x.split(" ") if w.strip() != ""]
+        # split on " " or "\n"
+        x = x.replace(" ", " ")
+        x = x.replace("\n", " ")
+        x = x.replace("\u0120", " ")
+        words = x.split(" ")
+
+        return [w for w in words if w.strip() != ""]
     
     def follow(self, v, **kwargs):
         if v is None: return None
@@ -260,9 +266,12 @@ class WordsOp(Node):
         
         if len(words) > 0 and contains_next_token:
             # allow continuation sub-tokens
-            continuation_tokens = tset("[^\u0120].*", regex=True)
-            valid_continuations = union(tset("eos"), continuation_tokens)
-            components = [((valid_continuations, (words[:-1] + [words[-1] + NextToken])))] + components
+            continuation_tokens = tset("[^\u0120\n ].*", regex=True)
+            # valid_continuations = union(tset("eos"), continuation_tokens)
+            components = [
+                ((continuation_tokens, (words[:-1] + [words[-1] + NextToken]))),
+                ((tset("eos"), words))
+            ] + components
         
         return fmap(
             *components
