@@ -1024,3 +1024,19 @@ p.is-left-aligned {
     font-size: 12pt;
     text-align: justify !important;
 }
+
+p.uni-branding {
+    font-size: 10pt;
+    margin-top: 30pt;
+    display: block;
+    text-align: center;
+    opacity: 0.6;
+}
+
+.uni-branding img {
+    display: block;
+    margin: auto;
+    height: 10pt;
+    margin-top: 10pt;
+    opacity: 0.6;
+}
