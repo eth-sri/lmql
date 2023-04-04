@@ -66,17 +66,17 @@
             with
             <ul class="inner">
             <span class="placeholder"> AAAAAAAAAAA.</span>
-            <li> control flow.</li>
             <li> constraints.</li>
             <li> a debugger.</li>
             <li> decoders.</li>
             <li> 🤗 Transformers.</li>
             <li> templates.</li>
+            <li> retrieval.</li>
             <li> interaction.</li>
             <li> distributions.</li>
             <li> token masking.</li>
-            <li> retrieval.</li>
-            </ul>
+            <li> control flow.</li>
+            </ul> 
             </span>
           </span><br/>
           <span class="big-sub">
@@ -768,14 +768,14 @@ Review: We had a great stay. Hiking in the mountains was fabulous and the food i
           <!-- <figure class="image">
             <img src="static/images/decoder.png" style="width: 185pt; margin: auto;"/> 
           </figure> -->
-<div class="code"><b>for</b> i <b>i</b>n range(n):
- "[THOUGHT]"
- <b>if</b> THOUGHT.endswith("<<"):
-   " [EXPR]"
-   " {calc(EXPR)}>>"
- <b>elif</b> THOUGHT.endswith("So the answer"):
-   <b>break</b>
-"is[RESULT]"
+<div class="code"><span class="lmql-kw">for</span> i <span class="lmql-kw">in</span> <span class="lmql-fct">range</span>(n):
+ <span class="lmql-str">"[THOUGHT]"</span>
+ <span class="lmql-kw">if</span> THOUGHT.endswith("<<"):
+   <span class="lmql-str">" [EXPR]"</span>
+   <span class="lmql-str">" {calc(EXPR)}>>"</span>
+ <span class="lmql-kw">elif</span> THOUGHT.endswith(<span class="lmql-str">"So the answer"</span>):
+   <span class="lmql-kw">break</span>
+<span class="lmql-str">"is[RESULT]"</span>
 </div>
             </code>
           </pre>
@@ -1005,7 +1005,7 @@ Review: We had a great stay. Hiking in the mountains was fabulous and the food i
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Tue, Apr 4, 7:43 PM (UTC)<br/>
+        Last updated on Tue, Apr 4, 7:57 PM (UTC)<br/>
       </div>
     </div>
   </div>
