@@ -218,14 +218,14 @@
           <!-- <figure class="image">
             <img src="static/images/decoder.png" style="width: 185pt; margin: auto;"/> 
           </figure> -->
-<div class="code"><b>for</b> i <b>i</b>n range(n):
- "[THOUGHT]"
- <b>if</b> THOUGHT.endswith("<<"):
-   " [EXPR]"
-   " {calc(EXPR)}>>"
- <b>elif</b> THOUGHT.endswith("So the answer"):
-   <b>break</b>
-"is[RESULT]"
+<div class="code"><span class="lmql-kw">for</span> i <span class="lmql-kw">in</span> <span class="lmql-fct">range</span>(n):
+ <span class="lmql-str">"[THOUGHT]"</span>
+ <span class="lmql-kw">if</span> THOUGHT.endswith("<<"):
+   <span class="lmql-str">" [EXPR]"</span>
+   <span class="lmql-str">" {calc(EXPR)}>>"</span>
+ <span class="lmql-kw">elif</span> THOUGHT.endswith(<span class="lmql-str">"So the answer"</span>):
+   <span class="lmql-kw">break</span>
+<span class="lmql-str">"is[RESULT]"</span>
 </div>
             </code>
           </pre>
