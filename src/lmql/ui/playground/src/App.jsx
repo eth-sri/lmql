@@ -2219,7 +2219,7 @@ function OpenAICredentials() {
 
   return <PromptPopup>
     <div className="click-handler" onClick={() => OpenAICredentialsState.setOpen(false)}/>
-    <Dialog style={{transform: "scale(" + (displayState.mode == "embed" ? 0.8 : 1) + ")"}}>
+    <Dialog className={displayState.mode == "embed" ? "embed" : ""}>
       <h1>OpenAI Credentials</h1>
       <Explainer>
         <p>

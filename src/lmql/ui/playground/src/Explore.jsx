@@ -61,6 +61,16 @@ export const Dialog = styled.div`
     }
   }
 
+  &.embed {
+    width: calc(100% - 22pt) !important;
+    margin: 0;
+    max-width: 100% !important;
+    height: 100%;
+    max-height: 100%;
+    border: 1pt solid grey;
+    font-size: 8pt !important;
+  }
+
   label {
     font-size: 10pt;
     position: relative;
