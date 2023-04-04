@@ -6,7 +6,7 @@ LMQL constraints are evaluated eagerly on each generated token, and will be used
 
 This chapter provides an overview of the set of currently available constraints. Beyond that, LMQL constraint support is modular and extendible. If you are interested in implementing your own constraint, please see [Custom Constraints](#custom-constraints).
 
-## Stopping Phrases
+## Stopping Phrases and Type Constraints
 For many prompts, scripted prompts in particular, it is important to ensure that the model stops decoding once a certain word or symbol is reached. To do so, LMQL supports the `STOPS_AT` constraint. It takes two arguments, the first is the name of the variable to which the model output is assigned, the second is the stopping phrase. 
 In the example below we use it to ensure that as soon as the model predicts the newline character `\n` the decoding of the variable `THING` is stopped, and prompt clause continues execution.
 
@@ -21,6 +21,21 @@ from
    'openai/text-ada-001'
 where
    STOPS_AT(THING, "\n")
+```
+
+In a similar manner we can constrain a variable to be a string encoding an integer by using `INT`:
+
+```{lmql}
+name::number
+argmax
+   "A number: [N]"
+from
+   'openai/text-ada-001'
+where
+    INT(N)
+```
+```model-output
+A number: 2
 ```
 
 **Note:** If multiple variables in the query have the same name, the constraint is applied to all of them.
@@ -58,9 +73,9 @@ name::length
 argmax
    "Hello [NAME]"
 from
-   'openai/text-ada-001'
+   'openai/text-3a-001'
 where
-    len(NAME) <> 3
+    len(NAME) < 10
 ```
 
 ```model-output
