@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax\n   \"A number: [N]\"\nfrom\n   'openai/text-ada-001'\nwhere\n    INT(N)", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
