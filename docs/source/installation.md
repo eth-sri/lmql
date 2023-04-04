@@ -32,7 +32,7 @@ As an alternative to the playground, the command-line tool `lmql run` can be use
 
 LMQL can also be used directly from within Python. To use LMQL in Python, you can import the `lmql` package, run query code via `lmql.run` or use a decorator `@lmql.query` for LMQL query functions. 
 
-For more details, please see the [Python Integration](./python_integration.md) chapter.
+For more details, please see the [Python Integration](./python/python.ipynb) chapter.
 
 ## Self-Hosted Models
 

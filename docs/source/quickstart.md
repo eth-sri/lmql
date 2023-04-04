@@ -24,9 +24,9 @@ We can identify different *clauses* in this program:
 
 * **Model Clause** `from "openai/text-ada-001"`: Here, you specify what model you want to use for text generation. Currently, LMQL supports [OpenAI models](https://platform.openai.com/docs/models), like GPT-3.5 variants, ChatGPT, and GPT-4, as well as self-hosted models via [🤗 Transformers](https://huggingface.co/transformers). For more details, please see [Models](./language/models.md).
 
-* **Constraint Clause** `where len(WHO) < 10`: In this part of the query, users can specify logical, high-level constraints on the output. LMQL uses novel evaluation sematnics for these constraints, to automatically translate character-level constraints like `len(WHO) < 10` to (sub)token masks, that can be eagerly enforced during text generation. To learn more, see [Constraints](./language/constraints.md).
+* **Constraint Clause** `where len(WHO) < 10`: In this part of the query, users can specify logical, high-level constraints on the output. LMQL uses novel evaluation semantics for these constraints, to automatically translate character-level constraints like `len(WHO) < 10` to (sub)token masks, that can be eagerly enforced during text generation. To learn more, see [Constraints](./language/constraints.md).
 
-This is only a brief overview of LMQL's core feature set. To learn more consider reading any of the referenced chapters or the [LMQL research paper](https://arxiv.org/pdf/2212.06094).
+This is only a brief overview of LMQL's features. To learn more consider reading the referenced chapters of the documentation or the [LMQL research paper](https://arxiv.org/pdf/2212.06094).
 
 
 ## 3. Enjoy
