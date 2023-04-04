@@ -16,6 +16,7 @@ To get started with LMQL, check out the :doc:`quickstart` guide.
 
 We also provide the following resources to get started with LMQL:
 
+
 .. raw:: html
 
     <div class="getting-started-options">
@@ -38,7 +39,7 @@ We also provide the following resources to get started with LMQL:
           <div class="cmd"> 
               pip install lmql
           </div> 
-          To run LMQL locally, read the <span><a href="quickstart.html">Installation Instructions</a> section of the documentation</span>.
+          To run LMQL locally, read the <span><a href="quickstart.html">Installation Instructions</a> section of the documentation.</span>
         </div>
         <div class="column getting-started">
           <h2>Community</h2>

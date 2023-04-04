@@ -42,7 +42,6 @@
 .getting-started-options {
     margin: 0 0;
     max-width: 800px;
-    padding: 0 1rem;
 }
 
 .getting-started:hover {
@@ -63,6 +62,12 @@
     flex-direction: row;
     flex-direction: column;
     box-shadow: 0pt 0pt 10pt 0pt rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 540pt) {
+    .getting-started {
+        width: 100%;
+    }
 }
 
 @media screen and (max-width: 769px), print {
@@ -97,7 +102,8 @@
 
 .getting-started .cmd {
     padding: 5pt;
-    margin: 5pt;
+    margin: 5pt auto;
+    max-width: 280pt;
     border-radius: 4pt;
     background-color: #dcdcdc;
     color: rgb(35, 35, 35);
