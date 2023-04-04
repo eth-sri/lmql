@@ -23,6 +23,21 @@ where
    STOPS_AT(THING, "\n")
 ```
 
+In a similar manner we can constrain a variable to be a string encoding an integer by using `INT`:
+
+```{lmql}
+name::number
+argmax
+   "A number: [N]"
+from
+   'openai/text-ada-001'
+where
+    INT(N)
+```
+```model-output
+A number: 2
+```
+
 **Note:** If multiple variables in the query have the same name, the constraint is applied to all of them.
 
 ## Choice From Set
