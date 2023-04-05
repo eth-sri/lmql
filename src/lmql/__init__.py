@@ -116,7 +116,7 @@ def query(fct):
     
     calling_frame = inspect.stack()[1]
     scope = LMQLInputVariableScope(fct, calling_frame)
-    code = fct.__doc__.strip()
+    code = fct.__doc__
     
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
