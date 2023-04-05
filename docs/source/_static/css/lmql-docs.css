@@ -155,8 +155,9 @@
 
 .highlight-model-output::before {
     content: "Model Output";
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     position: absolute;
-    top: -10pt;
+    top: 4pt;
     font-size: 9pt;
     text-transform: uppercase;
     left: 0pt;
@@ -169,9 +170,11 @@
 .highlight-model-output {
     position: relative;
     padding-left: 5pt;
+    top: -5pt;
     padding-right: 5pt;
     z-index: -1;
-    font-size: 0.95em;
+    font-size: 0.9em;
+    font-family: monospace;
 }
 
 html[data-theme="dark"] .highlight-model-output::before {
@@ -183,19 +186,78 @@ html[data-theme="dark"] .highlight-model-output {
 }
 
 .highlight-model-output .highlight, html[data-theme="dark"] .highlight-model-output .highlight {
-    background: transparent !important;
+    display: block;
+    white-space: break-spaces !important;
 }
 
-html[data-theme="dark"] .highlight-model-output .highlight pre {
+html[data-theme="dark"] .highlight-model-output .highlight {
     background-color: rgb(30, 30, 30);
     border-color: rgb(68, 68, 68);
 }
 
 
-.highlight-model-output .highlight pre {
-    background-color: #fbfbfb;
+.highlight-model-output .highlight {
+    background-color: #fbfbfb !important;
+    border: 0.5pt solid grey;
     position: relative;
-    top: -12pt;
+    /* top: -12pt; */
     border-color: rgb(223, 219, 219);
     white-space: break-spaces !important;
+    padding: 10pt;
+    padding-top: 20pt;
+}
+
+.variable {
+    display: inline; 
+    padding: 0.5pt;
+}
+
+.variable .variable-name {
+    font-weight: 700;
+    color: #333;
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 0.2em;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.9);
+    display: inline;
+    margin: 0;
+    margin-right: 0.0em;
+    margin-left: 0;
+    font-size: 0.7em;
+    padding: 0.12em;
+    position: relative;
+    top: -0.15em;
+    left: 0.1em;
+
+    transform-origin: 0 50%;
+    overflow: hidden;
+}
+
+.variable .variable-name.visible {
+    opacity: 1.0;
+}
+
+.val1 {
+    background-color: rgba(255, 166, 0, 0.5) !important;
+    cursor: default;
+}
+
+.val1:hover, .val1.hover, .val1-hover .val1 {
+    background-color: rgba(255, 166, 0, 1.0) !important;
+}
+.val2 {
+    background-color: rgba(206, 128, 184, 1.0) !important;
+    cursor: default;
+}
+
+.val2:hover, .val2.hover, .val2-hover .val2 {
+    background-color: rgba(206, 128, 184, 1.0) !important;
+}
+.val3 {
+    background-color: rgb(130, 140, 249) !important;
+    cursor: default;
+}
+
+.val3:hover, .val3.hover, .val3-hover .val3 {
+    background-color: rgba(107, 119, 255, 1.0) !important;
 }

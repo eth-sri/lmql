@@ -35,9 +35,9 @@ from
    'openai/text-ada-001'
 where
     INT(N)
-```
-```model-output
-A number: 2
+
+model-output::
+A number: [N 2]
 ```
 
 **Note:** If multiple variables in the query have the same name, the constraint is applied to all of them.
@@ -56,19 +56,18 @@ from
    'openai/text-ada-001'
 where
    THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])
-```
 
-```model-output
+model-output::
 A list of things not to forget when going to the sea (not travelling): ⏎
-- Sunglasses ⏎
-- Sunscreen ⏎
-- Volleyball ⏎
-- Sunscreen ⏎
-- Sunscreen ⏎
+- [THING Sunglasses] ⏎
+- [THING Sunscreen] ⏎
+- [THING Volleyball] ⏎
+- [THING Sunscreen] ⏎
+- [THING Sunscreen] ⏎
 ```
 
 ## Length 
-Similar to Python the `len` function can be used to refer to the length of a variable and can thus be used to add constraints on it's length.
+Similar to Python, the `len` function can be used to refer to the length of a variable and can thus be used to add constraints on it's length.
 
 ```{lmql}
 name::length
@@ -78,12 +77,11 @@ from
    'openai/text-3a-001'
 where
     len(NAME) < 10
-```
 
-```model-output
-Hello ⏎
+model-output::
+Hello [NAME ⏎
 ⏎
-I am in
+I am in]
 ```
 
 ## Combining Constraints

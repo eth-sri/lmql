@@ -13,11 +13,10 @@ from
     'openai/text-davinci-003'
 where
     STOPS_AT(MATH, "=")
-```
 
-```model-output
+model-output::
 A simple math problem for addition (without solution, without words):
-7 + 8 = 15
+[MATH 7 + 8 =] 15
 ```
 
 
@@ -62,14 +61,14 @@ where
       STOPS_AT(REASON_OR_CALC, "<<") and
       STOPS_AT(EXPR, "=") and
       STOPS_AT(REASON_OR_CALC, "So the answer")
-```
-```model-output
+
+model-output::
 Q: Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?
 Let's think step by step.
-Josh bought the house for $80,000 and put in $50,000 in repairs.
-The value of the house increased by 150%, so the new value of the house is $80,000 + 150% of $80,000 = << 80,000 + (80,000*1.5) = 200000.0>>$200,000.
-The profit Josh made is the difference between the new value of the house and the amount he spent on it, which is $200,000 - $80,000 - $50,000 = << 200,000 - 80,000 - 50,000 = 70000>>$70,000.
-So the answer is $70,000.
+[REASON_OR_CALC Josh bought the house for $80,000 and put in $50,000 in repairs.
+The value of the house increased by 150%, so the new value of the house is $80,000 + 150% of $80,000 = <<] [EXPR 80,000 + (80,000*1.5) =] 200000.0>> [REASON_OR_CALC $200,000.
+The profit Josh made is the difference between the new value of the house and the amount he spent on it, which is $200,000 - $80,000 - $50,000 = <<] [EXPR 200,000 - 80,000 - 50,000 =] 70000>> [REASON_OR CALC $70,000.
+So the answer] is [RESULT $70,000.]
 ```
 
 ## Beyond Calculators
@@ -96,14 +95,14 @@ from
    "openai/text-davinci-003"
 where
    STOPS_AT(TERM, "'")
-```
-```model-output
+
+model-output::
 Q: From which countries did the Norse originate?
-Action: Let's search Wikipedia for the term 'Norse'.
+Action: Let's search Wikipedia for the term '[TERM Norse'].
 Result: Norse is a demonym for Norsemen, a Medieval North Germanic ethnolinguistic group ancestral to modern Scandinavians, defined as speakers of Old Norse from about the 9th to the 13th centuries.
 Norse may also refer to:
 
-Final Answer: The Norse originated from North Germanic countries, including Denmark, Norway, Sweden, and Iceland.
+Final Answer: [ANSWER The Norse originated from North Germanic countries, including Denmark, Norway, Sweden, and Iceland.]
 ```
 
 LMQL can also access the state of the surrounding python interpreter. To showcase this, we show how to use the `assign` and `get` functions to store and retrieve values in a simple key-value store.
@@ -142,31 +141,31 @@ from
 where
    STOPS_AT(REASONING, "# result") and STOPS_AT(REASONING, "Therefore, ") and
    STOPS_AT(OBJECT, ".") and STOPS_AT(OBJECT, ",")            
-```
-```model-output
+
+model-output::
 (...)
 A: Let's think step by step
 
-At the start of the game:
-`assign("Alice", "black") # result {Alice: "black"}`
-`assign("Bob", "brown") # result {Bob: "brown"}`
-`assign("Claire", "blue") # result {Claire: "blue"}`
+[REASONING At the start of the game:
+`assign("Alice", "black") # result] {Alice: "black"}`
+[REASONING `assign("Bob", "brown") # result] {Bob: "brown"}`
+[REASONING `assign("Claire", "blue") # result] {Claire: "blue"}`
 
-After Bob and Claire swap balls:
-`assign("Bob", "blue") # result {Bob: "blue"}`
-`assign("Claire", "brown") # result {Claire: "brown"}`
+[REASONING After Bob and Claire swap balls:
+`assign("Bob", "blue") # result] {Bob: "blue"}`
+[REASONING `assign("Claire", "brown") # result] {Claire: "brown"}`
 
-After Alice and Bob swap balls:
-`assign("Alice", "blue") # result {Alice: "blue"}`
-`assign("Bob", "black") # result {Bob: "black"}`
+[REASONING After Alice and Bob swap balls:
+`assign("Alice", "blue") # result] {Alice: "blue"}`
+[REASONING `assign("Bob", "black") # result] {Bob: "black"}`
 
-After Claire and Bob swap balls:
-`assign("Claire", "black") # result {Claire: "black"}`
-`assign("Bob", "brown") # result {Bob: "brown"}`
+[REASONING After Claire and Bob swap balls:
+`assign("Claire", "black") # result] {Claire: "black"}`
+[REASONING `assign("Bob", "brown") # result] {Bob: "brown"}`
 
-At the end of the game, Alice has a blue ball:
-`get("Alice") # result blue`
-Therefore at the end of the game, Alice has the blue ball.
+[REASONING At the end of the game, Alice has a blue ball:
+`get("Alice") # result] blue`
+Therefore at the end of the game, Alice has the [OBJECT blue ball.]
 ```
 
 As shown in the example above, the `assign` and `get` functions can be used to store and retrieve values in a simple key-value store. The model is merely instructed to make use of these functions in its reasoning. The query then implements logic to intercept any function use and insert the result of the function call into the reasoning. This allows the model to incorporate the state of the key-value store into its reasoning.

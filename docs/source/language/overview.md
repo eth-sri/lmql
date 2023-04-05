@@ -1,7 +1,7 @@
 # Overview
 
 LMQL is a declarative, SQL-like programming language for language model interaction. As an example consider the following query, demonstrating the basic syntax of LMQL:
-
+ 
 ```{lmql}
 
 name::overview-query
@@ -14,12 +14,12 @@ from
    "openai/text-davinci-003"
 where
    not "\n" in ANALYSIS and CLASSIFICATION in [" positive", " neutral", " negative"]
-```
-```model-output
+
+model-output::
 Review: We had a great stay. Hiking in the mountains was fabulous and the food is really good.⏎
 Q: What is the underlying sentiment of this review and why?⏎
-A: The underlying sentiment of this review is positive because the reviewer had a great stay, enjoyed the hiking and found the food to be good.⏎
-Based on this, the overall sentiment of the message can be considered to be [CLASSIFICATION]
+A: [ANALYSIS The underlying sentiment of this review is positive because the reviewer had a great stay, enjoyed the hiking and found the food to be good.]⏎
+Based on this, the overall sentiment of the message can be considered to be [CLASSIFICATION positive]
 ```
 
 In this program, we use the language model `openai/text-davinci-003` (GPT-3.5) to perform a sentiment analysis on a provided user review. We first ask the model to provide some basic analysis of the review, and then we ask the model to classify the overall sentiment as one of `positive`, `neutral`, or `negative`. The model is able to correctly identify the sentiment of the review as `positive`.
@@ -74,11 +74,11 @@ where
    not "\n" in ANALYSIS
 distribution
    CLASSIFICATION in [" positive", " neutral", " negative"]
-```
-```model-output
+
+model-output::
 Review: We had a great stay. Hiking in the mountains was fabulous and the food is really good.⏎
 Q: What is the underlying sentiment of this review and why?⏎
-A: The underlying sentiment of this review is positive because the reviewer had a great stay, enjoyed the hiking and found the food to be good.⏎
+A: [ANALYSIS The underlying sentiment of this review is positive because the reviewer had a great stay, enjoyed the hiking and found the food to be good.]⏎
 Based on this, the overall sentiment of the message can be considered to be [CLASSIFICATION]
 
 P(CLASSIFICATION)
@@ -119,15 +119,15 @@ from
     "openai/text-davinci-003"
 where
     not "\n" in ANALYSIS and CLASSIFICATION in [" positive", " neutral", " negative"] and STOPS_AT(FURTHER_ANALYSIS, ".")
-```
-```model-output
+
+model-output::
 Review: We had a great stay. Hiking in the mountains was fabulous and the food is really good.⏎
 Q: What is the underlying sentiment of this review and why?⏎
-A: The underlying sentiment of this review is positive because the reviewer had a great stay, enjoyed the hiking and found the food to be good.⏎
-Based on this, the overall sentiment of the message can be considered to be positive⏎
+A: [ANALYSIS The underlying sentiment of this review is positive because the reviewer had a great stay, enjoyed the hiking and found the food to be good.]⏎
+Based on this, the overall sentiment of the message can be considered to be [CLASSIFICATION positive]⏎
 What is it that they liked about their stay?⏎
 ⏎
-The reviewer liked the hiking in the mountains and the food.
+[FURTHER_ANALYSIS The reviewer liked the hiking in the mountains and the food.]
 ```
 
 As shown here, we can use the `if` statement to dynamically react to the model's output. In this case, we ask the model to provide a more detailed analysis of the review, depending on the overally positive, neutral, or negative sentiment of the review. All intermediate variables like `ANALYSIS`, `CLASSIFICATION` or `FURTHER_ANALYSIS` can be considered the output of query, and may be processed by an surrounding automated system. 

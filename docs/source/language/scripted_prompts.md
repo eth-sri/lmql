@@ -12,14 +12,13 @@ sample(temperature=0.8)
    "[LIST]"
 from
    'openai/text-ada-001'
-```
 
-```model-output
+model-output::
 A list of things not to forget when going to the sea (not travelling):
-
--A phone with call, texting or tech services
+[LIST -A phone with call, texting or tech services
 -A copy of the local paper
 -A pen or phone Keytar
+]
 ```
 
 This can work well, however, it is unclear if the model will always produce a well-structured list of items. Further, we have to parse the response to separate the various items and process them further.
@@ -40,15 +39,14 @@ from
    'openai/text-ada-001'
 where
    STOPS_AT(THING, "\n")
-```
 
-```model-output
+model-output::
 A list of things not to forget when going to the sea (not travelling):
--A phone with a/r text
--pletter
--accoon
--Films about/of the sea
--A has been in the Poconos for/ Entered the Poconos
+-[THING A phone with a/r text]
+-[THING pletter]
+-[THING accoon]
+-[THING Films about/of the sea]
+-[THING A has been in the Poconos for/ Entered the Poconos]
 ```
 
 Note how we use a stopping condition on `THING`, such that a new line in the model output leads to a continuation of our provided template. Without the stopping condition, simple template filling would not be possible, as the model would generate more than one items for the first variable already.
@@ -69,17 +67,16 @@ from
    'openai/text-ada-001'
 where
    STOPS_AT(THING, "\n")
-```
 
-```model-output
+model-output::
 A list of things not to forget when going to the sea (not travelling):
--A good pair of blue/gel saskaers
--A good sun tanner
--A good air freshener
--A good spot forwashing your hands
--A good spot for washing your feet
+-[THING A good pair of blue/gel saskaers]
+-[THING A good sun tanner]
+-[THING A good air freshener]
+-[THING A good spot forwashing your hands]
+-[THING A good spot for washing your feet]
 
-# print output: ['A good pair of blue/gel saskaers', 'A good sun tanner', 'A good air freshener', 'A good spot forwashing your hands', 'A good spot for washing your feet']
+# print output: \['A good pair of blue/gel saskaers', 'A good sun tanner', 'A good air freshener', 'A good spot forwashing your hands', 'A good spot for washing your feet'\]
 ```
 
 Because we decode our list `THING` by `THING`, we can easily access the individual items, without having to think about parsing or validation. We just add them to a `backpack` list of things, which we then can process further.
