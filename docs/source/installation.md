@@ -1,4 +1,4 @@
-# Installation Instructions
+# 💾 Installation Instructions
 
 > For quick experimentation, you can also use the web-based [Playground IDE](https://lmql.ai/playground)
 

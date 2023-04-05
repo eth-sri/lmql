@@ -1,4 +1,4 @@
-Welcome to LMQL
+💬 Welcome to LMQL
 ===================================
 
 **LMQL** (Language Model Query Language) is a programming language for large language model (LM) interaction. 
@@ -38,7 +38,7 @@ We also provide the following resources to get started with LMQL:
           <div class="cmd"> 
               pip install lmql
           </div> 
-          To run LMQL locally, read the <span><a href="quickstart.html">Installation Instructions</a> section of the documentation.</span>
+          To run LMQL locally, read the <span><a href="installation.html">Installation Instructions</a> section of the documentation.</span>
         </div>
         <div class="column getting-started">
           <h2>Community</h2>
@@ -63,7 +63,7 @@ Contents
 
   quickstart
   installation
-  Playground IDE <https://lmql.ai/playground>
+  ⚡️ Playground IDE <https://lmql.ai/playground>
 
 .. toctree::
    :maxdepth: 1
