@@ -1,10 +1,9 @@
 Welcome to LMQL
 ===================================
 
-**LMQL** (Language Model Query Language) is a programming language for large language model interaction. 
+**LMQL** (Language Model Query Language) is a programming language for large language model (LM) interaction. 
 It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness 
-of Python. With only a few lines of LMQL code, users can express advanced, multi-part and tool-augmented LM queries, 
-which then are optimized by the LMQL runtime to run efficiently as part of the LM decoding loop.
+of Python. It has a focus on multi-part prompting and enables novel forms of LM interaction via `scripting <language/scripted_prompts.md>`_, `constraint-guided decoding <language/constraints.md>`_, `tool augmentation <language/functions.md>`_, and efficiency.
 
 LMQL is a research project by the `Secure,  Reliable, and Intelligent Systems Lab <https://www.sri.inf.ethz.ch/>`_ at ETH Zürich.
 
@@ -70,6 +69,7 @@ Contents
    :maxdepth: 1
    :caption: 📖 LMQL Language 
    
+   language/overview.md
    language/scripted_prompts.md
    language/constraints.md
    language/decoders.md

@@ -2,7 +2,9 @@
 
 LMQL allows you to specify constraints on the language model output. This is valuable in scripted prompting to ensure the model output stops at the desired point, but also allows to guide the model during decoding.
 
-LMQL constraints are evaluated eagerly on each generated token, and will be used by the runtime to generate token masks during generation. This means, that the provided constraints are either satisfied by directly guiding the model during generation appropriately or, if this is not possible, validation will fail early on during generation, saving the cost of generating invalid output. In case of greedy decoding, this terminates the generation process, in case of branching decoding, it will prune the branch and continue generation only in the remaining, valid branches.
+**Token Masking and Eager Validation** LMQL constraints are evaluated eagerly on each generated token, and will be used by the runtime to generate token masks during generation. This means, that the provided constraints are either satisfied by directly guiding the model during generation appropriately or, if this is not possible, validation will fail early on during generation, saving the cost of generating invalid output. In case of greedy decoding, this terminates the generation process, in case of branching decoding, it will prune the branch and continue generation only in the remaining, valid branches.
+
+**High-Level Text Constraints** Constraints are high-level and operate on a text (not token) level. For instance, users can specify constraints like `VAR in ["Hello", "Hi", "Greetings"]`, without having to consider the exact tokenization of the individual phrases. LMQL will automatically translate these constraints to token masks, that can be used to guide the model during generation, allowing to generate output that satisfies the provided constraint using one generation call only.
 
 This chapter provides an overview of the set of currently available constraints. Beyond that, LMQL constraint support is modular and extendible. If you are interested in implementing your own constraint, please see [Custom Constraints](#custom-constraints).
 
@@ -107,7 +109,7 @@ To inspect the implementation of the different built-in constraint operators, se
    len(VAR) = len(old(VAR)) where token == "<|endoftext|>" # the model ends generation of VAR with the <|endoftext|> token
    ```
 
-Given a value, final and follow implementation of a custom operator, it can be used modularly, together with all other available LMQL operators. This includes potential operators that enforce regular expressions or context-free grammars on the model output. For more details, please see the [LMQL paper](https://arxiv.org/abs/2212.06094).
+Given a value, final and follow implementation of a custom operator, it can be used modularly together with all other available LMQL operators. This includes operators that may enforce regular expressions or context-free grammars on the model output. For more details on custom operators, see the [LMQL paper](https://arxiv.org/abs/2212.06094).
 
 ### Expressiveness of LMQL Constraints
 
