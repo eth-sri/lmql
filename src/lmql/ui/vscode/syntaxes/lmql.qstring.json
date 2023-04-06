@@ -1,6 +1,6 @@
 {
     "scopeName": "lmql.qstring.injection",
-    "injectionSelector": "L:comment.inline-lmql #string, L:source.lmql",
+    "injectionSelector": "L:comment.inline-lmql #string, L:source.lmql #string",
     "patterns": [
         {
             "begin": "\\[",
