@@ -16,6 +16,7 @@ function getSnippet(allow_snippet=true) {
 export const displayState = {
   // if ?embed, mode = embed, else playground
   mode: getSnippet(false) ? 'embed' : 'playground',
+  preloaded: getSnippet(true) ? true : false,
   embedFile: null
 }
 
@@ -114,6 +115,7 @@ export const persistedState = new PersistedState();
 
 export const trackingState = {
   setTrackMostLikely: () => { },
+  getTrackMostLikely: () => false,
   setSelectedNode: () => { },
 }
 

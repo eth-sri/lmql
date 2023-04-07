@@ -81,7 +81,7 @@ from
 where
    STOPS_AT(EXPERT, ".") and STOPS_AT(EXPERT, "\\n") and STOPS_AT(ANSWER, ".")`,
             state: 'precomputed/meta.json'
-         },
+         }
       ]
    },
    {

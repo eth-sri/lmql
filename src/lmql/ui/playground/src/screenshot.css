@@ -1,0 +1,510 @@
+.lmql-spinner {
+    font-size: 24pt;
+    font-weight: bold;
+    line-height: 1.5;
+    background-color: #353535 !important;
+    border: 0.5pt solid #212B3B;
+    width: 25pt;
+    position: absolute;
+    height: 16pt;
+    max-height: 24pt;
+    border-radius: 2pt;
+    opacity: 1.0;
+    display: block;
+    padding: 0;
+    flex: 0;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%) scale(0.7);
+    margin-bottom: 10pt;
+}
+
+/* both parts pulse with an amplitude offset */
+.lmql-spinner .pt1 {
+    color: white;
+    animation: pulse 2s infinite;
+    position: absolute;
+    top: -6pt;
+    left: 2pt;
+}
+
+.lmql-spinner .pt2 {
+    color: white;
+    font-size: 12pt;
+    position: absolute;
+    top: -2.5pt;
+    right: 2pt;
+    animation: pulse 2s infinite;
+    animation-delay: 1s;
+}
+
+.lmql-spinner .pt3 {
+    position: absolute;
+    bottom: -5pt;
+    right: -0.47pt;
+    border: 5pt solid #353535;
+    border-top-color: transparent;
+    border-left-color: transparent;
+    border-bottom-color: transparent;
+}
+
+/* the animation */
+@keyframes pulse {
+    0% {
+        opacity: 0.1;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+
+    100% {
+        opacity: 0.1;
+    }
+}
+
+</style></style><style>body {
+    font-family: sans-serif;
+    line-height: 1.5;
+    color: rgb(41, 41, 41);
+    margin: 0;
+    padding: 20pt;
+    overflow: hidden;
+}
+
+h2 {
+    display: none;
+    position: fixed;
+    top: -10pt;
+    font-size: 40pt;
+    left: 0pt;
+    width: 100%;
+    text-align: center;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-weight: 1200;
+    color: #39414d;
+}
+
+h2 img {
+    height: 0.9em;
+    vertical-align: middle;
+    position: relative;
+    bottom: 4pt;
+    margin-left: 4pt;
+}
+
+h1.url {
+
+    font-size: 22pt;
+    position: fixed;
+    bottom: 20pt;
+    right: 20pt;
+    color: rgb(104, 103, 114);
+    margin: 0;
+    width: 100%;
+    text-align: right;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-weight: 600;
+}
+
+h1.url .blue {
+    color: rgb(92, 105, 250);
+}
+
+
+.val1 {
+    background-color: rgba(255, 166, 0, 0.5) !important;
+    cursor: default;
+}
+
+.val1:hover,
+.val1.hover,
+.val1-hover .val1 {
+    background-color: rgba(255, 166, 0, 1.0) !important;
+}
+
+.val2 {
+    background-color: rgba(206, 128, 184, 1.0) !important;
+    cursor: default;
+}
+
+.val2:hover,
+.val2.hover,
+.val2-hover .val2 {
+    background-color: rgba(206, 128, 184, 1.0) !important;
+}
+
+.val3 {
+    background-color: rgba(107, 119, 255, 1.0) !important;
+    cursor: default;
+}
+
+.val3:hover,
+.val3.hover,
+.val3-hover .val3 {
+    background-color: rgba(107, 119, 255, 1.0) !important;
+}
+
+.loading-indicator {
+    position: absolute;
+    top: 50%;
+    transform: scale(1.5);
+    left: 0;
+    right: 0;
+    opacity: 0.5;
+    animation: fadeout 0.5s ease-in-out forwards;
+    animation-delay: 0.8s;
+}
+
+@keyframes fadeout {
+    from {
+        opacity: 0.5;
+    }
+
+    to {
+        opacity: 0.0;
+    }
+}
+
+.output {
+    margin: auto;
+    box-shadow: 0 0 100pt rgba(0, 0, 0, 0.2);
+    border-radius: 5pt;
+    width: 500pt;
+    height: auto;
+    margin-top: 10pt;
+    padding: 10pt;
+    border: 2pt solid rgb(210, 205, 205);
+    font-size: 20pt;
+    background-color: white;
+
+    padding-top: 25pt !important;
+    position: relative;
+
+    color: transparent;
+    animation: fadein 0.5s ease-in-out forwards;
+    animation-delay: 1.0s;
+}
+
+@keyframes fadein {
+    from {
+        color: transparent;
+    }
+
+    to {
+        color: black;
+    }
+}
+
+.output::before {
+    content: "Model Output";
+    position: absolute;
+    top: 5pt;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    text-transform: uppercase;
+    color: black;
+    z-index: 999;
+    font-size: 12pt;
+    color: grey;
+    font-weight: 300;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
+}
+
+.columns {
+    display: flex;
+    flex-direction: column;
+    margin: 60pt;
+    position: fixed;
+    top: -30pt;
+    left: 0;
+    align-items: center;
+    justify-content: center;
+
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    line-height: 1.5;
+}
+
+.columns .column {
+    flex: 1;
+    padding: 10pt;
+}
+
+.column.output {
+    color: rgb(39, 39, 39);
+    font-size: 15pt;
+    margin-left: 0;
+
+    white-space: pre-wrap;
+}
+
+.column.code label,
+.column.code .dot {
+    display: none;
+}
+
+.column.code h3 {
+    color: rgb(213, 212, 212);
+}
+
+.column.code h3 a {
+    position: absolute;
+    top: 8pt;
+    font-size: 8pt;
+    text-transform: none;
+    right: 9pt;
+
+    color: rgb(125, 120, 120);
+}
+
+.column.code h3 a:hover {
+    color: rgb(201, 201, 201);
+    text-decoration: underline;
+}
+
+.column.code {
+    background-color: #24272D;
+    border: 0.5pt solid grey;
+    position: relative;
+    padding-top: 300pt;
+}
+
+.column.code .title {
+    position: absolute;
+    top: 5pt;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    text-transform: uppercase;
+    color: black;
+    z-index: 999;
+
+    color: grey;
+    font-weight: 300;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
+}
+
+.column.code:before {
+    content: "Model Output";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    z-index: -1;
+    border-radius: 4pt;
+    box-shadow: 0pt 0pt 100pt 0pt rgba(0, 0, 0, 0.1);
+    font-size: 20pt;
+}
+
+.column.code pre {
+    margin-top: 20pt;
+}
+
+.column.code pre a {
+    color: #7d7a7a;
+}
+
+.column.code pre label a {
+    color: #6e5ac7;
+}
+
+.column.code pre a:hover {
+    text-decoration: underline;
+}
+
+.column.code {
+    background-color: #24272D;
+
+    margin: auto;
+    box-shadow: 0 0 20pt rgba(0, 0, 0, 0.2);
+    border-radius: 5pt;
+    width: 500pt;
+    margin-top: 10pt;
+    padding: 10pt;
+    border: 2pt solid rgb(95, 95, 95);
+    font-size: 12pt;
+    color: white;
+    margin-right: 10pt;
+}
+
+.output .variable.prompt {
+    background-color: transparent;
+}
+
+.output .variable {
+    border-radius: 0.2em;
+    display: inline;
+    background: #ccc;
+    -webkit-box-decoration-break: clone;
+    -ms-box-decoration-break: clone;
+    -o-box-decoration-break: clone;
+    box-decoration-break: clone;
+    position: relative;
+
+    padding: 0.1em;
+    padding-right: 0.4em;
+    margin-left: 0.1em;
+}
+
+.lmql-kw {
+    font-weight: bold;
+    color: #c678dd;
+}
+
+.lmql-str {
+    color: #a7d884;
+}
+
+.lmql-comment {
+    color: #5c6370;
+}
+
+
+.output .variable .variable-name {
+    font-weight: 700;
+    color: #333;
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 0.2em;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.9);
+    display: inline;
+    margin: 0;
+    margin-right: 0.6em;
+    margin-left: 0;
+    font-size: 0.7em;
+    padding: 0.12em;
+    position: relative;
+    top: -0.15em;
+    left: 0.1em;
+
+    opacity: 0.0;
+    animation: varNameFadeIn 0.15s;
+
+    transform-origin: 0 50%;
+    overflow: hidden;
+}
+
+@keyframes varNameFadeIn {
+    0% {
+        opacity: 0.0;
+        max-width: 0pt;
+    }
+
+    100% {
+        opacity: 1.0;
+        max-width: 100%;
+    }
+}
+
+.output .variable .variable-name.visible {
+    opacity: 1.0;
+}
+
+.output .cursor {
+    display: inline-block;
+    width: 0.5em;
+    height: 1.0em;
+    background-color: white;
+    opacity: 0.3;
+    position: relative;
+    top: 0.47em;
+    left: 0.1em;
+    border-radius: 0.1em;
+    animation: blink 0.6s infinite;
+    transform: scale(1.27) translateY(-0.25em);
+    transition: all 1.2s;
+}
+
+.output .cursor:before {
+    position: absolute;
+    content: "";
+    width: 100%;
+    height: 100%;
+    border-radius: 0.1em;
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+body {
+    height: 100vh;
+    background: linear-gradient(90deg, #fffefe, #fef4f3);
+}
+
+.slider-thumb::before {
+    position: absolute;
+    content: "";
+    left: 30%;
+    top: 20%;
+    width: 450px;
+    height: 450px;
+    background: #ffffff;
+    border-radius: 62% 47% 82% 35% / 45% 45% 80% 66%;
+    will-change: border-radius, transform, opacity;
+    animation: sliderShape 5s linear infinite;
+    display: block;
+    z-index: -1;
+    -webkit-animation: sliderShape 5s linear infinite;
+    /* blure filter */
+    filter: blur(200px);
+}
+
+@keyframes sliderShape {
+
+    0%,
+    100% {
+        border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+        transform: translate3d(0, 0, 0) rotateZ(0.01deg);
+    }
+
+    34% {
+        border-radius: 70% 30% 46% 54% / 30% 29% 71% 70%;
+        transform: translate3d(0, 5px, 0) rotateZ(0.01deg);
+    }
+
+    50% {
+        transform: translate3d(0, 0, 0) rotateZ(0.01deg);
+    }
+
+    67% {
+        border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%;
+        transform: translate3d(0, -3px, 0) rotateZ(0.01deg);
+    }
+}
+
+@keyframes blink {
+    0% {
+        opacity: 0.3;
+    }
+
+    50% {
+        opacity: 0.85;
+    }
+
+    100% {
+        opacity: 0.3;
+    }
+}
+
+.output {
+    transition: all 1.0s;
+}
+
+.output.typing {
+    border: 2pt solid rgb(167, 167, 246);
+}
+
+.output:not(.typing) {
+    border: 2pt solid rgb(234, 233, 233);
+}
+
+.output.typing .cursor:first-child {
+    left: 0pt;
+}
+
+.output:not(.typing) .cursor {
+    opacity: 0.0 !important;
+    animation: none !important;
+}

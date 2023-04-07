@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import {queries} from "./queries";
-import { persistedState, trackingState } from "./State";
+import { displayState, persistedState, trackingState } from "./State";
 
 export const PromptPopup = styled.div`
   position: absolute;
@@ -371,7 +371,7 @@ export function Explore() {
         // check if first visit
         const editorContents = window.localStorage.getItem("lmql-editor-contents");
         if (editorContents === null || (typeof editorContents === "string" && editorContents.trim().length === 0)) {
-          ExploreState.setVisibility(true);
+          ExploreState.setVisibility(!displayState.preloaded);
         }
 
         // check for hash-specified example to load

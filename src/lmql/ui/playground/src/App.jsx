@@ -4,11 +4,12 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsFillExclamationSquareFill, BsBoxArrowUpRight, BsArrowRightCircle, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
+import { BsSquare, BsFillExclamationSquareFill, BsBoxArrowUpRight, BsArrowRightCircle, BsFillCameraFill, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
 import { ExploreState, Explore, PromptPopup, Dialog } from './Explore'
+import { CodeScreenshot } from "./CodeScreenshot";
 import { errorState, persistedState, trackingState, displayState} from "./State"
 import { configuration, LMQLProcess, isLocalMode} from './Configuration';
 import { ValidationGraph } from "./ValidationGraph";
@@ -1733,6 +1734,7 @@ function SidePanel(props) {
 
   const [trackMostLikly, setTrackMostLiklyInternal] = useState(window.localStorage.getItem("trackMostLikely") === "true");
   trackingState.setTrackMostLikely = setTrackMostLiklyInternal
+  trackingState.getTrackMostLikely = () => trackMostLikly
   const setTrackMostLikly = (value) => {
     setTrackMostLiklyInternal(value)
     window.localStorage.setItem("trackMostLikely", value)
@@ -2338,6 +2340,9 @@ class App extends React.Component {
       topMenuOpen: false,
       // true by default, false if local storage is set
       simpleMode: window.localStorage.getItem("simple-mode") == "true",
+
+      /* show code screenshot overlay */
+      codeScreenshot: false
     }
   }
 
@@ -2481,6 +2486,27 @@ class App extends React.Component {
     this.setMostLikelyNode(node)
   };
 
+  getCodeScreenshotInput() {
+    let modelResult = null;
+    if (trackingState.getTrackMostLikely()) {
+      modelResult = reconstructTaggedModelResult([this.state.mostLikelyNode]);
+    } else {
+      modelResult = reconstructTaggedModelResult(this.state.selectedNodes);
+    }
+    return {
+      "code": persistedState.getItem("lmql-editor-contents"),
+      "model_result": modelResult,
+    }
+  }
+
+  onCodeScreenshot() {
+    this.setState({ codeScreenshot: true })
+  }
+
+  hideCodeScreenshot() {
+    this.setState({ codeScreenshot: false })
+  }
+
   render() {
     trackingState.setSelectedNode = n => {
       this.onSelectNode(n)
@@ -2517,8 +2543,8 @@ class App extends React.Component {
               {configuration.BROWSER_MODE && <li onClick={() => OpenAICredentialsState.setOpen(true)}>
               <BsKeyFill/> OpenAI Credentials
               </li>}
-              {configuration.DEV_MODE && <li onClick={() => this.onExportState()}><BsFileArrowDownFill/> Export State
-              </li>}
+              {configuration.DEV_MODE && <li onClick={() => this.onExportState()}><BsFileArrowDownFill/> Export State</li>}
+              {configuration.DEV_MODE && <li onClick={() => this.onCodeScreenshot()}><BsFillCameraFill/> Code Screenshot</li>}
               <li>
                 <a href="https://github.com/eth-sri/lmql" disabled target="_blank" rel="noreferrer"><BsGithub/>LMQL on Github</a>
               </li>
@@ -2544,6 +2570,7 @@ class App extends React.Component {
         </Row>
         <OpenAICredentials />
         {configuration.DEMO_MODE && displayState.mode != "embed" && <Explore />}
+        {this.state.codeScreenshot && <CodeScreenshot hide={this.hideCodeScreenshot.bind(this)} {...this.getCodeScreenshotInput()}/>}
       </ContentContainer>
     );
   }
