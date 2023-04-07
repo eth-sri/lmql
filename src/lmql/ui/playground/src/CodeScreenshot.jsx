@@ -1,7 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import styled from "styled-components";
-import {queries} from "./queries";
-import { persistedState, trackingState } from "./State";
 // import monaco
 import monaco from "@monaco-editor/loader";
 import {registerLmqlLanguage} from "./editor/lmql-monaco-language";
@@ -626,7 +624,6 @@ function typeIn(element) {
     `;
     let containerElement = element;
     element = element.children[0];
-    const cursorElement = containerElement.children[1];
 
     let chunkSize = 1;
     let currentVariable = null;
@@ -644,7 +641,6 @@ function typeIn(element) {
         
         let i = 0;
         while (i<upper || is_prompt) {
-            let original_i = i;
             let cursor = getCursorState(text, offset + i);
 
             if (is_prompt && cursor.context != "prompt") {
@@ -743,7 +739,6 @@ export function CodeScreenshot(props) {
     const [highlightedCode, setHighlightedCode] = useState("");
     const outputRef = useRef(null);
     const contentRef = useRef(null);
-    const [parsedOuput, setParsedOutput] = useState([]);
     const [scale, setScale] = useState(1);
     const [fontScale, setFontScale] = useState(18);
     const [layout, setLayout] = useState("vertical");
@@ -757,10 +752,16 @@ export function CodeScreenshot(props) {
         const storedLayout = localStorage.getItem("code-screenshot-layout");
 
         if (storedScale) {
-            setScale(storedScale);
+            let scale = parseFloat(storedScale);
+            if (!isNaN(scale)) {
+                setScale(scale);
+            }
         }
         if (storedFontScale) {
-            setFontScale(storedFontScale);
+            let fontScale = parseFloat(storedFontScale);
+            if (!isNaN(fontScale)) {
+                setFontScale(fontScale);
+            }
         }
         if (storedLayout) {
             setLayout(storedLayout);
@@ -789,7 +790,7 @@ export function CodeScreenshot(props) {
             }
             // on R key 
             if (e.key === "r") {
-                startTyping(parsedOuput);
+                startTyping();
             }
             // check shift
             if (e.key === "+") {
@@ -838,7 +839,7 @@ export function CodeScreenshot(props) {
     //     }
     // ]
 
-    const startTyping = useCallback((d) => {
+    const startTyping = useCallback(() => {
         let output = []
         if (props.model_result && props.model_result.length > 0) {
             if (props.model_result[0].tokens.length > 0) {
@@ -936,16 +937,16 @@ export function CodeScreenshot(props) {
 
     useEffect(() => {
         if (outputRef.current) {
-            startTyping(parsedOuput);
+            startTyping();
         }
-    }, [outputRef.current, parsedOuput]);
+    }, [outputRef.current]);
     
     return <CodeScreenshotDiv>
         <div className="configuration">
             <button className="hide" onClick={() => props.hide()}>
                 Close (Esc)
             </button><br/>
-            <button className="replay" onClick={() => startTyping(parsedOuput)}>
+            <button className="replay" onClick={() => startTyping()}>
                 Replay (R)
             </button><br/>
             {/* toggle layout */}
