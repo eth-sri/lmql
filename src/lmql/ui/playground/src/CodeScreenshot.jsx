@@ -902,6 +902,7 @@ export function CodeScreenshot(props) {
                 monaco.editor.defineTheme('solarized-dark', data);
                 monaco.editor.setTheme('solarized-dark');
 
+                // let fittingCode = props.code;
                 // code 
                 let fittingCode = props.code
                 // break lines (do not break words) with indent if longer than 80 chars
@@ -913,8 +914,8 @@ export function CodeScreenshot(props) {
                     let currentLine = "";
                     for (let word of words) {
                         if (currentLine.length + word.length > maxLength) {
-                            fittingCode += currentLine + "\n";
-                            currentLine = indent + "➥ " + word + " ";
+                            fittingCode += currentLine + "\\ \n";
+                            currentLine = indent + " ➥ " + word + " ";
                         } else {
                             currentLine += word + " ";
                         }
@@ -929,7 +930,40 @@ export function CodeScreenshot(props) {
                     // split into lines
                     // highlighted = highlighted.split("<br/>");
 
-                    setHighlightedCode(result);
+                    // let n = 0;
+                    // let resultCode = "";
+                    // let tag_count = 0;
+                    // let text = ""
+                    // for (let c of result) {
+                    //     if (c == "<") {
+                    //         tag_count++;
+                    //     }
+                    //     let in_tag = tag_count % 2 == 1
+                    //     if (c == ">") {
+                    //         tag_count--;
+                    //     }
+                    //     if (c == "\n") {
+                    //         n = 0;
+                    //         console.log("newline", n)
+                    //     }
+                    //     if (n > maxLength && !in_tag && c == " ") {
+                    //         resultCode += "\n";
+                    //         console.log("newline", n)
+                    //         n = 0;
+                    //     }
+                    //     if (!in_tag) {
+                    //         n += 1
+                    //         text += c;
+                    //     }
+
+                    //     resultCode += c;
+                    // }
+
+                    // console.log(text)
+                    // console.log(resultCode)
+
+                    console.log(result)
+                    setHighlightedCode(result.replaceAll("\\ </span>", "</span>"));
                 })
                 })
         })
