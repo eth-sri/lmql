@@ -3,6 +3,10 @@
     position: relative;
 }
 
+html[data-theme="dark"] .highlight.lmql {
+    border: 1pt solid rgb(110, 109, 109);
+}
+
 .highlight.lmql iframe {
     background-color: var(--pst-color-background);
 }
@@ -93,6 +97,16 @@
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     cursor: pointer;
     color:rgba(0, 0, 0, 0.957)
+}
+
+html[data-theme="dark"] .getting-started>a {
+    background-color: rgb(57, 57, 57) !important;
+    border-color: rgb(75, 75, 75);
+    color: rgb(215, 215, 215);
+}
+
+html[data-theme="dark"] .getting-started>a.primary {
+    background-color: rgb(66, 64, 174) !important;
 }
 
 .getting-started>a:hover {
@@ -190,11 +204,6 @@ html[data-theme="dark"] .highlight-model-output {
     white-space: break-spaces !important;
 }
 
-html[data-theme="dark"] .highlight-model-output .highlight {
-    background-color: rgb(30, 30, 30);
-    border-color: rgb(68, 68, 68);
-}
-
 
 .highlight-model-output .highlight {
     background-color: #fbfbfb !important;
@@ -205,6 +214,11 @@ html[data-theme="dark"] .highlight-model-output .highlight {
     white-space: break-spaces !important;
     padding: 10pt;
     padding-top: 20pt;
+}
+
+html[data-theme="dark"] .highlight-model-output .highlight {
+    background-color: rgb(30, 30, 30) !important;
+    border-color: rgb(68, 68, 68) !important;
 }
 
 .variable {
