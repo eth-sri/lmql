@@ -63,6 +63,8 @@ class LMQLTokenizer:
     def __init__(self, tokenizer_impl):
         self.tokenizer_impl = tokenizer_impl
 
+        self.detokenizer_cache = {}
+
     @property
     def vocab_size(self):
         return self.tokenizer_impl.vocab_size
@@ -92,12 +94,29 @@ class LMQLTokenizer:
         return tokens
         
     def decode(self, input_ids):
+        key = str(input_ids)
+        n = len(input_ids)
+        if n in self.detokenizer_cache.keys():
+            if key in self.detokenizer_cache[n].keys():
+                # print("cache hit")
+                return self.detokenizer_cache[n][key]
+        if n-1 in self.detokenizer_cache.keys():
+            key = str(input_ids[:-1])
+            if key in self.detokenizer_cache[n-1].keys():
+                # print("secondary cache hit")
+                return self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]])
+
         s = ""
         for chunk in self.chunk_out_by_special_ids(input_ids):
             if type(chunk) is str:
                 s += chunk
             else:
                 s += self.tokenizer_impl.decode(chunk)
+
+        if not n in self.detokenizer_cache.keys():
+            self.detokenizer_cache[n] = {}
+        self.detokenizer_cache[n][key] = s
+
         return s
 
     def __call__(self, s: str):

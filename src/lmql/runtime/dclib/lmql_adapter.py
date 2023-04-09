@@ -172,7 +172,11 @@ class QueryDcLibAdapter:
             dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
 
         try:
+            import time
+
             decoder_step = 0
+            average_step_time = None
+            start = time.time()
             async for _ in decoder_fct(prompt_ids, **decoder_args):
                 await debug_out(decoder_step)
                 decoder_step += 1
@@ -187,6 +191,11 @@ class QueryDcLibAdapter:
                 if interrupt.check():
                     interrupt.clear()
                     raise InterruptedError("lmql.runtime.interrupt")
+                
+                average_step_time = time.time() - start if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
+                # if decoder_step % 10 == 0:
+                #     print("step", decoder_step, "time", average_step_time)
+                start = time.time()
                 
         except dc.FinishException as fe:
             # one last call to debug_out to get the final state

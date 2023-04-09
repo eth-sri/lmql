@@ -18,11 +18,15 @@ def cmd_run():
     emoji:🏃 run a LMQL script (e.g. "lmql run latest/hello.lmql")
     """
     import asyncio
+    import time
+
+    start = time.time()
 
     parser = argparse.ArgumentParser(description="Runs a LMQL program.")
     parser.add_argument("lmql_file", type=str, help="path to the LMQL file to run")
     parser.add_argument("--no-clear", action="store_true", dest="no_clear", help="don't clear inbetween printing results")
     parser.add_argument("--no-realtime", action="store_true", dest="no_realtime", help="don't print text as it's being generated")
+    parser.add_argument("--time", action="store_true", dest="time", help="Time the query.")
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -52,6 +56,9 @@ def cmd_run():
             for (value, prob), label in zip(distribution, labels):
                 label = label.ljust(max_length)
                 print(" - {} {}".format(label, prob))
+
+    if args.time:
+        print("Query took:", time.time() - start)
 
 def ensure_node_install():
     try:
