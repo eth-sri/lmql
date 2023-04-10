@@ -20,7 +20,9 @@ from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.lmql_runtime import LMQLQueryFunction, FunctionContext
 
 import lmql.runtime.lmql_runtime as runtime_support
-from lmql.runtime.lmql_runtime import compiled_query
+
+# re-export lmql runtime functions
+from lmql.runtime.lmql_runtime import compiled_query, tag
 
 import os
 
