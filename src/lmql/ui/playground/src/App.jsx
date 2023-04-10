@@ -763,9 +763,9 @@ const ModelResultText = styled.div`
 
   div .tag-assistant {
     display: inline-block;
-    width: 65%;
     border: 1pt solid #5c5c5c;
     margin-top: 5pt;
+    margin-right: 4%;
 
     border-radius: 8pt;
     overflow: hidden;
@@ -774,7 +774,7 @@ const ModelResultText = styled.div`
 
   div .tag-user {
     display: block;
-    margin-left: 32%;
+    margin-left: 4%;
     position: relative;
     border: 1pt solid #5c5c5c;
     border-radius: 8pt;
@@ -918,8 +918,8 @@ class Truncated extends React.Component {
 
   componentDidMount() {
     this.stepper = setInterval(() => {
-      this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 4 }))
-    }, 10)
+      this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 16 }))
+    }, 5)
   }
 
   componentWillUnmount() {

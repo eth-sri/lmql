@@ -567,7 +567,11 @@ export function DecoderGraph(props) {
                             target: to
                         }
                     };
-                    cy.add({group: "edges", ...e})
+                    try {
+                        cy.add({group: "edges", ...e})
+                    } catch (e) {
+                        console.error("error adding edge", e)
+                    }
                 }))
 
                 let mostLikely = layoutDecoderGraph(cy)
@@ -588,11 +592,23 @@ export function DecoderGraph(props) {
         const renderer = {
             add_result: (output) => {
                 if (output.type == "decoder-graph-state") {
-                    // persist decoder graph in local state
-                    const raw = JSON.stringify(output.data)
-                    setRawGraphData(raw)
-                    persistedState.setItem("decoder-graph", raw, onPersistedGraphChange)
-                    setCyData(output.data)
+                    setCyData(cyData => {
+                        // persist decoder graph in local state
+                        let updated = Object.assign({nodes: [], edges: []}, cyData || {})
+                        let nodes = {}
+                        updated.nodes.forEach(n => nodes[n.id] = n)
+                        output.data.nodes.forEach(n => nodes[n.id] = n)
+                        updated.nodes = Array.from(Object.values(nodes))
+                        
+                        updated.edges = Array.from([...updated.edges, ...output.data.edges])
+                        
+                        // console.log("updating", output.data.nodes.length)
+
+                        const raw = JSON.stringify(updated)
+                        setRawGraphData(raw)
+                        persistedState.queueSetItem("decoder-graph", raw, onPersistedGraphChange)
+                        return updated
+                    })
                 } else {
                     // nop in this component
                 }

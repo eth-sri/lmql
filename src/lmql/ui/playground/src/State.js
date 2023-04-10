@@ -27,6 +27,8 @@ class PersistedState {
       this.items = {}
       this.listeners = {}
       this.restore()
+
+      this.saveQueue = {}
     }
   
     persist(k) {
@@ -115,6 +117,15 @@ class PersistedState {
           if (listener !== exclude_listener) listener(value);
         })
       }
+    }
+
+    queueSetItem(key, value, exclude_listener=null) {
+      if (this.saveQueue[key]) {
+        clearTimeout(this.saveQueue[key]);
+      }
+      this.saveQueue[key] = setTimeout(() => {
+        this.setItem(key, value, exclude_listener);
+      })
     }
   }
   

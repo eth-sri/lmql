@@ -11,6 +11,11 @@ from .dclib_array import DataArray, Continuation, topk, alpha_length_normalized,
 
 detokenize_seqs = True
 
+@dataclass
+class DecoderGraphSnapshot:
+    node_hashes = None
+    step_not_updated_count = None
+
 class DecoderGraph:
     def __init__(self):
         self.nodes = {}
@@ -18,6 +23,8 @@ class DecoderGraph:
         self.edges = []
 
         self.ctr = 0
+
+        self.json_snapshot: DecoderGraphSnapshot = DecoderGraphSnapshot()
 
     def add_node(self, node):
         uid = f"n{self.ctr}"
@@ -34,13 +41,39 @@ class DecoderGraph:
     def add_edge(self, from_node, to_node):
         self.edges.append((self.node_ids[from_node], self.node_ids[to_node]))
 
-    async def json(self):
+    async def json(self, diff: bool = False):
         nodes = []
+        
+        if self.json_snapshot.node_hashes is None:
+            self.json_snapshot.node_hashes = {}
+        if self.json_snapshot.step_not_updated_count is None:
+            self.json_snapshot.step_not_updated_count = {}
+        
         for k, v in self.nodes.items():
+            hash = None
+            if diff and k in self.json_snapshot.node_hashes:
+                # this will ignore changes to nodes that have not been updated for 3 steps (may miss changes to nodes that 
+                # are not updated for a long time, careful for now)
+                if k in self.json_snapshot.step_not_updated_count and self.json_snapshot.step_not_updated_count[k] > 2:
+                    continue
+                hash = await v.json_hash()
+                if self.json_snapshot.node_hashes[k] == str(hash):
+                    self.json_snapshot.step_not_updated_count[k] = self.json_snapshot.step_not_updated_count.get(k, 0) + 1
+                    continue
+                    
+                # else:
+                #     print("node changed", k, self.json_snapshot.node_hashes[k], hash)
+            if hash is None:
+                hash = await v.json_hash()
+
             nodes.append({
                 "id": k,
                 **await v.json()
             })
+            
+            if diff:
+                self.json_snapshot.node_hashes[k] = str(hash)
+                self.json_snapshot.step_not_updated_count[k] = 0
 
         return {
             "nodes": nodes,
@@ -179,6 +212,12 @@ class DecoderSequence:
             self.tokenizer_cache[name] = await providers[name]()
         
         return self.tokenizer_cache[name]
+
+    async def json_hash(self):
+        o = await self.json()
+        if type(o["user_data"]) is dict and "openai-continuations" in o["user_data"]:
+            o["user_data"].pop("openai-continuations")
+        return hash(str(o))
 
     async def json(self):
         seqtext = await self.detokenized("seqtext")

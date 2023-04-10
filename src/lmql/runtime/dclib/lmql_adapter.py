@@ -166,7 +166,7 @@ class QueryDcLibAdapter:
         
         async def debug_out(decoder_step):
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
-                data = await dc.DecoderSequence.graph.json()
+                data = await dc.DecoderSequence.graph.json(diff=True)
                 data = replace_inf_nan_with_str(data)
                 _DCLibDebugPrinter.printer.add_decoder_state(data)
             dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
@@ -184,17 +184,18 @@ class QueryDcLibAdapter:
                 if step_budget is not None and decoder_step >= step_budget:
                     print("warning: step budget exceeded")
                     break
-                
-                if "performance_stats" in decoder_args:
-                    Stats.print_all()
 
                 if interrupt.check():
                     interrupt.clear()
                     raise InterruptedError("lmql.runtime.interrupt")
                 
-                average_step_time = time.time() - start if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
-                # if decoder_step % 10 == 0:
-                #     print("step", decoder_step, "time", average_step_time)
+                average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
+
+                if "performance_stats" in decoder_args:
+                    if decoder_step % 10 == 0:
+                        Stats.print_all()
+                        print("step", decoder_step, "time", average_step_time)
+
                 start = time.time()
                 
         except dc.FinishException as fe:
@@ -219,7 +220,7 @@ class QueryDcLibAdapter:
             return [self.make_decoder_head(i,n,s) for i,s in enumerate(result_sequences)]
     
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats"]
+        INTERNAL_ARGS = ["decoder", "dcmodel", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args

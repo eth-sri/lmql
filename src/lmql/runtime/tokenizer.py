@@ -103,8 +103,16 @@ class LMQLTokenizer:
         if n-1 in self.detokenizer_cache.keys():
             key = str(input_ids[:-1])
             if key in self.detokenizer_cache[n-1].keys():
+                global reverse_special_token_mappings
                 # print("secondary cache hit")
-                return self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]])
+                if input_ids[-1] >= self.tokenizer_impl.vocab_size:
+                    extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
+                else:
+                    extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]])
+                if not n in self.detokenizer_cache.keys():
+                    self.detokenizer_cache[n] = {}
+                self.detokenizer_cache[n][str(input_ids)] = extended
+                return extended
 
         s = ""
         for chunk in self.chunk_out_by_special_ids(input_ids):
