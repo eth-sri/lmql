@@ -1,7 +1,8 @@
 {
   "name": "lmql",
-  "displayName": "Language Model Query Language (LMQL)",
-  "description": "Language Model Query Language",
+  "displayName": "Language Model Query Language (LMQL) Syntax Highlighting",
+  "description": "Syntax highlighting for .lmql and Python files with embedded LMQL.",
+  "publisher": "lmql-team",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.76.0"
@@ -9,6 +10,7 @@
   "categories": [
     "Programming Languages"
   ],
+  "icon": "lmql-vscode.png",
   "contributes": {
     "languages": [{
       "id": "lmql",
@@ -38,5 +40,6 @@
   },
   "repository": "https://github.com/eth-sri/lmql",
   "homepage": "https://lmql.ai",
-  "bugs": "https://github.com/eth-sri/lmql/issues"
+  "bugs": "https://github.com/eth-sri/lmql/issues",
+  "readme": "./README.md"
 }
