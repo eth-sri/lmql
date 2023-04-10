@@ -40,6 +40,9 @@ class GraphWriter:
         elif hasattr(obj, "__dataclass_fields__"):
             self.node(obj, label=str(type(obj)))
             for f in obj.__dataclass_fields__:
+                # handle type references
+                if type(object) is type:
+                    return False
                 vs = obj.__dict__[f]
                 if type(vs) is not list: vs = [vs]
                 for v in vs:

@@ -273,7 +273,7 @@ function Query(q, showcase_info, id, i) {
     <div class="query">
         <h3>
             LMQL
-            <a href="playground#${id.replaceAll("precomputed-", "").replaceAll("-json", "")}" target="_blank">
+            <a href="playground?snippet=${id.replaceAll("precomputed-", "").replaceAll("-json", "")}" target="_blank">
             Open In Playground
             </a>
         </h3>

@@ -12,11 +12,12 @@ def LMQLOp(name):
     def class_transformer(cls):
         if type(name) is list:
             for n in name:
-                lmql_operation_registry[n] = f"lmql.{cls.__name__}"
+                lmql_operation_registry[n] = f"{cls.__name__}"
             return cls
-        lmql_operation_registry[name] = f"lmql.{cls.__name__}"
+        lmql_operation_registry[name] = f"{cls.__name__}"
         return cls
     return class_transformer
+
 class Node:
     def __init__(self, predecessors):
         assert type(predecessors) is list, "Predecessors must be a list, not {}".format(type(predecessors))

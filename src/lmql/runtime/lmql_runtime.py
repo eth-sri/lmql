@@ -148,7 +148,7 @@ class LMQLQueryFunction(LMQLChainMixIn):
 def tag(t):
     return f"<lmql:{t}/>"
 
-def query(output_variables=None, group_by=None):
+def compiled_query(output_variables=None, group_by=None):
     if output_variables is None:
         output_variables = []
     

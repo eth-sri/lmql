@@ -14,7 +14,6 @@ const CodeScreenshotDiv = styled.div`
     z-index: 99999;
     display: flex;
     align-items: flex-start;
-    padding-top: 50pt;
     justify-content: center;
 
     /* nice white, blue, red gradient */
@@ -157,38 +156,15 @@ const CodeScreenshotDiv = styled.div`
     }
 
 
-    .val1 {
-        background-color: rgba(255, 166, 0, 0.5) !important;
-        cursor: default;
-    }
-
-    .val1:hover,
-    .val1.hover,
-    .val1-hover .val1 {
-        background-color: rgba(255, 166, 0, 1.0) !important;
-    }
-
-    .val2 {
-        background-color: rgba(206, 128, 184, 1.0) !important;
-        cursor: default;
-    }
-
-    .val2:hover,
-    .val2.hover,
-    .val2-hover .val2 {
-        background-color: rgba(206, 128, 184, 1.0) !important;
-    }
-
-    .val3 {
-        background-color: #949cf5 !important;
-        cursor: default;
-    }
-
-    .val3:hover,
-    .val3.hover,
-    .val3-hover .val3 {
-        background-color: rgba(107, 119, 255, 1.0) !important;
-    }
+    .val0 { background-color: #6b77ff !important; }
+    .val8 { background-color: #bc67ed !important; }
+    .val7 { background-color: #f055cf !important; }
+    .val2 { background-color: #ff4baa !important; }
+    .val6 { background-color: #ff5482 !important; }
+    .val3 { background-color: #ff6c5b !important; }
+    .val5 { background-color: #ff8935 !important; }
+    .val4 { background-color: #ffa600 !important; }
+    .val1 { background-color: #f5d77e !important; }
 
     .loading-indicator {
         position: absolute;
@@ -628,7 +604,7 @@ function typeIn(element) {
     let chunkSize = 1;
     let currentVariable = null;
     let insertionPoint = element;
-    let varCounter = 1;
+    let varCounter = varOffset;
     let interval = null;
 
     let varMapping = {}
@@ -667,7 +643,7 @@ function typeIn(element) {
                 } else {
                     varMapping[currentVariable] = varCounter;
                     varSpan.classList.add("val" + varCounter);
-                    varCounter++;
+                    varCounter = (varCounter + 1) % 9;
                 }
 
                 varSpan.setAttribute("data-name", currentVariable);
@@ -724,7 +700,7 @@ function typeIn(element) {
     }, 1500);
 
     setTimeout(() => {
-        interval = setInterval(advance, 20)
+        interval = setInterval(advance, 10)
     }, 1800)
     
     window.setTimeout(() => {
@@ -734,6 +710,9 @@ function typeIn(element) {
     }, 100);
 }
 
+let cutOffState = 0;
+let varOffset = 0;
+
 export function CodeScreenshot(props) {
     let maxLength = props.maxLength || 60;
     const [highlightedCode, setHighlightedCode] = useState("");
@@ -742,7 +721,9 @@ export function CodeScreenshot(props) {
     const [scale, setScale] = useState(1);
     const [fontScale, setFontScale] = useState(18);
     const [layout, setLayout] = useState("vertical");
-
+    
+    const [cutOff, setCutOff] = useState(0);
+    const [_varOffset, setVarOffset] = useState(0);
 
     // restore on first 
     useEffect(() => {
@@ -800,16 +781,32 @@ export function CodeScreenshot(props) {
                 setFontScale(s => s - 1);
             }
             // +/-
+            // with alt it is finer 
+            let scale = e.altKey ? 0.01 : 0.1;
             if (e.key === "=") {
-                setScale(s => s + 0.1);
+                setScale(s => s + scale);
             }
             if (e.key === "-") {
-                setScale(s => s - 0.1);
+                setScale(s => s - scale);
             }
         }
         window.addEventListener("keydown", keydown);
         return () => {
             window.removeEventListener("keydown", keydown);
+        }
+    }, []);
+    // mouse wheel scale
+    useEffect(() => {
+        const wheel = (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                let scale = e.deltaY * 0.001;
+                setScale(s => s + scale);
+            }
+        }
+        window.addEventListener("wheel", wheel);
+        return () => {
+            window.removeEventListener("wheel", wheel);
         }
     }, []);
 
@@ -839,7 +836,7 @@ export function CodeScreenshot(props) {
     //     }
     // ]
 
-    const startTyping = useCallback(() => {
+    const startTyping = () => {
         let output = []
         if (props.model_result && props.model_result.length > 0) {
             if (props.model_result[0].tokens.length > 0) {
@@ -847,14 +844,27 @@ export function CodeScreenshot(props) {
                 while (content.startsWith(" ") || content.startsWith("\n")) {
                     content = content.substring(1);
                 }
+
                 props.model_result[0].tokens[0].content = content;
             }
             
+            let first = true;
             for (let t of props.model_result[0].tokens) {
+                let content = t.content.replaceAll("\\n", "\n").replaceAll("\\t", "\t");
+
+                // apply cutoff
+                if (first) {
+                    first = false;
+                    if (cutOffState > 0) {
+                        content = content.substring(cutOffState);
+                        content = "..." + content;
+                    }
+                }
+
                 if (t.variable === "__prompt__") {
                     output.push({
                         "context": "prompt",
-                        "text": t.content.replaceAll("\\n", "\n")
+                        "text": content
                     })
                 } else if (t.variable === "<eos>") {
                     output.push({
@@ -866,7 +876,7 @@ export function CodeScreenshot(props) {
                     output.push({
                         "context": "variable",
                         "variable": t.variable.split("[")[0],
-                        "text": t.content.replaceAll("\\n", "\n")
+                        "text": content
                     })
                 }
             }
@@ -889,9 +899,9 @@ export function CodeScreenshot(props) {
             }
             acc += newText;
         }
-        typeIn(outputRef.current, acc);
+        typeIn(outputRef.current, acc, varOffset % 9);
         setText(outputRef.current, acc);
-    });
+    };
 
     // on mount type output
     useEffect(() => {
@@ -962,7 +972,7 @@ export function CodeScreenshot(props) {
                     // console.log(text)
                     // console.log(resultCode)
 
-                    console.log(result)
+
                     setHighlightedCode(result.replaceAll("\\ </span>", "</span>"));
                 })
                 })
@@ -987,6 +997,16 @@ export function CodeScreenshot(props) {
             <button className="toggle-layout" onClick={() => setLayout(layout == "horizontal" ? "vertical" : "horizontal")}>
                 {layout == "horizontal" ? "Vertical" : "Horizontal"}
             </button><br/>
+            Initial Prompt Cutoff:<br/>
+            <input value={cutOff} onChange={(e) => {
+                cutOffState = e.target.value == "" ? 0 : parseInt(e.target.value)
+                setCutOff(e.target.value == "" ? 0 : parseInt(e.target.value))
+            }}></input><br/>
+            Variable Color Offset:<br/>
+            <input value={_varOffset} onChange={(e) => {
+                varOffset = e.target.value == "" ? 0 : parseInt(e.target.value)
+                setVarOffset(e.target.value == "" ? 0 : parseInt(e.target.value))
+            }}></input><br/>
             Font Size via Keys _ (down) and + (up)<br/>
             Overall Scale via Keys - (down) and = (up)<br/>
         </div>

@@ -1,3 +1,5 @@
+import {queries} from "./queries";
+
 function getSnippet(allow_snippet=true) {
   const url = window.location.href
   if (url.indexOf('?') === -1) {
@@ -44,8 +46,13 @@ class PersistedState {
       let snippetFile = getSnippet()
       if (snippetFile) {
         console.log("loading snippet from", snippetFile)
+        let matches = queries.filter(c => c.queries.find(q => q.state == "precomputed/" + snippetFile + ".json"))
+        if (matches.length === 1) {
+          let q = matches[0].queries.find(q => q.state == "precomputed/" + snippetFile + ".json")
+          snippetFile = q.state
+        }
+
         fetch(snippetFile).then(r => r.text()).then(data => {
-          console.log(data)
           // remove ? from url
           window.history.replaceState({}, document.title, window.location.pathname);
           if (data) {

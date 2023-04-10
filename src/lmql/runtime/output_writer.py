@@ -6,8 +6,8 @@ class DebuggerOutputWriter:
     def add_compiler_output(self, code): pass
 
 class PrintingDebuggerOutputWriter:
-    def __init__(self):
-        self.clear = False
+    def __init__(self, clear=False):
+        self.clear = clear
         self.print_output = True
 
     def add_decoder_state(*args, **kwargs): 
@@ -55,3 +55,4 @@ class StreamingOutputWriter:
 
 silent = DebuggerOutputWriter()
 stream = StreamingOutputWriter
+printing = PrintingDebuggerOutputWriter(clear=True)

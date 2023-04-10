@@ -13,6 +13,8 @@ from lmql.language.validator import LMQLValidator, LMQLValidationError
 from lmql.language.fragment_parser import LMQLDecoderConfiguration, LMQLQuery, LanguageFragmentParser, FragmentParserError
 from lmql.runtime.model_registry import model_name_aliases
 
+OPS_NAMESPACE = "lmql.ops"
+
 class PromptScope(ast.NodeVisitor):
     def scope(self, query: LMQLQuery):
         self.distribution_vars = set([query.distribution.variable_name]) if query.distribution is not None else set()    
@@ -107,6 +109,9 @@ class QueryStringTransformation(ast.NodeTransformer):
                     declared_template_vars.add(stmt.name)
                     compiled_qstring += "[" + stmt.name + "]"
 
+        if len(compiled_qstring) == 0:
+            return constant
+
         result_code = f'yield context.query(f"""{compiled_qstring}""")'
 
         for v in declared_template_vars:
@@ -198,7 +203,7 @@ class WhereClauseTransformation():
 
         # check for template variables
         if node.id in self.scope.defined_vars and not keep_variables:
-            return f"lmql.Var('{node.id}')"
+            return f"lmql.runtime_support.Var('{node.id}')"
 
         return bn or node.id
 
@@ -209,7 +214,7 @@ class WhereClauseTransformation():
                 tops = [self.transform_node(op, snf) for op in ops]
                 tops_list = ",\n  ".join([t.strip() or "None" for t in tops])
                 
-                Op = "lmql.AndOp" if type(expr.op) is ast.And else "lmql.OrOp"
+                Op = "lmql.runtime_support.AndOp" if type(expr.op) is ast.And else "lmql.OrOp"
                 return snf.add(f"{Op}([\n  {tops_list}\n])")
         # elif type(expr) is ast.Call:
         #     tfunc = self.transform_node(expr.func, snf)
@@ -222,7 +227,7 @@ class WhereClauseTransformation():
             op = expr.op
             
             Ops = {
-                ast.Not: "lmql.NotOp"
+                ast.Not: f"{OPS_NAMESPACE}.NotOp"
             }
 
             for OpT, impl in Ops.items():
@@ -236,10 +241,10 @@ class WhereClauseTransformation():
             assert len(expr.ops) == 1, "compiler currently does not support comparison with more than one operator"
             
             Ops = {
-                ast.Eq: "lmql.EqOp",
-                ast.Lt: "lmql.Lt",
-                ast.Gt: "lmql.Gt",
-                ast.In: "lmql.InOp"
+                ast.Eq: f"{OPS_NAMESPACE}.EqOp",
+                ast.Lt: f"{OPS_NAMESPACE}.Lt",
+                ast.Gt: f"{OPS_NAMESPACE}.Gt",
+                ast.In: f"{OPS_NAMESPACE}.InOp"
             }
 
             for OpT, impl in Ops.items():
@@ -247,6 +252,11 @@ class WhereClauseTransformation():
                     ops = [self.transform_node(c, snf) for c in [expr.left] + expr.comparators]
                     ops_list = ", ".join(ops).strip()
                     return snf.add(f"{impl}([{ops_list}])")
+            
+            # if is_type_constraint(expr):
+            #     type_name = expr.comparators[0].id
+            #     var_name = expr.left.args[0].id
+            #     return snf.add(f"{OPS_NAMESPACE}.TypeConstraint([{type_name}, {OPS_NAMESPACE}.Var('{var_name}')])")
             
             assert False, "operator {} is not supported.".format(astunparse.unparse(expr))
         elif type(expr) is ast.Constant:
@@ -286,10 +296,10 @@ class WhereClauseTransformation():
         node = NameTransformer(transform_name).visit(node)
 
         args = (" " + ", ".join(names)) if len(names) > 0 else ""
-        var_ops = (", ".join([f"lmql.Var('{n}')" for n in names])).strip() if len(names) > 0 else ""
+        var_ops = (", ".join([f"{OPS_NAMESPACE}.Var('{n}')" for n in names])).strip() if len(names) > 0 else ""
         fct_code = astunparse.unparse(node).strip()
         
-        return f"lmql.OpaqueLambdaOp([lambda{args}: {fct_code}, {var_ops}])"
+        return f"{OPS_NAMESPACE}.OpaqueLambdaOp([lambda{args}: {fct_code}, {var_ops}])"
 
 def is_allowed_builtin_python_call(node):
     if type(node) is not ast.Name:
@@ -303,9 +313,30 @@ def get_builtin_name(node, plain_python=False):
     n = node.id
     
     if n in lmql_operation_registry.keys():
-        return lmql_operation_registry[n]
+        return OPS_NAMESPACE + "." + lmql_operation_registry[n]
     
     return None
+
+def is_type_constraint(expr: ast.Expr):
+    if not type(expr.left) is ast.Call:
+        return False
+    if not type(expr.left.func) is ast.Name:
+        return False
+    if not expr.left.func.id == "type":
+        return False
+    if not type(expr.ops[0]) is ast.Is:
+        return False
+    if not len(expr.comparators) == 1:
+        return False
+    right = expr.comparators[0]
+    if not type(right) is ast.Name:
+        return False
+    if not len(expr.left.args) == 1:
+        return False
+    if not type(expr.left.args[0]) is ast.Name:
+        return False
+    
+    return True
 
 class DecodeClauseTransformation:
     def __init__(self, query):
@@ -352,7 +383,7 @@ class PythonFunctionWriter:
         self.file = open(self.filename, "w")
 
         self.indent = "  "
-        self.write("import lmql.runtime.lmql_runtime as lmql\n")
+        self.write("import lmql\n")
         self.write(self.prologue)
         
         if decorators is not None:
@@ -466,7 +497,7 @@ class LMQLCompiler:
 
             # generate function that runs query
             with PythonFunctionWriter("query", output_file, list(scope.free_vars) + ["context"], 
-                q.prologue, decorators=["lmql.query"], decorators_args=[output_variables]) as writer:
+                q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
                 
                 writer.add(f"context.set_model({model_name})")
                 writer.add(f"context.set_decoder({astunparse.unparse(q.decode.method).strip()}, {unparse_list(q.decode.decoding_args)})")
