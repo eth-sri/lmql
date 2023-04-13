@@ -550,9 +550,12 @@ class AsyncOpenAIAPI:
         self.complete_api_worker.cancel()
         for worker in self.complete_request_workers:
             worker.cancel()
-        loop = asyncio.get_event_loop()
-        while not all([t.done() for t in (self.complete_request_workers + [self.complete_api_worker])]):
-            loop._run_once()
+        try:
+            loop = asyncio.get_event_loop()
+            while not all([t.done() for t in (self.complete_request_workers + [self.complete_api_worker])]):
+                loop._run_once()
+        except:
+            pass # if no more event loop is around, no need to wait for the workers to finish
 
     async def api_complete_worker(self, queue):
         while True:
