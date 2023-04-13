@@ -42,13 +42,12 @@ const ContentContainer = styled.div`
   
   color: white;
   flex: 1;
-  height: calc(100% - 40pt);
-  width: 100%;
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: calc(100% - 4pt);
+  height: calc(100% - 2pt);
+  margin: 2pt;
 `;
 
 const Panel = styled.div.attrs(props => ({ className: "panel" }))`
@@ -58,7 +57,8 @@ const Panel = styled.div.attrs(props => ({ className: "panel" }))`
   padding: 10px;
   display: flex;
   flex-direction: column;
-  margin-left: 2.5pt;
+  margin-left: 1.5pt;
+  margin-right: 1.5pt;
   width: 40%;
   position: relative;
 

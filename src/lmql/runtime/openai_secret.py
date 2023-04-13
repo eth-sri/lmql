@@ -30,7 +30,7 @@ def get_openai_secret():
         openai-secret: <your openai secret>
         openai-org: <your openai org>
         
-        Alternatively, you may just define the environment variable OPENAI_API_KEY=sk-...
+Alternatively, you may just define the environment variable OPENAI_API_KEY=sk-...
         """.format("\n".join(" - " + p for p in search_paths))
             raise FileNotFoundError(m)
 
