@@ -506,7 +506,12 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
 
         if head.is_at_eos() and self.current_variable is not None:
             text = (await head.text(strip_padding=True, offset=self.current_variable_offset))
-            self.program_variables.set(self.current_variable, text, scores=self.current_variable_scores[:-1], diff="", montonicity="fin")
+            variable_value = text
+            variable_value, postprocessed_prompt = execute_postprocess(self.interpreter.where, self.current_variable, variable_value)
+            print([variable_value], [postprocessed_prompt])
+
+            print([self.prompt + text], [self.prompt + postprocessed_prompt])
+            self.program_variables.set(self.current_variable, variable_value, scores=self.current_variable_scores[:-1], diff="", montonicity="fin")
             self.current_variable = None
             
             self.num_variables_decoded += 1

@@ -94,6 +94,14 @@ def strip_next_token(x):
         x = x[:-len(NextToken)]
     return x
 
+class postprocessed_value:
+    def __init__(self, value):
+        self.value = value
+class postprocessed_rewrite:
+    def __init__(self, rewrite):
+        self.rewrite = rewrite
+
+
 @LMQLOp("SENTENCES")
 class Sentences(Node):
     def forward(self, v):
@@ -836,7 +844,6 @@ class StopAtOp(Node):
         op1 = strip_next_token(op1)
         op2 = args[1]
 
-
         matched_phrase_index = op1.rfind(op2)
         op2_in_op1 = matched_phrase_index != -1 and matched_phrase_index + len(op2) > len(op1) - len(op1_diff)
 
@@ -865,6 +872,11 @@ class StopAtOp(Node):
             else: 
                 r = "fin"
             return r
+    
+    def postprocess(self, var_name, value):
+        if var_name == self.predecessors[0].name:
+            # matched_phrase_index = op1.rfind(op2)
+            return postprocessed_rewrite("postprocessed " + var_name + " " + value), postprocessed_value(value)
 
 class OpaqueLambdaOp(Node):
     def forward(self, *args):
@@ -966,6 +978,46 @@ def execute_op_stops_at_only(op: Node, result=None):
         # TODO: what about not
         return []
     return result
+
+def execute_postprocess(op: Node, var_name: str, value: str):
+    """
+    Applies any postprocess() operations of the provided constraints
+    to the specified variable and value.
+
+    Returns a tuple of (postprocessed_value, rewritten_prompt)
+    """
+    nodes = [op]
+    postprocessed = None
+    rewritten_prompt = None
+    postprocessing_op = None
+
+    while len(nodes) > 0:
+        op = nodes.pop()
+        nodes += [p for p in op.predecessors if type(p) is Node]
+
+        if hasattr(op, "postprocess"):
+            result = op.postprocess(var_name, value)
+
+            if result is not None:
+                assert postprocessed is None, "The specified set of constraints contains multiple postprocessing operations for the same variable. {} and {} both postprocess variable {}.".format(postprocessing_op, op, var_name)
+                if type(result) is tuple:
+                    for v in result:
+                        if type(v) is postprocessed_value:
+                            postprocessed = v.value
+                        elif type(v) is postprocessed_rewrite:
+                            rewritten_prompt = v.rewrite
+                        else:
+                            assert False, "Invalid postprocess() return value: {} for {}".format(v, op)
+                else:
+                    postprocessed = result
+                postprocessing_op = op
+    
+    if rewritten_prompt is None:
+        rewritten_prompt = var_name
+    if postprocessed is None:
+        postprocessed = value
+    
+    return postprocessed, rewritten_prompt
 
 def execute_op(op: Node, trace=None, context=None, return_final=False):
     # for constant dependencies, just return their value
