@@ -1,5 +1,5 @@
 """
-Serves a llama.cpp model as LMQL inference API.
+Serves a transformers model as LMQL inference API.
 """
 
 from dataclasses import dataclass, field
@@ -11,28 +11,31 @@ from multiprocessing import Queue as MPQueue
 from queue import Empty
 from queue import Queue
 import multiprocessing
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
+import requests
+import asyncio
+import sys
 import atexit
-import argparse
+import argparse 
 import time
-from llama_cpp.llama import Llama, llama_cpp
-import inspect
+import os
+import subprocess
+
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+import torch
 from lmql.model.serve_types import TokenizerProcessor, ModelProcessor, InferenceServerState
 
-class LlamaCPPTokenizerProcessor(TokenizerProcessor):
-    def __init__(self, state: InferenceServerState, processor: "ModelProcessor"):
-        super().__init__(state)
-        self.model = processor
+class HFTokenizerProcessor(TokenizerProcessor):
 
     def tokenize(self, tokenizer, sample_id, client_id, item):
         text = item["text"]
 
         if text == "<EOS>":
-            input_ids = [tokenizer.token_eos()]
+            input_ids = [tokenizer.eos_token_id]
         elif text == "<BOS>":
-            input_ids = [tokenizer.token_bos()]
+            input_ids = [tokenizer.bos_token_id]
         else:
-            input_ids = tokenizer.tokenize(b" " + text.encode("utf-8"))
+            input_ids = tokenizer(text)["input_ids"]
 
         self.state.all_results_queue.put({
             "sample_id": sample_id,
@@ -43,17 +46,17 @@ class LlamaCPPTokenizerProcessor(TokenizerProcessor):
     def detokenize(self, tokenizer, sample_id, client_id, item):
         input_ids = item["input_ids"]
 
-        text = tokenizer.detokenize(input_ids).decode('utf-8')
+        text = tokenizer.decode(input_ids)
         self.state.all_results_queue.put({
             "sample_id": sample_id,
             "client_id": client_id,
             "text": text
         })
 
-    def run(self):
+    def run(self, index):
         # load tokenizer
-        tokenizer = self.model
-        print("Tokenizer {} ready!".format(self.model_identifier))
+        tokenizer = AutoTokenizer.from_pretrained(self.model_identifier)
+        print("Tokenizer #{} {} ready!".format(index, self.model_identifier))
 
         while not self.state.exit:
             item = self.queue.get()
@@ -72,19 +75,26 @@ class LlamaCPPTokenizerProcessor(TokenizerProcessor):
             else:
                 print("error: unknown TokenizerProcessor action {}".format(action))
         
-        print("Tokenizer shut down.")
-    
-class LlamaCPPModelProcessor(ModelProcessor):
-    def __init__(self, state: InferenceServerState, cuda: bool = False, cache: Optional[str] = None, llama_kwargs: Optional[dict] = None):
-        super().__init__(state, cuda, cache)
-        assert llama_kwargs is not None
-        self.llama_kwargs = llama_kwargs
+        print("Tokenizer #{} shut down.".format(index))
 
-    def run(self):        
+class HFModelProcessor(ModelProcessor):
+
+    def run(self):
+        dtype = self.state.dtype
+        if dtype == "float16":
+            dtype = torch.float16
+        else:
+            dtype = None
+        
         # load model
-        print("Loading {} (CPU)".format(self.model_identifier))
-        self.model = Llama(**{**self.llama_kwargs, 'logits_all': True})
-
+        if not self.cuda:
+            print("Loading {} (CPU)".format(self.model_identifier))
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, torch_dtype=dtype, resume_download=True)
+        else:
+            print("Loading {} (Multi-GPU)".format(self.model_identifier))
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, torch_dtype=dtype, resume_download=True, device_map="auto")
+        self.model.eval()
+        
         print("Ready!".format(self.model_identifier))
 
         while not self.state.exit:
@@ -103,14 +113,20 @@ class LlamaCPPModelProcessor(ModelProcessor):
 
             self.request_count += 1
         
-
+            device = "cuda" if self.cuda else "cpu"
 
             sample_id = item["sample_id"]
             client_id = item["client_id"]
-            input_ids = item["input_ids"]
+            input_ids = torch.tensor(item["input_ids"], dtype=torch.long).to(device)
+            attention_mask = item.get("attention_mask", None)
+            
+            if attention_mask is None:
+                attention_mask = torch.ones_like(input_ids).to(device)
+            else:
+                attention_mask = torch.tensor(attention_mask, dtype=torch.long).to(device)
 
             if self.cache is not None:
-                key = str(input_ids)
+                key = "IDs:" + str(input_ids.tolist()) + " MASK:" + str(attention_mask.tolist())
                 if key in self.cache:
                     self.requests_cached += 1
                     self.state.all_results_queue.put({
@@ -119,47 +135,39 @@ class LlamaCPPModelProcessor(ModelProcessor):
                         "next_token_logits": self.cache[key]
                     })
                     continue
-            self.model.reset()
-            res = self.model.eval(input_ids[0])
             
-            next_token_logits = self.model.all_logits[-1]
+            res = self.model.forward(input_ids=input_ids, attention_mask=attention_mask)
+            
+            if input_ids.ndimension() == 2:
+                next_token_logits = res.logits[:,-1]
+            else:
+                next_token_logits = res.logits[-1]
             
             if self.cache is not None:
-                key = str(input_ids.tolist())
-                self.cache[key] = next_token_logits
+                key = "IDs:" + str(input_ids.tolist()) + " MASK:" + str(attention_mask.tolist())
+                self.cache[key] = next_token_logits.tolist()
 
             self.state.all_results_queue.put({
                 "client_id": client_id,
                 "sample_id": sample_id,
-                "next_token_logits": [next_token_logits]
+                "next_token_logits": next_token_logits.detach().tolist()
             })
         
         print("Processor shut down")
         
-base_llama_kwargs = {}
+
+
 
 def get_serve(state: InferenceServerState, args: argparse.Namespace)->Tuple[ModelProcessor, TokenizerProcessor]:
     # run model in separate process
-    llama_kwargs = {kwarg: getattr(args, kwarg) for kwarg in base_llama_kwargs.keys()}
-    processor = LlamaCPPModelProcessor(state, cuda=False, cache=args.cache, llama_kwargs=llama_kwargs)
+    processor = HFModelProcessor(state, cuda=args.cuda, cache=args.cache)
     processor.run_in_parallel()
 
     # run tokenizers in separate process
-    tokenizer_processor = LlamaCPPTokenizerProcessor(state, processor=processor)
-    tokenizer_processor.run_in_parallel(1)
+    tokenizer_processor = HFTokenizerProcessor(state)
+    tokenizer_processor.run_in_parallel(n=args.num_tokenizer_processes)
     return processor, tokenizer_processor
 
 def add_parser(base_parser):
-    
-    sig = inspect.signature(Llama.__init__)
-    for name, param in sig.parameters.items():
-        if name == 'self':
-            continue
-        base_llama_kwargs[name] = None
-        _type = param.annotation
-        if hasattr(_type, '__args__'):
-            _type=_type.__args__[0]
-        if param.default == inspect.Parameter.empty:
-            base_parser.add_argument(f'--{name}', default=_type(), type=_type, help="required for llama.cpp")
-        else:
-            base_parser.add_argument(f'--{name}', default=param.default, type=_type, help="optional for llama.cpp") 
+    ...
+
