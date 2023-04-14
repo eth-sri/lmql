@@ -2,6 +2,14 @@ import os
 import termcolor
 
 class DebuggerOutputWriter:
+    def __init__(self, allows_input=True):
+        self.allows_input = allows_input
+
+    async def input(self, *args):
+        if not self.allows_input:
+            assert False, "current LMQL output writer does not allow input"
+        return input(*args)
+
     def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables): pass
     def add_compiler_output(self, code): pass
 
@@ -54,5 +62,6 @@ class StreamingOutputWriter:
     def add_compiler_output(self, code): pass
 
 silent = DebuggerOutputWriter()
+headless = DebuggerOutputWriter(allows_input=False)
 stream = StreamingOutputWriter
 printing = PrintingDebuggerOutputWriter(clear=True)
