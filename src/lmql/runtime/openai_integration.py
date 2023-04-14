@@ -552,11 +552,11 @@ class DclibOpenAiModel(DcModel):
                 elif type(mask) is int: full_logits[mask] = np.finfo(np.float32).min
                 else: full_logits[mask < 0] = np.finfo(np.float32).min
                 
+                # make sure all token_ids are unique
+                token_ids = np.array(list(set(token_ids)))
+
                 # re-determine logprobs with logits mask applied
                 logprobs = np.take_along_axis(full_logits, token_ids, axis=-1)
-
-                # make sure all token_ids are different
-                assert len(token_ids) == len(set(token_ids)), "token_ids are not unique"
 
                 next_token_ids.append(token_ids)
                 next_token_scores.append(logprobs)
