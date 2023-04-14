@@ -15,7 +15,7 @@ __license__ = "MIT"
 from lmql.language.compiler import LMQLCompiler
 import lmql.runtime.lmql_runtime as lmql_runtime
 import tempfile
-from lmql.runtime.output_writer import silent, stream, printing
+from lmql.runtime.output_writer import silent, stream, printing, headless
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.lmql_runtime import LMQLQueryFunction, FunctionContext
 
