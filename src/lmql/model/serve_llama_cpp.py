@@ -180,7 +180,7 @@ class ModelProcessor:
                         "next_token_logits": self.cache[key]
                     })
                     continue
-            
+            self.model.reset()
             res = self.model.eval(input_ids[0])
             
             next_token_logits = self.model.all_logits[-1]
