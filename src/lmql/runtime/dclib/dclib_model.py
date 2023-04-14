@@ -470,6 +470,9 @@ class DcModel:
                 common_i = min(len(ids) - 1, len(updated_ids) - 1)
                 while updated_ids[common_i] != ids[common_i] and common_i > 0:
                     common_i -= 1
+            if get_strip_eos(seqidx, rewritten_ids.strip_eos) and updated_ids is None:
+                ids = ids[:common_i]
+            else:
                 ids = ids[:common_i + 1]
 
             # find the sequence that is continued by the rewritten sequence

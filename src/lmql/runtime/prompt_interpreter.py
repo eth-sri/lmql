@@ -477,6 +477,7 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
         if head.is_at_eos() and self.current_variable is not None:
             text = (await head.text(strip_padding=True, offset=self.current_variable_offset))
             variable_value = text
+            raw = variable_value
             # set raw variable value
             self.program_variables.set(self.current_variable, variable_value, scores=self.current_variable_scores[:-1], diff="", montonicity="fin")
             # apply postprocessing, if constraints specify it
@@ -521,6 +522,7 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
                 self.last_seen_input_ids = head.input_ids_without_padding[:self.current_variable_offset].tolist() + appended_ids
                 self.current_variable_offset = len(self.last_seen_input_ids)
 
+                # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(appended_input_ids=[head.eos_token_id] + self.last_seen_input_ids, strip_eos=-n_tokens_to_strip, value_offset=value_offset)
             else:
                 # set last_seen_input_ids to current input_ids w/o eos token
