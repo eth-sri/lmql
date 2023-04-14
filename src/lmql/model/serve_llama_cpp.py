@@ -93,6 +93,13 @@ class TokenizerProcessor:
         
         print("Tokenizer shut down.")
 
+    def run_in_parallel(self):
+        atexit.register(self.shutdown)
+
+        p = multiprocessing.Process(target=self.run)
+        p.start()
+        return p
+    
 class ModelProcessor:
     def __init__(self, state: InferenceServerState, llama_kwargs: dict, cache: str = None):
         self.model_identifier = state.model_identifier
@@ -174,22 +181,28 @@ class ModelProcessor:
                     })
                     continue
             
-            res = self.model.eval(input_ids)
+            res = self.model.eval(input_ids[0])
             
             next_token_logits = self.model.all_logits[-1]
             
             if self.cache is not None:
                 key = str(input_ids.tolist())
-                self.cache[key] = next_token_logits.tolist()
+                self.cache[key] = next_token_logits
 
             self.state.all_results_queue.put({
                 "client_id": client_id,
                 "sample_id": sample_id,
-                "next_token_logits": next_token_logits.detach().tolist()
+                "next_token_logits": [next_token_logits]
             })
         
         print("Processor shut down")
+        
+    def run_in_parallel(self):
+        atexit.register(self.shutdown)
 
+        p = multiprocessing.Process(target=self.run)
+        p.start()
+        return p
 
 class LMQLInferenceAPIHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -374,10 +387,13 @@ if __name__ == "__main__":
         if name == 'self':
             continue
         llama_kwargs[name] = None
+        _type = param.annotation
+        if hasattr(_type, '__args__'):
+            _type=_type.__args__[0]
         if param.default == inspect.Parameter.empty:
-            parser.add_argument(name)
+            parser.add_argument(name, type=_type)
         else:
-            parser.add_argument(f'--{name}', default=param.default) 
+            parser.add_argument(f'--{name}', default=param.default, type=_type) 
 
     args = parser.parse_args()
     
@@ -396,11 +412,11 @@ if __name__ == "__main__":
 
     # run model in separate process
     processor = ModelProcessor(state, cache=args.cache, llama_kwargs=llama_kwargs)
-    processor.run()
+    processor.run_in_parallel()
 
     # run tokenizers in separate process
     tokenizer_processor = TokenizerProcessor(state, processor)
-    tokenizer_processor.run()
+    tokenizer_processor.run_in_parallel()
 
     # run inference API server in this process
     server_address = (args.host, args.port)
