@@ -73,6 +73,13 @@ class LlamaCPPTokenizerProcessor(TokenizerProcessor):
                 print("error: unknown TokenizerProcessor action {}".format(action))
         
         print("Tokenizer shut down.")
+
+    def run_in_parallel(self):
+        atexit.register(self.shutdown)
+
+        p = multiprocessing.Process(target=self.run)
+        p.start()
+        return p
     
 class LlamaCPPModelProcessor(ModelProcessor):
     def __init__(self, state: InferenceServerState, cuda: bool = False, cache: Optional[str] = None, llama_kwargs: Optional[dict] = None):
@@ -135,7 +142,14 @@ class LlamaCPPModelProcessor(ModelProcessor):
             })
         
         print("Processor shut down")
-        
+
+    def run_in_parallel(self):
+        atexit.register(self.shutdown)
+
+        p = multiprocessing.Process(target=self.run)
+        p.start()
+        return p
+ 
 base_llama_kwargs = {}
 
 def get_serve(state: InferenceServerState, args: argparse.Namespace)->Tuple[ModelProcessor, TokenizerProcessor]:
@@ -146,7 +160,7 @@ def get_serve(state: InferenceServerState, args: argparse.Namespace)->Tuple[Mode
 
     # run tokenizers in separate process
     tokenizer_processor = LlamaCPPTokenizerProcessor(state, processor=processor)
-    tokenizer_processor.run_in_parallel(1)
+    tokenizer_processor.run_in_parallel()
     return processor, tokenizer_processor
 
 def add_parser(base_parser):

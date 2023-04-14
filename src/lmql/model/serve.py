@@ -1,5 +1,5 @@
 """
-Serves a transformers model as LMQL inference API.
+Serves a model as LMQL inference API.
 """
 
 from dataclasses import dataclass, field
