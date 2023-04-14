@@ -44,16 +44,17 @@ async def main():
             if rpad < 0:
                 rpad = 0
 
-            print(f" - {query['name']}{' ' * rpad}", end=" ")
+            print(f" - {query['name']}{'.' * rpad}", end=" ", flush=True)
             # run query
             try:
                 s = time.time()
-                error_buffer = io.StringIO()
-                sys.stderr = error_buffer
+                # error_buffer = io.StringIO()
+                # sys.stderr = error_buffer
                 await lmql.run(query["code"], output_writer=lmql.headless)
                 print(termcolor.colored("[OK]", "green"), f"({time.time() - s:.2f}s)")
             except Exception as e:
-                print(error_buffer.getvalue())
+                # print(error_buffer.getvalue())
+                print(e)
                 print(termcolor.colored("[FAIL]", "red"), f"({time.time() - s:.2f}s)")
 
 
