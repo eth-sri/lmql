@@ -117,7 +117,7 @@ class DecoderSequence:
         # if no stop_phrase is provided assume no tokens to be stop_phrase
         if stop_phrase is None: self.stop_phrase = np.array([False for _ in range(len(input_ids))])
         else: self.stop_phrase = stop_phrase
-        assert len(self.stop_phrase) == len(self.input_ids), "Length of determinism status does not match length of inputs"
+        assert len(self.stop_phrase) == len(self.input_ids), "Length of stop_phrase status does not match length of inputs for {} and {}".format(self.stop_phrase, self.input_ids)
 
         # cache for logits when model is called with this sequence
         self.logits = None
@@ -473,7 +473,7 @@ class DeterministicDecoderSequence(DecoderSequence):
             "logprob": self.logprobs[-1],
             "seqlogprob": self.logprobs.sum(),
             "pool": self.pool,
-            "deterministic": True,
+            **({"deterministic": True} if self.deterministic[-1] else {}),
             "next_ids": self.next_ids.tolist(),
             "next_logprobs": self.next_logprobs.tolist() if self.next_logprobs is not None else None,
             "user_data": await self.user_data_json(),
@@ -487,10 +487,11 @@ class DeterministicDecoderSequence(DecoderSequence):
             "sticky_user_data_keys": list(self.sticky_user_data_keys)
         }
 
-    def expand(self):
+    def expand(self, limit=None):
         """ Returns the sequence that corresponds to the full expansion of this pre-determined deterministic sequence. """
         s = self
-        while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
+        steps = 0
+        while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0 and (limit is None or steps < limit):
             s = s.extend(Continuation(s.next_ids[0], s.next_logprobs[0], s.user_data))
         return s
 

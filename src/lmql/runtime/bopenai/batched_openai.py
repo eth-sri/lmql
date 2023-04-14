@@ -653,7 +653,7 @@ class AsyncOpenAIAPI:
                 biases = biases[:299] + [(50256, kwargs["logit_bias"][50256])]
             else:
                 biases = biases[:300]
-            print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.")
+            print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.", file=sys.stderr)
             kwargs["logit_bias"] = {t:b for t,b in biases}
 
 

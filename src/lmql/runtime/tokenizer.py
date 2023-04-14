@@ -60,9 +60,9 @@ global reverse_special_token_mappings
 reverse_special_token_mappings = {}
 
 class LMQLTokenizer:
-    def __init__(self, tokenizer_impl):
+    def __init__(self, tokenizer_impl, model_identifier):
         self.tokenizer_impl = tokenizer_impl
-
+        self.model_identifier = model_identifier
         self.detokenizer_cache = {}
 
     @property
@@ -197,7 +197,7 @@ def load_tokenizer(model_identifier):
 
     # check environment of USE_JS_TOKENIZER
     if "LMQL_BROWSER" in os.environ:
-        return LMQLTokenizer(get_js_tokenizer(model_identifier))
+        return LMQLTokenizer(get_js_tokenizer(model_identifier), model_identifier)
 
     from transformers import AutoTokenizer
     import torch
@@ -213,7 +213,7 @@ def load_tokenizer(model_identifier):
 
     if cache_path.exists():
         with open(cache_path, "rb") as f:
-            return LMQLTokenizer(pickle.load(f))
+            return LMQLTokenizer(pickle.load(f), model_identifier)
     else:
         from transformers import AutoTokenizer
         t = AutoTokenizer.from_pretrained(model_identifier)

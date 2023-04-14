@@ -188,18 +188,27 @@ class DclibOpenAiModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens):
         return (await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids)))
     
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic=False, stop_phrase=False, needs_rewrite=True):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
         
         completion = [np.array(cont) for cont in tokens]
 
         def make_detseq(s, token_score, completion):
+            # compose deterministic flags
+            if type(deterministic) is bool:
+                deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])])
+                next_deterministic = np.array([deterministic] * len(completion[1:]))
+            else:
+                assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored"
+                deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])])
+                next_deterministic = np.array(deterministic[1:])
+
             return detseq(ids=np.concatenate([s.input_ids, completion[:1]], axis=0), 
                     next_ids=completion[1:],
                     logprobs=np.concatenate([s.logprobs, token_score[:1]], axis=0),
                     next_logprobs=token_score[1:],
-                    deterministic=np.concatenate([s.deterministic, np.array([deterministic])]),
-                    next_deterministic=np.array([deterministic] * len(completion[1:])),
+                    deterministic=deterministic_flags,
+                    next_deterministic=next_deterministic,
                     predecessor=s,
                     user_data=None,
                     stop_phrase=np.concatenate([s.stop_phrase, np.array([stop_phrase])]),

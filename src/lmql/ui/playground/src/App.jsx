@@ -2431,11 +2431,28 @@ class App extends React.Component {
 
     // when document browser scale is changed
     window.addEventListener("resize", ResizeObservers.notify)
+    
+    this.onKeyDown = this.onKeyDown.bind(this)
+    window.addEventListener("keydown", this.onKeyDown)
+  }
+
+  onKeyDown(event) {
+    /* On R*/
+    if (event.keyCode == 82 && event.ctrlKey) {
+      this.onRun();
+    }
+    /* On Escape */
+    if (event.keyCode == 27) {
+      LMQLProcess.kill()
+    }
   }
 
   componentWillUnmount() {
     LMQLProcess.remove("render", this)
     LMQLProcess.remove("status", this.onStatus.bind(this))
+    
+    window.removeEventListener("resize", ResizeObservers.notify)
+    window.removeEventListener("keydown", this.onKeyDown)
   }
 
   onExportState() {

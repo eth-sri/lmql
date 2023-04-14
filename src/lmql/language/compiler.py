@@ -39,16 +39,25 @@ class PromptScope(ast.NodeVisitor):
             self.written_vars.add(v)
             if v in self.free_vars: self.free_vars.remove(v)
 
-        # capture set of format vars
-        used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}]+\}", qstring)]
+        # capture set of format vars (exclude {{ and }})
+        # replace {{ and }} with escape sequence \u007b and \u007d 
+        qstring = qstring.replace("{{", "__curly_open__").replace("}}", "__curly_close__")
+        used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}\{]+\}", qstring)]
         for v in used_fstring_expr:
             if v.startswith(":"):
                 continue
-            parsed = ast.parse(v).body[0].value
-            self.visit(parsed)
+            try:
+                parsed = ast.parse(v).body[0].value
+                self.visit(parsed)
+            except:
+                raise RuntimeError("Failed to parse fstring expression: ", v)
+
             
             # if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
             #     self.free_vars.add(v)
+
+        # put double curly braces back in
+        qstring = qstring.replace("__curly_open__", "{{").replace("__curly_close__", "}}")
                 
         template_tags = [v[1:-1] for v in re.findall("\{:[A-z0-9]+\}", qstring)]
         for tt in template_tags:
@@ -496,7 +505,9 @@ class LMQLCompiler:
             output_variables = "output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
 
             # generate function that runs query
-            with PythonFunctionWriter("query", output_file, list(scope.free_vars) + ["context"], 
+            parameters = list(sorted(list(scope.free_vars.union(set(["context"])))))
+
+            with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
                 
                 writer.add(f"context.set_model({model_name})")

@@ -1,6 +1,8 @@
 class ProgramState:
     def __init__(self, runtime=None):
         self.variable_values = {}
+        # postprocessed, converted variable values if not just str (e.g. objects, int)
+        self.variable_program_values = {}
         self.variable_diffs = {}
         self.variable_scores = {}
         self.variable_monotonicity = {}
@@ -20,14 +22,18 @@ class ProgramState:
     def __setitem__(self, key, value):
         self.set(key, value)
 
-    def set(self, name, value, scores=None, diff=None, montonicity="var"):
+    def set(self, name, value, program_value=None, scores=None, diff=None, montonicity="var"):
         self.variable_values[name] = value
+        self.variable_program_values[name] = program_value if program_value is not None else value
         self.variable_diffs[name] = diff
         self.variable_scores[name] = scores
         self.variable_monotonicity[name] = montonicity
 
     def get(self, name, default=None):
         return self.variable_values.get(name, default)
+
+    def get_program_value(self, name, default=None):
+        return self.variable_program_values.get(name, default)
     
     def get_diff(self, name, default=None):
         return self.variable_diffs.get(name, default)
@@ -38,6 +44,7 @@ class ProgramState:
     def copy(self):
         s = ProgramState()
         s.variable_values = self.variable_values.copy()
+        s.variable_program_values = self.variable_program_values.copy()
         s.variable_monotonicity = self.variable_monotonicity.copy()
         s.variable_diffs = self.variable_diffs.copy()
         s.variable_scores = self.variable_scores.copy()

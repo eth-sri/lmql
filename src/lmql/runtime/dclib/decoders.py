@@ -13,7 +13,6 @@ async def argmax(prompt_ids: np.ndarray, n=1, max_len=2048, **kwargs):
     model = dc.model(**kwargs)
     h = dc.seqs([dc.seq(prompt_ids)] * n)
     done = dc.seqs()
-    
     step = 0
     
     # provide early first result to user

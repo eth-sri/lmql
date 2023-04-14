@@ -37,6 +37,7 @@ class RewrittenInputIds:
     appended_input_ids: List[np.ndarray]
     strip_eos: bool = True
     user_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
+    value_offset: Optional[int] = None
 
     def strip_ids(self, input_ids, i):
         if self.strip_eos == True:
@@ -107,7 +108,7 @@ class InputIdRewriter:
         if mask_seq_to_rewrite is not None:
             if not mask_seq_to_rewrite[i]:
                 return None
-        
+
         head = DecoderHead(i, 
             head_input_ids[:-1], head_input_ids[-1], next_token_scores[i],
             self.tokenize,
@@ -120,45 +121,37 @@ class InputIdRewriter:
         return await self.head_rewriter(head)
 
     async def input_ids_rewriter_fn(self, input_ids, next_token_scores, seq_idx = None, next_token_logprob = None, mask_seq_to_rewrite = None, user_data=None):
+        assert dim(input_ids) == 2, "input_ids must be a 2D tensor"
+
         def get_user_data(i):
             if user_data is None: 
                 return None
             return user_data[i]
         
-        if dim(input_ids) == 2:
-            head_results: List[RewrittenInputIds] = await asyncio.gather(*(self.rewrite_seq(i, head_input_ids, next_token_scores, next_token_logprob, mask_seq_to_rewrite, user_data=get_user_data(i)) for i, head_input_ids in enumerate(input_ids)))
+        head_results: List[RewrittenInputIds] = await asyncio.gather(*(self.rewrite_seq(i, head_input_ids, next_token_scores, next_token_logprob, mask_seq_to_rewrite, user_data=get_user_data(i)) for i, head_input_ids in enumerate(input_ids)))
 
-            if all(r is None for r in head_results):
-                # note: user data will be lost here
-                return RewrittenInputIds(appended_input_ids=None, strip_eos=False, user_data=[None for _ in range(len(input_ids))])
-            else:
-                strip_eos = [r.strip_eos if r is not None else False for r in head_results]
-                if all([s == True for s in strip_eos]): strip_eos = True
+        if all(r is None for r in head_results):
+            # note: user data will be lost here
+            return RewrittenInputIds(appended_input_ids=None, strip_eos=False, user_data=[None for _ in range(len(input_ids))], value_offset=[None for _ in range(len(input_ids))])
+        else:
+            strip_eos = [r.strip_eos if r is not None else False for r in head_results]
+            if all([s == True for s in strip_eos]): strip_eos = True
 
-                # collect appended input ids
-                appended_seqs = [rewrite.appended_input_ids if rewrite is not None else [] for rewrite in head_results]
-                appended_seqs = [nputil.ensure_array(seq) for seq in appended_seqs]
+            # collect appended input ids
+            appended_seqs = [rewrite.appended_input_ids if rewrite is not None else [] for rewrite in head_results]
+            appended_seqs = [nputil.ensure_array(seq) for seq in appended_seqs]
 
-                # collect user data
-                user_data = [rewrite.user_data if rewrite is not None else None for rewrite in head_results]
-                
-                # handle case where nothing needs to be appended but we still need to strip eos
-                if all(seq is None for seq in appended_seqs):
-                    appended_seqs = None
+            # collect user data
+            user_data = [rewrite.user_data if rewrite is not None else None for rewrite in head_results]
+            
+            # handle case where nothing needs to be appended but we still need to strip eos
+            if all(seq is None for seq in appended_seqs):
+                appended_seqs = None
 
-                return RewrittenInputIds(appended_input_ids=appended_seqs, strip_eos=strip_eos, user_data=user_data)
-        else: # must be dim() == 1
-            assert False, "warning: 1D input_ids are deprecated and will be removed in a future version."
-            assert input_ids.dim() == 1, "input_ids must be 1D or 2D for InputIdRewriter"
-            assert seq_idx is not None, "seq_idx must be provided for 1D input_ids"
-            assert mask_seq_to_rewrite is None, "mask_seq_to_rewrite is not supported for 1D input_ids"
+            # value offsets
+            value_offset = [rewrite.value_offset if rewrite is not None else None for rewrite in head_results]
 
-            result = await self.head_rewriter(DecoderHead(seq_idx, input_ids, None, self.tokenize, self.detokenize, self.eos_token_id, self.initial_prompt_offset))
-
-            if result is None:
-                return RewrittenInputIds(appended_input_ids=None, strip_eos=False)
-            else:
-                return RewrittenInputIds(appended_input_ids=ensure_tensor(result.appended_input_ids, input_ids.device), strip_eos=result.strip_eos)
+            return RewrittenInputIds(appended_input_ids=appended_seqs, strip_eos=strip_eos, user_data=user_data, value_offset=value_offset)
 
 class ActivePromptingRewriter:
     def __init__(self, head_rewriter, tokenize, detokenize, eos_token_id, initial_prompt_offset):

@@ -1,6 +1,7 @@
 import os
 import re
 import math
+import asyncio
 from dataclasses import dataclass
 from lmql.ops import *
 from lmql.runtime.decoder_head import DecoderHead
@@ -14,6 +15,7 @@ from typing import Dict, Optional, Any
 
 import numpy as np
 from lmql.utils import nputil
+from lmql.runtime.stats import Stats
 
 import lmql.ops.token_set as token_set
 
@@ -22,6 +24,8 @@ from lmql.runtime.multi_head_interpretation import InterpretationHead, Interpret
 
 class DecodingError(Exception): ...
 class FailedToDecodeVariable(Exception): ...
+
+stats = Stats("interpreter")
 
 def is_prefix_seq(seq1, seq2):
     num_matching = 0
@@ -54,7 +58,7 @@ def copy(value):
 
 class LMQLContextAPI:
     def __init__(self, program_variables, interpreter):
-        self.program_variables = program_variables
+        self.program_variables: ProgramState = program_variables
         self.interpreter = interpreter
 
     async def json(self):
@@ -63,7 +67,7 @@ class LMQLContextAPI:
     # LMQL runtime API
 
     def get_var(self, name):
-        return self.program_variables.get(name)
+        return self.program_variables.get_program_value(name)
 
     def query(self, qstring):
         return InterpreterCall(qstring, loc=None)
@@ -265,49 +269,50 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
             stopping_phrases = []
         # follow_masking disabled
         elif self.current_variable is not None:
-            where = self.interpreter.where
-            
-            text = (await head.text(self.current_variable_offset, strip_padding=True))
-            diff_text = (await head.text(max(self.current_variable_offset, self.num_last_seen_ids - 1), strip_padding=True))
+            with stats.timer("where_clause_logit_processor:follow_masking"):
+                where = self.interpreter.where
+                
+                text = (await head.text(self.current_variable_offset, strip_padding=True))
+                diff_text = (await head.text(max(self.current_variable_offset, self.num_last_seen_ids - 1), strip_padding=True))
 
-            # current context
-            program_variables: ProgramState = self.program_variables.copy()
-            program_variables.set(self.current_variable, text, scores=self.current_variable_scores, diff=diff_text, montonicity="inc")
+                # current context
+                program_variables: ProgramState = self.program_variables.copy()
+                program_variables.set(self.current_variable, text, scores=self.current_variable_scores, diff=diff_text, montonicity="inc")
 
-            # follow context
-            follow_program_variables: ProgramState = self.program_variables.copy()
-            follow_program_variables.set(self.current_variable, text + str(NextToken), scores=self.current_variable_scores, diff=diff_text, montonicity="inc")
+                # follow context
+                follow_program_variables: ProgramState = self.program_variables.copy()
+                follow_program_variables.set(self.current_variable, text + str(NextToken), scores=self.current_variable_scores, diff=diff_text, montonicity="inc")
 
-            # digest token with where expr
-            valid, is_final, trace = digest(where,
-                context=program_variables,
-                follow_context=follow_program_variables
-            )
+                # digest token with where expr
+                valid, is_final, trace = digest(where,
+                    context=program_variables,
+                    follow_context=follow_program_variables
+                )
 
-            stopping_conditions: List[StopAtOp] = execute_op_stops_at_only(where)
-            stopping_phrases = {
-                "tokenized": [await s.stopping_phrase_tokenized(head.tokenizer_fn) for s in stopping_conditions if s.variable.name == self.current_variable],
-                "text": [s.stopping_phrase for s in stopping_conditions if s.variable.name == self.current_variable],
-            }
+                stopping_conditions: List[StopAtOp] = execute_op_stops_at_only(where)
+                stopping_phrases = {
+                    "tokenized": [await s.stopping_phrase_tokenized(head.tokenizer_fn) for s in stopping_conditions if s.variable.name == self.current_variable],
+                    "text": [s.stopping_phrase for s in stopping_conditions if s.variable.name == self.current_variable],
+                }
 
-            # check if follow_masking is disabled
-            if not self.interpreter.configuration["follow_masking"]:
-                logit_mask = None
-                mask = "*"
-            else:
-                # obtain where follow map
-                follow_map = where.follow_map if where is not None else None
-                # print(id(self), self.current_variable, [text], "mask", follow_map)
-                mask = create_mask(follow_map, valid, is_final)
-                logit_mask = await head.translate_mask(mask, len(head.next_token_logits))
+                # check if follow_masking is disabled
+                if not self.interpreter.configuration["follow_masking"]:
+                    logit_mask = None
+                    mask = "*"
+                else:
+                    # obtain where follow map
+                    follow_map = where.follow_map if where is not None else None
+                    # print(id(self), self.current_variable, [text], "mask", follow_map)
+                    mask = create_mask(follow_map, valid, is_final)
+                    logit_mask = await head.translate_mask(mask, len(head.next_token_logits))
         else:
             assert self.current_prompt is not None, f"error: where() is called but current variable and current prompt are None and query head is {self.query_head.done}"
             next_token = await self.get_next_prompt_token(head, pop=False)
             mask = tset("<prompt>")
             stopping_phrases = []
             logit_mask = await head.make_mask(next_token, vocab_size=len(head.next_token_logits))
-
-        await self.debugger_output(head, valid, is_final, mask, stopping_phrases, program_variables, trace)
+        with stats.timer("where debugger out"):
+            await self.debugger_output(head, valid, is_final, mask, stopping_phrases, program_variables, trace)
 
         # also include backtracking mask (only present if backtracking is enabled)
         logit_mask_backtracker = self.get_backtracker_mask(head)
@@ -420,42 +425,7 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
             return await head.tokenize(current_prompt)
 
     async def active_prompt(self, head: DecoderHead):
-        assert self.interpreter.configuration["backtracking"] == False, "backtracking is not supported with active prompting (beam search)"
-
-        # print("Head", head.head, "active_prompt()", len(head.input_ids_without_padding), [(await head.text(strip_padding=True))])
-        if self.current_variable_offset == -1:
-            self.current_variable_offset = head.initial_prompt_offset
-
-        # update last seen ids
-        full_ids = head.input_ids_without_padding.tolist() + [head.next_token_id]
-        self.last_seen_input_ids = full_ids
-
-        # print("active_prompt()", len(full_ids), [(await head.detokenize(full_ids))], head.next_token_id, self.current_prompt is not None)
-
-        if head.is_at_eos() and self.current_variable is not None:
-            text = (await head.text(strip_padding=True, offset=self.current_variable_offset))
-            self.program_variables.set(self.current_variable, text, scores=self.current_variable_scores, diff="", montonicity="fin")
-            self.current_variable = None
-            self.num_variables_decoded += 1
-            self.current_variable_scores = ()
-
-            await self.advance(active_prompting=True)
-            
-            # if query is finished, keep eos token (indicates to decoder that this sequence/query has finished decoding)
-            if self.query_head.done: return None
-            # assert not head.is_at_eos(), "active_prompt() called when head is at eos but current variable is None"
-            # return None
-
-        if self.current_prompt is not None:
-            next_token = await self.get_next_prompt_token(head, pop=True)
-            if next_token is None: 
-                return
-            
-            full_ids = head.input_ids_without_padding.tolist() + [next_token]
-            self.last_seen_input_ids = full_ids
-
-            self.current_variable_offset = len(head.input_ids_without_padding) + 1
-            return next_token
+        assert "active_prompt is longer supported"
 
     async def get_next_prompt_token(self, head: DecoderHead, pop=True):
         if self.current_prompt is not None:
@@ -507,11 +477,15 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
         if head.is_at_eos() and self.current_variable is not None:
             text = (await head.text(strip_padding=True, offset=self.current_variable_offset))
             variable_value = text
-            variable_value, postprocessed_prompt = execute_postprocess(self.interpreter.where, self.current_variable, variable_value)
-            print([variable_value], [postprocessed_prompt])
-
-            print([self.prompt + text], [self.prompt + postprocessed_prompt])
+            # set raw variable value
             self.program_variables.set(self.current_variable, variable_value, scores=self.current_variable_scores[:-1], diff="", montonicity="fin")
+            # apply postprocessing, if constraints specify it
+            # - variable_value is the postprocessed, converted value (does not have to be a string)
+            # - postprocessed_prompt is the string in the prompt that corresponds to the variable value
+            variable_value, postprocessed_prompt = execute_postprocess(self.interpreter.where, self.current_variable, variable_value, context=self.program_variables)
+            
+            # set postprocessed variable value and program value
+            self.program_variables.set(self.current_variable, postprocessed_prompt, program_value=variable_value, scores=self.current_variable_scores[:-1], diff="", montonicity="fin")
             self.current_variable = None
             
             self.num_variables_decoded += 1
@@ -521,25 +495,33 @@ class HypothesisHead(BacktrackerHeadMixin, LMQLContextAPI):
             self.current_variable_scores = ()
 
             # extend prompt
-            self.prompt += text
-            old_prompt = self.prompt
+            prompt_length_before = len(self.prompt) # prompt without current variable
+            old_prompt = self.prompt + text # prompt with current variable in raw form
+            self.prompt += postprocessed_prompt # prompt with current variable in postprocessed form
+            
+            appended_value_prompt = self.prompt[prompt_length_before:]
 
+            #  advance to next variable in prompt program (appends intermediate instructions to prompt)
             while self.current_variable is None and not self.query_head.done:
                 await self.advance()
 
+            # determines part of self.prompt that was appended by variable or program
+            appended_program_prompt = self.prompt[prompt_length_before + len(appended_value_prompt):]
+
             if old_prompt != self.prompt or self.query_head.done:
-                # print(f"detokenized decoder head IDs:\n", await head.detokenize(head.input_ids))
-                # old_prompt_tokens = await head.tokenize(old_prompt)
-                # new_prompt = await head.tokenize(self.prompt)
-                appended_ids = await head.tokenize(self.prompt[len(old_prompt):])
+                n_tokens_to_strip = len(self.last_seen_input_ids) - self.current_variable_offset
+                value_ids, program_ids = await asyncio.gather(head.tokenize(appended_value_prompt), head.tokenize(appended_program_prompt))
+                appended_ids = value_ids + program_ids
+                value_offset = self.current_variable_offset + len(value_ids)
                 
                 # if query is finished, add eos token to appended IDs (indicates to decoder that this sequence/query has finished decoding)
-                if self.query_head.done: appended_ids += [head.eos_token_id]
+                if self.query_head.done: 
+                    appended_ids += [head.eos_token_id]
                 
-                self.last_seen_input_ids = head.input_ids_without_padding.tolist() + appended_ids
-                self.current_variable_offset = len(head.input_ids_without_padding) + len(appended_ids)
+                self.last_seen_input_ids = head.input_ids_without_padding[:self.current_variable_offset].tolist() + appended_ids
+                self.current_variable_offset = len(self.last_seen_input_ids)
 
-                return RewrittenInputIds(appended_input_ids=appended_ids, strip_eos=True)
+                return RewrittenInputIds(appended_input_ids=[head.eos_token_id] + self.last_seen_input_ids, strip_eos=-n_tokens_to_strip, value_offset=value_offset)
             else:
                 # set last_seen_input_ids to current input_ids w/o eos token
                 self.last_seen_input_ids = head.input_ids_without_padding.tolist()
@@ -706,34 +688,37 @@ class HypothesesBasedHeadPool:
             
             # await self.advance_generation_if_needed(generation)
 
-            interpreter_head = await self.get_head(head, readonly=True)
+            with stats.timer("where"):
+                interpreter_head = await self.get_head(head, readonly=True)
 
-            if head.is_at_eos():
-                return head.next_token_logits
-            logits = await interpreter_head.where_clause_logit_processor(head)
+                if head.is_at_eos():
+                    return head.next_token_logits
+                logits = await interpreter_head.where_clause_logit_processor(head)
 
-            if return_user_data:
-                return logits, {"head": await interpreter_head.json()}
-            
-            return logits
+                if return_user_data:
+                    return logits, {"head": await interpreter_head.json()}
+                
+                return logits
         
         async def rewriter(decoder_head: DecoderHead): 
-            head = await self.get_head(decoder_head)
-            res = await head.head_input_id_rewriter(decoder_head)
+            with stats.timer("rewrite"):
+                head = await self.get_head(decoder_head)
+                res = await head.head_input_id_rewriter(decoder_head)
 
-            # update head storage location
-            self.update_head(head)
-            
-            # keep track of the assigned interpreter head during further decoding
-            head_data = await head.json()
-            return RewrittenInputIds.with_user_data(res, "head", head_data)
+                # update head storage location
+                self.update_head(head)
+                
+                # keep track of the assigned interpreter head during further decoding
+                head_data = await head.json()
+                return RewrittenInputIds.with_user_data(res, "head", head_data)
 
         async def active_prompter(decoder_head): 
             # need to allow branching here because one where call might be followed by multiple active prompting calls 
             head = await self.get_head(decoder_head)
             return await head.active_prompt(decoder_head)
 
-        query_result: Optional[List[DecoderHead]] = await self.intepreter.model.query(self.initial_prompt, where, rewriter, active_prompter)
+        with stats.timer("model.query"):
+            query_result: Optional[List[DecoderHead]] = await self.intepreter.model.query(self.initial_prompt, where, rewriter, active_prompter)
 
         # collect query result
         head_result = []
@@ -757,6 +742,9 @@ class HypothesesBasedHeadPool:
 
         if len(head_result) == 0:
             print("warning: the query has no valid result.")
+
+        # print(stats)
+        # print(VocabularyMatcher.instance().stats)
 
         if len(head_result) == 1:
             return head_result[0]

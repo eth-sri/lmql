@@ -166,7 +166,7 @@ class QueryDcLibAdapter:
         
         async def debug_out(decoder_step):
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
-                data = await dc.DecoderSequence.graph.json(diff=True)
+                data = await dc.DecoderSequence.graph.json(diff=False)
                 data = replace_inf_nan_with_str(data)
                 _DCLibDebugPrinter.printer.add_decoder_state(data)
             dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
