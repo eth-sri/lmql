@@ -77,7 +77,7 @@ def load(filepath=None, autoconnect=False, force_model=None, output_writer=None)
     module.query.force_model(force_model)
     return module
 
-async def run_file(filepath, output_writer=None, force_model=None, *args):
+async def run_file(filepath, *args, output_writer=None, force_model=None):
     module = load(filepath, autoconnect=True, output_writer=output_writer, force_model=force_model)
     
     if module is None: 
