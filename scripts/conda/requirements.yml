@@ -9,7 +9,7 @@ dependencies:
   - pytorch::torchvision
   - pytorch::torchaudio
   - pytorch::pytorch-cuda=11.7
-  - conda-forge::nodejs=14.20
+  - conda-forge::nodejs=18.15
   - pip:
     - astunparse
     - openai
