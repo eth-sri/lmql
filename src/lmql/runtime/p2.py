@@ -456,7 +456,7 @@ class P2:
                 )
 
         # do nothing rewrite
-        user_data = seq.data().copy()
+        user_data = (seq.data() or {}).copy()
         user_data["head"] = state
         return RewrittenInputIds(appended_input_ids=None, strip_eos=False, user_data=user_data)
 

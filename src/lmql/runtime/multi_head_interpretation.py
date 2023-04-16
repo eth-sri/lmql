@@ -141,3 +141,9 @@ class InterpretationHead:
         # make sure any interaction with self._iterator_fct sets the fresh_copy flag to False
         self.fresh_copy = False
         return self._iterator_fct
+    
+    def __repr__(self):
+        return str(self)
+    
+    def __str__(self):
+        return f"<InterpretationHead {self.fct.__name__}, {self.args}, {self.kwargs}>"

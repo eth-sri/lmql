@@ -260,7 +260,7 @@ class DcModel:
         return await sequences.aelement_wise(op_argmax)
 
 
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None):
         with self.stats.timer("score"):
             assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
             
@@ -269,7 +269,7 @@ class DcModel:
             
             completion = [np.array(cont) for cont in tokens]
 
-            def make_detseq(s, token_score, completion, user_data):
+            def make_detseq(s, token_score, completion):
                 # compose deterministic flags
                 if type(deterministic) is bool:
                     deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])])
@@ -286,7 +286,7 @@ class DcModel:
                         deterministic=deterministic_flags,
                         next_deterministic=next_deterministic,
                         predecessor=s,
-                        user_data=None,
+                        user_data=user_data,
                         stop_phrase=np.concatenate([s.stop_phrase, np.array([stop_phrase])]),
                         needs_rewrite=needs_rewrite,
                         sticky_user_data_keys=s.sticky_user_data_keys)
@@ -303,7 +303,7 @@ class DcModel:
                     eos_token_id=self.eos_token_id
                 )
                 for s,c,ts in zip(batch_sqs,completion[i:i+max_batch_size], token_scores):
-                    results.append(make_detseq(s, ts[:len(c)], c, s.user_data))
+                    results.append(make_detseq(s, ts[:len(c)], c))
 
             return results
 
