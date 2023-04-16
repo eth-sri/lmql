@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 from lmql.ops.ops import *
 from lmql.runtime.output_writer import silent
 from lmql.runtime.prompt_interpreter import PromptInterpreter, LMQLResult
+from lmql.runtime.p2 import P2
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.postprocessing.conditional_prob import ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
@@ -119,7 +120,7 @@ class LMQLQueryFunction(LMQLChainMixIn):
     async def __acall__(self, *args, **kwargs):
         kwargs = self.make_kwargs(*args, **kwargs)
 
-        interpreter = PromptInterpreter(force_model=self.model)
+        interpreter = P2(force_model=self.model)
         if self.output_writer is not None:
             interpreter.output_writer = self.output_writer
 
@@ -145,6 +146,12 @@ class LMQLQueryFunction(LMQLChainMixIn):
 
         return results
 
+def context_call(fct_name, *args, **kwargs):
+    return ("call:" + fct_name, args, kwargs)
+
+def interrupt_call(fct_name, *args, **kwargs):
+    return ("interrupt:" + fct_name, args, kwargs)
+
 def tag(t):
     return f"<lmql:{t}/>"
 
@@ -167,3 +174,4 @@ def compiled_query(output_variables=None, group_by=None):
                                  postprocessors=postprocessors, 
                                  scope=LMQLInputVariableScope(fct, calling_frame))
     return func_transformer
+    

@@ -133,7 +133,7 @@ class LMQLTokenizer:
         if type(s) is not list:
             s = [s]
             unpack = True
-
+        
         for seq in s:
             chunk_input_ids = []
             for chunk in self.chunk_out_by_tags(seq):

@@ -9,7 +9,7 @@ from lmql.runtime.program_state import ProgramState
 import lmql.ops.token_set as token_set
 
 from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, DistributionVariable
-from lmql.runtime.multi_head_interpretation import InterpretationHead, InterpreterCall, InterpreterCall, InterpreterHeadPool
+from lmql.runtime.multi_head_interpretation import InterpretationHead, InterpreterCall, InterpreterCall
 
 import numpy as np
 from lmql.utils import nputil

@@ -121,10 +121,12 @@ class QueryStringTransformation(ast.NodeTransformer):
         if len(compiled_qstring) == 0:
             return constant
 
-        result_code = f'yield context.query(f"""{compiled_qstring}""")'
+        # result_code = f'yield context.query(f"""{compiled_qstring}""")'
+        result_code = interrupt_call('query', f'f"""{compiled_qstring}"""')
 
         for v in declared_template_vars:
-            result_code += f"\n{v} = context.get_var('{v}')"
+            get_var_call = yield_call('get_var', f'"{v}"')
+            result_code += f"\n{v} = " + get_var_call
         return ast.parse(result_code)
 
     # def transform_prompt_stmt(self, stmt):
@@ -466,6 +468,12 @@ def preprocess_text(lmql_code):
     common_indent = min([len(l) - len(l.lstrip()) for l in lines if len(l.strip()) > 0])
     return "\n".join([l[common_indent:] for l in lines])
 
+def yield_call(func, *args):
+    return f"""yield lmql.runtime_support.context_call("{func}", {", ".join([str(a) for a in args])})"""
+
+def interrupt_call(func, *args):
+    return f"""yield lmql.runtime_support.interrupt_call("{func}", {", ".join([str(a) for a in args])})"""
+
 class LMQLCompiler:
     def __init__(self):
         pass
@@ -510,18 +518,20 @@ class LMQLCompiler:
             with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
                 
-                writer.add(f"context.set_model({model_name})")
-                writer.add(f"context.set_decoder({astunparse.unparse(q.decode.method).strip()}, {unparse_list(q.decode.decoding_args)})")
+                writer.add(yield_call("set_model", model_name))
+                # writer.add(f"context.set_decoder({})")
+                writer.add(yield_call("set_decoder", astunparse.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))
                 writer.add("# where")
                 writer.add(q.where)
-                writer.add(f"context.set_where_clause({q.where_expr})")
+                writer.add(yield_call("set_where_clause", q.where_expr))
                 writer.add("# prompt")
                 writer.add(astunparse.unparse(q.prompt))
                 if q.distribution:
                     writer.add("# distribution")
-                    writer.add("context.set_distribution('{}', {})".format(q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
+                    # writer.add("context.set_distribution('{}', {})".format(q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
+                    writer.add(yield_call("set_distribution", q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
                 
-                writer.add(f"yield ('result', context.get_return_value())")
+                writer.add(f"yield ('result', (" + yield_call("get_return_value", ()) + "))")
 
             return LMQLModule(output_file, lmql_code=lmql_code, output_variables=[v for v in scope.defined_vars])
         except FragmentParserError as e:

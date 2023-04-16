@@ -24,7 +24,7 @@ async def argmax(prompt_ids: np.ndarray, n=1, max_len=2048, **kwargs):
         h, done = (h + done).separate_by(dc.logical_not(dc.eos), dc.lt(max_len))
         
         step += 1
-        
+
         yield (h, done)
 
     dc.finish(done)
@@ -43,6 +43,8 @@ async def sample(prompt_ids: np.ndarray, temperature=1, n=1, max_len=2048, **kwa
         yield (h, done)
     
     yield (h, done)
+
+    dc.finish(done)
 
 
 @dc.decoder

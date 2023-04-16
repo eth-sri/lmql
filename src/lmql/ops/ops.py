@@ -1061,8 +1061,7 @@ def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context
 
     Returns a tuple of (postprocessed_value, rewritten_prompt)
     """
-    if op is None: 
-        return value, value
+    if op is None: return value, value
 
     nodes = [op]
 

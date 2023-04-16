@@ -165,7 +165,7 @@ export function ValidationGraph(props) {
               cy.nodes().remove()
               cy.edges().remove()
 
-              if (!props.graph) return;
+              if (!props.graph || props.graph == "None") return;
 
               props.graph.nodes.forEach(n => {
                   let label = n.data.label;

@@ -190,7 +190,12 @@ class DcModel:
         
         return np.stack(result_logits, axis=0), np.stack(result_raw, axis=0)
 
-    async def compute_logits_mask(self, input_ids, user_data, is_constrained, **kwargs):
+    async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, **kwargs):
+        if "modern_logits_processor" in kwargs:
+            processor = kwargs["modern_logits_processor"]
+            mask = await processor(seqs, additional_logits_processor_mask=is_constrained)
+            return mask
+
         if "dclib_additional_logits_processor" not in kwargs:
             return namedtuple("LogitsMaskResult", ["logits_mask", "user_data"])([None], user_data)
         
@@ -209,7 +214,7 @@ class DcModel:
             constrained_seqs = np.array([s.is_query_constrained for s in seqs], dtype=np.bool_)
 
             # compute logits mask
-            logits_mask_result = await self.compute_logits_mask(input_ids, user_data, constrained_seqs, **kwargs)
+            logits_mask_result = await self.compute_logits_mask(input_ids, user_data, constrained_seqs, seqs, **kwargs)
             logits_mask = logits_mask_result.logits_mask
             if len(logits_mask) == 1 and logits_mask[0] is None: logits_mask = None
             
@@ -406,9 +411,8 @@ class DcModel:
         
     async def _rewrite_seq(self, seqs_or_seq):
         # check self.model_args for an input_id_rewriter (e.g. LMQL interpreter)
-        if "input_id_rewriter" not in self.model_args:
+        if "input_id_rewriter" not in self.model_args and "modern_rewriter" not in self.model_args:
             return seqs_or_seq
-        rewriter = self.model_args.get("input_id_rewriter", None)
         
         # accept both a single sequence or a list of sequences
         unwrap = lambda v: v
@@ -420,13 +424,18 @@ class DcModel:
         # do not rewrite deterministic sequences (rewrite mask set to False)
         mask_seq_to_rewrite = np.array([s.needs_rewrite for s in seqs], dtype=np.bool_)
 
-        rewritten_ids = await rewriter.input_ids_rewriter_fn(
-                input_ids=[s.input_ids for s in seqs], 
-                next_token_scores=[None for _ in range(len(seqs))], 
-                next_token_logprob=[s.logprobs[-1] for s in seqs],
-                mask_seq_to_rewrite=mask_seq_to_rewrite,
-                user_data=[s.data() for s in seqs]
-        )
+        if "modern_rewriter" in self.model_args.keys():
+            rewriter = self.model_args["modern_rewriter"]
+            rewritten_ids = await rewriter(seqs, mask_seq_to_rewrite)
+        else:
+            rewriter = self.model_args.get("input_id_rewriter", None)
+            rewritten_ids = await rewriter.input_ids_rewriter_fn(
+                    input_ids=[s.input_ids for s in seqs], 
+                    next_token_scores=[None for _ in range(len(seqs))], 
+                    next_token_logprob=[s.logprobs[-1] for s in seqs],
+                    mask_seq_to_rewrite=mask_seq_to_rewrite,
+                    user_data=[s.data() for s in seqs]
+            )
     
         # update user data, if rewriter provides it
         for s, user_data in zip(seqs, rewritten_ids.user_data):
@@ -461,24 +470,21 @@ class DcModel:
                 return s
             
             # find the common prefix between the original sequence and the rewritten sequence
-            ids = s.input_ids
-            updated_ids = updated_ids
-
-            if updated_ids is None or len(updated_ids) == 0:
-                common_i = len(ids) - 1
-            else:
-                common_i = min(len(ids) - 1, len(updated_ids) - 1)
-                while updated_ids[common_i] != ids[common_i] and common_i > 0:
-                    common_i -= 1
-            if get_strip_eos(seqidx, rewritten_ids.strip_eos) and updated_ids is None:
-                ids = ids[:common_i]
-            else:
-                ids = ids[:common_i + 1]
-
-            # find the sequence that is continued by the rewritten sequence
-            continued_seq: DecoderSequence = s
-            while continued_seq is not None and len(continued_seq.input_ids) > len(ids):
+            continued_seq = s
+            # keep track of current continuation seqs, to potentially traverse forward again (matching updated ids)
+            successors = [] 
+            # traverse backwards until continued_seq matches ids in length - 1
+            while len(continued_seq.input_ids) > len(ids) and continued_seq.predecessor is not None:
+                successors.insert(0, continued_seq)
                 continued_seq = continued_seq.predecessor
+
+            # traverse forward again, until the sequence no longer matches with updated_ids
+            last_rewrite_offset = len(continued_seq.input_ids)
+            offset = last_rewrite_offset
+            while offset < len(successors) + last_rewrite_offset - 1and \
+                successors[offset - last_rewrite_offset].input_ids[-1] == updated_ids[offset]:
+                offset += 1
+                continued_seq = successors[offset - last_rewrite_offset - 1]
 
             assert continued_seq is not None, "error: a rewritten sequence is not a continuation of any sequence already decoded. Going from {} to {} with common text {}".format(
                 await s.text(),
@@ -489,31 +495,30 @@ class DcModel:
 
             # align user data
             user_data = continued_seq.extend_user_data(user_data=s.user_data)
-            if "inserted_stopping_phrase" in user_data.keys():
-                del user_data["inserted_stopping_phrase"]
 
             if updated_ids is None:
                 s = DecoderSequence(continued_seq.input_ids, continued_seq.logprobs, continued_seq.deterministic, stop_phrase=continued_seq.stop_phrase, 
                                     predecessor=continued_seq, user_data=user_data, sticky_user_data_keys=continued_seq.sticky_user_data_keys, epsilon_node=True)
+                s.needs_rewrite = False
                 return s
 
             # offset updated_ids to the number of tokens that are already present as continued_seq
-            appended_ids = updated_ids[common_i + 1:]
+            appended_ids = updated_ids[offset:]
 
             if len(appended_ids) == 0:
                 return DecoderSequence(continued_seq.input_ids, continued_seq.logprobs, continued_seq.deterministic, stop_phrase=continued_seq.stop_phrase,
                                     predecessor=continued_seq, user_data=user_data, sticky_user_data_keys=continued_seq.sticky_user_data_keys, epsilon_node=True)
-            
+
             # value tokens
-            num_value_tokens = value_offset - common_i
+            num_value_tokens = value_offset - offset
             deterministic = [True if i + 1 > num_value_tokens else False for i in range(len(appended_ids))]
-            continuation = (await self.score([continued_seq], [appended_ids], deterministic=deterministic, stop_phrase=False, needs_rewrite=False))[0]
+            continuation = (await self.score([continued_seq], [appended_ids], deterministic=deterministic, stop_phrase=False, needs_rewrite=False, user_data=user_data))[0]
             
             continuation.stop_phrase = s.stop_phrase[:len(continuation.input_ids)]
             continuation.needs_rewrite = False
             
             steps = 0
-            while type(continuation) is DeterministicDecoderSequence and len(continuation.next_ids) > 0 and steps < num_value_tokens + 1:
+            while type(continuation) is DeterministicDecoderSequence and len(continuation.next_ids) > 0 and steps < num_value_tokens:
                 continuation.user_data = deepcopy(s.predecessor.user_data)
                 # print("continuation.user_data", continuation.user_data, flush=True)
                 continuation = continuation.extend(Continuation(continuation.next_ids[0], continuation.next_logprobs[0], continuation.user_data))
@@ -573,7 +578,7 @@ def _stripped_ids(seqs, seqidx, strip_eos):
         return seqs[seqidx].input_ids[:-1]
     elif type(strip_eos) is list:
         sequence_strip = strip_eos[seqidx]
-        if sequence_strip == True:  
+        if sequence_strip == True:
             return seqs[seqidx].input_ids[:-1]
         elif type(sequence_strip) is int:
             return seqs[seqidx].input_ids[:sequence_strip] 

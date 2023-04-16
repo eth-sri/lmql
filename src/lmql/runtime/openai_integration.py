@@ -136,7 +136,7 @@ class DclibOpenAiModel(DcModel):
             - (token_id, "fixed"): Complete with the provided token_id with full probability 1.0 (no API use necessary)
 
         """
-        stopping_phrases = s.data("head.stopping_phrases.text")
+        stopping_phrases = s.data("head").stopping_phrases["text"]
 
         if mask is None:
             return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
@@ -188,7 +188,7 @@ class DclibOpenAiModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens):
         return (await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids)))
     
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
         
         completion = [np.array(cont) for cont in tokens]
@@ -210,7 +210,7 @@ class DclibOpenAiModel(DcModel):
                     deterministic=deterministic_flags,
                     next_deterministic=next_deterministic,
                     predecessor=s,
-                    user_data=None,
+                    user_data=user_data,
                     stop_phrase=np.concatenate([s.stop_phrase, np.array([stop_phrase])]),
                     needs_rewrite=needs_rewrite,
                     sticky_user_data_keys=s.sticky_user_data_keys)
@@ -353,7 +353,7 @@ class DclibOpenAiModel(DcModel):
             with self.stats.timer("logit_masks"):
                 # print("completion_buffer", s)
                 constrained_seqs = np.array([s.is_query_constrained], dtype=np.bool_)
-                logits_mask_result = await self.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, **kwargs)
+                logits_mask_result = await self.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
                 logits_mask = logits_mask_result.logits_mask[0]
 
             # update user data with new information obtained when computing logits masks
@@ -463,7 +463,7 @@ class DclibOpenAiModel(DcModel):
 
                 # retroactively apply logits mask to logits
                 mask = completion.logit_mask_or_fixed_id
-                if mask is None: 
+                if mask is None:
                     pass
                 elif type(mask) is int: 
                     full_logits[mask] = np.finfo(np.float32).min
@@ -486,7 +486,7 @@ class DclibOpenAiModel(DcModel):
             next_token_scores = next_token_scores
 
             def successor_user_data(continuation_buffer: SequenceResult, num_successors):
-                default_user_data = {"head": {"variable": s.data("head.variable"), "head_index": s.data("head.head_index")}}
+                default_user_data = {}
                 if continuation_buffer.continuation_type is None:
                     return [default_user_data.copy()] * num_successors
                 continuation_as_user_data = {
@@ -572,7 +572,7 @@ class DclibOpenAiModel(DcModel):
                 logits.append(full_logits)
 
             def successor_user_data(continuation_buffer: SequenceResult, num_successors):
-                default_user_data = {"head": {"variable": s.data("head.variable"), "head_index": s.data("head.head_index")}}
+                default_user_data = {}
                 if continuation_buffer.continuation_type is None:
                     return [default_user_data.copy()] * num_successors
                 continuation_as_user_data = {
