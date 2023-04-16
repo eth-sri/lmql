@@ -260,7 +260,7 @@ class DcModel:
         return await sequences.aelement_wise(op_argmax)
 
 
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False):
         with self.stats.timer("score"):
             assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
             
@@ -297,11 +297,14 @@ class DcModel:
                 batch_input_ids = np.stack([s.input_ids for s in batch_sqs], axis=0)
                 batch_completion = np.stack(self.model.right_pad(completion[i:i+max_batch_size], pad_token_id=self.eos_token_id)["input_ids"], axis=0)
 
-                token_scores, _ = await self.model.score(
-                    batch_input_ids,
-                    batch_completion,
-                    eos_token_id=self.eos_token_id
-                )
+                if noscore:
+                    token_scores = np.zeros_like(batch_completion)
+                else:
+                    token_scores, _ = await self.model.score(
+                        batch_input_ids,
+                        batch_completion,
+                        eos_token_id=self.eos_token_id
+                    )
                 for s,c,ts in zip(batch_sqs,completion[i:i+max_batch_size], token_scores):
                     results.append(make_detseq(s, ts[:len(c)], c))
 
@@ -409,7 +412,7 @@ class DcModel:
     def report_stats(self, printer, decoder_step=None):
         self.model.report_stats(printer, decoder_step)
         
-    async def _rewrite_seq(self, seqs_or_seq):
+    async def _rewrite_seq(self, seqs_or_seq, noscore=False):
         # check self.model_args for an input_id_rewriter (e.g. LMQL interpreter)
         if "input_id_rewriter" not in self.model_args and "modern_rewriter" not in self.model_args:
             return seqs_or_seq
@@ -455,11 +458,11 @@ class DcModel:
         rewriting_tasks = []
         for seqidx, (s, updated_ids, offset) in enumerate(zip(seqs, all_updated_ids, value_offset)):
             # run actually rewrites asynchronously
-            rewriting_tasks.append(self._rewrite_seq_task(s, seqidx, seqs, rewritten_ids, updated_ids, offset))
+            rewriting_tasks.append(self._rewrite_seq_task(s, seqidx, seqs, rewritten_ids, updated_ids, offset, noscore=noscore))
         rewritten_seqs = [s for s in await asyncio.gather(*rewriting_tasks) if s is not None]
         return unwrap(rewritten_seqs)
 
-    async def _rewrite_seq_task(self, s, seqidx, seqs, rewritten_ids, updated_ids, value_offset):
+    async def _rewrite_seq_task(self, s, seqidx, seqs, rewritten_ids, updated_ids, value_offset, noscore=False):
         if (updated_ids is None or len(updated_ids) == 0) and not get_strip_eos(seqidx, rewritten_ids.strip_eos):
             return s
         else:
@@ -518,7 +521,7 @@ class DcModel:
             # value tokens
             num_value_tokens = value_offset - offset
             deterministic = [True if i + 1 > num_value_tokens else False for i in range(len(appended_ids))]
-            continuation = (await self.score([continued_seq], [appended_ids], deterministic=deterministic, stop_phrase=False, needs_rewrite=False, user_data=user_data))[0]
+            continuation = (await self.score([continued_seq], [appended_ids], deterministic=deterministic, stop_phrase=False, needs_rewrite=False, user_data=user_data, noscore=noscore))[0]
             
             continuation.stop_phrase = s.stop_phrase[:len(continuation.input_ids)]
             continuation.needs_rewrite = False
@@ -543,7 +546,7 @@ class DcModel:
 
             return continuation
 
-    async def rewrite(self, ar: Union[DataArray, List[DecoderSequence], DecoderSequence]):
+    async def rewrite(self, ar: Union[DataArray, List[DecoderSequence], DecoderSequence], noscore=False):
         """
         Applies the active rewriting strategy (e.g. the LMQL interpreter) to the provided (array of) sequences.
         
@@ -558,7 +561,7 @@ class DcModel:
 
             If no rewriting strategy is provided, no rewriting is performed.
             """
-            return path, await self._rewrite_seq(seqs)
+            return path, await self._rewrite_seq(seqs, noscore=noscore)
         
         with stats.timer("rewrite"):
             result_items = await asyncio.gather(*[op_rewrite(path, seqs) for path, seqs in ar.sequences.items()])

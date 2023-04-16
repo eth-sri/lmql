@@ -20,7 +20,7 @@ async def argmax(prompt_ids: np.ndarray, n=1, max_len=2048, **kwargs):
 
     while len(h) > 0:
         h = h.extend(await model.argmax(h))
-        h = await model.rewrite(h)
+        h = await model.rewrite(h, noscore=True)
         h, done = (h + done).separate_by(dc.logical_not(dc.eos), dc.lt(max_len))
         
         step += 1
@@ -37,7 +37,7 @@ async def sample(prompt_ids: np.ndarray, temperature=1, n=1, max_len=2048, **kwa
 
     while len(h) > 0:
         h = h.extend(await model.sample(h, temperature=temperature))
-        h = await model.rewrite(h)
+        h = await model.rewrite(h, noscore=True)
         h, done = (h + done).separate_by(dc.logical_and(dc.logical_not(dc.eos), dc.lt(max_len)))
 
         yield (h, done)

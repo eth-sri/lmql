@@ -185,10 +185,12 @@ class DclibOpenAiModel(DcModel):
         self.score_queue.put_nowait((kwargs,result_fut))
         return await result_fut
 
-    async def _score_next_tokens(self, s, next_tokens):
+    async def _score_next_tokens(self, s, next_tokens, noscore=False):
+        if noscore:
+            return np.zeros(len(next_tokens), dtype=np.float32)
         return (await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids)))
     
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
         
         completion = [np.array(cont) for cont in tokens]
@@ -216,7 +218,7 @@ class DclibOpenAiModel(DcModel):
                     sticky_user_data_keys=s.sticky_user_data_keys)
         results = []
 
-        for s,compl,result in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl) for s, compl in zip(sqs, completion)))):
+        for s,compl,result in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
             results.append(make_detseq(s, result, compl))
 
         return results
