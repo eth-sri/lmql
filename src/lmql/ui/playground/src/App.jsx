@@ -797,11 +797,12 @@ const ModelResultText = styled.div`
     background-color: #333;
     opacity: 1.0;
     border-radius: 2pt;
-    margin-left: 1pt;
+    margin-left: 2pt;
   }
 
   div .variable:hover {
     position: relative;
+    transform: scale(1.1);
   }
 
   div .badge {
@@ -1850,6 +1851,24 @@ const Toolbar = styled.div`
   .bottom {
     margin-top: 40pt;
   }
+
+  >a {
+    display: block;
+    margin: 4pt;
+    margin-left: 8pt;
+    font-size: 10pt;
+    color: black;
+
+    text-decoration: none;
+
+    @media screen and (max-width: 40em) {
+      display: none;
+    }
+
+    :hover {
+      text-decoration: underline;
+    }
+  }
 `
 
 const ButtonGroup = styled.div`
@@ -1905,7 +1924,7 @@ const FancyButton = styled.button`
     }
   }
 
-  @media (max-width: 40em) {
+  @media (max-width: 50em) {
     &.in-toolbar {
       position: absolute;
       bottom: 20pt;
@@ -2540,6 +2559,8 @@ class App extends React.Component {
             LMQL Playground
           </Title>
           {configuration.DEMO_MODE && <FancyButton className="in-toolbar" onClick={() => ExploreState.setVisibility(true)}><ExploreIc/> Explore LMQL</FancyButton>}
+          {window.location.hostname.includes("lmql.ai") && <a href={"https://docs.lmql.ai/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
+          Install LMQL Locally </a>}
           <Spacer />
           {/* show tooltip with build time */}
           {/* trigger button */}
