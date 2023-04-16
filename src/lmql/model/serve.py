@@ -40,10 +40,11 @@ class InferenceServerState:
     exit: bool = False
 
 class TokenizerProcessor:
-    def __init__(self, state: InferenceServerState):
+    def __init__(self, state: InferenceServerState, ready_event: multiprocessing.Event = None):
         self.model_identifier = state.tokenizer_descriptor
         self.queue = state.tokenize_queue
         self.state = state
+        self.ready_event = ready_event
 
     def shutdown(self):
         self.state.exit = True
@@ -79,6 +80,9 @@ class TokenizerProcessor:
         tokenizer = AutoTokenizer.from_pretrained(self.model_identifier)
         print("Tokenizer #{} {} ready!".format(index, self.model_identifier))
 
+        if self.ready_event:
+            self.ready_event.set()
+
         while not self.state.exit:
             item = self.queue.get()
             if item is None:
@@ -111,11 +115,12 @@ class TokenizerProcessor:
         return workers
 
 class ModelProcessor:
-    def __init__(self, state: InferenceServerState, cuda: bool = False, cache: str = None):
+    def __init__(self, state: InferenceServerState, cuda: bool = False, cache: str = None, ready_event: multiprocessing.Event = None):
         self.model_identifier = state.model_identifier
         self.queue = state.queue
         self.state = state
         self.cuda = cuda
+        self.ready_event = ready_event
         
         self.cache = None
         if cache is not None:
@@ -183,6 +188,9 @@ class ModelProcessor:
         self.model.eval()
         
         print("Ready!".format(self.model_identifier))
+
+        if self.ready_event:
+            self.ready_event.set()
 
         while not self.state.exit:
             self.print_stats()
@@ -444,6 +452,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", action="store_true", default=False)
     parser.add_argument("--cache", type=str, default=None)
     parser.add_argument("--dtype", type=str, default="none")
+    parser.add_argument("--wait_until_ready", action="store_true", default=False, help="Whether the server should start only after the model and tokenizer have been loaded.")
     parser.add_argument("--num-tokenizer-processes", type=int, default=2, dest="num_tokenizer_processes")
     
     args = parser.parse_args()
@@ -463,12 +472,17 @@ if __name__ == "__main__":
                                  all_results_queue=manager.Queue())
 
     # run model in separate process
-    processor = ModelProcessor(state, cuda=args.cuda, cache=args.cache)
+    processor = ModelProcessor(state, cuda=args.cuda, cache=args.cache, ready_event=(multiprocessing.Event() if args.wait_until_ready else None))
     processor.run_in_parallel()
 
     # run tokenizers in separate process
-    tokenizer_processor = TokenizerProcessor(state)
+    tokenizer_processor = TokenizerProcessor(state, ready_event=(multiprocessing.Event() if args.wait_until_ready else None))
     tokenizer_processor.run_in_parallel(n=args.num_tokenizer_processes)
+
+    # don't serve until the model and tokenizer are ready
+    if args.wait_until_ready:
+        processor.ready_event.wait()
+        tokenizer_processor.ready_event.wait()
 
     # run inference API server in this process
     server_address = (args.host, args.port)
