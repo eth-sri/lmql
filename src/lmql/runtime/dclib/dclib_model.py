@@ -481,8 +481,11 @@ class DcModel:
             # traverse forward again, until the sequence no longer matches with updated_ids
             last_rewrite_offset = len(continued_seq.input_ids)
             offset = last_rewrite_offset
-            while offset < len(successors) + last_rewrite_offset - 1and \
+            while offset < len(successors) + last_rewrite_offset and \
+                updated_ids is not None and \
+                offset < len(updated_ids) and \
                 successors[offset - last_rewrite_offset].input_ids[-1] == updated_ids[offset]:
+                
                 offset += 1
                 continued_seq = successors[offset - last_rewrite_offset - 1]
 

@@ -63,13 +63,13 @@ class LMQLContext:
         if state:
             self.program_state: ProgramState = state.program_state
             self.state = state
+            self.prompt = state.prompt
         else:
             self.program_state = ProgramState()
             self.state = None
+            self.prompt = "<prompt not available>"
 
-        # TODO: re-enable distributions in P2
-        self.distribution_variable = None
-        self.distribution_values = None
+        self.program_state.runtime = interpreter
 
     async def json(self):
         return self.program_state
@@ -91,14 +91,19 @@ class LMQLContext:
     async def set_where_clause(self, where):
         self.interpreter.set_where_clause(where)
 
+    async def get_context(self, *args):
+        # prompt
+        return self
+
     async def get_all_vars(self):
         return self.program_state.variable_values.copy()
 
     async def set_distribution(self, distribution_variable, values):
-        self.interpreter.set_distribution(distribution_variable, values)
+        self.interpreter.distribution_variable = distribution_variable
+        self.interpreter.distribution_values = values
 
     async def get_return_value(self, *args):
-        return LMQLResult(self.state.prompt, await self.get_all_vars(), self.distribution_variable, self.distribution_values)
+        return LMQLResult(self.state.prompt, await self.get_all_vars(),self.interpreter.distribution_variable, self.interpreter.distribution_values)
 
 
 @dataclass
@@ -138,8 +143,13 @@ class P2:
         # constraints
         self.where = None
 
+        # distribution variable if any
+        self.distribution_variable = None
+        self.distribution_values = None
+
         # logging and debugger output
         self.output_writer = None
+        self.prefers_compact_mask  = False
 
     def set_where_clause(self, where):
         self.where = where
@@ -171,58 +181,75 @@ class P2:
         stmt_buffer = state.stmt_buffer
         prompt = state.prompt
 
+        distribution_variable = None
+        distribution_values = None
+
+        query_head = state.query_head
+
         async def continue_for_more_prompt_stmts():
             nonlocal stmt_buffer
+            nonlocal query_head
 
             if len(stmt_buffer) != 0: return
             
-            if state.query_head.current_args is None:
-                self.set_query_head_context(state)
-                await state.query_head.continue_()
+            if query_head.current_args is None:
+                query_head = query_head.copy()
+                assert query_head.fresh_copy, "query head must be fresh copy to avoid state sharing side effects"
+                query_head.context = LMQLContext(self, state)
+                await query_head.continue_()
 
-            qstring = state.query_head.current_args[0]
+            qstring = query_head.current_args[0]
             stmt_buffer = qstring_to_stmts(qstring) + [advance]
+
+            # return context used for last continue_
+            return query_head.context
         
-        while variable is None and state.query_head.result is None:
-            if len(stmt_buffer) == 0 and variable is None:
-                await continue_for_more_prompt_stmts()
+        try:
+            while variable is None and query_head.result is None:
+                if len(stmt_buffer) == 0 and variable is None:
+                    await continue_for_more_prompt_stmts()
 
-            s = stmt_buffer[0]
+                s = stmt_buffer[0]
 
-            if type(s) is str:
-                prompt += s
-                stmt_buffer = stmt_buffer[1:]
-            elif type(s) is TemplateVariable:
-                variable = s.name
-                # keep track of number of times a variable with this name has been decoded
-                if variable not in state.recurring_variable_counter.keys():
-                    state.recurring_variable_counter[s.name] = -1
-                state.recurring_variable_counter[s.name] += 1
-                
-                stmt_buffer = stmt_buffer[1:]
-                break
-            elif type(s) is DistributionVariable:
-                # distribution variables are skipped here, as the prompt interpreter will handle them
-                # self.query_head must terminate after this part of the prompt (ensure by validation)
-                stmt_buffer = stmt_buffer[1:]
-                assert len(state.stmt_buffer) == 0, "Distribution variables must be the last statement in a prompt"
-            elif s is advance:
-                self.set_query_head_context(state)
-                await state.query_head.advance(None)
-                stmt_buffer = stmt_buffer[1:]
-            else:
-                assert False, "prompt interpreter encountered unsupported prompt stmt of type {}: {}".format(type(s), s)
+                if type(s) is str:
+                    prompt += s
+                    stmt_buffer = stmt_buffer[1:]
+                    # keep latest prompt in transient state
+                    state = state.updated(prompt=prompt)
+                elif type(s) is TemplateVariable:
+                    variable = s.name
+                    # keep track of number of times a variable with this name has been decoded
+                    if variable not in state.recurring_variable_counter.keys():
+                        state.recurring_variable_counter[s.name] = -1
+                    state.recurring_variable_counter[s.name] += 1
+                    
+                    stmt_buffer = stmt_buffer[1:]
+                    break
+                elif type(s) is DistributionVariable:
+                    # distribution variables are skipped here, as they are handled in a postprocessing step after returning an LMQL result
+                    # self.query_head must terminate after this part of the prompt (ensure by validation)
+                    stmt_buffer = stmt_buffer[1:]
+                    assert len([s for s in stmt_buffer if s is not advance]) == 0, "Distribution variables must be the last statement in a prompt, but is {}".format(stmt_buffer)
+                    # this will consume the set_distribution call
+                elif s is advance:
+                    query_head: InterpretationHead = query_head.copy()
+                    query_head.context = LMQLContext(self, state)
+                    assert query_head.fresh_copy, "query head must be fresh copy to avoid state sharing side effects"
+                    await query_head.advance(None)
+                    stmt_buffer = stmt_buffer[1:]
+                else:
+                    assert False, "prompt interpreter encountered unsupported prompt stmt of type {}: {}".format(type(s), s)
+        except InterpretationHeadDone:
+            pass
 
         # merge named tuple with new stmt_buffer
-        
+
         return state.updated(
             variable=variable,
             prompt=prompt,
-            stmt_buffer=stmt_buffer
+            stmt_buffer=stmt_buffer,
+            query_head=query_head
         )
-    
-    def set_query_head_context(self, state):
-        state.query_head.context = LMQLContext(self, state)
 
     def interpreter_state_user_data(self, state: PromptState):
         return {"head": state}
@@ -268,7 +295,7 @@ class P2:
             follow_program_state.set(state.variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc")
 
             # digest token with where expr
-            valid, is_final, trace = ops.digest(self.where,
+            valid, is_final, trace, follow_trace = ops.digest(self.where,
                 context=program_state,
                 follow_context=follow_program_state
             )
@@ -280,7 +307,7 @@ class P2:
             }
 
             # obtain where follow map
-            follow_map = self.where.follow_map if self.where is not None else None
+            follow_map = follow_trace[self.where] if self.where is not None else None
             # print(id(self), self.variable, [text], "mask", follow_map)
             mask = ops.create_mask(follow_map, valid, is_final)
 
@@ -289,7 +316,7 @@ class P2:
             else:
                 logit_mask = mask.mask
         else:
-            assert False, f"error: where() is called but current variable and current prompt are None and query head has result {self.query_head.result}"
+            assert False, f"error: where() is called but current variable and current prompt are None and query head has result {state.query_head.result}"
 
         await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace)
 
@@ -299,7 +326,7 @@ class P2:
                         mask=mask,
                         program_state=program_state,
                         stopping_phrases=stopping_phrases,
-                        where=await self.where_graph_with_trace(trace)
+                        where=await self.where_graph_with_trace(trace, follow_trace)
         )
 
         # no mask, no logits processing
@@ -311,17 +338,17 @@ class P2:
         
         return logit_mask, self.interpreter_state_user_data(state)
 
-    async def where_graph_with_trace(self, trace):
+    async def where_graph_with_trace(self, trace, follow_trace):
         from lmql.utils.graph import CytoscapeGraphWriter
 
         def node_data(op):
             result = "-"
+            follow_map = "-"
             if trace is not None and op in trace:
                 result = trace[op]
+            if follow_trace is not None and op in follow_trace:
+                follow_map = follow_trace[op]
 
-            follow_map = "-"
-            if hasattr(op, "follow_map"):
-                follow_map = str(op.follow_map)
             return {
                 "result": result,
                 "follow_map": follow_map,
@@ -358,6 +385,7 @@ class P2:
             variable = state.variable
             
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
+            assert seq.input_ids[-1] == self.tokenizer.eos_token_id, "last token must be eos token"
             variable_value = text
             raw = variable_value
             # set raw variable value
@@ -382,13 +410,11 @@ class P2:
             appended_value_prompt = prompt[prompt_length_before:]
 
             #  advance to next variable in prompt program (appends intermediate instructions to prompt)
-            reached_end = False
-            try:
-                state = state.updated(variable=variable, prompt=prompt, program_state=program_state)
-                while state.variable is None:
-                    state = await self.advance(state)
-            except InterpretationHeadDone as e:
-                reached_end = True
+            
+            state = state.updated(variable=variable, prompt=prompt, program_state=program_state)
+            while state.variable is None and state.query_head.result is None:
+                state = await self.advance(state)
+            reached_end = state.query_head.result is not None
             
             prompt = state.prompt
 
@@ -448,9 +474,20 @@ class P2:
             user_data=[r.user_data if r is not None else None for r in results],
             value_offset=[r.value_offset if r is not None else None for r in results]
         )
+    
+    async def input(self, *args):
+        """Uses the output_writer input() implementation if available."""
+        if hasattr(self.output_writer, "input"):
+            return await self.output_writer.input(*args)
+        else:
+            return input(*args)
 
     async def run(self, fct, **kwargs):
         self.fct = fct
+
+        # intercept symbol table entry for input
+        if "input" in kwargs.keys() and kwargs["input"] == input:
+            kwargs["input"] = self.input
 
         # prepare initial program state
         context = LMQLContext(self, None)
@@ -519,7 +556,7 @@ class P2:
         
         async def debug_out(decoder_step):
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
-                data = await dc.DecoderSequence.graph.json(diff=False)
+                data = await dc.DecoderSequence.graph.json(diff=True)
                 data = replace_inf_nan_with_str(data)
                 _DCLibDebugPrinter.printer.add_decoder_state(data)
             dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)

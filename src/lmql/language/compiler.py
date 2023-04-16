@@ -98,6 +98,16 @@ class QueryStringTransformation(ast.NodeTransformer):
         else:
             self.generic_visit(expr)
         return expr
+    
+    # translate id access to context
+    def visit_Name(self, node: ast.Name):
+        name = str(node.id)
+        
+        if type(node.ctx) is ast.Load:
+            if name == "context":
+                return ast.parse("(" + yield_call("get_context", ()) + ")").body[0].value
+        return node
+
 
     def transform_Constant(self, constant):
         if type(constant.value) is not str: return constant
@@ -529,7 +539,7 @@ class LMQLCompiler:
                 if q.distribution:
                     writer.add("# distribution")
                     # writer.add("context.set_distribution('{}', {})".format(q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
-                    writer.add(yield_call("set_distribution", q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
+                    writer.add(yield_call("set_distribution", "\"" + q.distribution.variable_name + "\"", astunparse.unparse(q.distribution.values).strip()))
                 
                 writer.add(f"yield ('result', (" + yield_call("get_return_value", ()) + "))")
 

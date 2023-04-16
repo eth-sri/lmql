@@ -21,6 +21,7 @@ class InterpretationHeadDone(Exception):
 
 class InterpretationHead:
     def __init__(self, fct, context, args=None, kwargs=None, trace=None, continue_last=False):
+        # stateless configuration
         self.fct = fct
         self.context = context
         
@@ -30,16 +31,44 @@ class InterpretationHead:
         self.kwargs = kwargs
         if self.kwargs is None: self.kwargs = {}
 
+        # actual state
         self.current_args = None
         self.result = None
 
-        self.iterator_fct = None
+        self._iterator_fct = None
         self.trace = []
         self.future_trace = trace.copy() if trace is not None else []
         self.continue_last = continue_last
 
-    def copy(self):
-        return InterpretationHead(self.fct, None, self.args, self.kwargs, deepcopy(self.trace) + deepcopy(self.future_trace), self.current_args is not None)
+        self.fresh_copy = False
+
+    def copy(self):        
+        # self.result can be kept
+        
+        # continue with new head instance
+        advanced_head = InterpretationHead(self.fct, None, self.args, self.kwargs, None, None)
+        advanced_head.current_args = self.current_args
+        advanced_head.result = self.result
+        advanced_head._iterator_fct = self._iterator_fct
+        advanced_head.trace = self.trace
+        advanced_head.future_trace = self.future_trace
+        advanced_head.continue_last = self.continue_last
+        advanced_head.fresh_copy = True
+
+        # reset current instance with corresponding future trace to allow fast-forwarding on re-entry
+        self._iterator_fct = None
+        # reset context
+        self.context = None
+        # move trace + future_trace to self.trace to enable re-entry1
+        self.future_trace = deepcopy(self.trace) + deepcopy(self.future_trace)
+        # clear trace, as iterator_fct will re-enter
+        self.trace = []
+        # if current_args is not None, we are in the middle of fulfilling a yield call (needs to be fast-forwarded and re-entrance)
+        self.continue_last = self.current_args is not None
+
+        self.current_args = None
+
+        return advanced_head
 
     async def fast_forward(self):
         """
@@ -50,16 +79,19 @@ class InterpretationHead:
             await self.continue_()
 
     async def advance(self, result):
+        # make sure any interaction sets the fresh_copy flag to False
+        self.fresh_copy = False
+        
         await self.materialize_copy_if_necessary()
         
         self.trace.append(result)
-        self.current_args = await self.iterator_fct.asend(result)
+        self.current_args = await self.iterator_fct().asend(result)
         await self.handle_current_arg()
 
     async def materialize_copy_if_necessary(self):
         # materialize lazy copy if not yet done
-        if self.iterator_fct is None:
-            self.iterator_fct = self.fct(*self.args, **self.kwargs)
+        if self._iterator_fct is None:
+            self._iterator_fct = self.fct(*self.args, **self.kwargs)
 
             if len(self.future_trace) > 0:
                 await self.fast_forward()
@@ -96,8 +128,16 @@ class InterpretationHead:
             assert False, f"unexpected yield self.current_args from compiled function: {self.current_args}"
 
     async def continue_(self):
+        # make sure any interaction sets the fresh_copy flag to False
+        self.fresh_copy = False
+
         await self.materialize_copy_if_necessary()
 
         while self.current_args is None and self.result is None:
-            self.current_args = await self.iterator_fct.__anext__()
+            self.current_args = await self.iterator_fct().__anext__()
             await self.handle_current_arg()
+
+    def iterator_fct(self):
+        # make sure any interaction with self._iterator_fct sets the fresh_copy flag to False
+        self.fresh_copy = False
+        return self._iterator_fct

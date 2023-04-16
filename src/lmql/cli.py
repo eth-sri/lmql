@@ -3,6 +3,7 @@ import subprocess
 import os
 import argparse
 import lmql
+from lmql.runtime.p2 import LMQLResult
 
 import lmql.version as version_info
 
@@ -43,19 +44,20 @@ def cmd_run():
         results = [results]
     
     for r in results:
-        for v in [v for v in r.variables if v.startswith("P(")]:
-            distribution = r.variables[v]
-            max_prob = max([p for _,p in distribution])
-            labels = []
-            for value, prob in distribution:
-                label = value if prob != max_prob else f"{value} (*)"
-                labels.append(label)
-            max_length = max([len(str(l)) for l in labels])
+        if isinstance(r, LMQLResult):
+            for v in [v for v in r.variables if v.startswith("P(")]:
+                distribution = r.variables[v]
+                max_prob = max([p for _,p in distribution])
+                labels = []
+                for value, prob in distribution:
+                    label = value if prob != max_prob else f"{value} (*)"
+                    labels.append(label)
+                max_length = max([len(str(l)) for l in labels])
 
-            print(v)
-            for (value, prob), label in zip(distribution, labels):
-                label = label.ljust(max_length)
-                print(" - {} {}".format(label, prob))
+                print(v)
+                for (value, prob), label in zip(distribution, labels):
+                    label = label.ljust(max_length)
+                    print(" - {} {}".format(label, prob))
 
     if args.time:
         print("Query took:", time.time() - start)

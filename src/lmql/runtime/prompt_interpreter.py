@@ -582,9 +582,6 @@ class HypothesesBasedHeadPool:
         await self.root_head.advance()
         self.initial_prompt = self.root_head.prompt
 
-
-
-
     async def run(self):
         if self.initial_prompt is None:
             await self.prepare()

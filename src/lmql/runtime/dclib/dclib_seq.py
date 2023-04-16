@@ -54,7 +54,7 @@ class DecoderGraph:
             if diff and k in self.json_snapshot.node_hashes:
                 # this will ignore changes to nodes that have not been updated for 3 steps (may miss changes to nodes that 
                 # are not updated for a long time, careful for now)
-                if k in self.json_snapshot.step_not_updated_count and self.json_snapshot.step_not_updated_count[k] > 2:
+                if k in self.json_snapshot.step_not_updated_count and self.json_snapshot.step_not_updated_count[k] > 4:
                     continue
                 hash = await v.json_hash()
                 if self.json_snapshot.node_hashes[k] == str(hash):
@@ -440,6 +440,8 @@ class DeterministicDecoderSequence(DecoderSequence):
         self.align_user_data()
 
     def align_user_data(self):
+        if self.user_data is None: return
+
         # lmql-specific user data should be different for deterministic sequences
         head_variable = resolve_path(self.user_data, "head.variable")
 

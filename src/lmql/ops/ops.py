@@ -23,8 +23,6 @@ class Node:
         assert type(predecessors) is list, "Predecessors must be a list, not {}".format(type(predecessors))
         self.predecessors = predecessors
         self.depends_on_context = False
-        
-        self.follow_map = None
     
     def execute_predecessors(self, trace, context):
         return [execute_op(p, trace=trace, context=context) for p in self.predecessors]
@@ -1145,13 +1143,14 @@ def execute_op(op: Node, trace=None, context=None, return_final=False):
     return result
 
 def digest(expr, context, follow_context, no_follow=False):
-    if expr is None: return True, "fin", {}
+    if expr is None: return True, "fin", {}, {}
 
     trace = {}
+    follow_trace = {}
     expr_value, is_final = execute_op(expr, trace=trace, context=context, return_final=True)
 
     if no_follow:
-        return expr_value, is_final, trace
+        return expr_value, is_final, trace, follow_trace
 
     for op, value in trace.items():
         # determine follow map of predecessors
@@ -1161,7 +1160,7 @@ def digest(expr, context, follow_context, no_follow=False):
         else:
             # use * -> value, for constant value predecessor nodes
             def follow_map(p):
-                if is_node(p): return p.follow_map
+                if is_node(p): return follow_trace[p]
                 else: return fmap(("*", (p, ("fin",))))
             intm = fmap_product(*[follow_map(p) for p in op.predecessors])
         
@@ -1172,6 +1171,6 @@ def digest(expr, context, follow_context, no_follow=False):
         # print(name, value)
         # print("follow({}) = {}".format(name, op_follow_map))
 
-        setattr(op, "follow_map", op_follow_map)
+        follow_trace[op] = op_follow_map
     
-    return expr_value, is_final, trace
+    return expr_value, is_final, trace, follow_trace

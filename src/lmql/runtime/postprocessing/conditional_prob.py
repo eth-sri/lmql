@@ -100,7 +100,7 @@ class ConditionalDistributionPostprocessor:
             return results
 
         if len(results) > 1:
-            if "top1_distribution" in self.interpreter.specified_decoder_args and self.interpreter.specified_decoder_args["top1_distribution"]:
+            if "top1_distribution" in self.interpreter.decoder_kwargs and self.interpreter.decoder_kwargs["top1_distribution"]:
                 print("top1_distribution: only computing conditional distribution for the top1 result")
                 results = [results[0]]
             else:
@@ -119,7 +119,7 @@ class ConditionalDistributionPostprocessor:
                 continue
 
             scorer = ScoringQuery(result, i, result.prompt, distribution_values, self.output_writer)
-            scores = await scorer.score(model, batch_size=self.interpreter.specified_decoder_args.get("distribution_batch_size", None))
+            scores = await scorer.score(model, batch_size=self.interpreter.decoder_kwargs.get("distribution_batch_size", None))
 
             # print("Computing P({} | {}) for result {}...".format(distribution_variable, result.prompt[:10] + "...", i))
 
