@@ -535,15 +535,6 @@ class DcModel:
             
             continuation.user_data = rewritten_ids.rewritten_seq_user_data[seqidx] or user_data
 
-            assert len(continuation.input_ids) == len(continuation.stop_phrase), "error: the rewritten sequence does not have the same length as the stop phrase."
-
-            assert len(await continuation.text()) > len(await s.predecessor.text()), "error: the rewritten sequence is shorter than the original sequence. Going to\n {}\n from\n {} with common text {}".format(
-                [await continuation.text()],
-                [await s.predecessor.text()],
-                # common ids
-                [await self.detokenize(ids)]
-            )
-
             return continuation
 
     async def rewrite(self, ar: Union[DataArray, List[DecoderSequence], DecoderSequence], noscore=False):
