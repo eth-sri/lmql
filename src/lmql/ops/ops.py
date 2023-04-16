@@ -883,7 +883,7 @@ class StopAtOp(Node):
             return None
 
         op1, op1_diff = args[0]
-        if op1 is None:return None
+        if op1 is None: return None
         if op1_diff is None: op1_diff = ""
 
         op1 = strip_next_token(op1)

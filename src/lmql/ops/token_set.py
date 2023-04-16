@@ -54,11 +54,11 @@ class VocabularyMatcher:
         cache_path = cache_dir / f"token-mask-cache-{cache_identifier}.pkl"
         matcher_path = cache_dir / f"matcher-{cache_identifier}.pkl"
 
-        if matcher_path.exists():
+        try:
             with open(matcher_path, "rb") as f:
                 VocabularyMatcher._instance = pickle.load(f)
                 VocabularyMatcher._instance.stats = Stats("VocabularyMatcher")
-        else:
+        except:
             VocabularyMatcher._instance = VocabularyMatcher(tokenizer, tokenizer.model_identifier)
 
         if cache_path.exists():

@@ -512,6 +512,9 @@ class DcModel:
                 return DecoderSequence(continued_seq.input_ids, continued_seq.logprobs, continued_seq.deterministic, stop_phrase=continued_seq.stop_phrase,
                                     predecessor=continued_seq, user_data=user_data, sticky_user_data_keys=continued_seq.sticky_user_data_keys, epsilon_node=True)
 
+            # check if rewriting action provides user data specifically for the rewritten sequence
+            # user_data = rewritten_ids.rewritten_seq_user_data[seqidx] or user_data
+
             # value tokens
             num_value_tokens = value_offset - offset
             deterministic = [True if i + 1 > num_value_tokens else False for i in range(len(appended_ids))]
@@ -526,9 +529,17 @@ class DcModel:
                 # print("continuation.user_data", continuation.user_data, flush=True)
                 continuation = continuation.extend(Continuation(continuation.next_ids[0], continuation.next_logprobs[0], continuation.user_data))
                 steps += 1
-            continuation.user_data = user_data
+            
+            continuation.user_data = rewritten_ids.rewritten_seq_user_data[seqidx] or user_data
 
             assert len(continuation.input_ids) == len(continuation.stop_phrase), "error: the rewritten sequence does not have the same length as the stop phrase."
+
+            assert len(await continuation.text()) > len(await s.predecessor.text()), "error: the rewritten sequence is shorter than the original sequence. Going to\n {}\n from\n {} with common text {}".format(
+                [await continuation.text()],
+                [await s.predecessor.text()],
+                # common ids
+                [await self.detokenize(ids)]
+            )
 
             return continuation
 

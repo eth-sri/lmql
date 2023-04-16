@@ -30,6 +30,8 @@ class RewrittenInputIds:
     user_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
     value_offset: Optional[int] = None
 
+    rewritten_seq_user_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
+
 class advance: pass # used as symbol
 
 class PromptState(NamedTuple):
@@ -277,22 +279,28 @@ class P2:
         program_state = state.program_state.copy()
         trace = None
         logit_mask = None
+        
+        variable = state.variable
+        variable_offset = state.variable_offset
 
         if is_done:
             mask = tset("eos")
             logit_mask = mask.mask
             stopping_phrases = {"text": [], "tokenized": []}
-        elif state.variable is not None:
-            text = await s.text(state.variable_offset, pretty=False)
-            diff_text = await s.text(state.variable_offset, limit=-1, pretty=False)
+        elif variable is not None:
+            if ":before" in variable:
+                variable = variable.split(":before",1)[0]
+
+            text = await s.text(variable_offset, pretty=False)
+            diff_text = text[len(await s.text(variable_offset, limit=-1, pretty=False)):]
 
             # current context
             program_state: ProgramState = state.program_state.copy()
-            program_state.set(state.variable, text, scores=(), diff=diff_text, montonicity="inc")
+            program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc")
 
             # follow context
             follow_program_state: ProgramState = state.program_state.copy()
-            follow_program_state.set(state.variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc")
+            follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc")
 
             # digest token with where expr
             valid, is_final, trace, follow_trace = ops.digest(self.where,
@@ -302,8 +310,8 @@ class P2:
 
             stopping_conditions: List[ops.StopAtOp] = ops.execute_op_stops_at_only(self.where)
             stopping_phrases = {
-                "tokenized": [await self.tokenize(sc.stopping_phrase) for sc in stopping_conditions if sc.variable.name == state.variable],
-                "text": [sc.stopping_phrase for sc in stopping_conditions if sc.variable.name == state.variable],
+                "tokenized": [await self.tokenize(sc.stopping_phrase) for sc in stopping_conditions if sc.variable.name == variable],
+                "text": [sc.stopping_phrase for sc in stopping_conditions if sc.variable.name == variable],
             }
 
             # obtain where follow map
@@ -321,6 +329,7 @@ class P2:
         await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace)
 
         state = state.updated(
+                        variable=variable,
                         valid=valid,
                         final=is_final,
                         mask=mask,
@@ -379,7 +388,7 @@ class P2:
         state = self.interpreter_state_from_user_data(seq.predecessor, noroot=True)
         
         assert state is not None, "prompt interpreter state must be set in predecessor node"
-        
+
         if seq.is_done() and state.variable is not None:
             program_state = state.program_state.copy()
             variable = state.variable
@@ -431,31 +440,37 @@ class P2:
                 if reached_end:
                     program_ids += [self.tokenizer.eos_token_id]
                 
+                # value_offset indicates to the decoder, that the first `value_offset` appended tokens are still the value 
+                # of the variable, not deterministic tokens introduced by the prompt program
                 appended_ids = value_ids + program_ids
                 value_offset = state.variable_offset + len(value_ids)
                 
                 combined_new_ids = seq.input_ids[:-n_tokens_to_strip].tolist() + appended_ids
                 variable_offset = len(combined_new_ids)
 
-                state = state.updated(variable_offset=variable_offset)
+                rewritten_state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
+
+                if str(combined_new_ids) == "[50256, 15823, 284, 4141, 33322, 25, 198, 15823, 25, 314, 716, 1016, 284, 262, 3650, 198, 24111, 25, 220, 198, 198, 50256]":
+                    pass
+
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(
                     appended_input_ids=combined_new_ids, 
                     strip_eos=-n_tokens_to_strip,
                     value_offset=value_offset,
-                    user_data=self.interpreter_state_user_data(state)
+                    user_data=self.interpreter_state_user_data(state),
+                    rewritten_seq_user_data=self.interpreter_state_user_data(rewritten_state)
                 )
             else:
+                # do nothing rewrite
                 variable_offset = len(seq.input_ids) - 1
-                state = state.updated(variable_offset=variable_offset)
+                state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable)
                 return RewrittenInputIds(
                     appended_input_ids=None, 
                     strip_eos=not reached_end, 
                     user_data=self.interpreter_state_user_data(state)
                 )
-
-        # do nothing rewrite
         user_data = (seq.data() or {}).copy()
         user_data["head"] = state
         return RewrittenInputIds(appended_input_ids=None, strip_eos=False, user_data=user_data)
@@ -472,7 +487,8 @@ class P2:
             appended_input_ids=[r.appended_input_ids if r is not None else None for r in results],
             strip_eos=[r.strip_eos if r is not None else None for r in results],
             user_data=[r.user_data if r is not None else None for r in results],
-            value_offset=[r.value_offset if r is not None else None for r in results]
+            value_offset=[r.value_offset if r is not None else None for r in results],
+            rewritten_seq_user_data=[r.rewritten_seq_user_data if r is not None else None for r in results]
         )
     
     async def input(self, *args):
@@ -556,7 +572,7 @@ class P2:
         
         async def debug_out(decoder_step):
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
-                data = await dc.DecoderSequence.graph.json(diff=True)
+                data = await dc.DecoderSequence.graph.json(diff=False)
                 data = replace_inf_nan_with_str(data)
                 _DCLibDebugPrinter.printer.add_decoder_state(data)
             dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)

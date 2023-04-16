@@ -439,6 +439,9 @@ class DeterministicDecoderSequence(DecoderSequence):
 
         self.align_user_data()
 
+    # async def text(self, offset: int = None, limit: int = None, pretty=True) -> str:
+    #     return "<detseq> " + await super().text(offset, limit, pretty)
+
     def align_user_data(self):
         if self.user_data is None: return
 
@@ -446,15 +449,15 @@ class DeterministicDecoderSequence(DecoderSequence):
         head_variable = resolve_path(self.user_data, "head.variable")
 
         if head_variable is not None:
-            if "before(" in head_variable:
-                head_variable = head_variable.split(":before(", 1)[0]
-            if head_variable == "__done__":
-                set_path(self.user_data, "head", self.user_data["head"].updated(variable="__done__"))
-            else:
-                if len(self.next_ids) > 0:
-                    set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable + ":before(" + str(len(self.next_ids)) + ")"))
-                else:
-                    set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable))
+            # if "before(" in head_variable:
+            #     head_variable = head_variable.split(":before(", 1)[0]
+            # if head_variable == "__done__":
+            #     set_path(self.user_data, "head", self.user_data["head"].updated(variable="__done__"))
+            # else:
+            #     if len(self.next_ids) > 0:
+            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable + ":before(" + str(len(self.next_ids)) + ")"))
+            #     else:
+            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable))
             # deterministic sequences don't have stopping phrases
             set_path(self.user_data, "head", self.user_data["head"].updated(stopping_phrases={"tokenized": [], "text": []}))
         else:

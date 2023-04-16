@@ -69,8 +69,7 @@ where
          {
             name: "👩‍🔬 Meta Prompting",
             description: "Asking an expert to answer.",
-            code: `
-# metaprompting based on https://arxiv.org/pdf/2102.07350.pdf
+            code: `# metaprompting based on https://arxiv.org/pdf/2102.07350.pdf
 beam(n=2)
    "Q: What are Large Language Models?\\n\\n"
    "A good person to answer this question would be[EXPERT]\\n\\n"
