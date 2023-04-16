@@ -50,7 +50,7 @@ class VocabularyMatcher:
 
     @property
     def vocab_size(self):
-        return len(self.vocab)
+        return self.tokenizer.vocab_size
 
     def make_mask(self, tokens=None, regex=None, minus=None, prefix=False, exact=False, charlen=None):
         if tokens is not None:

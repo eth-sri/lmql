@@ -2,6 +2,7 @@ import asyncio
 import os
 import inspect
 import lmql.runtime.bopenai as openai
+from lmql.runtime.bopenai.openai_api import TiktokenTokenizer
 from lmql.runtime.stats import Stats
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, List, Union
@@ -807,12 +808,6 @@ class OptimisticChunkBasedOpenAIModel:
         self.buffer = []
 
         self.num_calls = 0
-
-    async def tokenize(self, *args, **kwargs):
-        def task():
-            return self.tokenizer.encode(*args, **kwargs)
-        return await asyncio.get_event_loop().run_in_executor(None, task)
-        return self.tokenizer.tokenize(*args, **kwargs)
     
     async def detokenize(self, *args, **kwargs):
         def task():
@@ -938,7 +933,10 @@ def openai_model(model_identifier):
 
         def get_tokenizer(self):
             if self._tokenizer is None:
-                self._tokenizer = load_tokenizer("gpt2")
+                if "gpt-4" in self.model_identifier or "chatgpt" in self.model_identifier or "turbo" in self.model_identifier:
+                    self._tokenizer = TiktokenTokenizer()
+                else:
+                    self._tokenizer = load_tokenizer("gpt2")
             self.served_model = OptimisticChunkBasedOpenAIModel(model_identifier, self._tokenizer)
             return self._tokenizer
 
