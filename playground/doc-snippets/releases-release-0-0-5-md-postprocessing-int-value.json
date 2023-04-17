@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax\n   \"My favorite number is: [NUM]\\n\"\n   print(type(NUM), NUM * 2) # <class 'int'> 4\n   \"Number times two is {NUM * 2}\"\nfrom\n   'openai/text-ada-001'\nwhere\n   INT(NUM)", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
