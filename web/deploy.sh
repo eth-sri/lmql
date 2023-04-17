@@ -7,6 +7,7 @@ rm -rf ../web-deploy/*
 
 echo "🌎  Building website..."
 # generate dynamic content
+npm install 
 node generate.js
 # copy index.html
 cp index.html ../web-deploy/
