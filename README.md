@@ -24,6 +24,7 @@
 LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python. With only a few lines of LMQL code, users can express advanced, multi-part and tool-augmented LM queries, which then are optimized by the LMQL runtime to run efficiently as part of the LM decoding loop.
 
 ![lmql-overview](https://user-images.githubusercontent.com/17903049/222918379-84a00b9a-1ef0-45bf-9384-15a20f2874f0.png)
+
 <p align="center">Example of a simple LMQL program.</p>
 
 
@@ -35,7 +36,7 @@ To install the latest version of LMQL run the following command with Python >=3.
 pip install lmql
 ```
 
-**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/). 
+**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/).
 
 ### Running LMQL Programs
 
@@ -45,7 +46,7 @@ After installation, you can launch the LMQL playground IDE with the following co
 lmql playground
 ```
 
-> Using the LMQL playground requires an installation of Node.js. If you are in a conda-managed environment you can install node.js via `conda install nodejs=14.20 -c conda-forge`. Otherwise, please see the offical Node.js website https://nodejs.org/en/download/ for instructions how to install it on your system.
+> Using the LMQL playground requires an installation of Node.js. If you are in a conda-managed environment you can install node.js via `conda install nodejs=14.20 -c conda-forge`. Otherwise, please see the official Node.js website https://nodejs.org/en/download/ for instructions how to install it on your system.
 
 This launches a browser-based playground IDE, including a showcase of many exemplary LMQL programs. If the IDE does not launch automatically, go to `http://localhost:3000`.
 
@@ -79,7 +80,7 @@ source scripts/activate-dev.sh
 
 ### Development without GPU
 
-This section outlines how to setup an LMQL development environment without local GPU support. Note that LMQL without local GPU support only supports the use of API-integrated models like `openai/text-davinci-003`. Please see the OpenAI API documentation (https://platform.openai.com/docs/models/gpt-3-5) to learn more about the set of available models. 
+This section outlines how to setup an LMQL development environment without local GPU support. Note that LMQL without local GPU support only supports the use of API-integrated models like `openai/text-davinci-003`. Please see the OpenAI API documentation (https://platform.openai.com/docs/models/gpt-3-5) to learn more about the set of available models.
 
 To setup a `conda` environment for LMQL with GPU support, run the following commands:
 
