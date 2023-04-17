@@ -163,13 +163,13 @@ def hello():
 argmax "Hello[WHO]" from "local:gpt2-medium" where len(WHO) < 10    
 """
     print("[Greeting 🤗 Transformers]")
-    asyncio.run(lmql.run(code_local))
+    asyncio.run(lmql.run(code_local, output_writer=lmql.printing))
     
     print("[Greeting OpenAI]")
     code_openai = """
 argmax "Hello[WHO]" from "openai/text-ada-001" where len(WHO) < 10    
 """
-    asyncio.run(lmql.run(code_openai))
+    asyncio.run(lmql.run(code_openai, output_writer=lmql.printing))
 
 hidden_commands = {
     "hello": hello

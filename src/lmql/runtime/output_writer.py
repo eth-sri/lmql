@@ -47,7 +47,7 @@ class StreamingOutputWriter:
                 
                 value = "\n".join(program_variables.variable_values.get(v, "").strip() for v in vars)
                     
-                    # os.system("clear")
+                # os.system("clear")
                 if self.last_value is None:
                     self.last_value = value
                     print(value, end="", flush=True)

@@ -379,8 +379,8 @@ class PromptInterpreter:
         return writer.graph.to_json(return_dict=True)
 
     async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace, text):
-        self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, self.where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
-        pass
+        if self.output_writer is not None:
+            self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, self.where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
 
     async def where_processor(self, seqs, additional_logits_processor_mask, **kwargs):
         zipped_task_inputs = zip(seqs, additional_logits_processor_mask, range(len(seqs)))

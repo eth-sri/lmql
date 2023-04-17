@@ -51,7 +51,6 @@ class ServedModel:
 
     def report_stats(self, printer, decoder_step=None):
         if printer is None:
-            print("no printer")
             return
         if hasattr(printer, "report_model_stats"):
             data = {

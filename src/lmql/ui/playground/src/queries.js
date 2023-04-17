@@ -218,6 +218,7 @@ distribution
    },
    {
       category: "Chatbots",
+      requires_input: true,
       queries: [
          {
             name: "🗣️ Chatbot",

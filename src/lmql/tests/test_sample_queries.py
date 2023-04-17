@@ -38,6 +38,11 @@ async def main():
     
     for category in queries:
         print(f"{category['category']}")
+        
+        if "requires_input" in category.keys() and category["requires_input"]:
+            print(" [Skipping because it requires user input]".format(category["category"]))
+            continue
+        
         for query in category["queries"]:
             # rpad
             rpad = 50 - len(query["name"])
