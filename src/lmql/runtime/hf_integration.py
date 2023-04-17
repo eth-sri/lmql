@@ -1,4 +1,5 @@
 import numpy as np
+import asyncio
 
 from lmql.model.served_model import ServedPretrainedModel
 import lmql.runtime.dclib as dc
@@ -9,6 +10,16 @@ def transformers_model(endpoint, model_identifier):
     import torch
 
     class NumpyBridgedServedPretrainedModel(ServedPretrainedModel):
+        def __init__(self, transformers_model: 'TransformersModel', *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.transformers_model = transformers_model
+        
+        async def tokenize(self, text):
+            return await self.transformers_model.tokenize(text)
+
+        async def detokenize(self, input_ids):
+            return await self.transformers_model.detokenize(input_ids)
+
         def __getattribute__(self, __name: str):
             if __name == "__dict__":
                 return super().__getattribute__(__name)
@@ -35,7 +46,7 @@ def transformers_model(endpoint, model_identifier):
             local = self.model_identifier.startswith("local:")
             if local:
                 self.model_identifier = self.model_identifier.split(":")[1]
-            self.served_model = NumpyBridgedServedPretrainedModel(endpoint, self.model_identifier, use_tq=False, local=local)
+            self.served_model = NumpyBridgedServedPretrainedModel(self, endpoint, self.model_identifier, use_tq=False, local=local)
 
             self.tokenizer = load_tokenizer(self.model_identifier)
 
@@ -43,18 +54,24 @@ def transformers_model(endpoint, model_identifier):
             return self.tokenizer
 
         async def tokenize(self, text):
-            input_ids = self.get_tokenizer()(text)["input_ids"]
-            # strip off bos if present, LMQL handles this internally
-            if len(input_ids) > 0 and input_ids[0] == self.bos_token_id:
-                input_ids = input_ids[1:]
-            return [i for i in input_ids if i is not None]
+            async def task(text):
+                input_ids = self.get_tokenizer()(text)["input_ids"]
+                # strip off bos if present, LMQL handles this internally
+                if len(input_ids) > 0 and input_ids[0] == self.tokenizer.bos_token_id:
+                    input_ids = input_ids[1:]
+                return [i for i in input_ids if i is not None]
+            t = asyncio.create_task(task(text))
+            return (await t)
         
         async def detokenize(self, input_ids):
-            input_ids = [i for i in input_ids if i is not None]
-            return self.get_tokenizer().decode(input_ids)
+            async def task(input_ids):
+                input_ids = [i for i in input_ids if i is not None]
+                return self.get_tokenizer().decode(input_ids)
+            t = asyncio.create_task(task(input_ids))
+            return (await t)
 
         def get_dclib_model(self):
             dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, self.tokenizer.bos_token_id, self.tokenizer.eos_token_id))
-            return dc.DcModel(self.served_model, self.tokenizer.bos_token_id, self.tokenizer.eos_token_id)
+            return dc.DcModel(self.served_model, self.tokenizer)
     
     return TransformersModel

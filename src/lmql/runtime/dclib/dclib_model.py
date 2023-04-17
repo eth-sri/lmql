@@ -98,7 +98,7 @@ class ModelQueue:
 ModelQueue._instances = {}
 
 class DcModel:
-    def __init__(self, model, bos_token_id, eos_token_id, truncation_threshold=-3e38, init_workers=True, **kwargs):
+    def __init__(self, model, tokenizer, truncation_threshold=-3e38, init_workers=True, **kwargs):
         """
         Parameters:
         
@@ -108,11 +108,12 @@ class DcModel:
         truncation_threshold: The threshold to use for logit truncation (cf. DecoderSequence.truncation_threshold). Logits below this threshold are considered to be -inf and will never be considered as next token.
         """
         self.model = model
+        self.tokenizer = tokenizer
         self.model_identifier = model.model_identifier
         self.model_args = kwargs
 
-        self.bos_token_id = bos_token_id
-        self.eos_token_id = eos_token_id
+        self.bos_token_id = tokenizer.bos_token_id
+        self.eos_token_id = tokenizer.eos_token_id
         self.truncation_threshold = truncation_threshold
 
         self.stats = Stats("dcmodel")

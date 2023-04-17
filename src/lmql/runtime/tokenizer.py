@@ -1,3 +1,5 @@
+import asyncio
+
 def get_js_tokenizer(model_identifier):
     import js
     from pyodide.ffi import to_js

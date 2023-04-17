@@ -820,7 +820,6 @@ class OptimisticChunkBasedOpenAIModel:
         def task():
             return self.tokenizer.encode(*args, **kwargs)
         return await asyncio.get_event_loop().run_in_executor(None, task)
-        return self.tokenizer.tokenize(*args, **kwargs)
     
     async def detokenize(self, *args, **kwargs):
         def task():
@@ -947,7 +946,7 @@ def openai_model(model_identifier):
 
             dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
 
-            return DclibOpenAiModel(self.served_model, bos_token_id, eos_token_id)
+            return DclibOpenAiModel(self.served_model, self.get_tokenizer())
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]

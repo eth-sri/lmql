@@ -122,79 +122,6 @@ class ServedModel:
             self.pending[sample_id].set_exception(TimeoutError("Timed out waiting for result of sample {}".format(sample_id)))
             del self.pending[sample_id]
 
-    async def detokenize(self, input_ids):
-        self.create_result_processor_task_if_required()
-        loop = asyncio.get_event_loop()
-
-        # handle torch tensors
-        if type(input_ids) is torch.Tensor:
-            input_ids = input_ids.tolist()
-
-        sample_id = self.sample_id
-        self.sample_id += 1
-        
-        payload = {
-            "action": "detokenize",
-            "client_id": self.client_id,
-            "input_ids": input_ids,
-            "sample_id": sample_id
-        }
-
-        try:
-            assert sample_id not in self.pending, "sample_id {} already in self.pending".format(sample_id)
-            # setup future and timeout
-            self.pending[sample_id] = loop.create_future()
-            r = requests.post(f"{self.host}/queue", json=payload)
-
-            if r.status_code != 200:
-                raise Exception(f"Error posting to {self.host}/queue: {r.status_code}")
-            
-            loop.call_later(self.timeout, self._timeout, sample_id)
-            
-            return (await self.pending[sample_id])["text"]
-        except requests.exceptions.ConnectionError as e:
-            # check for connection refused
-            if "Connection refused" in str(e):
-                raise Exception(f"Error connecting to {self.host}/queue. Please make sure an instance of the LMQL inference API for this model is running. To start it, run `python -m serve <MODEL>`.")
-            else:
-                raise e
-
-    async def tokenize(self, text):
-        self.create_result_processor_task_if_required()
-        loop = asyncio.get_event_loop()
-
-        assert type(text) == str, "The provided text for tokenize() must be str."
-
-        sample_id = self.sample_id
-        self.sample_id += 1
-
-        payload = {
-            "action": "tokenize",
-            "text": text,
-            "client_id": self.client_id,
-            "sample_id": sample_id
-        }
-
-        try:
-            assert sample_id not in self.pending, "sample_id {} already in self.pending".format(sample_id)
-            # setup future and timeout
-            self.pending[sample_id] = loop.create_future()
-            
-            r = requests.post(f"{self.host}/queue", json=payload)
-            
-            if r.status_code != 200:
-                raise Exception(f"Error posting to {self.host}/queue: {r.status_code}")
-            
-            loop.call_later(self.timeout, self._timeout, sample_id)
-            
-            return (await self.pending[sample_id])["input_ids"]
-        except requests.exceptions.ConnectionError as e:
-            # check for connection refused
-            if "Connection refused" in str(e):
-                raise Exception(f"Error connecting to {self.host}/queue. Please make sure an instance of the LMQL inference API for this model is running. To start it, run `python -m serve <MODEL>`.")
-            else:
-                raise e
-
     def reset_stats(self):
         self.consumed_tokens = 0
         self.num_queries = 0
@@ -251,43 +178,6 @@ class ServedModel:
                 raise Exception(f"Error connecting to {self.host}/queue. Please make sure an instance of the LMQL inference API for this model is running. To start it, run `python -m serve <MODEL>`.")
             else:
                 raise e
-
-
-class Sample:
-    def __init__(self, model, seq=None, input_ids=None):
-        assert not (self.seq is None and self.input_ids), "Either seq or input_ids must be provided for a Sample()"
-        
-        self.model = model
-        self._seq = seq
-        self._input_ids = input_ids
-    
-    async def seq(self):
-        if self._seq is None:
-            assert self._input_ids is not None
-            self._seq = await self.model.detokenize(self._input_ids)
-        return self._seq
-    
-    async def input_ids(self):
-        if self._input_ids is None:
-            assert self.seq is not None
-            self._input_ids = await self.model.tokenize(self._seq)
-        return self._input_ids
-
-    async def successor(self, token_id) -> 'Sample':
-        return Sample(self.model, input_ids=(await self.input_ids()) + [token_id])
-
-    async def distribution(self):
-        res = await self.model.forward(await self.input_ids())
-        return res["next_token_logits"]
-    
-    def __repr__(self) -> str:
-        return "<Sample seq={} input_ids={}>".format(self._seq, self._input_ids)
-
-    async def concat(self, text):
-        seq = (await self.seq()) + text
-        input_ids = await self.model.tokenize(seq)
-        
-        return Sample(self.model, seq=seq, input_ids=input_ids)
 
 @dataclass
 class ServedPretrainedModelOutput:

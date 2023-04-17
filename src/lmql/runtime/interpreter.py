@@ -481,6 +481,8 @@ class PromptInterpreter:
         return RewrittenInputIds(appended_input_ids=None, strip_eos=False, user_data=user_data)
 
     async def tokenize(self, *args):
+        # tokenize should be specific to the current model in use (infer from currently process
+        # dc.seq, interpreter should not be tokenizer-specific)
         async def task():
             return self.tokenizer(*args)["input_ids"]
         t = asyncio.create_task(task())
@@ -538,7 +540,7 @@ class PromptInterpreter:
             print("warning: no_repeat_ngram_size is known to cause issues when used with constrained decoding, including non-termination.")
 
         # tokenize initial prompt
-        prompt_ids = await self.dcmodel.tokenize(self.root_state.prompt)
+        prompt_ids = await self.tokenize(self.root_state.prompt)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
         n = len(prompt_ids)
