@@ -10,7 +10,7 @@ from lmql.ops.ops import *
 from lmql.runtime.langchain import LMQLChainMixIn
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import silent
-from lmql.runtime.p2 import P2
+from lmql.runtime.interpreter import PromptInterpreter
 from lmql.runtime.postprocessing.conditional_prob import \
     ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
@@ -125,7 +125,7 @@ class LMQLQueryFunction(LMQLChainMixIn):
     async def __acall__(self, *args, **kwargs):
         kwargs = self.make_kwargs(*args, **kwargs)
 
-        interpreter = P2(force_model=self.model)
+        interpreter = PromptInterpreter(force_model=self.model)
         if self.output_writer is not None:
             interpreter.output_writer = self.output_writer
 

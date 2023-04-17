@@ -3,7 +3,7 @@ import subprocess
 import os
 import argparse
 import lmql
-from lmql.runtime.p2 import LMQLResult
+from lmql.runtime.interpreter import LMQLResult
 
 import lmql.version as version_info
 

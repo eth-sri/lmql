@@ -127,7 +127,12 @@ class TokenMask:
     logits_mask: np.ndarray
     user_data: List[Any]
 
-class P2:
+class PromptInterpreter:
+    """
+    The PromptInterpreter is the main entry point for an LMQL query. It handles program execution, 
+    token masking and scripted interaction during query execution.
+    """
+
     def __init__(self, force_model=None) -> None:
         assert force_model is None, "force_model is not supported in P2"
         
@@ -267,7 +272,7 @@ class P2:
             return self.root_state
         return state_dict
 
-    async def token_mask_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
+    async def where_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
         state = self.interpreter_state_from_user_data(s)
         
         if not needs_masking:
@@ -284,6 +289,8 @@ class P2:
         
         variable = state.variable
         variable_offset = state.variable_offset
+
+        text = ""
 
         if is_done:
             mask = tset("eos")
@@ -328,7 +335,7 @@ class P2:
         else:
             assert False, f"error: where() is called but current variable and current prompt are None and query head has result {state.query_head.result}"
 
-        await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace)
+        await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace, text)
 
         state = state.updated(
                         variable=variable,
@@ -371,13 +378,13 @@ class P2:
 
         return writer.graph.to_json(return_dict=True)
 
-    async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace):
-        self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt, self.where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
+    async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace, text):
+        self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, self.where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
         pass
 
     async def where_processor(self, seqs, additional_logits_processor_mask, **kwargs):
         zipped_task_inputs = zip(seqs, additional_logits_processor_mask, range(len(seqs)))
-        token_mask_tasks = [self.token_mask_for_sequence(s, needs_masking, seqidx, **kwargs) for s,needs_masking, seqidx in zipped_task_inputs]
+        token_mask_tasks = [self.where_for_sequence(s, needs_masking, seqidx, **kwargs) for s,needs_masking, seqidx in zipped_task_inputs]
         results = [(mask, user_data) for mask, user_data in await asyncio.gather(*token_mask_tasks)]
         
         return TokenMask([r[0] for r in results], [r[1] for r in results])
@@ -574,7 +581,7 @@ class P2:
         
         async def debug_out(decoder_step):
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
-                data = await dc.DecoderSequence.graph.json(diff=False)
+                data = await dc.DecoderSequence.graph.json(diff=True)
                 data = replace_inf_nan_with_str(data)
                 _DCLibDebugPrinter.printer.add_decoder_state(data)
             self.dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)

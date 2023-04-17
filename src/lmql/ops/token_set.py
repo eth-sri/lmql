@@ -227,6 +227,9 @@ class VocabularyMatcher:
         tokens = []
         mask = mask
 
+        def tstr(t):
+            return str([t])[1:-1]
+
         if mask.sum() == mask.shape[0]:
             return "*"
 
@@ -248,7 +251,7 @@ class VocabularyMatcher:
                 # replace nl and space
                 s = self.tokenizer.convert_tokens_to_string([s])
                 s = s.encode("unicode_escape").decode("utf-8")
-                tokens.append(s)
+                tokens.append(tstr(s))
 
         return prefix + "{{{}}}".format(
             ", ".join([t for t in sorted(list(tokens))]) + ("..." if truncated else "")
