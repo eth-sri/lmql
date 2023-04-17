@@ -134,7 +134,7 @@ def _get_decorated_function_code(fct):
         common_indent = None
         lines = []
         for line in source[start-1:end]:
-            if line.strip() == "":
+            if line.strip() == "" or line.strip() == '"""lmql' or line.strip() == "'''lmql":
                 lines.append(line)
                 continue
             if common_indent is None:
@@ -142,7 +142,6 @@ def _get_decorated_function_code(fct):
             else:
                 common_indent = min(common_indent, len(line) - len(line.lstrip()))
             lines.append(line[common_indent:])
-        
         lines[0] = lines[0][startcol - common_indent:]
         lines[-1] = lines[-1][:endcol]
 
@@ -168,7 +167,7 @@ def query(fct):
     calling_frame = inspect.stack()[1]
     scope = LMQLInputVariableScope(fct, calling_frame)
     code = _get_decorated_function_code(fct)
-        
+
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(code)
