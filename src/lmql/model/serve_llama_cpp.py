@@ -2,22 +2,20 @@
 Serves a llama.cpp model as LMQL inference API.
 """
 
-from dataclasses import dataclass, field
-from collections import defaultdict
-
-import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from multiprocessing import Queue as MPQueue
 from queue import Empty
-from queue import Queue
 import multiprocessing
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 import atexit
 import argparse
 import time
-from llama_cpp.llama import Llama, llama_cpp
+from llama_cpp.llama import Llama
 import inspect
-from lmql.model.serve_types import TokenizerProcessor, ModelProcessor, InferenceServerState
+from lmql.model.serve_types import (
+    TokenizerProcessor,
+    ModelProcessor,
+    InferenceServerState,
+)
+
 
 class LlamaCPPTokenizerProcessor(TokenizerProcessor):
     def __init__(self, state: InferenceServerState, processor: "ModelProcessor"):
@@ -34,21 +32,17 @@ class LlamaCPPTokenizerProcessor(TokenizerProcessor):
         else:
             input_ids = tokenizer.tokenize(b" " + text.encode("utf-8"))
 
-        self.state.all_results_queue.put({
-            "sample_id": sample_id,
-            "client_id": client_id,
-            "input_ids": input_ids
-        })
+        self.state.all_results_queue.put(
+            {"sample_id": sample_id, "client_id": client_id, "input_ids": input_ids}
+        )
 
     def detokenize(self, tokenizer, sample_id, client_id, item):
         input_ids = item["input_ids"]
 
-        text = tokenizer.detokenize(input_ids).decode('utf-8')
-        self.state.all_results_queue.put({
-            "sample_id": sample_id,
-            "client_id": client_id,
-            "text": text
-        })
+        text = tokenizer.detokenize(input_ids).decode("utf-8")
+        self.state.all_results_queue.put(
+            {"sample_id": sample_id, "client_id": client_id, "text": text}
+        )
 
     def run(self):
         # load tokenizer
@@ -71,7 +65,7 @@ class LlamaCPPTokenizerProcessor(TokenizerProcessor):
                 self.detokenize(tokenizer, sample_id, client_id, item)
             else:
                 print("error: unknown TokenizerProcessor action {}".format(action))
-        
+
         print("Tokenizer shut down.")
 
     def run_in_parallel(self):
@@ -80,17 +74,24 @@ class LlamaCPPTokenizerProcessor(TokenizerProcessor):
         p = multiprocessing.Process(target=self.run)
         p.start()
         return p
-    
+
+
 class LlamaCPPModelProcessor(ModelProcessor):
-    def __init__(self, state: InferenceServerState, cuda: bool = False, cache: Optional[str] = None, llama_kwargs: Optional[dict] = None):
+    def __init__(
+        self,
+        state: InferenceServerState,
+        cuda: bool = False,
+        cache: Optional[str] = None,
+        llama_kwargs: Optional[dict] = None,
+    ):
         super().__init__(state, cuda, cache)
         assert llama_kwargs is not None
         self.llama_kwargs = llama_kwargs
 
-    def run(self):        
+    def run(self):
         # load model
         print("Loading {} (CPU)".format(self.model_identifier))
-        self.model = Llama(**{**self.llama_kwargs, 'logits_all': True})
+        self.model = Llama(**{**self.llama_kwargs, "logits_all": True})
 
         print("Ready!".format(self.model_identifier))
 
@@ -104,13 +105,11 @@ class LlamaCPPModelProcessor(ModelProcessor):
             except KeyboardInterrupt:
                 break
 
-            if item is None: 
+            if item is None:
                 time.sleep(0.1)
                 continue
 
             self.request_count += 1
-        
-
 
             sample_id = item["sample_id"]
             client_id = item["client_id"]
@@ -120,27 +119,31 @@ class LlamaCPPModelProcessor(ModelProcessor):
                 key = str(input_ids)
                 if key in self.cache:
                     self.requests_cached += 1
-                    self.state.all_results_queue.put({
-                        "client_id": client_id,
-                        "sample_id": sample_id,
-                        "next_token_logits": self.cache[key]
-                    })
+                    self.state.all_results_queue.put(
+                        {
+                            "client_id": client_id,
+                            "sample_id": sample_id,
+                            "next_token_logits": self.cache[key],
+                        }
+                    )
                     continue
             self.model.reset()
             res = self.model.eval(input_ids[0])
-            
+
             next_token_logits = self.model.all_logits[-1]
-            
+
             if self.cache is not None:
                 key = str(input_ids.tolist())
                 self.cache[key] = next_token_logits
 
-            self.state.all_results_queue.put({
-                "client_id": client_id,
-                "sample_id": sample_id,
-                "next_token_logits": [next_token_logits]
-            })
-        
+            self.state.all_results_queue.put(
+                {
+                    "client_id": client_id,
+                    "sample_id": sample_id,
+                    "next_token_logits": [next_token_logits],
+                }
+            )
+
         print("Processor shut down")
 
     def run_in_parallel(self):
@@ -149,13 +152,19 @@ class LlamaCPPModelProcessor(ModelProcessor):
         p = multiprocessing.Process(target=self.run)
         p.start()
         return p
- 
+
+
 base_llama_kwargs = {}
 
-def get_serve(state: InferenceServerState, args: argparse.Namespace)->Tuple[ModelProcessor, TokenizerProcessor]:
+
+def get_serve(
+    state: InferenceServerState, args: argparse.Namespace
+) -> Tuple[ModelProcessor, TokenizerProcessor]:
     # run model in separate process
     llama_kwargs = {kwarg: getattr(args, kwarg) for kwarg in base_llama_kwargs.keys()}
-    processor = LlamaCPPModelProcessor(state, cuda=False, cache=args.cache, llama_kwargs=llama_kwargs)
+    processor = LlamaCPPModelProcessor(
+        state, cuda=False, cache=args.cache, llama_kwargs=llama_kwargs
+    )
     processor.run_in_parallel()
 
     # run tokenizers in separate process
@@ -163,17 +172,24 @@ def get_serve(state: InferenceServerState, args: argparse.Namespace)->Tuple[Mode
     tokenizer_processor.run_in_parallel()
     return processor, tokenizer_processor
 
+
 def add_parser(base_parser):
-    
     sig = inspect.signature(Llama.__init__)
     for name, param in sig.parameters.items():
-        if name == 'self':
+        if name == "self":
             continue
         base_llama_kwargs[name] = None
         _type = param.annotation
-        if hasattr(_type, '__args__'):
-            _type=_type.__args__[0]
+        if hasattr(_type, "__args__"):
+            _type = _type.__args__[0]
         if param.default == inspect.Parameter.empty:
-            base_parser.add_argument(f'--{name}', default=_type(), type=_type, help="required for llama.cpp")
+            base_parser.add_argument(
+                f"--{name}", default=_type(), type=_type, help="required for llama.cpp"
+            )
         else:
-            base_parser.add_argument(f'--{name}', default=param.default, type=_type, help="optional for llama.cpp") 
+            base_parser.add_argument(
+                f"--{name}",
+                default=param.default,
+                type=_type,
+                help="optional for llama.cpp",
+            )
