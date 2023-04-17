@@ -49,7 +49,7 @@
 
 function getPlaygroundUrl() {
     const host = window.location.host;
-    if (host === "docs.lmql.ai") {
+    if (host.includes("lmql.ai")) {
         return "https://lmql.ai/playground";
     } else if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
         return "http://localhost:3000/playground";
@@ -186,7 +186,7 @@ function openPlaygroundSnippet(link, snippet) {
 </li>
 </ul>
 <h3 id="preview">Preview</h3>
-<p>Apart from the above changes, we are also working on a number of other features, including:</p>
+<p>Apart from the changes above, we are also working on a number of other features, including:</p>
 <ul>
 <li><p><strong>llama.cpp support</strong> as started in <a href="https://github.com/eth-sri/lmql/pull/18">this PR</a>, thanks to <a href="https://github.com/CircArgs">@CircArgs</a>.</p>
 </li>
@@ -213,7 +213,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Mon, Apr 17, 3:54 PM (UTC)<br/>
+        Last updated on Mon, Apr 17, 4:01 PM (UTC)<br/>
       </div>
     </div>
   </div>
