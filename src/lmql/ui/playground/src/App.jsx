@@ -2549,7 +2549,7 @@ class App extends React.Component {
       this.state.selectedNodeTrigger.trigger(n)
     };
 
-    const simpleModeClassName = this.state.simpleMode ? "" : "simple-mode";
+    const simpleModeClassName = (this.state.simpleMode && displayState.mode != "embed") ? "" : "simple-mode";
 
     return (
       <ContentContainer className={this.state.graphLayout ? 'graph-layout' : ''}>
