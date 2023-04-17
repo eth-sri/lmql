@@ -15,6 +15,14 @@ from lmql.runtime.model_registry import model_name_aliases
 
 OPS_NAMESPACE = "lmql.ops"
 
+class FreeVarCollector(ast.NodeVisitor):
+    def __init__(self, free_vars):
+        self.free_vars = free_vars
+
+    def visit_Name(self, node):
+        if type(node.ctx) is ast.Load:
+            self.free_vars.add(node.id)
+
 class PromptScope(ast.NodeVisitor):
     def scope(self, query: LMQLQuery):
         self.distribution_vars = set([query.distribution.variable_name]) if query.distribution is not None else set()    
@@ -25,6 +33,10 @@ class PromptScope(ast.NodeVisitor):
         self.written_vars = set()
 
         for p in query.prompt: self.visit(p)
+        
+        # also collect variable reads from where clause
+        if query.where is not None:
+            FreeVarCollector(self.free_vars).visit(query.where)
 
         query.scope = self
 
