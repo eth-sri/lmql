@@ -9,16 +9,18 @@ from lmql.runtime.multi_head_interpretation import InterpretationHead, Interpret
 from lmql.runtime.program_state import ProgramState
 import lmql.runtime.dclib as dc
 from lmql.runtime.stats import Stats
-from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.interrupt import interrupt
-from lmql.runtime.dclib.lmql_adapter import DcLibMaskLogitsProcessorWithUserData, _DCLibDebugPrinter, replace_inf_nan_with_str
 from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, DistributionVariable
+from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher
 from lmql.runtime.model_registry import LMQLModelRegistry
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
+
+class _DCLibDebugPrinter: pass
+_DCLibDebugPrinter.printer = None
 
 def set_dclib_debug_printer(printer):
     _DCLibDebugPrinter.printer = printer
@@ -450,10 +452,6 @@ class P2:
 
                 rewritten_state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
 
-                if str(combined_new_ids) == "[50256, 15823, 284, 4141, 33322, 25, 198, 15823, 25, 314, 716, 1016, 284, 262, 3650, 198, 24111, 25, 220, 198, 198, 50256]":
-                    pass
-
-
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(
                     appended_input_ids=combined_new_ids, 
@@ -515,23 +513,27 @@ class P2:
             stopping_phrases=None, where=None)
         self.root_state = await self.advance(self.root_state)
 
-        # prepare tokenizer
-        self.tokenizer = load_tokenizer(self.model_identifier if not self.model_identifier.startswith("openai/") else "gpt2")
-
         # prepare dcmodel
         decoder_args = self.decoder_kwargs
         self.model.decoder_args = decoder_args
-        dcmodel: dc.DcModel = self.model.get_dclib_model()
+        self.dcmodel: dc.DcModel = self.model.get_dclib_model()
 
-        assert issubclass(type(dcmodel), dc.DcModel), "The provided dcmodel must be a subclass of DcModel"
+        # handle queries w/o any TemplateVariables
+        if self.root_state.query_head.result is not None:
+            return [self.root_state.query_head.result]
+
+        # prepare tokenizer
+        self.tokenizer = self.model.get_tokenizer()
+
+        assert issubclass(type(self.dcmodel), dc.DcModel), "The provided dcmodel must be a subclass of DcModel"
 
         if "no_repeat_ngram_size" in decoder_args:
             print("warning: no_repeat_ngram_size is known to cause issues when used with constrained decoding, including non-termination.")
 
         # tokenize initial prompt
-        prompt_ids = await dcmodel.tokenize(self.root_state.prompt)
-        if dcmodel.bos_token_id is not None:
-            prompt_ids = [dcmodel.bos_token_id] + prompt_ids
+        prompt_ids = await self.dcmodel.tokenize(self.root_state.prompt)
+        if self.dcmodel.bos_token_id is not None:
+            prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
         n = len(prompt_ids)
         
         # make sure that the initial prompt is not considered part of a variable
@@ -564,9 +566,9 @@ class P2:
             decoder_args["max_len"] = decoder_args["max_length"]
 
         # setup dcmodel for use
-        dcmodel.model_args = decoder_args
-        decoder_args["dcmodel"] = dcmodel
-        dc.set_truncation_threshold(dcmodel.truncation_threshold)
+        self.dcmodel.model_args = decoder_args
+        decoder_args["dcmodel"] = self.dcmodel
+        dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 
         step_budget = decoder_args.get("step_budget", 1024)
         
@@ -575,7 +577,7 @@ class P2:
                 data = await dc.DecoderSequence.graph.json(diff=False)
                 data = replace_inf_nan_with_str(data)
                 _DCLibDebugPrinter.printer.add_decoder_state(data)
-            dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
+            self.dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
 
         try:
             import time
@@ -623,7 +625,7 @@ class P2:
                 # +1 for the eos token
                 billable_tokens += upper + (1 if has_deterministic_tail else 0)
             
-            dcmodel.log_billable_tokens(billable_tokens)
+            self.dcmodel.log_billable_tokens(billable_tokens)
 
             results = []
 

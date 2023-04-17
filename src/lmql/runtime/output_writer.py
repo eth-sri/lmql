@@ -61,6 +61,8 @@ class StreamingOutputWriter:
             
     def add_compiler_output(self, code): pass
 
+# ready to use output writer configurations
+
 silent = DebuggerOutputWriter()
 headless = DebuggerOutputWriter(allows_input=False)
 stream = StreamingOutputWriter

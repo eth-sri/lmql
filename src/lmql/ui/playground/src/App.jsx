@@ -2462,7 +2462,7 @@ class App extends React.Component {
     }
     /* On Escape */
     if (event.keyCode == 27) {
-      LMQLProcess.kill()
+      LMQLProcess.kill();
     }
   }
 

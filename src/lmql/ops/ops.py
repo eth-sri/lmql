@@ -270,7 +270,9 @@ class TokensOp(Node):
         import asyncio
         if x is None: return None
         if x == "": return []
-        
+
+        assert False, "TOKENS() operation is currently not supported"
+
         tokens = context.runtime.model.sync_tokenize(x)
         return tokens
 

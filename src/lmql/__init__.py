@@ -1,5 +1,4 @@
 import lmql.version as version_info
-from lmql.runtime.lmql_runtime import LMQLInputVariableScope
 
 """
 lmql.
@@ -12,19 +11,17 @@ __author__ = 'Luca Beurer-Kellner, Marc Fischer and Mark Mueller'
 __email__ = "luca.beurer-kellner@inf.ethz.ch"
 __license__ = "MIT"
 
-from lmql.language.compiler import LMQLCompiler
-import lmql.runtime.lmql_runtime as lmql_runtime
-import tempfile
-from lmql.runtime.output_writer import silent, stream, printing, headless
-from lmql.runtime.model_registry import LMQLModelRegistry
-from lmql.runtime.lmql_runtime import LMQLQueryFunction, FunctionContext
-
-import lmql.runtime.lmql_runtime as runtime_support
-
-# re-export lmql runtime functions
-from lmql.runtime.lmql_runtime import compiled_query, tag
-
 import os
+import tempfile
+
+import lmql.runtime.lmql_runtime as lmql_runtime
+import lmql.runtime.lmql_runtime as runtime_support
+from lmql.language.compiler import LMQLCompiler
+# re-export lmql runtime functions
+from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
+                                       LMQLQueryFunction, compiled_query, tag)
+from lmql.runtime.model_registry import LMQLModelRegistry
+from lmql.runtime.output_writer import headless, printing, silent, stream
 
 model_registry = LMQLModelRegistry
 
@@ -40,7 +37,7 @@ def _autoconnect_model(model_name):
         from lmql.runtime.openai_integration import openai_model
 
         # hard-code openai/ namespace to be openai-API-based
-        Model = openai_model(model_name)
+        Model = openai_model(model_name[7:])
         lmql_runtime.register_model(model_name, Model)
         lmql_runtime.register_model("*", Model)
     else:
@@ -114,8 +111,8 @@ def _query_from_string(s):
     return module.query
         
 def _get_decorated_function_code(fct):
-    import inspect
     import ast
+    import inspect
 
     source = ""
 
@@ -164,7 +161,7 @@ def _get_decorated_function_code(fct):
 
 def query(fct):
     import inspect
-    
+
     # support for lmql.query(<query string>)
     if type(fct) is str: return _query_from_string(fct)
     

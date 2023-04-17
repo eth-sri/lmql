@@ -1,23 +1,21 @@
 import asyncio
-import os
 import inspect
-import lmql.runtime.bopenai as openai
-from lmql.runtime.stats import Stats
-from dataclasses import dataclass
-from typing import Any, Callable, Optional, List, Union
-
+import os
 from collections import namedtuple
+from dataclasses import dataclass
+from typing import Any, Callable, List, Optional, Union
+
 import numpy as np
+
+import lmql.runtime.bopenai as openai
+import lmql.runtime.dclib as dc
+from lmql.runtime.dclib.dclib_model import DcModel
+from lmql.runtime.dclib.dclib_seq import (DecoderSequence, deepcopy, deepmerge,
+                                          detseq, is_deterministic)
+from lmql.runtime.stats import Stats
+from lmql.runtime.tokenizer import load_tokenizer
 from lmql.utils import nputil
 
-from lmql.runtime.decoder_head import DecoderHead
-from lmql.runtime.rewriter import InputIdRewriter, ActivePromptingRewriter
-
-from lmql.runtime.tokenizer import load_tokenizer
-from lmql.runtime.dclib.lmql_adapter import QueryDcLibAdapter
-from lmql.runtime.dclib.dclib_model import DcModel
-from lmql.runtime.dclib.dclib_seq import deepcopy, deepmerge, is_deterministic, detseq, DecoderSequence
-import lmql.runtime.dclib as dc
 
 def is_allowed(m): 
     """
@@ -111,13 +109,13 @@ class DclibOpenAiModel(DcModel):
         
         self.model_identifier = "openai/" + self.model.model_identifier
 
-        self.model.chunk_size = kwargs.get("openai_chunksize", 32)
+        self.model.chunk_size = kwargs.get("openai_chunksize", 64)
         self.num_billed_tokens = {}
         self.num_requests = 0
 
         self.stats = Stats("openai")
 
-        # openai.Completion.set_chaos(0.05)
+        # openai.Completion.set_chaos(0.05) # for unreliably testing
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
 
     def log_billable_tokens(self, n: int):
@@ -440,7 +438,7 @@ class DclibOpenAiModel(DcModel):
                     next_token_ids.append(np.array([next_token], dtype=np.int64))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
-                    full_logits = np.ones(self.model.tokenizer.vocab_size) * np.finfo(np.float32).min
+                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
                     if next_token < len(full_logits):
                         full_logits[next_token] = next_token_score
                     # else: 
@@ -458,7 +456,7 @@ class DclibOpenAiModel(DcModel):
                 prob_tokens = await self.tokenize_list(tokens)
                 token_ids = np.array(prob_tokens, dtype=np.int64).reshape(-1)
 
-                full_logits = np.ones(self.model.tokenizer.vocab_size) * np.finfo(np.float32).min
+                full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
                 full_logits[next_token] = np.finfo(np.float32).min
                 assert kwargs.get("temperature", 1.0) != 0.0 or np.all(full_logits < next_token_score), "next token score is not the highest"
@@ -538,7 +536,7 @@ class DclibOpenAiModel(DcModel):
                     next_token_ids.append(np.array([next_token], dtype=np.int64))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
-                    full_logits = np.ones(self.model.tokenizer.vocab_size) * np.finfo(np.float32).min
+                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
                     full_logits[next_token] = next_token_score
                     logits.append(full_logits)
                     continue
@@ -550,11 +548,11 @@ class DclibOpenAiModel(DcModel):
                 probs = sorted(list(complete_data["logprobs"]["top_logprobs"].items()), key=lambda x: x[1], reverse=True)
                 logprobs = [p[1] for p in probs]
                 tokens = [p[0] for p in probs]
-                token_ids = np.array([self.model.tokenizer(t)["input_ids"][0] for t in tokens], dtype=np.int64)
+                token_ids = np.array([self.model.get_tokenizer()(t)["input_ids"][0] for t in tokens], dtype=np.int64)
 
                 assert token_ids[0] == next_token, f"top1 logprob token is not the same as the predicted token {token_ids[0]} (top1) != {next_token} (predicted)"
 
-                full_logits = np.ones(self.model.tokenizer.vocab_size) * np.finfo(np.float32).min
+                full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
 
                 # retroactively apply logits mask to logits
@@ -930,66 +928,31 @@ def openai_model(model_identifier):
     # make sure openai org and secret are available
     import lmql.runtime.openai_secret
     
-    class ServedModelInterfaceCls:
+    class OpenAIModel:
         def __init__(self) -> None:
             self.model_identifier = model_identifier
-            self.decoder_args = None
-
-            self.use_dclib_decoders = False
-            self.active_prompting = False
-
             self.served_model = None
             self._tokenizer = None
 
-            self.bos_token_id = self.get_tokenizer().bos_token_id
-            self.eos_token_id = self.get_tokenizer().eos_token_id
-
-            self.adapter = QueryDcLibAdapter(self.get_tokenizer().vocab_size, self.tokenize, self.detokenize, self.bos_token_id, self.eos_token_id)
-            self.hf_stats = HFModelStatsAdapter()
+            self.chunk_size = 64
 
         def get_tokenizer(self):
             if self._tokenizer is None:
                 self._tokenizer = load_tokenizer("gpt2")
-            self.served_model = OptimisticChunkBasedOpenAIModel(model_identifier, self._tokenizer)
+            self.served_model = self
             return self._tokenizer
 
-        def set_decoder(self, method, **kwargs):
-            # defaults
-            DEFAULTS = {
-                "max_len": 512,
-                "decoder": method
-            }
-            self.decoder_args = DEFAULTS.copy()
-
-            # custom user arguments
-            protected_args = set(["input_ids", "additional_logits_processors", "bos_token_id", "eos_token_id"])
-            for key, value in kwargs.items():
-                if key in protected_args:
-                    print("warning: cannot override runtime determined decoder argument {}.".format(key))
-                    continue
-                self.decoder_args[key] = value
-        
         def get_dclib_model(self):
             bos_token_id = self.get_tokenizer().bos_token_id
             eos_token_id = self.get_tokenizer().eos_token_id
 
-            return DclibOpenAiModel(self.served_model, bos_token_id, eos_token_id, **self.decoder_args)
+            dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
 
-        async def score_distribution_values(self, prompt, values):
-            return await self.adapter.score_distribution_values(prompt, values, self.get_dclib_model())
-
-        async def query(self, prompt, mask_logits_processor, head_input_id_rewriter, active_prompt_rewriter):
-            assert self.decoder_args is not None, "Cannot query() a model without calling set_decoder first."
-
-            dclib_model = self.get_dclib_model()
-            return await self.adapter.query(prompt, mask_logits_processor, head_input_id_rewriter, active_prompt_rewriter, dclib_model, self.decoder_args)
+            return DclibOpenAiModel(self.served_model, bos_token_id, eos_token_id)
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]
         
         async def detokenize(self, input_ids):
             return self.get_tokenizer().decode(input_ids)
-
-        def sync_tokenize(self, text):
-            return self.get_tokenizer()(text)["input_ids"]
-    return ServedModelInterfaceCls
+    return OpenAIModel

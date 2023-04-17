@@ -413,8 +413,8 @@ class DcModel:
         self.model.report_stats(printer, decoder_step)
         
     async def _rewrite_seq(self, seqs_or_seq, noscore=False):
-        # check self.model_args for an input_id_rewriter (e.g. LMQL interpreter)
-        if "input_id_rewriter" not in self.model_args and "modern_rewriter" not in self.model_args:
+        # check self.model_args for a "modern_rewriter" key
+        if "modern_rewriter" not in self.model_args:
             return seqs_or_seq
         
         # accept both a single sequence or a list of sequences
@@ -427,18 +427,8 @@ class DcModel:
         # do not rewrite deterministic sequences (rewrite mask set to False)
         mask_seq_to_rewrite = np.array([s.needs_rewrite for s in seqs], dtype=np.bool_)
 
-        if "modern_rewriter" in self.model_args.keys():
-            rewriter = self.model_args["modern_rewriter"]
-            rewritten_ids = await rewriter(seqs, mask_seq_to_rewrite)
-        else:
-            rewriter = self.model_args.get("input_id_rewriter", None)
-            rewritten_ids = await rewriter.input_ids_rewriter_fn(
-                    input_ids=[s.input_ids for s in seqs], 
-                    next_token_scores=[None for _ in range(len(seqs))], 
-                    next_token_logprob=[s.logprobs[-1] for s in seqs],
-                    mask_seq_to_rewrite=mask_seq_to_rewrite,
-                    user_data=[s.data() for s in seqs]
-            )
+        rewriter = self.model_args["modern_rewriter"]
+        rewritten_ids = await rewriter(seqs, mask_seq_to_rewrite)
     
         # update user data, if rewriter provides it
         for s, user_data in zip(seqs, rewritten_ids.user_data):
