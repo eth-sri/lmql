@@ -1,3 +1,5 @@
+import asyncio
+
 def get_js_tokenizer(model_identifier):
     import js
     from pyodide.ffi import to_js
@@ -60,9 +62,9 @@ global reverse_special_token_mappings
 reverse_special_token_mappings = {}
 
 class LMQLTokenizer:
-    def __init__(self, tokenizer_impl):
+    def __init__(self, tokenizer_impl, model_identifier):
         self.tokenizer_impl = tokenizer_impl
-
+        self.model_identifier = model_identifier
         self.detokenizer_cache = {}
 
     @property
@@ -133,7 +135,7 @@ class LMQLTokenizer:
         if type(s) is not list:
             s = [s]
             unpack = True
-
+        
         for seq in s:
             chunk_input_ids = []
             for chunk in self.chunk_out_by_tags(seq):
@@ -197,7 +199,7 @@ def load_tokenizer(model_identifier):
 
     # check environment of USE_JS_TOKENIZER
     if "LMQL_BROWSER" in os.environ:
-        return LMQLTokenizer(get_js_tokenizer(model_identifier))
+        return LMQLTokenizer(get_js_tokenizer(model_identifier), model_identifier)
 
     from transformers import AutoTokenizer
     import torch
@@ -213,13 +215,13 @@ def load_tokenizer(model_identifier):
 
     if cache_path.exists():
         with open(cache_path, "rb") as f:
-            return LMQLTokenizer(pickle.load(f))
+            return LMQLTokenizer(pickle.load(f), model_identifier)
     else:
         from transformers import AutoTokenizer
         t = AutoTokenizer.from_pretrained(model_identifier)
         with open(cache_path, "wb") as f:
             pickle.dump(t, f)
-        return LMQLTokenizer(t)
+        return LMQLTokenizer(t, model_identifier)
 
 if __name__ == "__main__":
     import sys

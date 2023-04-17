@@ -38,6 +38,11 @@ async def main():
     
     for category in queries:
         print(f"{category['category']}")
+        
+        if "requires_input" in category.keys() and category["requires_input"]:
+            print(" [Skipping because it requires user input]".format(category["category"]))
+            continue
+        
         for query in category["queries"]:
             # rpad
             rpad = 50 - len(query["name"])
@@ -48,12 +53,12 @@ async def main():
             # run query
             try:
                 s = time.time()
-                # error_buffer = io.StringIO()
-                # sys.stderr = error_buffer
+                error_buffer = io.StringIO()
+                sys.stderr = error_buffer
                 await lmql.run(query["code"], output_writer=lmql.headless)
                 print(termcolor.colored("[OK]", "green"), f"({time.time() - s:.2f}s)")
             except Exception as e:
-                # print(error_buffer.getvalue())
+                print(error_buffer.getvalue())
                 print(e)
                 print(termcolor.colored("[FAIL]", "red"), f"({time.time() - s:.2f}s)")
 

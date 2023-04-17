@@ -83,4 +83,4 @@ Because we decode our list `THING` by `THING`, we can easily access the individu
 
 ## Python Compatibility
 
-Going beyond simple control flow, LMQL supports most valid Python constructs in the prompt clause of a query, where top-level strings like `"-[THING]"` are automatically interpreted as model input and template variables are assigned accordingly. For more advanced usage, also see the [External Functions](functions.md) chaptor.
+Going beyond simple control flow, LMQL supports most valid Python constructs in the prompt clause of a query, where top-level strings like `"-[THING]"` are automatically interpreted as model input and template variables are assigned accordingly. For more advanced usage, also see the [External Functions](functions.md) chapter.

@@ -1,3 +1,15 @@
+"""
+Simple environment timer to measure the runtime of different parts of the
+code. 
+
+Usage:
+
+stats = Stats("my_stats") # singleton instance
+
+with stats.timer("my_tag"):
+    # do something
+"""
+
 import time
 
 class StatsTimer:

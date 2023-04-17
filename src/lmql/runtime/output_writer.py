@@ -47,7 +47,7 @@ class StreamingOutputWriter:
                 
                 value = "\n".join(program_variables.variable_values.get(v, "").strip() for v in vars)
                     
-                    # os.system("clear")
+                # os.system("clear")
                 if self.last_value is None:
                     self.last_value = value
                     print(value, end="", flush=True)
@@ -60,6 +60,8 @@ class StreamingOutputWriter:
             print(f"{prompt}\n", end="\r")
             
     def add_compiler_output(self, code): pass
+
+# ready to use output writer configurations
 
 silent = DebuggerOutputWriter()
 headless = DebuggerOutputWriter(allows_input=False)

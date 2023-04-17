@@ -353,20 +353,20 @@ lmql-var:hover, lmql-var.is-hover, lmql-var-hover lmql-var {
     color: rgba(101, 98, 98, 0.777) !important;
 }
 
-.lmql-fct {
+.lmql-fct, .highlight.lmql .n {
     color: #E5C07B;
 }
 
-.lmql-kw {
+.lmql-kw, .highlight.lmql .kn, .highlight.lmql .kp, .highlight.lmql .ow, .highlight.lmql .nb {
     font-weight: bold;
     color: #c678dd;
 }
 
-.lmql-str {
+.lmql-str, .highlight.lmql .sd, .highlight.lmql .s2, .highlight.lmql .s1 {
     color: #a7d884;
 }
 
-.lmql-comment {
+.lmql-comment, .highlight.lmql .c1 {
     color: #5c6370;
 }
 
@@ -1058,4 +1058,111 @@ p.uni-branding {
     height: 10pt;
     margin-top: 10pt;
     opacity: 0.6;
+}
+
+section.blog {
+    font-size: 14pt;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+    position: relative;
+}
+
+section.blog.startpage {
+    margin-bottom: 0pt;
+}
+
+/* hr after */
+section.blog.startpage .container::after {
+    content: "";
+    display: block;
+    width: 100%;
+    margin-top: 40pt;
+    height: 0.5pt;
+    background-color: rgb(229, 229, 229);
+}
+
+section.blog p {
+    text-align: left !important;
+}
+
+section.blog .date {
+    position: absolute;
+    top: 20pt;
+    right: 10pt;
+    color: rgba(0, 0, 0, 0.4);
+    font-size: 12pt !important;
+}
+
+section.blog h5.is-2 {
+    max-width: calc(100% - 120pt);
+}
+
+@media screen and (max-width: 500pt) {
+    section.blog .date {
+        top: -10pt;
+    }
+
+    section.blog h5.is-2 {
+        max-width: 100%;
+        width: 100%;
+    }
+}
+
+section.blog h1 {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+section.blog span.author-block {
+    font-size: 14pt !important;
+}
+
+a.anchor {
+    color: rgb(36, 36, 36);
+}
+
+a.blog.see-all {
+    display: block;
+    text-align: center;
+    margin-bottom: 20pt;
+}
+
+section.blog li {
+    margin-bottom: 16pt;
+}
+
+img.inline-logo {
+    height: 0.8em;
+    position: relative;
+    top: 0.02em;
+    margin-right: 5pt;
+}
+
+section.blog pre {
+    background-color: black;
+    color: white;
+    font-size: 10pt;
+    border-radius: 4pt;
+    background-color: #24272D;
+
+    box-shadow: 0pt 20pt 40pt 0pt rgba(0, 0, 0, 0.1);
+    z-index: -1;
+}
+
+.highlight.lmql {
+    position: relative;
+    overflow: visible;
+}
+
+.highlight.lmql>button {
+    position: absolute;
+    top: 5pt;
+    right: 5pt;
+
+    border: none;
+    color: white;
+    background: transparent;
+}
+
+.highlight.lmql>button:hover {
+    text-decoration: underline;
+    cursor: pointer;
 }

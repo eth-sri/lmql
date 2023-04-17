@@ -31,10 +31,8 @@ class LiveDebuggerOutputWriter:
             result = "-"
             if trace is not None and op in trace:
                 result = trace[op]
-
-            follow_map = "-"
-            if hasattr(op, "follow_map"):
-                follow_map = str(op.follow_map)
+                follow_map = "<follow_map output not supporte>"
+            
             return {
                 "result": result,
                 "follow_map": follow_map,
