@@ -15,6 +15,13 @@ cp static/images/lmql.svg ../web-deploy/lmql.svg
 cp -r static ../web-deploy/
 cp -r try ../web-deploy/
 
+# build blog
+pushd blog
+node generate.js
+popd
+# sync all *.html files except index.template.html 
+rsync -av --exclude="index.template.html" blog/*.html ../web-deploy/blog/
+
 echo "📦  Building playground..."
 # create playground destination
 mkdir -p ../web-deploy/playground
