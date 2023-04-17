@@ -5,8 +5,9 @@ import astunparse
 import inspect
 from lmql.language.fragment_parser import LMQLQuery
 from lmql.language.compiler import PromptScope, SNFList, WhereClauseTransformation
-from lmql.ops.ops import NextToken
-from lmql.runtime.prompt_interpreter import ProgramState, digest
+from lmql.ops.ops import NextToken, digest
+from lmql.runtime.program_state import ProgramState
+
 
 global show_transformed
 show_transformed = False

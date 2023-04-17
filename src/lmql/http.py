@@ -1,3 +1,13 @@
+"""
+Dispatching implementation for a simple HTTP fetch() function.
+
+Dispatches to the LMQL Browser Runtime if the LMQL_BROWSER environment variable is set, 
+otherwise uses aiohttp.
+
+For browser use this is required, as the native Python networking stack
+is not available when running via Pyodide.
+"""
+
 import os
 import json
     

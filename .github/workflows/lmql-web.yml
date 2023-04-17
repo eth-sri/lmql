@@ -6,8 +6,6 @@ name: Browser Build & Web Deploy
 on:
   push:
     branches: [ "main", "updated-web"]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
   build:
