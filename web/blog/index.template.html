@@ -49,7 +49,7 @@
 
 function getPlaygroundUrl() {
     const host = window.location.host;
-    if (host === "docs.lmql.ai") {
+    if (host.includes("lmql.ai")) {
         return "https://lmql.ai/playground";
     } else if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
         return "http://localhost:3000/playground";

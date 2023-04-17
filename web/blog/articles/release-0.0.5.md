@@ -37,7 +37,7 @@ Today we are releasing version 0.0.5 of LMQL. This release focuses on stability 
 
 ### Preview
 
-Apart from the above changes, we are also working on a number of other features, including:
+Apart from the changes above, we are also working on a number of other features, including:
 
 * **llama.cpp support** as started in [this PR](https://github.com/eth-sri/lmql/pull/18), thanks to [@CircArgs](https://github.com/CircArgs).
 * Support for **Type Constraints**, e.g.  `type(VAR) is DataClass`, that automatically force the model to produce a value that structurally conforms to the given type. See this [Twitter thread](https://twitter.com/lbeurerkellner/status/1646187597901733889) for more details.
