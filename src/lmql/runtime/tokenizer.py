@@ -219,7 +219,7 @@ def load_tokenizer(model_identifier):
         t = AutoTokenizer.from_pretrained(model_identifier)
         with open(cache_path, "wb") as f:
             pickle.dump(t, f)
-        return LMQLTokenizer(t)
+        return LMQLTokenizer(t, model_identifier)
 
 if __name__ == "__main__":
     import sys
