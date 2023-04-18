@@ -8,6 +8,6 @@ dependencies:
     - openai
     - termcolor
     - pydot
-    - transformers==4.25.1
+    - transformers==4.28.1
     - pandas
     - accelerate
