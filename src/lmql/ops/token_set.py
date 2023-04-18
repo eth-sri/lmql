@@ -14,6 +14,8 @@ def get_vocab(tokenizer):
         return tokenizer.vocab
     elif hasattr(tokenizer, "get_vocab"):
         return tokenizer.get_vocab()
+    elif hasattr(tokenizer, "tokenizer_impl"):
+        return get_vocab(tokenizer.tokenizer_impl)
     else:
         assert False, "Could not obtain full vocabulary from unknown tokenizer type: {}".format(type(tokenizer))
 

@@ -37,6 +37,8 @@ class PromptScope(ast.NodeVisitor):
         # also collect variable reads from where clause
         if query.where is not None:
             FreeVarCollector(self.free_vars).visit(query.where)
+        if query.from_ast is not None:
+            FreeVarCollector(self.free_vars).visit(query.from_ast)
 
         query.scope = self
 
