@@ -38,7 +38,7 @@ def get_js_tokenizer(model_identifier):
             else:
                 return tokens
          
-        def decode(self, input_ids):
+        def decode(self, input_ids, clean_up_tokenization_spaces=None):
             # set typed array type of input_ids to int
             return str(js.detokenize_gpt(to_js([int(i) for i in input_ids])))
 
