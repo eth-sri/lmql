@@ -81,7 +81,7 @@ class DecoderGraph:
         }
 
 class DecoderSequence:
-    def __init__(self, input_ids_or_str, logprobs=None, deterministic=None, stop_phrase=None, predecessor=None, user_data=None, sticky_user_data_keys=None, epsilon_node=False):
+    def __init__(self, input_ids_or_str, logprobs=None, deterministic=None, stop_phrase=None, predecessor=None, user_data=None, sticky_user_data_keys=None, epsilon_node=False, internal=False):
         assert all([p > DecoderSequence.truncation_threshold for p in logprobs]) if logprobs is not None else True
 
         if type(input_ids_or_str) == str:
@@ -147,6 +147,9 @@ class DecoderSequence:
 
     def __new__(cls, *args, **kwargs):
         s = super().__new__(cls)
+
+        if "internal" in kwargs and kwargs["internal"]:
+            return s
 
         setattr(s, "_id", f"s_{DecoderSequence.seq_ctr}")
 
@@ -233,6 +236,7 @@ class DecoderSequence:
             "seq_id": self.id,
             # "input_ids": self.input_ids.tolist(),
             "text": [text],
+            "needs_rewrite": self.needs_rewrite,
             "seqtext": seqtext,
             "root": root,
             "logprob": self.logprobs[-1],
@@ -302,21 +306,63 @@ class DecoderSequence:
             set_path(user_data, sk, self.data(sk), create_missing=True, replace=False)
         return user_data
 
-    def extend(self, continuation):
-        stop_phrase = self.detect_stop_phrase(continuation)
-        return DecoderSequence(
-            input_ids_or_str=np.concatenate([self.input_ids, continuation.token.reshape(1)]), 
-            logprobs=np.concatenate([self.logprobs, continuation.logprob.reshape(1)]),
-            # deterministic tokens are only extended in DeterministicDecoderSequence.extend.
-            # So here, all extended tokens are non-deterministic, i.e. model predictions.
-            deterministic=np.concatenate([self.deterministic, np.array([False])]),
-            stop_phrase=stop_phrase,
-            predecessor=self,
-            user_data=self.extend_user_data(continuation),
-            sticky_user_data_keys=self.sticky_user_data_keys
-        )
+    def extend(self, continuation, internal=False):
+        stop_phrase = self.detect_stop_phrase(continuation.token)
+        
+        next_tokens = continuation.token.reshape(-1)
+        next_logprobs = continuation.logprob.reshape(-1)
+        num_next_tokens = next_tokens.shape[0]
+        
+        if num_next_tokens == 1:
+            return DecoderSequence(
+                input_ids_or_str=np.concatenate([self.input_ids, next_tokens.reshape(1)]), 
+                logprobs=np.concatenate([self.logprobs, next_logprobs.reshape(1)]),
+                # deterministic tokens are only extended in DeterministicDecoderSequence.extend.
+                # So here, all extended tokens are non-deterministic, i.e. model predictions.
+                deterministic=np.concatenate([self.deterministic, np.array([False])]),
+                stop_phrase=stop_phrase,
+                predecessor=self,
+                user_data=self.extend_user_data(continuation),
+                sticky_user_data_keys=self.sticky_user_data_keys,
+                internal=internal
+            )
+        else:
+            extended_input_ids = np.concatenate([self.input_ids, next_tokens[0].reshape(1)])
+            extended_logprobs = np.concatenate([self.logprobs, next_logprobs[0].reshape(1)])
+            extended_deterministic = np.concatenate([self.deterministic, np.array([False])])
 
-    def detect_stop_phrase(self, continuation):
+            reduced_next_ids = next_tokens[1:]
+            reduced_next_logprobs = next_logprobs[1:]
+            reduced_deterministic = [False for _ in range(num_next_tokens - 1)]
+
+            user_data = continuation.user_data
+            assert type(user_data) is list, "extend() with multi-token continuations, expects multiple user_data dicts"
+
+            stop_phrase = self.detect_stop_phrase(continuation.token)
+            if self.data("injected_stop_phrase"):
+                print(self)
+                assert not extended_deterministic[-1]
+
+            return DeterministicDecoderSequence(
+                input_ids=extended_input_ids, 
+                logprobs=extended_logprobs, 
+                deterministic=extended_deterministic,
+                stop_phrase=stop_phrase,#np.concatenate([self.stop_phrase, self.data("injected_stop_phrase")]),
+                next_ids=reduced_next_ids,
+                next_logprobs=reduced_next_logprobs,
+                next_deterministic=reduced_deterministic,
+                predecessor=self, 
+                user_data=user_data[0],
+                next_user_data=user_data[1:],
+                needs_rewrite=False,
+                sticky_user_data_keys=self.sticky_user_data_keys
+            )
+
+    def detect_stop_phrase(self, next_tokens):
+        # only consider the first token of the next tokens
+        if nputil.is_array(next_tokens):
+            next_tokens = next_tokens.reshape(-1)[0]
+
         old_stop_phrase = self.stop_phrase
         new_stop_phrase = np.concatenate([old_stop_phrase, np.array([False])])
         stop_phrases = self.data("head").stopping_phrases["tokenized"]
@@ -324,7 +370,7 @@ class DecoderSequence:
         if stop_phrases is None:
             return new_stop_phrase
 
-        ids = np.concatenate([self.input_ids, continuation.token.reshape(1)]),
+        ids = np.concatenate([self.input_ids, next_tokens.reshape(1)]),
         for stop in stop_phrases:
             len_stop = len(stop)
             if ids[-len_stop:] == stop:
@@ -367,9 +413,16 @@ class DecoderSequence:
         return self.input_ids[-1] == get_tokenizer().eos_token_id
 
     def make_successors(self, next_tokens, next_token_scores, logits, user_data=None):
+        # TODO: differentiate len(next_token_scores) > 1 being branchings vs. fixed expansion
+        def is_truncated(score):
+            # list of score means that this is a fixed expansion
+            if type(score) is list: 
+                return False
+            return score < DecoderSequence.truncation_threshold
+
         # remove very low scoring tokens (likely they were masked and therefore score low)
-        next_tokens = np.stack([t for t, s in zip(next_tokens, next_token_scores) if s > DecoderSequence.truncation_threshold], axis=0)
-        next_token_scores = np.stack([s for s in next_token_scores if s > DecoderSequence.truncation_threshold], axis=0)
+        next_tokens = np.stack([t for t, s in zip(next_tokens, next_token_scores) if not is_truncated(s)], axis=0)
+        next_token_scores = np.stack([s for s in next_token_scores if not is_truncated(s)], axis=0)
 
         return Continuation(next_tokens, next_token_scores, user_data)
 # global counter for all sequences created in this process for identification purposes
@@ -426,11 +479,12 @@ def deepmerge(a, b):
     return a
 
 class DeterministicDecoderSequence(DecoderSequence):
-    def __init__(self, input_ids, logprobs, deterministic, stop_phrase, next_ids, next_logprobs=None, next_deterministic=None, predecessor=None, user_data=None, needs_rewrite=False, sticky_user_data_keys=None):
+    def __init__(self, input_ids, logprobs, deterministic, stop_phrase, next_ids, next_logprobs=None, next_deterministic=None, predecessor=None, user_data=None, needs_rewrite=False, sticky_user_data_keys=None, next_user_data=None):
         super().__init__(input_ids, logprobs, deterministic, stop_phrase, predecessor, user_data=user_data.copy() if user_data is not None else None, sticky_user_data_keys=sticky_user_data_keys)
         self.next_ids = next_ids
         self.next_logprobs = next_logprobs
         self.next_deterministic = next_deterministic
+        self.next_user_data = next_user_data
 
         self.needs_rewrite = needs_rewrite
 
@@ -517,10 +571,10 @@ class DeterministicDecoderSequence(DecoderSequence):
         # additionally add self.user_data for deterministic sequence extensions
         return deepmerge(deepcopy(self.user_data), super().extend_user_data(continuation=continuation, user_data=user_data))
 
-    def extend(self, continuation):
+    def extend(self, continuation, internal=False):
         # if not more predetermined tokens are left, just extend as usual and return a regular seq()
         if len(self.next_ids) <= 0:
-            return super().extend(continuation)
+            return super().extend(continuation, internal=internal)
 
         assert continuation.token == self.next_ids[0], "deterministic sequences must be extended by the predetermined next token: provided: " + str(continuation.token) + ", predetermined: " + str(self.next_ids[0])
 
@@ -531,10 +585,14 @@ class DeterministicDecoderSequence(DecoderSequence):
         reduced_next_ids = self.next_ids[1:]
         reduced_next_logprobs = self.next_logprobs[1:] if self.next_logprobs is not None else None
         reduced_deterministic = None if self.next_deterministic is None else self.next_deterministic[1:]
+        reduced_user_data = None if self.next_user_data is None else self.next_user_data[1:]
 
-        user_data = self.extend_user_data(continuation)
+        if self.next_user_data is not None:
+            user_data = self.next_user_data[0]
+        else:
+            user_data = self.extend_user_data(continuation)
 
-        stop_phrase = self.detect_stop_phrase(continuation)
+        stop_phrase = self.detect_stop_phrase(continuation.token)
         if self.data("injected_stop_phrase"):
             print(self)
             assert not extended_deterministic[-1]
@@ -549,8 +607,9 @@ class DeterministicDecoderSequence(DecoderSequence):
             next_deterministic=reduced_deterministic,
             predecessor=self, 
             user_data=user_data,
+            next_user_data=reduced_user_data,
             needs_rewrite=self.needs_rewrite,
-            sticky_user_data_keys=self.sticky_user_data_keys,
+            sticky_user_data_keys=self.sticky_user_data_keys
         )
 
     def __repr__(self) -> str:

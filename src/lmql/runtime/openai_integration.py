@@ -15,13 +15,8 @@ from lmql.runtime.dclib.dclib_seq import (DecoderSequence, deepcopy, deepmerge,
 from lmql.runtime.stats import Stats
 from lmql.runtime.tokenizer import load_tokenizer
 from lmql.utils import nputil
+from lmql.runtime.masks import *
 
-
-def is_allowed(m): 
-    """
-    Given a logits mask, sets tensor cell value to True iff the corresponding token is allowed according to the mask.
-    """
-    return np.isclose(m, 0, atol=1e-8)
 
 def openai_complete_create(*args, **kwargs):
     if kwargs.get("chaos", False):
@@ -61,6 +56,8 @@ class CompletionResult:
     continuation_type: str
     logit_mask_or_fixed_id: Optional[Union[np.ndarray, int]] = None
 
+    user_data: Any = None
+
 @dataclass
 class CompletionCall:
     mode: str
@@ -71,6 +68,9 @@ class CompletionCall:
     
     # true iff inverting the api_mask leads to a smaller mask
     invert: bool = False
+
+    # set if user_data is already provided by logit mask computer
+    user_data: Any = None
     
     @property
     def api_mask(self, invert=None):
@@ -124,7 +124,7 @@ class DclibOpenAiModel(DcModel):
     def log_queries(self, n: int):
         pass # openai keeps track of queries via bopenai
 
-    def prepare_completion_call(self, s, mask, **kwargs):
+    def prepare_completion_call(self, s, logit_mask_result, **kwargs):
         """
         Computes an API compatible mask from the provided logit mask, as well as the required mode of completion.
 
@@ -134,30 +134,43 @@ class DclibOpenAiModel(DcModel):
             - (token_id, "fixed"): Complete with the provided token_id with full probability 1.0 (no API use necessary)
 
         """
-        stopping_phrases = s.data("head").stopping_phrases["text"]
+        user_data = logit_mask_result.user_data[-1]
+        next_token_masks = logit_mask_result.logits_mask
 
-        if mask is None:
+        stopping_phrases = user_data["head"].stopping_phrases["text"]
+
+        if any(mask is None for mask in next_token_masks):
+            assert len(next_token_masks) == 1, "DclibOpenAiModel: illegal state, encountered multiple next token masks with at least one None"
             return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
 
+        # if multiple next tokens are fixed, we we can use a single API call to score them all
+        if len(next_token_masks) > 1:
+            next_tokens = next_token_masks
+            return CompletionCall("fixed", next_tokens, s.input_ids, kwargs, stopping_phrases=stopping_phrases, user_data=logit_mask_result.user_data)
+        
+        assert len(next_token_masks) == 1, "DclibOpenAiModel: illegal state, encountered an empty list of next token masks"
+        mask = next_token_masks[0]
+
         invert = False
-        num_allowed = is_allowed(mask).sum(axis=-1)
-        assert num_allowed > 0, "DclibOpenAiModel: encountered logits mask with no allowed tokens"
+        num_allowed = mask_num_allowed(mask)
+        assert num_allowed > 0, "DclibOpenAiModel: encountered logits mask with no allowed tokens {}".format(mask)
 
         if num_allowed == 1:
             # check for <eos> case
-            if is_allowed(mask[self.eos_token_id]):
+            if mask_is_allowed(mask, self.eos_token_id):
                 return CompletionCall("fixed", self.eos_token_id, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
             else:
                 # otherwise we can treat this as a score call
-                return CompletionCall("fixed", mask.argmax(axis=-1), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
-        elif num_allowed < mask.shape[-1]:
-            if mask.shape[-1] - num_allowed > num_allowed:
+                return CompletionCall("fixed", mask_get_only_allowed(mask), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
+        elif num_allowed < self.tokenizer.vocab_size:
+            if self.tokenizer.vocab_size - num_allowed > num_allowed:
                 # if we have to mask more than half of the tokens, we should just invert the masking
                 invert = True
-        else: # num_allowed == mask.shape[-1] (full vocabulary)
+        else: # num_allowed == self.tokenizer.vocab_size (full vocabulary)
             return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
 
         # num_allowed < mask.shape[-1] and num_allowed > 1 (needs mask)
+        assert is_dense_mask(mask), "DclibOpenAiModel: encountered sparse logits mask where dense mask was expected: {}".format(mask)
         return CompletionCall("complete", mask, s.input_ids, kwargs, invert=invert, stopping_phrases=stopping_phrases)
 
     async def api_score(self, input_ids, offset):
@@ -256,8 +269,12 @@ class DclibOpenAiModel(DcModel):
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=0), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
             else:
                 fixed_next_token = nputil.ensure_array(fixed_next_token, dtype=np.int64)
-                logprob = (await self.api_score(np.concatenate([input_ids, fixed_next_token.reshape(1)], axis=0), len(input_ids)))
-                return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=logprob), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
+                logprob = (await self.api_score(np.concatenate([input_ids, fixed_next_token.reshape(-1)], axis=0), len(input_ids)))
+                
+                fixed_next_token = nputil.ensure_iterable(fixed_next_token)
+                logprob = nputil.ensure_iterable(logprob)
+
+                return CompletionResult(openai.response_buffer.fixed(tokens=fixed_next_token, token_logprobs=logprob), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
         elif len(completion_call.stopping_phrases) > 0:
             if len(completion_call.stopping_phrases) > 4:
                 # same but blaming it more on OpenAI
@@ -354,7 +371,10 @@ class DclibOpenAiModel(DcModel):
                 # print("completion_buffer", s)
                 constrained_seqs = np.array([s.is_query_constrained], dtype=np.bool_)
                 logits_mask_result = await self.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
-                logits_mask = logits_mask_result.logits_mask[0]
+
+                # we only do this for a single sequence here
+                logits_mask_result.user_data = logits_mask_result.user_data[0]
+                logits_mask_result.logits_mask = logits_mask_result.logits_mask[0]
 
             # update user data with new information obtained when computing logits masks
             if s.user_data is None:
@@ -362,7 +382,7 @@ class DclibOpenAiModel(DcModel):
             s.user_data = deepmerge(deepcopy(s.user_data), logits_mask_result.user_data[0])
             s.user_data["set_by"] = "where"
 
-            completion_call = self.prepare_completion_call(s, logits_mask, **kwargs)
+            completion_call = self.prepare_completion_call(s, logits_mask_result, **kwargs)
 
             # if no masking is required, we can use cached continuations if available
             if s.data("openai-continuations") is not None:
@@ -384,9 +404,12 @@ class DclibOpenAiModel(DcModel):
                     openai.response_buffer.singleton(token=s.next_ids[0], token_logprob=s.next_logprobs[0]),
                     None,
                     None,
+                    completion_call.user_data
                 )
 
-            return await self.async_complete(completion_call)
+            result = await self.async_complete(completion_call)
+            result.user_data = completion_call.user_data
+            return result
 
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
 
@@ -408,6 +431,30 @@ class DclibOpenAiModel(DcModel):
                 data["_step"] = decoder_step
             printer.report_model_stats(**data)
 
+    async def expand_fixed(self, continuation, completion, continuation_buffers: List[CompletionResult]):
+        fixed_next_token_ids = []
+        fixed_next_token_scores = []
+        fixed_logits = []
+        buffer = completion.buffer
+        complete_data = (await completion.buffer.get(0))
+
+        while "fixed" in complete_data.keys():
+            next_token = complete_data["logprobs"]["tokens"]
+            next_token_score = complete_data["logprobs"]["token_logprobs"]
+            fixed_next_token_scores.append(next_token_score)
+            fixed_next_token_ids.append(np.array([next_token], dtype=np.int64))
+            fixed_logits.append({next_token: next_token_score})
+
+            buffer = buffer[1:]
+            if await buffer.empty():
+                continuation = CompletionResult(buffer, completion.continuation_type, completion.logit_mask_or_fixed_id)
+                continuation_buffers[-1] = continuation
+                break
+            else:
+                complete_data = (await buffer.get(0))
+
+        return fixed_next_token_ids, fixed_next_token_scores, fixed_logits
+
     async def sample(self, sequences, num_samples=1, **kwargs):
         """
         Returns a pool with `n` sampled successor nodes per node in the pool.
@@ -421,10 +468,12 @@ class DclibOpenAiModel(DcModel):
             next_token_scores = []
             logits = []
             continuation_buffers: List[CompletionResult] = []
+            user_data = []
 
             for s, completion in zip(seqs, completions):
                 assert not await completion.buffer.empty(), "Completion buffer is empty {}".format(completion.buffer)
                 complete_data = (await completion.buffer.get(0))
+                user_data.append(completion.user_data)
 
                 # store pointer to continuation buffers in newly expanded nodes
                 continuation = CompletionResult(completion.buffer[1:], completion.continuation_type, completion.logit_mask_or_fixed_id)
@@ -432,17 +481,11 @@ class DclibOpenAiModel(DcModel):
 
                 # detect fixed results (i.e. deterministic tokens)
                 if "fixed" in complete_data.keys():
-                    next_token = complete_data["logprobs"]["tokens"]
-                    next_token_score = complete_data["logprobs"]["token_logprobs"]
-                    next_token_ids.append(np.array([next_token], dtype=np.int64))
-                    next_token_scores.append(np.array([next_token_score], dtype=np.float32))
+                    fixed_next_token_ids, fixed_next_token_scores, fixed_logits = await self.expand_fixed(continuation, completion, continuation_buffers)
                     
-                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
-                    if next_token < len(full_logits):
-                        full_logits[next_token] = next_token_score
-                    # else: 
-                    #  next_token is a special token, which is not in the vocab
-                    logits.append(full_logits)
+                    next_token_ids.append([fixed_next_token_ids])
+                    next_token_scores.append([fixed_next_token_scores])
+                    logits.append([fixed_logits])
                     continue
 
                 # get sampled token and score
@@ -484,10 +527,16 @@ class DclibOpenAiModel(DcModel):
             next_token_ids = next_token_ids
             next_token_scores = next_token_scores
 
-            def successor_user_data(continuation_buffer: SequenceResult, num_successors):
-                default_user_data = {}
+            def successor_user_data(i: int):
+                continuation_buffer: SequenceResult = continuation_buffers[i]
+                successor_user_data = user_data[i]
+                num_successors = len(next_token_ids[i])
+                
+                default_user_data = successor_user_data or {}
                 if continuation_buffer.continuation_type is None:
                     return [default_user_data.copy()] * num_successors
+                
+                assert successor_user_data is None, "user_data for non-fixed continuations must be None"
                 continuation_as_user_data = {
                     "openai-continuations": {
                         continuation_buffer.continuation_type: continuation_buffer
@@ -497,7 +546,7 @@ class DclibOpenAiModel(DcModel):
                 return [continuation_as_user_data] + [default_user_data.copy()] * (num_successors - 1)
 
             s = [s.make_successors(next_token_ids[i], next_token_scores[i], logits=logits[i], 
-                user_data=successor_user_data(continuation_buffers[i], len(next_token_ids[i]))) for i,s in enumerate(seqs)]
+                user_data=successor_user_data(i)) for i,s in enumerate(seqs)]
             return s
         with self.stats.timer("sample"):
             return await sequences.aelement_wise(op_sample)
@@ -521,23 +570,24 @@ class DclibOpenAiModel(DcModel):
             next_token_scores = []
             logits = []
             continuation_buffers: List[CompletionResult] = []
+            user_data = []
 
             for s, completion in zip(seqs, completions):
+                assert not await completion.buffer.empty(), "Completion buffer is empty {}".format(completion.buffer)
                 complete_data = (await completion.buffer.get(0))
+                user_data.append(completion.user_data)
+
                 # store pointer to continuation buffers in newly expanded nodes
                 continuation = CompletionResult(completion.buffer[1:], completion.continuation_type, completion.logit_mask_or_fixed_id)
                 continuation_buffers.append(continuation)
 
                 # detect fixed results (i.e. deterministic tokens)
                 if "fixed" in complete_data.keys():
-                    next_token = complete_data["logprobs"]["tokens"]
-                    next_token_score = complete_data["logprobs"]["token_logprobs"]
-                    next_token_ids.append(np.array([next_token], dtype=np.int64))
-                    next_token_scores.append(np.array([next_token_score], dtype=np.float32))
+                    fixed_next_token_ids, fixed_next_token_scores, fixed_logits = await self.expand_fixed(continuation, completion, continuation_buffers)
                     
-                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
-                    full_logits[next_token] = next_token_score
-                    logits.append(full_logits)
+                    next_token_ids.append([fixed_next_token_ids])
+                    next_token_scores.append([fixed_next_token_scores])
+                    logits.append([fixed_logits])
                     continue
 
                 # get sampled token and score
@@ -570,10 +620,16 @@ class DclibOpenAiModel(DcModel):
                 next_token_scores.append(logprobs)
                 logits.append(full_logits)
 
-            def successor_user_data(continuation_buffer: SequenceResult, num_successors):
-                default_user_data = {}
+            def successor_user_data(i: int):
+                continuation_buffer: SequenceResult = continuation_buffers[i]
+                successor_user_data = user_data[i]
+                num_successors = len(next_token_ids[i])
+                
+                default_user_data = successor_user_data or {}
                 if continuation_buffer.continuation_type is None:
                     return [default_user_data.copy()] * num_successors
+                
+                assert successor_user_data is None, "user_data for non-fixed continuations must be None"
                 continuation_as_user_data = {
                     "openai-continuations": {
                         continuation_buffer.continuation_type: continuation_buffer
@@ -583,7 +639,7 @@ class DclibOpenAiModel(DcModel):
                 return [continuation_as_user_data] + [default_user_data.copy()] * (num_successors - 1)
 
             return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=logits[i], 
-                user_data=successor_user_data(continuation_buffers[i], len(logits[i]))) for i,s in enumerate(seqs)]
+                user_data=successor_user_data(i)) for i,s in enumerate(seqs)]
         
         with self.stats.timer("topk"):
             return await sequences.aelement_wise(op_topk)

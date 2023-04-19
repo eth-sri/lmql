@@ -292,6 +292,18 @@ class response_buffer:
                 "top_logprobs": [top_logprobs]
             }
         })
+    
+    @classmethod
+    def fixed(cls, tokens=None, token_logprobs=None):
+        return cls(None, {
+            "text": " ".join([str(t) for t in tokens]),
+            "logprobs": {
+                "text_offset": [0 for _ in tokens],
+                "token_logprobs": [lp for lp in token_logprobs],
+                "tokens": [t for t in tokens],
+                "top_logprobs": [{t: p} for t, p in zip(tokens, token_logprobs)]
+            }
+        })
 
 
     def _append(self, data):

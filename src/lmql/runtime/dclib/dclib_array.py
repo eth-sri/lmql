@@ -316,8 +316,8 @@ class DataArray:
         def op_extend(p1, p2):
             extended_seqs = []
             for sq, continuation in zip(p1, p2):
-                tokens = continuation.token.reshape(-1)
-                logprobs = continuation.logprob.reshape(-1)
+                tokens = nputil.ensure_iterable(continuation.token)
+                logprobs = nputil.ensure_iterable(continuation.logprob)
                 user_data = continuation.user_data or [None] * len(tokens)
                 for t,s,u in zip(tokens, logprobs, user_data):
                     extended_seqs.append(sq.extend(Continuation(t, s, u)))

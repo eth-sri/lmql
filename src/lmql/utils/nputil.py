@@ -14,7 +14,6 @@ def ensure_array(v, dtype=None):
     if is_array(v): return v
     else: return np.array(v, dtype=dtype)
 
-
 def log_softmax(a):
     return a - np.log(np.sum(np.exp(a)))
 
@@ -63,3 +62,11 @@ def replace_inf_nan_with_str(d):
         if math.isinf(d) or math.isnan(d):
             return str(d)
     return d
+
+def ensure_iterable(v):
+    if is_array(v):
+        return v if v.ndim >= 1 else np.expand_dims(v, axis=0)
+    elif isinstance(v, list):
+        return v
+    else:
+        return [v]

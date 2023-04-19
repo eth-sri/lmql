@@ -29,6 +29,7 @@ class LiveDebuggerOutputWriter:
         
         def node_data(op):
             result = "-"
+            follow_map = "-"
             if trace is not None and op in trace:
                 result = trace[op]
                 follow_map = "<follow_map output not supporte>"
