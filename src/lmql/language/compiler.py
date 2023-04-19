@@ -12,6 +12,7 @@ from lmql.language.qstrings import qstring_to_stmts, TemplateVariable
 from lmql.language.validator import LMQLValidator, LMQLValidationError
 from lmql.language.fragment_parser import LMQLDecoderConfiguration, LMQLQuery, LanguageFragmentParser, FragmentParserError
 from lmql.runtime.model_registry import model_name_aliases
+import lmql.runtime.lmql_runtime as lmql_runtime
 
 OPS_NAMESPACE = "lmql.ops"
 
@@ -460,6 +461,9 @@ class LMQLModule(object):
     def load(self):
         sys.path.append(os.path.dirname(self.compiled_file))
         m = __import__(os.path.basename(self.compiled_file[:-3]))
+        for v in m.__dict__.values():
+            if type(v) is lmql_runtime.LMQLQueryFunction:
+                v.lmql_code = self.lmql_code
         setattr(m, "code", self.code)
         setattr(m, "lmql_code", self.lmql_code)
         return m

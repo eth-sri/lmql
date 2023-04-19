@@ -22,6 +22,7 @@ from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
                                        LMQLQueryFunction, compiled_query, tag)
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
+from lmql.runtime.interpreter import LMQLResult
 
 model_registry = LMQLModelRegistry
 
@@ -148,8 +149,8 @@ def _get_decorated_function_code(fct):
         source = "\n".join(lines)
 
         quote_types = "'''" if source.endswith("'''") else '"""'
-        if source.startswith(quote_types):
-            source = source[len(quote_types):]
+        if source.lstrip().startswith(quote_types):
+            source = source.lstrip()[len(quote_types):]
         assert source.endswith(quote_types), f"Docstring of @lmql.query function {fct.__name__} must be on the first line of the function, but is:\n {source}"
         source = source[:-len(quote_types)].strip("\n")
     except:
