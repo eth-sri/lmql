@@ -100,7 +100,7 @@ class LMQLContext:
         return self
 
     async def get_all_vars(self):
-        return self.program_state.variable_values.copy()
+        return self.program_state.variable_program_values.copy()
 
     async def set_distribution(self, distribution_variable, values):
         self.interpreter.distribution_variable = distribution_variable

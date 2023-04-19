@@ -244,8 +244,6 @@ class IntOp(Node):
 
     def postprocess(self, operands, raw):
         value = int(raw)
-        if raw.startswith(" "):
-            value = " " + str(value)
         return postprocessed_rewrite(str(value)), postprocessed_value(value)
 
     def postprocess_order(self, other, **kwargs):
@@ -950,6 +948,16 @@ class StopAtOp(Node):
                 return "after"
         
         return 0 # other constraints cannot be compared
+
+@LMQLOp(["STOPS_BEFORE", "stops_before"])
+class StopBeforeOp(StopAtOp):
+    def postprocess(self, operands, value):
+        op2 = operands[1]
+        matched_phrase_index = value.rfind(op2)
+        if matched_phrase_index != -1:
+            value = value[:matched_phrase_index]
+
+        return postprocessed_rewrite(value), postprocessed_value(value)
 
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):
