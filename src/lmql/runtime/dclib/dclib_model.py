@@ -7,6 +7,7 @@ from .dclib_global import stats
 from .dclib_seq import DecoderSequence, detseq, deepcopy, deepmerge, DecoderSequence, DeterministicDecoderSequence, Continuation
 import numpy as np
 from lmql.utils import nputil
+import lmql.runtime.masks as masks
 from dataclasses import dataclass
 import sys
 
@@ -22,13 +23,14 @@ class DcModelLogitsTask:
 
 class ModelQueue:
     @staticmethod
-    def get(model_identifier):
+    def get(model_identifier, vocab_size: int):
         if model_identifier not in ModelQueue._instances.keys():
-            ModelQueue._instances[model_identifier] = ModelQueue(model_identifier)
+            ModelQueue._instances[model_identifier] = ModelQueue(model_identifier, vocab_size)
         return ModelQueue._instances[model_identifier]
     
-    def __init__(self, model_identifier):
+    def __init__(self, model_identifier, vocab_size: int):
         self.model_identifier = model_identifier
+        self.vocab_size = vocab_size
         self.logits_queue = asyncio.Queue()
         self.logits_workers = [asyncio.create_task(self.queue_worker_logits()) for _ in range(8)]
     
@@ -59,6 +61,10 @@ class ModelQueue:
                 # group by parameters
                 groups = [[]]
                 for t in batch:
+                    # make sure fixed input id masks have their own group (need to use score())
+                    if masks.is_fixed_int_mask(t.logits_mask) and len(t.logits_mask) > 1:
+                        groups[-1].append(t)
+                        continue
                     if len(groups[-1]) == 0:
                         groups[-1].append(t)
                         continue
@@ -73,9 +79,26 @@ class ModelQueue:
                 for group in groups:
                     kwargs = group[0].kwargs
                     model = group[0].model
+                    logits_mask = [task.logits_mask for task in group]
+
+                    # handle multi-token logits masks
+                    if masks.is_fixed_int_mask(logits_mask[0]):
+                        assert len(logits_mask) == 1, "logits_mask is fixed, but multiple tasks in batch"
+                        fixed_next_ids = logits_mask[0]
+                        input_ids = group[0].input_ids
+                        fut = group[0].result_fut
+
+                        _, logits = await model.score(input_ids.reshape(1,-1), nputil.ensure_array(fixed_next_ids).reshape(1,-1), **kwargs)
+                        # unwrap batch dimension
+                        logits = logits[0]
+                        
+                        fut.set_result((logits, logits))
+                        continue
+
+                    # handle default case (predict next token only)
                     logits, raw = await model.logits(
                         [task.input_ids for task in group],
-                        logits_mask=self.stack_logit_masks([task.logits_mask for task in group]),
+                        logits_mask=self.stack_logit_masks(logits_mask),
                         **kwargs
                     )
                     for logits, raw, fut in zip(logits, raw, [task.result_fut for task in group]):
@@ -87,13 +110,28 @@ class ModelQueue:
                 print("Exception in queue worker logits: ", e)
 
     def stack_logit_masks(self, logit_masks):
+        def dense(m):
+            if len(m) == 0 or m is None:
+                return np.zeros((self.vocab_size), dtype=np.float32)
+            if len(m) > 1:
+                m = m[:1]
+            assert len(m) == 1, f"stack_logit_masks: expected single-next-token mask, got {len(m)}. This should be a score() call."
+            m = m[0]
+            if m is None:
+                return np.zeros((self.vocab_size), dtype=np.float32)
+            elif type(m) is int or type(m) is np.int64:
+                token_ids = np.array(m)
+                mask = np.ones((self.vocab_size), dtype=np.float32) * -np.inf
+                mask[token_ids] = 0
+                return mask
+            else:
+                assert m.ndim == 1 and m.shape[0] == self.vocab_size
+                return m
+
         if all([m is None for m in logit_masks]):
             return None
         else:
-            existing = [m for m in logit_masks if m is not None]
-            vocab_size = existing[0].shape[1] if existing[0].ndim == 2 else existing[0].shape[0]
-            lm = np.stack([m if m is not None else np.zeros((vocab_size), dtype=np.bool) for m in logit_masks])
-            return lm
+            return np.stack([dense(m) for m in logit_masks], axis=0)
 
 ModelQueue._instances = {}
 
@@ -118,7 +156,7 @@ class DcModel:
 
         self.stats = Stats("dcmodel")
 
-        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier)
+        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier, self.tokenizer.vocab_size)
         else: self.logits_queue = None
 
     def log_billable_tokens(self, n: int):
@@ -149,47 +187,24 @@ class DcModel:
 
         return await result_fut
 
-    async def autobatch_logits_with_cache(self, model, input_ids, max_batch_size, cache=None, logits_mask=None, **kwargs):
+    async def autobatch_logits(self, model, input_ids, max_batch_size, logits_mask=None, **kwargs):
         kwargs = {**self.model_args, **kwargs}
-
-        if cache is not None: 
-            input_ids_to_process = [ids for cache, ids in zip(cache, input_ids) if cache is None]
-        else: 
-            input_ids_to_process = input_ids
-
-        # print("call model for ", len(input_ids_to_process), " sequences", [len(ids) for ids in input_ids_to_process])
 
         # automatic batching
         results = await asyncio.gather(*[self.model_logits_async(
             model, 
-            input_ids_to_process[i],
+            input_ids[i],
             logits_mask=logits_mask[i] if logits_mask is not None else None,
             eos_token_id=self.eos_token_id,
             **model.model_kwargs,
             **kwargs
-        ) for i in range(len(input_ids_to_process))])
+        ) for i in range(len(input_ids))])
 
         # call model only for non-cached input_ids
-        processed_logits = np.stack([r[0] for r in results], axis=0)
-        processed_logits_raw = np.stack([r[1] for r in results], axis=0)
+        processed_logits = [nputil.ensure_array(r[0]) for r in results]
+        processed_logits_raw = [nputil.ensure_array(r[1]) for r in results]
 
-        # shortcut if no cache
-        if cache is None: return processed_logits, processed_logits_raw
-
-        # merge with cache
-        result_logits = []
-        result_raw = []
-        ptr = 0
-        for c in cache:
-            if c is not None:
-                result_logits.append(c[0])
-                result_raw.append(c[1])
-            else:
-                result_logits.append(processed_logits[ptr])
-                result_raw.append(processed_logits_raw[ptr])
-                ptr += 1
-        
-        return np.stack(result_logits, axis=0), np.stack(result_raw, axis=0)
+        return processed_logits, processed_logits_raw
 
     async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, **kwargs):
         if "modern_logits_processor" in kwargs:
@@ -209,7 +224,6 @@ class DcModel:
         with self.stats.timer("logits"):
             input_ids = [s.input_ids for s in seqs]
             user_data = [s.data() for s in seqs]
-            cache = [(s.logits, s.raw_logits) if s.logits is not None else None for s in seqs]
 
             # determine set of sequences that are constrained
             constrained_seqs = np.array([s.is_query_constrained for s in seqs], dtype=np.bool_)
@@ -218,23 +232,23 @@ class DcModel:
             logits_mask_result = await self.compute_logits_mask(input_ids, user_data, constrained_seqs, seqs, **kwargs)
             logits_mask = logits_mask_result.logits_mask
             if len(logits_mask) == 1 and logits_mask[0] is None: logits_mask = None
-            
+
             # update user data with new information obtained when computing logits masks
             for s, updated_user_data in zip(seqs, logits_mask_result.user_data):
                 if updated_user_data is None: continue
                 # TODO: update instead of reassign
-                s.user_data = updated_user_data
+                s.user_data = updated_user_data[0]
                 s.user_data["set_by"] = "where"
 
             # compute logits with automatic batching
-            result_logits, result_raw = await self.autobatch_logits_with_cache(self.model, input_ids, max_batch_size=max_batch_size, cache=cache, logits_mask=logits_mask, **kwargs)
+            result_logits, result_raw = await self.autobatch_logits(self.model, input_ids, max_batch_size=max_batch_size, logits_mask=logits_mask, **kwargs)
 
             # cache logits in nodes (if self.input_ids is used)
             for s,logits,raw in zip(seqs, result_logits, result_raw):
                 s.logits = logits
                 s.raw_logits = raw
             
-            return result_logits, result_raw
+            return result_logits, result_raw, logits_mask_result.user_data
 
     async def argmax(self, sequences, **kwargs):
         """
@@ -376,19 +390,37 @@ class DcModel:
             if len(seqs) == 0:
                 return []
 
-            logits, raw_logits = await self.logits(seqs, **kwargs)
-            vocab_size = logits.shape[-1]
+            logits, raw_logits, user_data = await self.logits(seqs, **kwargs)
+            vocab_size = self.tokenizer.vocab_size
 
             next_token_ids = []
             for i in range(len(logits)):
                 probs = np.exp(logits[i])
+                
+                # detect multiple fixed tokens
+                if probs.ndim > 1:
+                    num_fixed = probs.shape[0]
+                    next_token_ids.append(probs.argmax(axis=-1))
+                    continue
+                
+                # otherwise do regular sampling)
                 num_possible = (probs > 0).sum()
-                next_token_ids.append(np.random.choice(vocab_size, size=max(num_samples, num_possible), p=probs, replace=False))
-            next_token_ids = np.stack(next_token_ids, axis=0)
+                next_token_ids.append(np.random.choice(vocab_size, size=min(num_samples, num_possible), 
+                                                       p=probs, replace=False))
 
-            next_token_scores = np.take_along_axis(logits, next_token_ids.reshape(-1,1), axis=-1)
-
-            return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=raw_logits[i]) for i,s in enumerate(seqs)]
+            next_token_scores = []
+            for i in range(len(logits)):
+                token_ids = next_token_ids[i]
+                seq_logits = logits[i]
+                if seq_logits.ndim > 1:
+                    token_ids = token_ids.reshape(-1, 1)
+                    next_token_scores.append(np.take_along_axis(logits[i], token_ids, axis=-1).reshape(-1))
+                else:
+                    token_ids = token_ids.reshape(-1)
+                    next_token_scores.append(np.take_along_axis(logits[i], token_ids, axis=-1))
+            
+            return [s.make_successors(next_token_ids[i], next_token_scores[i], user_data=user_data[i],
+                                      logits=raw_logits[i]) for i,s in enumerate(seqs)]
         
         return await sequences.aelement_wise(op_sample)
 

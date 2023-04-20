@@ -53,12 +53,16 @@ class ge(criterion):
     def __init__(self, max_len):
         self.max_len = max_len
     def __call__(self, seq):
+        if self.max_len is None:
+            return True
         return len(seq) >= self.max_len
 
 class lt(criterion): 
     def __init__(self, max_len):
         self.max_len = max_len
     def __call__(self, seq):
+        if self.max_len is None:
+            return True
         return len(seq) < self.max_len
 
 

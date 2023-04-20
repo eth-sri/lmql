@@ -198,6 +198,7 @@ function initDecoderGraphCy(element) {
     return cytoscape({
         container: element,
         maxZoom: 2.0,
+        pixelRatio: 2*window.devicePixelRatio,
         boxSelectionEnabled: false,
         autounselectify: true,
 

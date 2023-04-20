@@ -34,3 +34,8 @@ def mask_get_only_allowed(m):
 
 def is_dense_mask(mask):
     return type(mask) is np.ndarray and all([type(x) is np.float32 or type(x) is np.float64 for x in mask]), "Mask must be a numpy array of floats"
+
+def is_fixed_int_mask(mask):
+    return type(mask) is list and len(mask) > 0 and (
+        type(mask[0]) is int or type(mask[0]) is np.int64
+    )
