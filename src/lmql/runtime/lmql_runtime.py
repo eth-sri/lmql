@@ -1,14 +1,20 @@
+"""
+Runtime support used by compiled LMQL query code.
+"""
+
 import inspect
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from lmql.ops.ops import *
-from lmql.runtime.output_writer import silent
-from lmql.runtime.prompt_interpreter import PromptInterpreter, LMQLResult
-from lmql.runtime.model_registry import LMQLModelRegistry
-from lmql.runtime.postprocessing.conditional_prob import ConditionalDistributionPostprocessor
-from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
 from lmql.runtime.langchain import LMQLChainMixIn
+from lmql.runtime.model_registry import LMQLModelRegistry
+from lmql.runtime.output_writer import silent
+from lmql.runtime.interpreter import PromptInterpreter
+from lmql.runtime.postprocessing.conditional_prob import \
+    ConditionalDistributionPostprocessor
+from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
+
 
 def register_model(identifier, ModelClass):
     LMQLModelRegistry.registry[identifier] = ModelClass
@@ -51,6 +57,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     function_context: Optional[FunctionContext] = None
 
     is_langchain_use: bool = False
+
+    lmql_code: str = None
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
         # check for pydantic base class and do kw initialization then
@@ -145,6 +153,12 @@ class LMQLQueryFunction(LMQLChainMixIn):
 
         return results
 
+def context_call(fct_name, *args, **kwargs):
+    return ("call:" + fct_name, args, kwargs)
+
+def interrupt_call(fct_name, *args, **kwargs):
+    return ("interrupt:" + fct_name, args, kwargs)
+
 def tag(t):
     return f"<lmql:{t}/>"
 
@@ -167,3 +181,4 @@ def compiled_query(output_variables=None, group_by=None):
                                  postprocessors=postprocessors, 
                                  scope=LMQLInputVariableScope(fct, calling_frame))
     return func_transformer
+    

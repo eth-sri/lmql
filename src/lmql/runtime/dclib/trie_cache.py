@@ -1,7 +1,7 @@
 from typing import List, Dict, Union
 import numpy as np
 import asyncio
-from lmql.model.client import ServedPretrainedModel
+from lmql.model.served_model import ServedPretrainedModel
 from lmql.runtime.hf_integration import transformers_model
 
 from .dclib_model import model

@@ -69,6 +69,7 @@ export function registerLmqlLanguage(monaco) {
             "where",
             "DISTRIBUTION",
             "distribution",
+            "context",
         
             // This section is the result of running
             // `import keyword; for k in sorted(keyword.kwlist + keyword.softkwlist): print("  '" + k + "',")`

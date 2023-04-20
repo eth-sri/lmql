@@ -82,6 +82,7 @@ Contents
     
     python/python.ipynb
     python/langchain.ipynb
+    python/pandas.ipynb
    
 .. toctree::
     :maxdepth: 1

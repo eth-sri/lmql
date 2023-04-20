@@ -31,10 +31,8 @@ class LiveDebuggerOutputWriter:
             result = "-"
             if trace is not None and op in trace:
                 result = trace[op]
-
-            follow_map = "-"
-            if hasattr(op, "follow_map"):
-                follow_map = str(op.follow_map)
+                follow_map = "<follow_map output not supporte>"
+            
             return {
                 "result": result,
                 "follow_map": follow_map,
@@ -76,6 +74,10 @@ async def lmql(code, *args, web=False):
 
     for r in (result if type(result) is list else [result]):
         if r is None:
+            continue
+
+        if type(r) is not lmql.LMQLResult:
+            print(r)
             continue
         
         for v in [v for v in r.variables if v.startswith("P(")]:

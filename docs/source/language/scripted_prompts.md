@@ -5,7 +5,7 @@ In LMQL, prompts are not just static text, as they can also contain control flow
 **Packing List** For instance, let's say we want to generate a packing list. One way to do this would be the following query:
 
 ```{lmql}
-  
+
 name::list
 sample(temperature=0.8)
    "A few things not to forget when going to the sea (not travelling): \n"
@@ -73,10 +73,10 @@ A list of things not to forget when going to the sea (not travelling):
 -[THING A good pair of blue/gel saskaers]
 -[THING A good sun tanner]
 -[THING A good air freshener]
--[THING A good spot forwashing your hands]
+-[THING A good spot for washing your hands]
 -[THING A good spot for washing your feet]
 
-# print output: \['A good pair of blue/gel saskaers', 'A good sun tanner', 'A good air freshener', 'A good spot forwashing your hands', 'A good spot for washing your feet'\]
+# print output: \['A good pair of blue/gel saskaers', 'A good sun tanner', 'A good air freshener', 'A good spot for washing your hands', 'A good spot for washing your feet'\]
 ```
 
 Because we decode our list `THING` by `THING`, we can easily access the individual items, without having to think about parsing or validation. We just add them to a `backpack` list of things, which we then can process further.

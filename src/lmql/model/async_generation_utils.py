@@ -52,9 +52,6 @@ from transformers.generation.stopping_criteria import (
 )
 from transformers.utils import logging
 
-from lmql.model.hf_beam_search import BeamSearchScorer, BeamScorer
-from lmql.runtime.rewriter import RewrittenInputIds, ActivePromptTokens
-
 logger = logging.get_logger(__name__)
 
 def ensure_tensor(v):

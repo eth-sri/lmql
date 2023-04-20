@@ -11,6 +11,13 @@ from functools import total_ordering
 
 from .openai_api import complete, OpenAIRateLimitError, Capacity
 
+global logit_bias_logging
+logit_bias_logging = True
+
+def set_logit_bias_logging(value):
+    global logit_bias_logging
+    logit_bias_logging = value
+
 class EmptyStreamError(Exception): pass
 
 class ChaosException(openai.APIError): pass
@@ -653,7 +660,9 @@ class AsyncOpenAIAPI:
                 biases = biases[:299] + [(50256, kwargs["logit_bias"][50256])]
             else:
                 biases = biases[:300]
-            print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.")
+            global logit_bias_logging
+            if logit_bias_logging:
+                print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.", file=sys.stderr)
             kwargs["logit_bias"] = {t:b for t,b in biases}
 
 

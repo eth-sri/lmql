@@ -7,6 +7,7 @@ rm -rf ../web-deploy/*
 
 echo "🌎  Building website..."
 # generate dynamic content
+npm install 
 node generate.js
 # copy index.html
 cp index.html ../web-deploy/
@@ -14,6 +15,13 @@ cp static/images/lmql.svg ../web-deploy/lmql.svg
 # copy static content
 cp -r static ../web-deploy/
 cp -r try ../web-deploy/
+
+# build blog
+pushd blog
+node generate.js
+popd
+# sync all *.html files except index.template.html 
+rsync -av --exclude="index.template.html" blog/*.html ../web-deploy/blog/
 
 echo "📦  Building playground..."
 # create playground destination
