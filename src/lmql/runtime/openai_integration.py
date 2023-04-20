@@ -1,15 +1,13 @@
 import asyncio
 import inspect
-<<<<<<< HEAD
+
 import lmql.runtime.bopenai as openai
 from lmql.runtime.bopenai.openai_api import TiktokenTokenizer
 from lmql.runtime.stats import Stats
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, List, Union
 
-=======
 import os
->>>>>>> main
 from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Union
