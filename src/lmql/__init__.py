@@ -86,22 +86,21 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
 
     if output_writer is not None:
         module.query.output_writer = output_writer
-    
+
+    query_kwargs = module.query.args
     if not (len(args) == 1 and args[0] == ""):
-        for line in args:
-            line = line.strip()
-            key, value = line.split(":", 1)
-            kwargs[key.strip()] = value.strip()
+        for arg, query_kw in zip(args, query_kwargs[:len(args)]):
+            kwargs[query_kw] = arg
 
     return await module.query(**kwargs)
 
-async def run(code, output_writer=None):
+async def run(code, *args, output_writer=None, **kwargs):
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(code)
     
     os.chdir(os.path.join(os.path.dirname(__file__), "../../")) 
-    return await run_file(temp_lmql_file, output_writer=output_writer)
+    return await run_file(temp_lmql_file, *args, output_writer=output_writer, **kwargs)
         
 def _query_from_string(s):
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
