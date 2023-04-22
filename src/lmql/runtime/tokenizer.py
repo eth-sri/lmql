@@ -62,6 +62,8 @@ global reverse_special_token_mappings
 reverse_special_token_mappings = {}
 
 class LMQLTokenizer:
+    INVALID_CHARACTER = "\uFFFD"
+
     def __init__(self, tokenizer_impl, model_identifier):
         self.tokenizer_impl = tokenizer_impl
         self.model_identifier = model_identifier
@@ -111,6 +113,8 @@ class LMQLTokenizer:
                     extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
                 else:
                     extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]], clean_up_tokenization_spaces=False)
+                    if self.INVALID_CHARACTER in extended:
+                        return self.detokenizer_cache[n-1][key]
                 if not n in self.detokenizer_cache.keys():
                     self.detokenizer_cache[n] = {}
                 self.detokenizer_cache[n][str(input_ids)] = extended
