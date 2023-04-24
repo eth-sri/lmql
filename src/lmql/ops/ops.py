@@ -950,6 +950,42 @@ class StopBeforeOp(StopAtOp):
 
         return postprocessed_rewrite(value), postprocessed_value(value)
 
+@LMQLOp(["ESCAPED", "escaped"])
+class EscapedOp(Node):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def execute_predecessors(self, trace, context):
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of STOPS_AT must be a direct reference to a template variable."
+        return super().execute_predecessors(trace, context)
+    
+    def forward(self, *args, **kwargs):
+        return True
+    
+    def follow(self, *args, **kwargs):
+        return fmap(("*", True))
+    
+    def final(self, ops_final, operands, result, **kwargs):
+        return ops_final[0]
+    
+    @property
+    def variable(self):
+        return self.predecessors[0]
+
+    def postprocess_var(self, var_name):
+        return var_name == self.predecessors[0].name
+
+    def postprocess(self, operands, value):
+        value = value.replace("\n",  "\\n")
+        value = value.replace("\t",  "\\t")
+
+        return postprocessed_rewrite(value), postprocessed_value(value)
+
+    def postprocess_order(self, other, **kwargs):
+        if isinstance(other, StopAtOp):
+            return "after"
+        return 0
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
@@ -1085,7 +1121,13 @@ def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context
                 elif relative_order == "after":
                     i += 1
                 else:
-                    assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
+                    relative_order = current_op.postprocess_order(op, operands=current_op_inputs, other_inputs=inputs)
+                    if relative_order == "before":
+                        i += 1
+                    elif relative_order == "after":
+                        break
+                    else:
+                        assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
             postprocessors.insert(i, (op, inputs))
     
     rewritten_value = None
