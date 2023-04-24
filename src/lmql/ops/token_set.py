@@ -115,10 +115,6 @@ class VocabularyMatcher:
     def ensure_ready():
         VocabularyMatcher.instance()
 
-    @property
-    def vocab_size(self):
-        return self.tokenizer.vocab_size
-
     @staticmethod
     def with_cache(keys, provider):
         keys = [k for k in keys if k is not None]
@@ -168,7 +164,7 @@ class VocabularyMatcher:
 
         regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
 
-        mask = np.zeros([self.vocab_size], dtype=np.bool_)
+        mask = np.zeros([self.tokenizer.vocab_size], dtype=np.bool_)
 
         pattern = re.compile(regex, re.UNICODE)
         for id, subtoken in self.vocab.items():
@@ -177,9 +173,13 @@ class VocabularyMatcher:
 
         return mask
 
+    @property
+    def vocab_size(self):
+        return self.tokenizer.vocab_size
+
     def _make_mask_from_char_length(self, length):
         if self.token_lengths is None:
-            token_lengths = np.zeros([self.vocab_size], dtype=np.int32)
+            token_lengths = np.zeros([self.tokenizer.vocab_size], dtype=np.int32)
             for id, subtoken in self.vocab.items():
                 token_lengths[id] = len(subtoken)
             self.token_lengths = token_lengths
@@ -187,7 +187,7 @@ class VocabularyMatcher:
         return self.token_lengths == length
 
     def _make_mask_from_tokens(self, tokens, prefix, exact=False):
-        mask = np.zeros([self.vocab_size], dtype=np.bool_)
+        mask = np.zeros([self.tokenizer.vocab_size], dtype=np.bool_)
 
         if "*" in tokens:
             mask[:] = True
@@ -249,6 +249,10 @@ class VocabularyMatcher:
             if i == self.eos_token_id:
                 tokens.append("eos")
             else:
+                # invalid token
+                if not i in self.vocab:
+                    continue
+
                 s = self.vocab[i]
                 # replace nl and space
                 s = self.tokenizer.convert_tokens_to_string([s])
@@ -482,6 +486,14 @@ def tset(*tokens, regex=False, prefix=False, exact=False, charlen=None, name=Non
     if len(tokens) == 1 and type(tokens[0]) is set:
         return TokenSet(set(list(tokens[0])), minus=False, name=name)
     return TokenSet(set(tokens), minus=False, prefix=prefix, exact=exact, name=name)
+
+def charlen_tsets():
+    l1 = tset(charlen=1)
+    token_lengths = VocabularyMatcher.instance().token_lengths
+    assert token_lengths is not None, "VocabularyMatcher.instance().token_lengths is None even though it should be fully initialized."
+    # get unique values in token_lengths (numpy)
+    length_values = np.unique(token_lengths)
+    return {l: tset(charlen=l) for l in length_values}
 
 def ntset(*tokens):
     if len(tokens) == 1 and type(tokens[0]) is set:
