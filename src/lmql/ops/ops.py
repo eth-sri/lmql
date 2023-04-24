@@ -348,17 +348,8 @@ class LenOp(Node):
             v = strip_next_token(v)
             
             len_masks = []
-            all = "∅"
-            l = 1
-            while True:
-                tmask = tset(charlen=l)
-                all = tmask.union(all)
-                # if 'all' encompasses all possible tokens, then we have enumerated all possible lengths
-                if len(all) == VocabularyMatcher.instance().vocab_size:
-                    break
-                if len(tmask) > 0:
-                    len_masks.append((tmask, len(v) + l))
-                l += 1
+            for l,tmask in charlen_tsets().items():
+                len_masks.append((tmask, len(v) + l))
             
             return fmap(*len_masks)
 
