@@ -1,12 +1,5 @@
 import asyncio
 import inspect
-
-import lmql.runtime.bopenai as openai
-from lmql.runtime.bopenai.openai_api import TiktokenTokenizer
-from lmql.runtime.stats import Stats
-from dataclasses import dataclass
-from typing import Any, Callable, Optional, List, Union
-
 import os
 from collections import namedtuple
 from dataclasses import dataclass
@@ -22,7 +15,10 @@ from lmql.runtime.dclib.dclib_seq import (DecoderSequence, deepcopy, deepmerge,
 from lmql.runtime.stats import Stats
 from lmql.runtime.tokenizer import load_tokenizer
 from lmql.utils import nputil
+from lmql.ops.token_set import VocabularyMatcher
 
+global logit_bias_logging
+logit_bias_logging = True
 
 def is_allowed(m): 
     """
@@ -74,22 +70,49 @@ class CompletionCall:
     logit_mask_or_fixed_id: np.ndarray
     input_ids: np.ndarray
     kwargs: Any
+    model: str
+    
     stopping_phrases: List[str] = None
     
     # true iff inverting the api_mask leads to a smaller mask
     invert: bool = False
     
-    @property
-    def api_mask(self, invert=None):
+    
+    def api_mask(self):
         mask = self.logit_mask_or_fixed_id
         assert nputil.is_array(mask), "api_mask(): logit_mask_or_fixed_id must be a LongTensor not a " + str(type(mask))
+
+        kwargs = self.kwargs
+        tokenizer = load_tokenizer(self.model)
+        matcher = VocabularyMatcher.instance()
         
         if self.invert:
             masked = (mask >= 0)
         else:
             masked = (mask < 0)
         mask_value = 100 if self.invert else -100
-        return {int(idx): mask_value for idx in np.nonzero(masked)[0]}
+        mask_indices = set([int(i) for i in np.nonzero(masked)[0]])
+
+        global logit_bias_logging
+
+        includes_eos = tokenizer.eos_token_id in mask_indices
+        truncation_limit = 300
+        if includes_eos: truncation_limit -= 1
+        
+        processed_biases = []
+
+        for token_id in mask_indices:
+            if len(processed_biases) >= truncation_limit:
+                if logit_bias_logging:
+                    print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints. Constraints require {} tokens to be masked.".format(len(np.nonzero(masked)[0])))
+                break
+            if token_id in matcher.vocab:
+                processed_biases.append((token_id, mask_value))
+                
+        if includes_eos:
+            processed_biases.append((tokenizer.eos_token_id, mask_value))
+            
+        return {t:b for t,b in processed_biases}
 
     @property
     def continuation_type(self):
@@ -98,9 +121,10 @@ class CompletionCall:
         # unique cache key identifying the type of this completion
         parameter_values_key_segment = "temp-" + str(self.kwargs["temperature"]) + "-logprobs-" + str(self.kwargs["logprobs"])
         if self.mode == "complete":
-            api_mask = self.api_mask
+            api_mask = self.api_mask()
             mask_key_segment = [f"{id}={value}" for id, value in sorted(api_mask.items(), key=lambda x: x[0])]
             mask_key_segment = "-".join(mask_key_segment)
+            mask_key_segment = hash(mask_key_segment)
         else:
             mask_key_segment = "*"
         return f"{parameter_values_key_segment}-{mask_key_segment}"
@@ -117,6 +141,7 @@ class DclibOpenAiModel(DcModel):
         self.model_identifier = "openai/" + self.model.model_identifier
 
         self.model.chunk_size = kwargs.get("openai_chunksize", 64)
+        print("CS", self.model.chunk_size)
         self.num_billed_tokens = {}
         self.num_requests = 0
 
@@ -144,7 +169,7 @@ class DclibOpenAiModel(DcModel):
         stopping_phrases = s.data("head").stopping_phrases["text"]
 
         if mask is None:
-            return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
+            return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases, model=self.model_identifier)
 
         invert = False
         num_allowed = is_allowed(mask).sum(axis=-1)
@@ -153,19 +178,19 @@ class DclibOpenAiModel(DcModel):
         if num_allowed == 1:
             # check for <eos> case
             if is_allowed(mask[self.eos_token_id]):
-                return CompletionCall("fixed", self.eos_token_id, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
+                return CompletionCall("fixed", self.eos_token_id, s.input_ids, kwargs, stopping_phrases=stopping_phrases, model=self.model_identifier)
             else:
                 # otherwise we can treat this as a score call
-                return CompletionCall("fixed", mask.argmax(axis=-1), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
+                return CompletionCall("fixed", mask.argmax(axis=-1), s.input_ids, kwargs, stopping_phrases=stopping_phrases, model=self.model_identifier)
         elif num_allowed < mask.shape[-1]:
             if mask.shape[-1] - num_allowed > num_allowed:
                 # if we have to mask more than half of the tokens, we should just invert the masking
                 invert = True
         else: # num_allowed == mask.shape[-1] (full vocabulary)
-            return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
+            return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases, model=self.model_identifier)
 
         # num_allowed < mask.shape[-1] and num_allowed > 1 (needs mask)
-        return CompletionCall("complete", mask, s.input_ids, kwargs, invert=invert, stopping_phrases=stopping_phrases)
+        return CompletionCall("complete", mask, s.input_ids, kwargs, invert=invert, stopping_phrases=stopping_phrases, model=self.model_identifier)
 
     async def api_score(self, input_ids, offset):
         kwargs = {
@@ -254,7 +279,7 @@ class DclibOpenAiModel(DcModel):
         if mode == "*": # complete without mask
             pass
         elif mode == "complete": # complete with mask
-            logit_bias = completion_call.api_mask
+            logit_bias = completion_call.api_mask()
             kwargs.update({"logit_bias": logit_bias})
         elif mode == "fixed": # complete with fixed token
             fixed_next_token = completion_call.logit_mask_or_fixed_id # special return value case for prepare function
@@ -316,7 +341,7 @@ class DclibOpenAiModel(DcModel):
         if mode == "*": # complete without mask
             pass
         elif mode == "complete": # complete with mask
-            logit_bias = completion_call.api_mask
+            logit_bias = completion_call.api_mask()
             kwargs.update({"logit_bias": logit_bias})
         elif mode == "fixed": # complete with fixed token
             fixed_next_token = completion_call.logit_mask_or_fixed_id # special return value case for prepare function
@@ -936,20 +961,15 @@ def openai_model(model_identifier):
     class OpenAIModel:
         def __init__(self) -> None:
             self.model_identifier = model_identifier
-            self.served_model = None
             self._tokenizer = None
 
-            self.chunk_size = 64
+            self.decoder_args = {
+                "openai_chunksize": 64
+            }
 
         def get_tokenizer(self):
             if self._tokenizer is None:
-            
-            if "gpt-4" in self.model_identifier or "chatgpt" in self.model_identifier or "turbo" in self.model_identifier:
-                self._tokenizer = TiktokenTokenizer()
-            else:
-                self._tokenizer = load_tokenizer("gpt2")
-            
-            self.served_model = self
+                self._tokenizer = load_tokenizer("openai/" + self.model_identifier)
             return self._tokenizer
 
         def get_dclib_model(self):
@@ -958,7 +978,7 @@ def openai_model(model_identifier):
 
             dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
 
-            return DclibOpenAiModel(self.served_model, self.get_tokenizer())
+            return DclibOpenAiModel(self, self.get_tokenizer(), **self.decoder_args)
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]

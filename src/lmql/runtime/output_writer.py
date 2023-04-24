@@ -11,6 +11,7 @@ class DebuggerOutputWriter:
         return input(*args)
 
     def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables): pass
+
     def add_compiler_output(self, code): pass
 
 class PrintingDebuggerOutputWriter:

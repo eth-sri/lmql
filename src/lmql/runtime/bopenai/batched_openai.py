@@ -11,9 +11,6 @@ from functools import total_ordering
 
 from .openai_api import complete, OpenAIRateLimitError, Capacity
 
-global logit_bias_logging
-logit_bias_logging = True
-
 def set_logit_bias_logging(value):
     global logit_bias_logging
     logit_bias_logging = value
@@ -650,21 +647,8 @@ class AsyncOpenAIAPI:
             self.request_ctr += 1
         else:
             print("re-trying request id", request_id)
-        
-        kwargs = {"future": result_fut, "request_id": request_id, **kwargs}
-        
-        if "logit_bias" in kwargs and len(kwargs["logit_bias"]) > 300:
-            biases = list(kwargs["logit_bias"].items())
-            # make sure to always include eos if set and truncating
-            if 50256 in kwargs["logit_bias"]:
-                biases = biases[:299] + [(50256, kwargs["logit_bias"][50256])]
-            else:
-                biases = biases[:300]
-            global logit_bias_logging
-            if logit_bias_logging:
-                print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.", file=sys.stderr)
-            kwargs["logit_bias"] = {t:b for t,b in biases}
 
+        kwargs = {"future": result_fut, "request_id": request_id, **kwargs}
 
         assert kwargs.get("echo", False), f"bopenai requires echo=True for to enable proper error recovery. Please handle proper prompt removal in client code."
 

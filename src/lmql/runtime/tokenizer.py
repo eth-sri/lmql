@@ -194,12 +194,33 @@ class LMQLTokenizer:
         segments.append(s[offset:])
         return segments
 
+global tokenizers 
+tokenizers = {}
+
+def load_openai_tokenizer(model_identifier):
+    import lmql.runtime.tiktoken_tokenizer as tiktoken_tokenizer
+    
+    # check if tiktoken is available
+    if not tiktoken_tokenizer.is_available():
+        # use gpt2 otherwise (slower and does not work for chatgpt/gpt-4)
+        return load_tokenizer("gpt2")
+    
+    return tiktoken_tokenizer.get_tokenizer(model_identifier)
+    
+
 def load_tokenizer(model_identifier):
     import os
+    
+    # check if runtime already has a tokenizer for this model
+    if model_identifier in tokenizers.keys():
+        return tokenizers[model_identifier]
 
     # check environment of USE_JS_TOKENIZER
     if "LMQL_BROWSER" in os.environ:
         return LMQLTokenizer(get_js_tokenizer(model_identifier), model_identifier)
+
+    if model_identifier.startswith("openai/"):
+        return load_openai_tokenizer(model_identifier)
 
     from transformers import AutoTokenizer
     import torch
@@ -213,7 +234,7 @@ def load_tokenizer(model_identifier):
     cache_identifier = model_identifier.replace("/", "-")
     cache_path = cache_dir / f"tokenizer-{cache_identifier}.pkl"
 
-    if cache_path.exists():
+    if cache_path.exists() and False:
         with open(cache_path, "rb") as f:
             return LMQLTokenizer(pickle.load(f), model_identifier)
     else:
@@ -225,6 +246,7 @@ def load_tokenizer(model_identifier):
 
 if __name__ == "__main__":
     import sys
+    import numpy as np
 
     model_identifier = sys.argv[1]
     t = load_tokenizer(model_identifier)
@@ -234,7 +256,7 @@ if __name__ == "__main__":
     if to_tokenize.startswith("["):
         import json
         to_tokenize = json.loads(to_tokenize)
-        print(str([t.decode(torch.tensor(to_tokenize))])[1:-1])
+        print(str([t.decode([tok]) for tok in to_tokenize])[1:-1])
     else:
         res = t(to_tokenize)
         print(res)

@@ -56,65 +56,15 @@ async def complete(**kwargs):
     else:
         async for r in completion_api(**kwargs): yield r
 
-global tokenizer
-tokenizer = None
+global tokenizers
+tokenizers = None
 
-
-class TiktokenTokenizer:
-    def __init__(self):
-        self.enc = tiktoken.get_encoding("cl100k_base")
-        self.vocab = {self.enc.decode([i]): i for i in range(100256)}
-        for i in range(100256, self.enc.max_token_value):
-            self.vocab[f"<|special_{i}|>"] = i
-
-    def encode(self, text):
-        return self.enc.encode(text)
-
-    def tokenize(self, text):
-        return [self.enc.decode([i]) for i in self.enc.encode(text)]
-
-    def decode(self, ids):
-        return self.enc.decode(ids)
-
-    def __call__(self, text_or_list):
-        if isinstance(text_or_list, str):
-            input_ids = self.encode(text_or_list)
-        else:
-            input_ids = [self.encode(text) for text in text_or_list]
-
-        return {
-            "input_ids": input_ids,
-        }
-
-    @property
-    def vocab_size(self):
-        return self.enc.max_token_value
-    
-    @property
-    def eos_token_id(self):
-        return self.enc.eot_token
-
-    @property
-    def bos_token_id(self):
-        return self.enc.encode_single_token("<|endofprompt|>")
-
-    def convert_tokens_to_string(self, tokens):
-        return "".join(tokens)
-
-    @property
-    def name(self):
-        return "tiktoken_cl100k_base"
-
-def tokenize(text):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = TiktokenTokenizer()
+def tokenize(text, model):
+    tokenizer = load_tokenizer("openai/" + model)
     return tokenizer(text)["input_ids"]
 
-def detokenize(input_ids):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = TiktokenTokenizer()
+def detokenize(input_ids, model):
+    tokenizer = load_tokenizer("openai/" + model)
         
     while len(input_ids) > 0 and input_ids[0] == tokenizer.bos_token_id:
         input_ids = input_ids[1:]
@@ -146,15 +96,12 @@ async def chat_api(**kwargs):
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
 
-    #assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
-        
-
     # transform prompt into chat API format
     prompt_ids = kwargs["prompt"]
-    kwargs["prompt"] = [detokenize(p) for p in kwargs["prompt"]]
+    kwargs["prompt"] = [detokenize(p, kwargs["model"]) for p in kwargs["prompt"]]
     
     echo = kwargs.pop("echo")
-    
+
     if echo:
         data = {
             "choices": [
@@ -189,19 +136,21 @@ async def chat_api(**kwargs):
         elif tag == "user":
             role = "user"
         elif tag is None:
-            role = "user"
+            role = "assistant"
         else:
             print(f"warning: {tag} is not a valid tag for the OpenAI chat API. Please use one of :system, :user or :assistant.")
         
         messages.append({
             "role": role, 
-            "content": s["text"]
+            "content": s["text"],
         })
     
     del kwargs["prompt"]
     kwargs["messages"] = messages
     
     del kwargs["logprobs"]
+
+    has_strong_constraints = len(kwargs.get("logit_bias", {})) > 0 and all(v == 100 for v in kwargs.get("logit_bias", {}).values())
 
     async with CapacitySemaphore(num_prompts * max_tokens):
         
@@ -290,9 +239,11 @@ async def chat_api(**kwargs):
                                         })
                                     continue
                                 text = delta["content"]
-                                tokens = tokenize((" " if received_text == "" else "") + text)
+                                if len(received_text) == 0 and not has_strong_constraints:
+                                    text = " " + text
+                                tokens = tokenize("<|endoftext|>" + text, kwargs["model"])[1:]
+
                                 received_text += text
-                                # print([text], [received_text])
                                 
                                 choices.append({
                                     "text": text,

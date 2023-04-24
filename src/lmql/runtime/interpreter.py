@@ -326,7 +326,8 @@ class PromptInterpreter:
             # obtain where follow map
             follow_map = follow_trace[self.where] if self.where is not None else None
             # print(id(self), self.variable, [text], "mask", follow_map)
-            mask = ops.create_mask(follow_map, valid, is_final)
+            with Stats("interpreter").timer("create_mask"):
+                mask = ops.create_mask(follow_map, valid, is_final)
 
             if mask == "*": 
                 logit_mask = None
@@ -654,6 +655,11 @@ class PromptInterpreter:
                     assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             
+            if "performance_stats" in decoder_args:
+                if decoder_step % 10 == 0:
+                    Stats.print_all()
+                    print("step", decoder_step, "time", average_step_time)
+
             return results
 
     def validate_args(self, decoder_args, decoder_fct):
