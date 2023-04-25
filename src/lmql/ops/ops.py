@@ -244,8 +244,6 @@ class IntOp(Node):
 
     def postprocess(self, operands, raw):
         value = int(raw)
-        if raw.startswith(" "):
-            value = " " + str(value)
         return postprocessed_rewrite(str(value)), postprocessed_value(value)
 
     def postprocess_order(self, other, **kwargs):
@@ -350,17 +348,8 @@ class LenOp(Node):
             v = strip_next_token(v)
             
             len_masks = []
-            all = "∅"
-            l = 1
-            while True:
-                tmask = tset(charlen=l)
-                all = tmask.union(all)
-                # if 'all' encompasses all possible tokens, then we have enumerated all possible lengths
-                if len(all) == VocabularyMatcher.instance().vocab_size:
-                    break
-                if len(tmask) > 0:
-                    len_masks.append((tmask, len(v) + l))
-                l += 1
+            for l,tmask in charlen_tsets().items():
+                len_masks.append((tmask, len(v) + l))
             
             return fmap(*len_masks)
 
@@ -950,6 +939,16 @@ class StopAtOp(Node):
                 return "after"
         
         return 0 # other constraints cannot be compared
+
+@LMQLOp(["STOPS_BEFORE", "stops_before"])
+class StopBeforeOp(StopAtOp):
+    def postprocess(self, operands, value):
+        op2 = operands[1]
+        matched_phrase_index = value.rfind(op2)
+        if matched_phrase_index != -1:
+            value = value[:matched_phrase_index]
+
+        return postprocessed_rewrite(value), postprocessed_value(value)
 
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):

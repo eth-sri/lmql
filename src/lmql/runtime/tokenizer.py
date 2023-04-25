@@ -38,7 +38,7 @@ def get_js_tokenizer(model_identifier):
             else:
                 return tokens
          
-        def decode(self, input_ids):
+        def decode(self, input_ids, clean_up_tokenization_spaces=None):
             # set typed array type of input_ids to int
             return str(js.detokenize_gpt(to_js([int(i) for i in input_ids])))
 
@@ -110,7 +110,7 @@ class LMQLTokenizer:
                 if input_ids[-1] >= self.tokenizer_impl.vocab_size:
                     extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
                 else:
-                    extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]])
+                    extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]], clean_up_tokenization_spaces=False)
                 if not n in self.detokenizer_cache.keys():
                     self.detokenizer_cache[n] = {}
                 self.detokenizer_cache[n][str(input_ids)] = extended
@@ -121,7 +121,7 @@ class LMQLTokenizer:
             if type(chunk) is str:
                 s += chunk
             else:
-                s += self.tokenizer_impl.decode(chunk)
+                s += self.tokenizer_impl.decode(chunk, clean_up_tokenization_spaces=False)
 
         if not n in self.detokenizer_cache.keys():
             self.detokenizer_cache[n] = {}

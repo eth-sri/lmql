@@ -401,7 +401,7 @@ function EditorPanel(props) {
 
   function handleEditorDidMount(editor, monaco) {
     ResizeObservers.addResizeListener(() => {
-      let fontSize = window.innerWidth < 700 ? 10 : 16
+      let fontSize = window.innerWidth < 700 ? 12 : 16
       editor.updateOptions({ "fontSize": fontSize })
       window.setTimeout(() => {
         editor.layout()
@@ -453,6 +453,8 @@ function EditorPanel(props) {
           // tabSize: 6,
           // show whitespace
           renderWhitespace: "all",
+          // set font family
+          fontFamily: "Fira Code, monospace",
           automaticLayout: true
         }}
         // custom language
@@ -550,6 +552,7 @@ const Row = styled.div`
       flex-direction: column;
       height: calc(100%);
       padding: 0;
+      margin-right: 4pt;
     }
 
     &.simple-mode.simple .panel {
@@ -682,6 +685,7 @@ const ModelResultText = styled.div`
   line-height: 1.6em;
   white-space: pre-wrap;
   overflow-y: auto;
+  font-size: 10pt;
 
   &.chat-mode {
     padding-bottom: 50pt;
@@ -806,12 +810,12 @@ const ModelResultText = styled.div`
   }
 
   div .badge {
-    padding: 2.5pt 4pt;
+    padding: 1.0pt 4pt;
     border-radius: 2pt;
-    font-size: 8pt;
+    font-size: 0.9em;
     background-color: rgba(0, 0, 0, 0.5);
     position:relative; 
-    top: -1.25pt;
+    top: -0.05em;
     margin-right: 2pt;
     user-select: none;
     /* exclude from text selection */

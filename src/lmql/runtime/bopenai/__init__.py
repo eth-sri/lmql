@@ -9,6 +9,12 @@ api_key = None
 global _api
 _api = None
 
+def get_stats():
+    global _api
+    if _api is None:
+        _api = AsyncOpenAIAPI()
+    return _api.stats
+
 class AsyncConfiguration:
     @staticmethod
     def set_batch_size(bs):

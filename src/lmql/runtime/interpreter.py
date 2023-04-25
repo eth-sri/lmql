@@ -100,7 +100,7 @@ class LMQLContext:
         return self
 
     async def get_all_vars(self):
-        return self.program_state.variable_values.copy()
+        return self.program_state.variable_program_values.copy()
 
     async def set_distribution(self, distribution_variable, values):
         self.interpreter.distribution_variable = distribution_variable
@@ -184,7 +184,7 @@ class PromptInterpreter:
 
     async def advance(self, state: PromptState):
         if state.variable is not None:
-            return
+            return state
         
         variable = state.variable
         stmt_buffer = state.stmt_buffer
@@ -573,13 +573,18 @@ class PromptInterpreter:
         # alias max_length -> max_len
         if "max_length" in decoder_args:
             decoder_args["max_len"] = decoder_args["max_length"]
+        if not "max_len" in decoder_args.keys():
+            decoder_args["max_len"] = 2048
 
         # setup dcmodel for use
         self.dcmodel.model_args = decoder_args
         decoder_args["dcmodel"] = self.dcmodel
         dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 
-        step_budget = decoder_args.get("step_budget", 1024)
+        assert len(prompt_ids) < decoder_args["max_len"], "The initial prompt already exceeds the provided max_len. Please increase the max_len or reduce the initial prompt (Initial prompt: '{}', max_len: {})".format(len(prompt_ids), decoder_args["max_len"])
+
+        # set step budget at least to max_len
+        step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
         
         async def debug_out(decoder_step):
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
@@ -644,6 +649,8 @@ class PromptInterpreter:
                     results.append(state.query_head.result)
                 else:
                     state = await self.advance(state)
+                    assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
+
                     assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             

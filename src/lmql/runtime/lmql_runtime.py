@@ -57,6 +57,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     function_context: Optional[FunctionContext] = None
 
     is_langchain_use: bool = False
+
+    lmql_code: str = None
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
         # check for pydantic base class and do kw initialization then

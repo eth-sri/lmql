@@ -171,3 +171,4 @@ cython_debug/
 
 wip-snippets
 .vscode
+.lmql-algorithms-cache
