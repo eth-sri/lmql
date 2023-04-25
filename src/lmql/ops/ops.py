@@ -986,6 +986,40 @@ class EscapedOp(Node):
         if isinstance(other, StopAtOp):
             return "after"
         return 0
+
+@LMQLOp(["ERASE"])
+class EraseOp(Node):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def execute_predecessors(self, trace, context):
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of STOPS_AT must be a direct reference to a template variable."
+        return super().execute_predecessors(trace, context)
+    
+    def forward(self, *args, **kwargs):
+        return True
+    
+    def follow(self, *args, **kwargs):
+        return fmap(("*", True))
+    
+    def final(self, ops_final, operands, result, **kwargs):
+        return ops_final[0]
+    
+    @property
+    def variable(self):
+        return self.predecessors[0]
+
+    def postprocess_var(self, var_name):
+        return var_name == self.predecessors[0].name
+
+    def postprocess(self, operands, value):
+        return postprocessed_rewrite(""), postprocessed_value(value)
+
+    def postprocess_order(self, other, **kwargs):
+        if isinstance(other, StopAtOp):
+            return "after"
+        return 0
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
