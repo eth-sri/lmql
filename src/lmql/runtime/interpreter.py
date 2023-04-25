@@ -143,7 +143,10 @@ class PromptInterpreter:
 
         # decoder configuration
         self.decoder = None
-        self.decoder_kwargs = None
+        self.decoder_kwargs = {}
+        
+        # extra interpreter flags passed via @lmql.query/@lmql.compiled_query
+        self.extra_kwargs = {}
 
         # query program
         self.fct = None
@@ -162,6 +165,11 @@ class PromptInterpreter:
 
     def set_where_clause(self, where):
         self.where = where
+
+    def set_extra_args(self, **kwargs):
+        if "output_writer" in kwargs:
+            self.output_writer = kwargs["output_writer"]
+        self.extra_kwargs.update(kwargs)
 
     def set_decoder(self, method, **kwargs):
         self.decoder_kwargs = kwargs
@@ -539,6 +547,11 @@ class PromptInterpreter:
         if "no_repeat_ngram_size" in decoder_args:
             print("warning: no_repeat_ngram_size is known to cause issues when used with constrained decoding, including non-termination.")
 
+        # alternative mode where we only extract the prompt string
+        return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)
+        if return_prompt_string:
+            return self.root_state.prompt
+
         # tokenize initial prompt
         prompt_ids = await self.tokenize(self.root_state.prompt)
         if self.dcmodel.bos_token_id is not None:
@@ -633,7 +646,7 @@ class PromptInterpreter:
             for s in result_sequences:
                 upper = len(s.input_ids)
                 has_deterministic_tail = False
-                while s.deterministic[upper-1]:
+                while s.deterministic[upper-1] and upper >= 0:
                     upper -= 1
                     has_deterministic_tail = True
                 # +1 for the eos token
