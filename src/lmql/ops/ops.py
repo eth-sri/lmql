@@ -944,7 +944,7 @@ class StopAtOp(Node):
 class StopBeforeOp(StopAtOp):
     def postprocess(self, operands, value):
         op2 = operands[1]
-        matched_phrase_index = value.rfind(op2)
+        matched_phrase_index = value.find(op2)
         if matched_phrase_index != -1:
             value = value[:matched_phrase_index]
 
