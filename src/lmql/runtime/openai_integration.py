@@ -988,7 +988,9 @@ def openai_model(model_identifier):
             self.served_model = None
             self._tokenizer = None
 
-            self.chunk_size = 64
+            self.decoder_args = {
+                "openai_chunksize": 64
+            }
 
         def get_tokenizer(self):
             if self._tokenizer is None:
@@ -1002,11 +1004,14 @@ def openai_model(model_identifier):
 
             dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
 
-            return DclibOpenAiModel(self.served_model, self.get_tokenizer())
+            return DclibOpenAiModel(self, self.get_tokenizer(), **self.decoder_args)
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]
         
         async def detokenize(self, input_ids):
             return self.get_tokenizer().decode(input_ids)
+
+        def sync_tokenize(self, text):
+            return self.get_tokenizer()(text)["input_ids"]
     return OpenAIModel

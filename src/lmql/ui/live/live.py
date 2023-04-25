@@ -76,6 +76,10 @@ async def lmql(code, *args, web=False):
     for r in (result if type(result) is list else [result]):
         if r is None:
             continue
+
+        if type(r) is not lmql.LMQLResult:
+            print(r)
+            continue
         
         for v in [v for v in r.variables if v.startswith("P(")]:
             distribution = r.variables[v]

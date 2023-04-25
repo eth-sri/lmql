@@ -57,6 +57,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     function_context: Optional[FunctionContext] = None
 
     is_langchain_use: bool = False
+
+    lmql_code: str = None
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
         # check for pydantic base class and do kw initialization then
@@ -126,8 +128,10 @@ class LMQLQueryFunction(LMQLChainMixIn):
         kwargs = self.make_kwargs(*args, **kwargs)
 
         interpreter = PromptInterpreter(force_model=self.model)
-        if self.output_writer is not None:
-            interpreter.output_writer = self.output_writer
+        interpreter.set_extra_args(
+            output_writer = self.output_writer,
+            **kwargs
+        )
 
         query_kwargs = {}
         for a in self.args:

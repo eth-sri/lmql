@@ -38,7 +38,11 @@ def cmd_run():
     writer.clear = not args.no_clear
     writer.print_output = not args.no_realtime
 
-    results = asyncio.run(lmql.run_file(absolute_path, output_writer=writer))
+    if os.path.exists(absolute_path):
+        results = asyncio.run(lmql.run_file(absolute_path, output_writer=writer))
+    else:
+        code = args.lmql_file
+        results = asyncio.run(lmql.run(code, output_writer=writer))
     
     if type(results) is not list:
         results = [results]
@@ -159,17 +163,27 @@ def cmd_version():
 
 def hello():
     import asyncio
-    code_local = """
-argmax "Hello[WHO]" from "local:gpt2-medium" where len(WHO) < 10    
-"""
-    print("[Greeting 🤗 Transformers]")
-    asyncio.run(lmql.run(code_local, output_writer=lmql.printing))
+    backend = None
+    # check for additional arg
+    if len(sys.argv) > 2:
+        backend = sys.argv[2]
+        if backend not in ["hf", "openai"]:
+            print("Invalid backend, please specify one of {}".format(", ".join(["hf", "openai"])))
+            sys.exit(1)
     
-    print("[Greeting OpenAI]")
-    code_openai = """
-argmax "Hello[WHO]" from "openai/text-ada-001" where len(WHO) < 10    
-"""
-    asyncio.run(lmql.run(code_openai, output_writer=lmql.printing))
+    if backend is None or backend == "hf":
+        code_local = """
+    argmax "Hello[WHO]" from "local:gpt2-medium" where len(WHO) < 10    
+    """
+        print("[Greeting 🤗 Transformers]")
+        asyncio.run(lmql.run(code_local, output_writer=lmql.printing))
+    
+    if backend is None or backend == "openai":
+        print("[Greeting OpenAI]")
+        code_openai = """
+    argmax "Hello[WHO]" from "openai/text-ada-001" where len(WHO) < 10    
+    """
+        asyncio.run(lmql.run(code_openai, output_writer=lmql.printing))
 
 hidden_commands = {
     "hello": hello
