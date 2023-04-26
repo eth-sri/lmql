@@ -3,6 +3,7 @@ import asyncio
 from typing import Optional
 from dataclasses import dataclass
 from abc import abstractclassmethod, abstractmethod
+from lmql.utils.fixedseq import fixedseq
 
 import numpy as np
 from lmql.utils import nputil
@@ -12,6 +13,8 @@ class Continuation:
     token: Any
     logprob: Any
     user_data: Any
+    
+    logits: Optional[Any] = None
 
 class criterion: 
     def __and__(self, other):
@@ -323,8 +326,10 @@ class DataArray:
                 tokens = nputil.ensure_iterable(continuation.token)
                 logprobs = nputil.ensure_iterable(continuation.logprob)
                 user_data = continuation.user_data or [None] * len(tokens)
+                logits = continuation.logits if continuation.logits is not None else ([None] * len(tokens))
+                
                 for t,s,u in zip(tokens, logprobs, user_data):
-                    extended_seqs.append(sq.extend(Continuation(t, s, u)))
+                    extended_seqs.append(sq.extend(Continuation(t, s, u, logits)))
             return extended_seqs
 
         return DataArray(apply_componentwise(op_extend, self.sequences, other.sequences, "extend", allow_mismatch_keys=False), dims=self.shape)

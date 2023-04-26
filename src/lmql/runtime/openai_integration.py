@@ -4,6 +4,7 @@ import os
 from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Union
+from lmql.utils.fixedseq import fixedseq
 
 import numpy as np
 
@@ -481,11 +482,13 @@ class DclibOpenAiModel(DcModel):
 
                 # detect fixed results (i.e. deterministic tokens)
                 if "fixed" in complete_data.keys():
+
                     fixed_next_token_ids, fixed_next_token_scores, fixed_logits = await self.expand_fixed(continuation, completion, continuation_buffers)
                     
-                    next_token_ids.append([fixed_next_token_ids])
-                    next_token_scores.append([fixed_next_token_scores])
-                    logits.append([fixed_logits])
+                    print(completion.user_data, fixed_next_token_ids)
+                    next_token_ids.append([fixedseq(fixed_next_token_ids)])
+                    next_token_scores.append([fixedseq(fixed_next_token_scores)])
+                    logits.append([fixedseq(fixed_logits)])
                     continue
 
                 # get sampled token and score
@@ -524,7 +527,6 @@ class DclibOpenAiModel(DcModel):
                 logits.append(full_logits)
 
             logits = logits
-            next_token_ids = next_token_ids
             next_token_scores = next_token_scores
 
             def successor_user_data(i: int):
@@ -534,7 +536,9 @@ class DclibOpenAiModel(DcModel):
                 
                 default_user_data = successor_user_data or {}
                 if continuation_buffer.continuation_type is None:
-                    return [default_user_data.copy()] * num_successors
+                    if type(next_token_ids[i][0]) is fixedseq:
+                        return [fixedseq([default_user_data.copy() for _ in next_token_ids[i][0].value])] * num_successors
+                    return [fixedseq(default_user_data.copy())] * num_successors
                 
                 assert successor_user_data is None, "user_data for non-fixed continuations must be None"
                 continuation_as_user_data = {

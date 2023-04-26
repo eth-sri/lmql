@@ -1,6 +1,6 @@
 import asyncio
 from collections import namedtuple
-from typing import List, Union
+from typing import List, Union, Any
 
 from .dclib_array import DataArray
 from .dclib_global import stats
@@ -10,9 +10,10 @@ from lmql.utils import nputil
 import lmql.runtime.masks as masks
 from dataclasses import dataclass
 import sys
+from lmql.utils.fixedseq import fixedseq
 
 from lmql.runtime.stats import Stats
-
+from lmql.runtime.tokenizer import load_tokenizer
 @dataclass
 class DcModelLogitsTask:
     model: any
@@ -20,7 +21,6 @@ class DcModelLogitsTask:
     logits_mask: np.ndarray
     kwargs: dict
     result_fut: asyncio.Future
-
 class ModelQueue:
     @staticmethod
     def get(model_identifier, vocab_size: int):
@@ -33,6 +33,8 @@ class ModelQueue:
         self.vocab_size = vocab_size
         self.logits_queue = asyncio.Queue()
         self.logits_workers = [asyncio.create_task(self.queue_worker_logits()) for _ in range(8)]
+
+        self.tokenizer = load_tokenizer("gpt2-medium")
     
     def __del__(self):
         for w in self.logits_workers:
@@ -92,7 +94,7 @@ class ModelQueue:
                         # unwrap batch dimension
                         logits = logits[0]
                         
-                        fut.set_result((logits, logits))
+                        fut.set_result((logits, fixed_next_ids))
                         continue
 
                     # handle default case (predict next token only)
@@ -222,6 +224,21 @@ class DcModel:
 
     async def logits(self, seqs, max_batch_size=16, **kwargs):
         with self.stats.timer("logits"):
+            def has_precomputed_logits(s: DecoderSequence):
+                if not type(s) is DeterministicDecoderSequence:
+                    return False
+                if len(s.next_ids) <= 0: return False
+                if s.next_raw_logits is None: return False
+                if len(s.next_raw_logits[0]) <= 0: return False
+                return True
+            
+            det_seqs, seqs, arrangement = index_unzip(seqs, has_precomputed_logits)
+
+            det_next_ids = [s.next_ids[0] for s in det_seqs]
+            det_raw_logits = [s.next_raw_logits[0].reshape(1,-1) for s in det_seqs]
+            det_user_data = [s.next_user_data[0] for s in det_seqs]
+
+            # model predicted continuation logits
             input_ids = [s.input_ids for s in seqs]
             user_data = [s.data() for s in seqs]
 
@@ -247,8 +264,13 @@ class DcModel:
             for s,logits,raw in zip(seqs, result_logits, result_raw):
                 s.logits = logits
                 s.raw_logits = raw
-            
-            return result_logits, result_raw, logits_mask_result.user_data
+
+            # interleave det and non-det sequence results
+            result_logits = index_zip(det_raw_logits, result_logits, arrangement)
+            result_raw = index_zip(det_next_ids, result_raw, arrangement)
+            user_data = index_zip(det_user_data, logits_mask_result.user_data, arrangement)
+
+            return result_logits, result_raw, user_data
 
     async def argmax(self, sequences, **kwargs):
         """
@@ -260,17 +282,41 @@ class DcModel:
             if len(seqs) == 0:
                 return []
             
-            if all(type(s) is DeterministicDecoderSequence for s in seqs) and all(len(s.next_ids) > 0 for s in seqs):
-                next_token_ids = np.array([s.next_ids[0] for s in seqs])
-                next_token_scores = np.array([s.next_logprobs[0] for s in seqs])
-                return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=None) for i,s in enumerate(seqs)]
-            
             self.model.num_queries += len(seqs)
-            logits, raw_logits = await self.logits(seqs, **kwargs)
+            logits, raw_logits, user_data = await self.logits(seqs, **kwargs)
 
-            next_token_ids = logits.argmax(axis=-1)
-            next_token_scores = np.take_along_axis(logits, next_token_ids.reshape(-1,1), axis=-1)
-            return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=raw_logits[i]) for i,s in enumerate(seqs)]
+            next_token_ids = []
+            for i in range(len(logits)):
+                probs = logits[i]
+                # detect multiple fixed tokens
+                if probs.ndim > 1:
+                    fixed_next_tokens = raw_logits[i] # in this case raw_logits are the next token ids
+                    raw_logits[i] = fixedseq(logits[i]) # and logits are always raw
+                    next_token_ids.append(fixedseq(fixed_next_tokens))
+                    if probs.shape[0] > 1:
+                        user_data[i] = fixedseq(user_data[i])
+                    continue
+                
+                # otherwise use argmax
+                next_token_ids.append(probs.argmax().reshape(1, -1))
+
+            next_token_scores = []
+            for i in range(len(logits)):
+                token_ids = next_token_ids[i]
+                seq_logits = raw_logits[i]
+                if type(token_ids) is fixedseq:
+                    token_ids = token_ids.value.reshape(-1, 1)
+                    next_token_scores.append(fixedseq(np.take_along_axis(seq_logits.value, token_ids, axis=-1).reshape(-1)))
+                else:
+                    token_ids = token_ids.reshape(-1)
+                    next_token_scores.append(np.take_along_axis(seq_logits, token_ids, axis=-1))
+
+            print(user_data)
+
+            return [s.make_successors([next_token_ids[i]], 
+                                      [next_token_scores[i]], 
+                                      user_data=[user_data[i]],
+                                      logits=[raw_logits[i]]) for i,s in enumerate(seqs)]
         
         return await sequences.aelement_wise(op_argmax)
 
@@ -391,6 +437,7 @@ class DcModel:
                 return []
 
             logits, raw_logits, user_data = await self.logits(seqs, **kwargs)
+
             vocab_size = self.tokenizer.vocab_size
 
             next_token_ids = []
@@ -399,8 +446,11 @@ class DcModel:
                 
                 # detect multiple fixed tokens
                 if probs.ndim > 1:
-                    num_fixed = probs.shape[0]
-                    next_token_ids.append(probs.argmax(axis=-1))
+                    fixed_next_tokens = raw_logits[i] # in this case raw_logits are the next token ids
+                    raw_logits[i] = logits[i] # and logits are always raw
+                    next_token_ids.append(fixed_next_tokens.reshape(1, -1))
+                    if probs.shape[0] > 1:
+                        user_data[i] = [user_data[i]]
                     continue
                 
                 # otherwise do regular sampling)
@@ -414,7 +464,7 @@ class DcModel:
                 seq_logits = logits[i]
                 if seq_logits.ndim > 1:
                     token_ids = token_ids.reshape(-1, 1)
-                    next_token_scores.append(np.take_along_axis(logits[i], token_ids, axis=-1).reshape(-1))
+                    next_token_scores.append([np.take_along_axis(logits[i], token_ids, axis=-1).reshape(-1).tolist()])
                 else:
                     token_ids = token_ids.reshape(-1)
                     next_token_scores.append(np.take_along_axis(logits[i], token_ids, axis=-1))
@@ -431,13 +481,44 @@ class DcModel:
             if len(seqs) == 0:
                 return path, []
 
-            logits, raw_logits = await self.logits(seqs, **kwargs)
+            logits, raw_logits, user_data = await self.logits(seqs, **kwargs)
 
-            next_token_scores, next_tokens = nputil.topk(
-                logits, k, sorted=True, axis=1
-            )
+            next_token_ids = []
+            for i in range(len(logits)):
+                seq_logits = logits[i]
+                
+                # detect multiple fixed tokens
+                if seq_logits.ndim > 1:
+                    fixed_next_tokens = raw_logits[i] # in this case raw_logits are the next token ids
+                    raw_logits[i] = logits[i] # and logits are always raw
+                    next_token_ids.append(fixed_next_tokens.reshape(1, -1))
+                    # if seq_logits.shape[0] > 1:
+                    #     user_data[i] = [user_data[i]]
+                    continue
+                
+                # choose top k
+                _, next_tokens = nputil.topk(
+                    seq_logits.reshape(1,-1), k, sorted=True, axis=1
+                )
+                next_token_ids.append(next_tokens.reshape(-1,1))
 
-            return path, [s.make_successors(next_tokens[i], next_token_scores[i], logits=raw_logits[i]) for i,s in enumerate(seqs)]
+            next_token_scores = []
+            for i in range(len(logits)):
+                token_ids = next_token_ids[i]
+                seq_logits = logits[i]
+                if seq_logits.ndim > 1:
+                    token_ids = token_ids.reshape(-1, 1)
+                    next_token_scores.append([np.take_along_axis(logits[i], token_ids, axis=-1).reshape(-1).tolist()])
+                else:
+                    token_ids = token_ids.reshape(-1)
+                    next_token_scores.append(np.take_along_axis(logits[i], token_ids, axis=-1))
+
+            user_data = [user_data[i] for _ in range(len(next_token_ids[i]))]
+            if type(user_data) is list:
+                print(np.array(user_data).shape)
+            return path, [s.make_successors(next_token_ids[i], next_token_scores[i], 
+                                            user_data=user_data,
+                                            logits=raw_logits[i]) for i,s in enumerate(seqs)]
 
         result_items = await asyncio.gather(*[op_topk(path, seqs, k) for path, seqs in sequences.sequences.items()])
         return DataArray(dict(result_items))
@@ -626,3 +707,39 @@ def get_strip_eos(seqidx, strip_eos):
         elif type(sequence_strip) is int: return True
         else: return False
     else: return False
+
+
+def index_unzip(items, criterion):
+    """
+    Unzips 'items' into two sequences according to the criterion function.
+
+    Returns a tuple (a, b, arrangement) where a and b are the two sequences and arrangement is a boolean sequence indicating whether the corresponding item in the original sequence was in a (True) or b (False).
+    """
+    a = []
+    b = []
+    arrangement = []
+    for item in items:
+        if criterion(item):
+            a.append(item)
+            arrangement.append(True)
+        else:
+            b.append(item)
+            arrangement.append(False)
+    
+    return a, b, arrangement
+
+def index_zip(a, b, arrangement):
+    """
+    Zips two sequences a and b according to the arrangement sequence.
+    """
+    a_ctr = 0
+    b_ctr = 0
+    result = []
+    for a_or_b in arrangement:
+        if a_or_b:
+            result.append(a[a_ctr])
+            a_ctr += 1
+        else:
+            result.append(b[b_ctr])
+            b_ctr += 1
+    return result
