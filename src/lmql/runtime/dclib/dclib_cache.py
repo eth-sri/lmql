@@ -1,23 +1,54 @@
 import asyncio
 import numpy as np
 import pickle
+import os
 from typing import List, Union
 
 from .dclib_array import DataArray
-from .dclib_seq import DecoderSequence, Continuation, DeterministicDecoderSequence
+from .dclib_seq import DecoderSequence, Continuation, DeterministicDecoderSequence, deepcopy, deepmerge
 from .dclib_model import DcModel
 import lmql.runtime.masks as masks
 from lmql.utils.nputil import ensure_iterable
 
 class CachedDcModel:
-    def __init__(self, delegate, initial_prompt_ids=None):
-        self.delegate: DcModel = delegate
+    def __new__(cls, delegate, initial_prompt_ids=None, cache_file=None):
+        mc = super().__new__(cls)
         
-        self.cache = {}
-        self.mask_cache = {}
+        mc.delegate: DcModel = delegate
         
-        self.input_id_key_offset = len(initial_prompt_ids) if initial_prompt_ids else 0
+        mc.cache = {}
+        mc.mask_cache = {}
+        
+        mc.input_id_key_offset = len(initial_prompt_ids) if initial_prompt_ids else 0
+        mc.cache["initial_prompt_ids"] = str(initial_prompt_ids) if initial_prompt_ids is not None else None
+        mc.cache["model"] = delegate.model_identifier
     
+        mc.calls = 0
+        mc.hits = 0
+
+        mc.cache_file = cache_file
+
+        try:
+            if cache_file is not None and os.path.exists(cache_file):
+                with open(cache_file, "rb") as f:
+                    cache = pickle.load(f)
+                    if cache["initial_prompt_ids"] != str(initial_prompt_ids):
+                        print("warning: cache file is from a different query (revision). Its contents will be overwritten.")
+                    elif cache["model"] != delegate.model_identifier:
+                        print("warning: cache file is from a different model. Its contents will be overwritten.")
+                    else:
+                        mc.cache = cache
+        except Exception as e:
+            print("error: failed to load token cache from file", e)
+            pass
+
+        return mc
+    
+    def save(self):
+        if self.cache_file is not None:
+            with open(self.cache_file, "wb") as f:
+                pickle.dump(self.cache, f)
+
     def base_id(self, s: DecoderSequence):
         return str(s.input_ids[self.input_id_key_offset:]) + "-" + (s.data("head").variable if s.data() is not None and "head" in s.data() else "None")
 
@@ -27,9 +58,20 @@ class CachedDcModel:
     async def get_mask(self, s: DecoderSequence, **kwargs):
         if s.id in self.mask_cache:
             return self.mask_cache[s.id]
+        if hasattr(s, "logits_mask"):
+            return s.logits_mask
+
         constrained_seqs = np.array([True], dtype=np.bool_)
         logits_mask_result = await self.delegate.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
         self.mask_cache[s.id] = logits_mask_result
+
+        if s.user_data is None:
+            s.user_data = {}
+        s.user_data = deepmerge(deepcopy(s.user_data), logits_mask_result.user_data[0])
+        s.user_data["set_by"] = "where"
+
+        setattr(s, "logits_mask", logits_mask_result)
+
         return logits_mask_result
 
     async def get_cache(self, s: DecoderSequence, edge_type: str, **kwargs):
@@ -42,16 +84,17 @@ class CachedDcModel:
         mask = (await self.get_mask(s, **kwargs)).logits_mask[0]
         if mask is not None:
             if masks.mask_num_allowed(mask) == 1:
-                keys.append((self.base_id(s), masks.mask_get_only_allowed(mask)))
+                keys.append((self.base_id(s), str(masks.mask_get_only_allowed(mask))))
             else:
                 if masks.is_fixed_int_mask(mask):
-                    keys.append((self.base_id(s), edge_type, "-".join([str(i) for i in mask])))
+                    keys.append((self.base_id(s), edge_type, hash("-".join([str(i) for i in mask]))))
                 else:
-                    keys.append((self.base_id(s), edge_type, "-".join([str(i) for i in np.where(mask >= 0)[0]])))
+                    keys.append((self.base_id(s), edge_type, hash("-".join([str(i) for i in np.where(mask >= 0)[0]]))))
 
         for k in keys:
             if k in self.cache:
                 return keys, self.cache[k]
+
         return keys, None
     
     def set_cache(self, key, c: Union[Continuation, tuple]):
@@ -64,6 +107,8 @@ class CachedDcModel:
 
     async def argmax(self, arr: DataArray, **kwargs):
         async def op_argmax(seqs):
+            self.calls += len(seqs)
+
             # check cache for all
             cache_entries = [await self.get_cache(s, 'top-1', **kwargs) for s in seqs]
             cached_tokens = [e[1] for e in cache_entries]
@@ -87,6 +132,8 @@ class CachedDcModel:
                     continuation = s.make_successors(token.reshape(1), logprob, logits=None, user_data=user_data)
                     results.append(continuation)
 
+                    self.hits += 1
+
             # read full result from cache
             return results
 
@@ -94,6 +141,8 @@ class CachedDcModel:
 
     async def sample(self, arr: DataArray, num_samples=1, **kwargs):
         async def op_sample(seqs):
+            self.calls += len(seqs)
+
             # check cache for all
             cache_entries = [await self.get_cache(s, 'sample', **kwargs) for s in seqs]
             cached_tokens = [e[1] for e in cache_entries]
@@ -116,6 +165,7 @@ class CachedDcModel:
                     user_data = (await self.get_mask(s, **kwargs)).user_data
                     continuation = s.make_successors(token.reshape(1), logprob, logits=None, user_data=user_data)
                     results.append(continuation)
+                    self.hits += 1
 
             # read full result from cache
             return results
@@ -124,6 +174,8 @@ class CachedDcModel:
 
     async def topk_continuations(self, arr: DataArray, k: int, **kwargs):
         async def op_topk(seqs):
+            self.calls += len(seqs)
+            
             # check cache for all
             cache_entries_topk = [[] for s in seqs]
             for i in range(1, k+1):
@@ -159,10 +211,11 @@ class CachedDcModel:
                     user_data = []
                     for token, logprob in c:
                         c_user_data = (await self.get_mask(s, **kwargs)).user_data
-                        continuation = s.make_successors(token.reshape(1), logprob, logits=None, user_data=c_user_data)
+                        continuation = s.make_successors(token.reshape(1), logprob.reshape(1), logits=None, user_data=c_user_data)
                         tokens.append(continuation.token)
                         logprobs.append(continuation.logprob)
                         user_data.append(continuation.user_data)
+                    self.hits += 1
                     results.append(Continuation(np.array(tokens), np.array(logprobs), user_data))
 
             # read full result from cache
@@ -175,10 +228,9 @@ class CachedDcModel:
                     user_data=None, noscore=False):
         async def op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, user_data, noscore):
             assert len(user_data) == len(tok)
-            original = sq
 
-            while (self.base_id(sq), tok[0]) in self.cache:
-                token, logprob = self.cache[(self.base_id(sq), tok[0])]
+            while (self.base_id(sq), str(tok[0])) in self.cache:
+                token, logprob = self.cache[(self.base_id(sq), str(tok[0]))]
                 c = Continuation(token, logprob, user_data[0])
                 sq = sq.extend(c, internal=True)
                 tok = tok[1:]
@@ -187,7 +239,12 @@ class CachedDcModel:
                 if len(tok) == 0:
                     return [sq]
 
-            print("prescoring deterministic sequence of", len(tok))
+            if len(tok) <= 1 and not noscore:
+                return
+
+            # # scoring is only necessary if there more than one token needs to be expanded
+            # if len(tok) <= 1:
+            #     return
 
             result = await self.delegate.score([sq], [tok], max_batch_size, det, stop_phrase, needs_rewrite, None, noscore, internal=True)
 
@@ -195,7 +252,7 @@ class CachedDcModel:
             s = result[0]
             s.user_data = user_data[0]
             c = Continuation(np.array([s.input_ids[-1]]), np.array([s.logprobs[-1]]), [user_data[0]])
-            self.set_cache([(self.base_id(sq), int(s.input_ids[-1]))], c)
+            self.set_cache([(self.base_id(sq), str(int(s.input_ids[-1])))], c)
             user_data_offset = 1
             
             # add additional cache entries for deterministic tokens
@@ -204,11 +261,7 @@ class CachedDcModel:
                 sq = s
                 s = sq.extend(c)
                 user_data_offset += 1
-                self.set_cache([(self.base_id(sq), s.input_ids[-1])], c)
-            
-            # print("pre-explored ", (await s.text())[len(await original.text()):])
-
-            return result
+                self.set_cache([(self.base_id(sq), str(s.input_ids[-1]))], c)
         
         assert len(sqs) == len(tokens)
         return await asyncio.gather(*[op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, ud, noscore) for sq, tok, det, ud in zip(sqs, tokens, deterministic, user_data)])
@@ -230,6 +283,8 @@ class CachedDcModel:
         return self.delegate.model
     
     def report_stats(self, *args):
+        print("Cache hits: %d/%d (%.2f%%)" % (self.hits, self.calls, 100 * self.hits / max(1,self.calls)))
+
         return self.delegate.report_stats(*args)
     
     def log_billable_tokens(self, *args, **kwargs):

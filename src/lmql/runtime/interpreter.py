@@ -164,6 +164,7 @@ class PromptInterpreter:
         self.output_writer = None
         self.prefers_compact_mask  = False
         self.caching = True
+        self.cache_file = None
         
         self.eager_followmap_expansion = True
 
@@ -645,15 +646,24 @@ class PromptInterpreter:
             decoder_args["max_len"] = decoder_args["max_length"]
         if not "max_len" in decoder_args.keys():
             decoder_args["max_len"] = 2048
+        
+        # parse cache argument
         if "cache" in decoder_args.keys():
-            if not decoder_args["cache"]:
-                print("info: caching is disabled")
-            self.caching = decoder_args.pop("cache")
+            cache_value = decoder_args.pop("cache")
+            if type(cache_value) is bool:
+                if cache_value == False:
+                    print("info: disabling model output caching")
+                self.caching = cache_value
+            elif type(cache_value) is str:
+                self.caching = True
+                self.cache_file = cache_value
+            else:
+                assert False, "Invalid value for 'cache' parameter. Expected either a boolean (to enable/disable) or a string (to enable with a disk-based cache file)"
 
         # setup dcmodel for use
         self.dcmodel.model_args = decoder_args
         if self.caching:
-            self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids)
+            self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids, cache_file=self.cache_file)
         decoder_args["dcmodel"] = self.dcmodel
         dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 

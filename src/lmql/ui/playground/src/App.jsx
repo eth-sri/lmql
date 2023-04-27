@@ -178,6 +178,9 @@ function TokenCountIndicator() {
   const [stats, setStats] = useState({})
 
   const format_cost = (c, precision) => {
+    if (c == 0) {
+      return "$0.00"
+    }
     c = c.toFixed(precision)
     if (c === (0).toFixed(precision))
       return "<$" + (Math.pow(10, -precision)).toFixed(precision);
@@ -261,7 +264,7 @@ function TokenCountIndicator() {
   let model = ""
   let steps = 1;
   let copyString = ""
-  if (stats.tokens) {
+  if (stats.tokens || stats._step) {
     tokenCount = stats.tokens
     model = stats.model
     steps = stats._step || 1

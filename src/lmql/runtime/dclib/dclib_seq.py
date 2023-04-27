@@ -325,7 +325,8 @@ class DecoderSequence:
     def detect_stop_phrase(self, continuation):
         old_stop_phrase = self.stop_phrase
         new_stop_phrase = np.concatenate([old_stop_phrase, np.array([False])])
-        stop_phrases = self.data("head").stopping_phrases["tokenized"]
+        
+        stop_phrases = self.data("head").stopping_phrases["tokenized"] if self.data("head") is not None else []
 
         if stop_phrases is None:
             return new_stop_phrase
