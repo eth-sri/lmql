@@ -15,7 +15,7 @@ def ensure_array(v, dtype=None):
     else: return np.array(v, dtype=dtype)
 
 def ensure_iterable(v):
-    if type(v) is np.int64 or type(v) is np.float32:
+    if type(v) is np.float32 or type(v) is np.float64 or type(v) is np.int32 or type(v) is np.int64:
         return [v]
     elif type(v) is np.ndarray:
         if v.ndim == 0:

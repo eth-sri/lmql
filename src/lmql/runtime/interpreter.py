@@ -324,7 +324,7 @@ class PromptInterpreter:
                 masks.append(mask)
                 logit_masks.append(logit_mask)
                 states.append(state)
-        
+
         # pre-score the expanded sequences
         if len(s.input_ids) - unexpanded_offset > 0:
             num_to_score = len(s.input_ids) - unexpanded_offset
