@@ -7,6 +7,7 @@ from typing import Any, Callable, List, Optional, Union
 
 import numpy as np
 
+import lmql.runtime.masks as masks
 import lmql.runtime.bopenai as openai
 import lmql.runtime.dclib as dc
 from lmql.runtime.dclib.dclib_model import DcModel
@@ -140,18 +141,18 @@ class DclibOpenAiModel(DcModel):
             return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
 
         invert = False
-        num_allowed = is_allowed(mask).sum(axis=-1)
+        num_allowed = masks.mask_num_allowed(mask)
         assert num_allowed > 0, "DclibOpenAiModel: encountered logits mask with no allowed tokens"
 
         if num_allowed == 1:
             # check for <eos> case
-            if is_allowed(mask[self.eos_token_id]):
+            if masks.mask_is_allowed(mask, self.eos_token_id):
                 return CompletionCall("fixed", self.eos_token_id, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
             else:
                 # otherwise we can treat this as a score call
-                return CompletionCall("fixed", mask.argmax(axis=-1), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
-        elif num_allowed < mask.shape[-1]:
-            if mask.shape[-1] - num_allowed > num_allowed:
+                return CompletionCall("fixed", masks.mask_get_only_allowed(mask), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
+        elif num_allowed < self.tokenizer.vocab_size:
+            if self.tokenizer.vocab_size - num_allowed > num_allowed:
                 # if we have to mask more than half of the tokens, we should just invert the masking
                 invert = True
         else: # num_allowed == mask.shape[-1] (full vocabulary)
@@ -188,7 +189,7 @@ class DclibOpenAiModel(DcModel):
             return np.zeros(len(next_tokens), dtype=np.float32)
         return (await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids)))
     
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
         
         completion = [np.array(cont) for cont in tokens]
@@ -199,7 +200,7 @@ class DclibOpenAiModel(DcModel):
                 deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])])
                 next_deterministic = np.array([deterministic] * len(completion[1:]))
             else:
-                assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored"
+                assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
                 deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])])
                 next_deterministic = np.array(deterministic[1:])
 
@@ -213,7 +214,9 @@ class DclibOpenAiModel(DcModel):
                     user_data=user_data,
                     stop_phrase=np.concatenate([s.stop_phrase, np.array([stop_phrase])]),
                     needs_rewrite=needs_rewrite,
-                    sticky_user_data_keys=s.sticky_user_data_keys)
+                    sticky_user_data_keys=s.sticky_user_data_keys,
+                    internal=internal
+            )
         results = []
 
         for s,compl,result in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
@@ -496,9 +499,8 @@ class DclibOpenAiModel(DcModel):
                 }
                 return [continuation_as_user_data] + [default_user_data.copy()] * (num_successors - 1)
 
-            s = [s.make_successors(next_token_ids[i], next_token_scores[i], logits=logits[i], 
+            return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=logits[i], 
                 user_data=successor_user_data(continuation_buffers[i], len(next_token_ids[i]))) for i,s in enumerate(seqs)]
-            return s
         with self.stats.timer("sample"):
             return await sequences.aelement_wise(op_sample)
 

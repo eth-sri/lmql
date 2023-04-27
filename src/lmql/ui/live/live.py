@@ -28,10 +28,11 @@ class LiveDebuggerOutputWriter:
         from lmql.utils.graph import CytoscapeGraphWriter
         
         def node_data(op):
+            follow_map = "<follow_map output not supported>"
+
             result = "-"
             if trace is not None and op in trace:
                 result = trace[op]
-                follow_map = "<follow_map output not supporte>"
             
             return {
                 "result": result,

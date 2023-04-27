@@ -7,6 +7,7 @@ from .dclib_global import stats
 from .dclib_seq import DecoderSequence, detseq, deepcopy, deepmerge, DecoderSequence, DeterministicDecoderSequence, Continuation
 import numpy as np
 from lmql.utils import nputil
+import lmql.runtime.masks as masks
 from dataclasses import dataclass
 import sys
 
@@ -22,14 +23,15 @@ class DcModelLogitsTask:
 
 class ModelQueue:
     @staticmethod
-    def get(model_identifier):
+    def get(model_identifier, vocab_size):
         if model_identifier not in ModelQueue._instances.keys():
-            ModelQueue._instances[model_identifier] = ModelQueue(model_identifier)
+            ModelQueue._instances[model_identifier] = ModelQueue(model_identifier, vocab_size)
         return ModelQueue._instances[model_identifier]
     
-    def __init__(self, model_identifier):
+    def __init__(self, model_identifier, vocab_size):
         self.model_identifier = model_identifier
         self.logits_queue = asyncio.Queue()
+        self.vocab_size = vocab_size
         self.logits_workers = [asyncio.create_task(self.queue_worker_logits()) for _ in range(8)]
     
     def __del__(self):
@@ -90,9 +92,17 @@ class ModelQueue:
         if all([m is None for m in logit_masks]):
             return None
         else:
-            existing = [m for m in logit_masks if m is not None]
-            vocab_size = existing[0].shape[1] if existing[0].ndim == 2 else existing[0].shape[0]
-            lm = np.stack([m if m is not None else np.zeros((vocab_size), dtype=np.bool) for m in logit_masks])
+            # TODO: return logprob 0 for eos mask
+            for i in range(len(logit_masks)):
+                if masks.is_fixed_int_mask(logit_masks[i]):
+                    logit_masks[i] = masks.to_dense(logit_masks[i], self.vocab_size)
+                elif type(logit_masks[i]) is np.int64:
+                    logit_masks[i] = masks.to_dense(nputil.ensure_array(logit_masks).reshape(1), self.vocab_size)
+                elif type(logit_masks[i]) is int:
+                    logit_masks[i] = masks.to_dense(nputil.ensure_array(logit_masks).reshape(1), self.vocab_size)
+                else:
+                    assert len(logit_masks[i]) == self.vocab_size
+            lm = np.stack([m if m is not None else np.zeros((self.vocab_size), dtype=np.bool) for m in logit_masks])
             return lm
 
 ModelQueue._instances = {}
@@ -118,7 +128,7 @@ class DcModel:
 
         self.stats = Stats("dcmodel")
 
-        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier)
+        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier, self.tokenizer.vocab_size)
         else: self.logits_queue = None
 
     def log_billable_tokens(self, n: int):
@@ -194,7 +204,7 @@ class DcModel:
     async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, **kwargs):
         if "modern_logits_processor" in kwargs:
             processor = kwargs["modern_logits_processor"]
-            mask = await processor(seqs, additional_logits_processor_mask=is_constrained)
+            mask = await processor(seqs, additional_logits_processor_mask=is_constrained, **kwargs)
             return mask
 
         if "dclib_additional_logits_processor" not in kwargs:
@@ -261,7 +271,7 @@ class DcModel:
         return await sequences.aelement_wise(op_argmax)
 
 
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         with self.stats.timer("score"):
             assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
             
@@ -290,7 +300,9 @@ class DcModel:
                         user_data=user_data,
                         stop_phrase=np.concatenate([s.stop_phrase, np.array([stop_phrase])]),
                         needs_rewrite=needs_rewrite,
-                        sticky_user_data_keys=s.sticky_user_data_keys)
+                        sticky_user_data_keys=s.sticky_user_data_keys,
+                        internal=internal
+                )
             results = []
 
             for i in range(0, len(sqs), max_batch_size):
@@ -380,13 +392,14 @@ class DcModel:
             vocab_size = logits.shape[-1]
 
             next_token_ids = []
+            next_token_scores = []
+
             for i in range(len(logits)):
                 probs = np.exp(logits[i])
                 num_possible = (probs > 0).sum()
-                next_token_ids.append(np.random.choice(vocab_size, size=max(num_samples, num_possible), p=probs, replace=False))
-            next_token_ids = np.stack(next_token_ids, axis=0)
-
-            next_token_scores = np.take_along_axis(logits, next_token_ids.reshape(-1,1), axis=-1)
+                token_ids = np.random.choice(vocab_size, size=min(num_samples, num_possible), p=probs, replace=False)
+                next_token_ids.append(token_ids)
+                next_token_scores.append(np.take_along_axis(logits[i], token_ids, axis=-1))
 
             return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=raw_logits[i]) for i,s in enumerate(seqs)]
         

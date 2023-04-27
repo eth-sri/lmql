@@ -170,10 +170,8 @@ const TokenCountDiv = styled.div`
   white-space: pre-line;
   max-height: 10pt;
 
-  :hover .tooltip {
-    visibility: visible;
-    opacity: 1;
-  }
+  /* indicate copy */
+  cursor: pointer;
 `
 
 function TokenCountIndicator() {
@@ -262,6 +260,7 @@ function TokenCountIndicator() {
   let tokenCount = 0;
   let model = ""
   let steps = 1;
+  let copyString = ""
   if (stats.tokens) {
     tokenCount = stats.tokens
     model = stats.model
@@ -274,20 +273,26 @@ function TokenCountIndicator() {
     const toFirstUpper = k => k.charAt(0).toUpperCase() + k.slice(1)
     text = `Tokens: ${tokenCount}, ${otherKeys.map(k => `${toFirstUpper(k)}: ${stats[k]}`).join(", ")}`
 
+    copyString = `Tokens: ${tokenCount}\n${otherKeys.map(k => `${toFirstUpper(k)}: ${stats[k]}`).join("\n")}`
+
     // time elapsed
     if (stats._start) {
       const end = stats._end || stats._now || Date.now();
       const elapsed = (end - stats._start) / 1000
       text += `\n Time: ${elapsed.toFixed(1)}s, `
+      copyString += `\nTime: ${elapsed.toFixed(1)}s, `
     }
 
     text += `${(tokenCount / steps).toFixed(2)} tok/step`
     if (model.includes("openai")) {
       text += ` Est. Cost ${cost_estimate(model, tokenCount / 1000, 4)}`
+      copyString += `\nEst. Cost ${cost_estimate(model, tokenCount / 1000, 4)}`
     }
   }
 
-  return <TokenCountDiv>
+  return <TokenCountDiv onClick={() => {
+    navigator.clipboard.writeText(copyString)
+  }}>
     {text}
   </TokenCountDiv>
 }

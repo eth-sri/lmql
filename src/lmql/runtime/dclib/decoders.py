@@ -19,7 +19,7 @@ async def argmax(prompt_ids: np.ndarray, n=1, max_len=2048, **kwargs):
     yield h
 
     while len(h) > 0:
-        h = h.extend(await model.argmax(h))
+        h = h.extend(await model.argmax(h, noscore=True))
         h = await model.rewrite(h, noscore=True)
         h, done = (h + done).separate_by(dc.logical_not(dc.eos), dc.lt(max_len))
         
@@ -36,7 +36,7 @@ async def sample(prompt_ids: np.ndarray, temperature=1, n=1, max_len=2048, **kwa
     done = dc.seqs()
 
     while len(h) > 0:
-        h = h.extend(await model.sample(h, temperature=temperature))
+        h = h.extend(await model.sample(h, temperature=temperature, noscore=True))
         h = await model.rewrite(h, noscore=True)
         h, done = (h + done).separate_by(dc.logical_and(dc.logical_not(dc.eos), dc.lt(max_len)))
 
@@ -130,12 +130,14 @@ async def beam_sample(prompt_ids: np.ndarray, n=4, max_len=None, temperature=Non
         done = dc.topk(done, n, name = "done_" + str(num_steps))
 
         # stop when done already tracks topk results
-        if len(done) == n and dc.max_score(h) < dc.min_score(done):
+        if len(done) == n and (len(h) == 0 or dc.max_score(h) < dc.min_score(done)):
             break
 
         yield (h, done)
     
     yield (h, done)
+
+    dc.finish(done)
 
 @dc.decoder
 async def beam_search(prompt_ids: np.ndarray, n=4, max_len=None, **kwargs):

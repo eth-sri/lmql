@@ -9,6 +9,7 @@ from lmql.runtime.multi_head_interpretation import InterpretationHead, Interpret
 from lmql.runtime.program_state import ProgramState
 import lmql.runtime.dclib as dc
 from lmql.runtime.stats import Stats
+from lmql.runtime.tokenizer import LMQLTokenizer
 from lmql.runtime.interrupt import interrupt
 from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, DistributionVariable
 from lmql.utils.nputil import replace_inf_nan_with_str
@@ -139,7 +140,7 @@ class PromptInterpreter:
         # model-specific components
         self.model = None
         self.model_identifier = None
-        self.tokenizer = None
+        self.tokenizer: LMQLTokenizer = None
 
         # decoder configuration
         self.decoder = None
@@ -162,6 +163,9 @@ class PromptInterpreter:
         # logging and debugger output
         self.output_writer = None
         self.prefers_compact_mask  = False
+        self.caching = True
+        
+        self.eager_followmap_expansion = True
 
     def set_where_clause(self, where):
         self.where = where
@@ -281,10 +285,58 @@ class PromptInterpreter:
         return state_dict
 
     async def where_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
+        mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, **kwargs)
+        
+        # if we cannot predict the next token deterministically
+        if mask is None or len(mask) > 1 or not needs_masking:
+            # ask the model to predict the next token
+            return logit_mask, state
+
+        # otherwise, we can expand the sequence deterministically, until a probabilistic token mask is encountered
+        masks = [mask]
+        logit_masks = [logit_mask]
+        states = [state]
+
+        #  checks if current mask can be expanded further
+        mask_can_be_expanded_further = lambda: mask is not None and len(mask) == 1 and mask.mask.argmax() != self.model.get_tokenizer().eos_token_id
+
+        unexpanded_offset = len(s.input_ids)
+        initial_s = s
+
+        # expand as far as possible
+        while mask_can_be_expanded_further() and self.eager_followmap_expansion:
+            # extend the sequence with the next token
+            s = s.extend(dc.Continuation(mask.mask.argmax(), np.array([0]), None), internal=True)
+            # do not futher expand sequences at <eos>
+            if s.is_done(): break
+
+            # rewrite to get next-token user data and set it on the sequence
+            rewrite_result: RewrittenInputIds = await self.rewrite_for_sequence(s, True, assert_no_advance=True)
+            s.user_data = rewrite_result.user_data
+            s.user_data["set_by"] = "rewrite"
+
+            # call another step of where_for_sequence
+            mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, **kwargs)
+
+            if mask_can_be_expanded_further():
+                # save the current mask
+                masks.append(mask)
+                logit_masks.append(logit_mask)
+                states.append(state)
+        
+        # pre-score the expanded sequences
+        if len(s.input_ids) - unexpanded_offset > 0:
+            num_to_score = len(s.input_ids) - unexpanded_offset
+            if hasattr(self.dcmodel, "prescore"):
+                await self.dcmodel.prescore([initial_s], [s.input_ids[-num_to_score:]], deterministic=[[False] * num_to_score], user_data=[states[-num_to_score:]], noscore=kwargs.get("noscore", False))
+
+        return logit_masks[0], states[0]
+
+    async def where_step_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
         state = self.interpreter_state_from_user_data(s)
         
         if not needs_masking:
-            return None, self.interpreter_state_user_data(state)
+            return None, None, self.interpreter_state_user_data(state)
 
         is_done = state.query_head.result is not None
 
@@ -304,6 +356,7 @@ class PromptInterpreter:
             mask = tset("eos")
             logit_mask = mask.mask
             stopping_phrases = {"text": [], "tokenized": []}
+            follow_trace = None
         elif variable is not None:
             if ":before" in variable:
                 variable = variable.split(":before",1)[0]
@@ -357,12 +410,15 @@ class PromptInterpreter:
 
         # no mask, no logits processing
         if logit_mask is None:
-            return None, self.interpreter_state_user_data(state)
+            return None, None, self.interpreter_state_user_data(state)
         
         # translate boolean mask to logit bias mask
-        logit_mask = np.logical_not(logit_mask) * np.finfo(np.float32).min
+        if len(mask) == 1:
+            logit_mask = mask.mask.argmax()
+        else:
+            logit_mask = np.logical_not(logit_mask) * np.finfo(np.float32).min
         
-        return logit_mask, self.interpreter_state_user_data(state)
+        return mask, logit_mask, self.interpreter_state_user_data(state)
 
     async def where_graph_with_trace(self, trace, follow_trace):
         from lmql.utils.graph import CytoscapeGraphWriter
@@ -397,7 +453,7 @@ class PromptInterpreter:
         
         return TokenMask([r[0] for r in results], [r[1] for r in results])
 
-    async def rewrite_for_sequence(self, seq: dc.DecoderSequence, needs_rewrite):
+    async def rewrite_for_sequence(self, seq: dc.DecoderSequence, needs_rewrite, assert_no_advance=False):
         if not needs_rewrite:
             return None
 
@@ -436,7 +492,8 @@ class PromptInterpreter:
             appended_value_prompt = prompt[prompt_length_before:]
 
             #  advance to next variable in prompt program (appends intermediate instructions to prompt)
-            
+            assert not assert_no_advance, f"error: prompt interpreter tried to advance query program even though assert_no_advance was set"
+
             state = state.updated(variable=variable, prompt=prompt, program_state=program_state)
             while state.variable is None and state.query_head.result is None:
                 state = await self.advance(state)
@@ -588,9 +645,15 @@ class PromptInterpreter:
             decoder_args["max_len"] = decoder_args["max_length"]
         if not "max_len" in decoder_args.keys():
             decoder_args["max_len"] = 2048
+        if "cache" in decoder_args.keys():
+            if not decoder_args["cache"]:
+                print("info: caching is disabled")
+            self.caching = decoder_args.pop("cache")
 
         # setup dcmodel for use
         self.dcmodel.model_args = decoder_args
+        if self.caching:
+            self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids)
         decoder_args["dcmodel"] = self.dcmodel
         dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 
@@ -667,10 +730,13 @@ class PromptInterpreter:
                     assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             
+            if hasattr(self.dcmodel, "save"):
+                self.dcmodel.save()
+
             return results
 
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats"]
+        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args
