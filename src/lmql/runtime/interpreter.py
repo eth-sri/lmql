@@ -744,6 +744,10 @@ class PromptInterpreter:
                 self.dcmodel.save()
 
             return results
+        finally:
+            # make sure token cache is saved if possible
+            if hasattr(self.dcmodel, "save"):
+                self.dcmodel.save()
 
     def validate_args(self, decoder_args, decoder_fct):
         INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache"]

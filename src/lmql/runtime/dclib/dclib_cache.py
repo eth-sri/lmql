@@ -76,9 +76,8 @@ class CachedDcModel:
 
     async def get_cache(self, s: DecoderSequence, edge_type: str, **kwargs):
         kwargs = {**self.delegate.model_args, **kwargs}
-        
-        # standard key is sequence id + edge type
-        keys = [(self.base_id(s), edge_type)] if edge_type != "sample" else []
+
+        keys = []
 
         # compute logits mask
         mask = (await self.get_mask(s, **kwargs)).logits_mask[0]
@@ -87,13 +86,18 @@ class CachedDcModel:
                 keys.append((self.base_id(s), str(masks.mask_get_only_allowed(mask))))
             else:
                 if masks.is_fixed_int_mask(mask):
-                    keys.append((self.base_id(s), edge_type, hash("-".join([str(i) for i in mask]))))
+                    keys.append((self.base_id(s), edge_type, "-".join([str(i) for i in mask])))
                 else:
-                    keys.append((self.base_id(s), edge_type, hash("-".join([str(i) for i in np.where(mask >= 0)[0]]))))
+                    keys.append((self.base_id(s), edge_type, "-".join([str(i) for i in np.where(mask >= 0)[0]])))
+
+        # standard key is sequence id + edge type
+        keys += [(self.base_id(s), edge_type)] if edge_type != "sample" and mask is None else []
 
         for k in keys:
             if k in self.cache:
                 return keys, self.cache[k]
+
+        # print(keys)
 
         return keys, None
     
@@ -283,8 +287,7 @@ class CachedDcModel:
         return self.delegate.model
     
     def report_stats(self, *args):
-        print("Cache hits: %d/%d (%.2f%%)" % (self.hits, self.calls, 100 * self.hits / max(1,self.calls)))
-
+        # print("Cache hits: %d/%d (%.2f%%)" % (self.hits, self.calls, 100 * self.hits / max(1,self.calls)))
         return self.delegate.report_stats(*args)
     
     def log_billable_tokens(self, *args, **kwargs):
