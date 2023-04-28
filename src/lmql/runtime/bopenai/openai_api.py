@@ -1,4 +1,5 @@
 import os
+import sys
 
 if "LMQL_BROWSER" in os.environ:
     import lmql.runtime.maiohttp as aiohttp
@@ -92,6 +93,24 @@ def tagged_segments(s):
     segments.append({"tag": current_tag, "text": s[offset:]})
     return segments
 
+def get_endpoint(type):
+    if type == "completions":
+        if os.environ.get("OPENAI_COMPLETIONS_ENDPOINT"):
+            return os.environ["OPENAI_COMPLETIONS_ENDPOINT"]
+        return "https://api.openai.com/v1/completions"
+    elif type == "chat":
+        if os.environ.get("OPENAI_CHAT_ENDPOINT"):
+            return os.environ["OPENAI_CHAT_ENDPOINT"]
+        return "https://api.openai.com/v1/chat/completions"
+
+def get_extra_headers(type):
+    if os.environ.get("OPENAI_HEADERS"):
+        print(os.environ["OPENAI_HEADERS"])
+        extra_headers = json.loads(os.environ["OPENAI_HEADERS"])
+        print(f"Using custom headers: {extra_headers}")
+        return extra_headers
+    return {}
+
 async def chat_api(**kwargs):
     from lmql.runtime.openai_secret import openai_secret, openai_org
     global stream_semaphore
@@ -163,10 +182,11 @@ async def chat_api(**kwargs):
         
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "https://api.openai.com/v1/chat/completions",
+                get_endpoint("chat"),
                 headers={
                     "Authorization": f"Bearer {openai_secret}",
                     "Content-Type": "application/json",
+                    **get_extra_headers("chat")
                 },
                 json={**kwargs},
             ) as resp:
@@ -294,10 +314,11 @@ async def completion_api(**kwargs):
         
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "https://api.openai.com/v1/completions",
+                get_endpoint("completions"),
                 headers={
                     "Authorization": f"Bearer {openai_secret}",
                     "Content-Type": "application/json",
+                    **get_extra_headers("completion"),
                 },
                 json={**kwargs},
             ) as resp:
