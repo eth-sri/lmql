@@ -202,19 +202,14 @@ class DcModel(DcModelRewriteMixin):
         
         return np.stack(result_logits, axis=0), np.stack(result_raw, axis=0)
 
-    async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, **kwargs):
+    async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, required=False, **kwargs):
         if "modern_logits_processor" in kwargs:
             processor = kwargs["modern_logits_processor"]
             mask = await processor(seqs, additional_logits_processor_mask=is_constrained, **kwargs)
             return mask
 
-        if "dclib_additional_logits_processor" not in kwargs:
-            return namedtuple("LogitsMaskResult", ["logits_mask", "user_data"])([None], user_data)
-        
-        processor = kwargs["dclib_additional_logits_processor"]
-        mask = await processor(input_ids, user_data=user_data, additional_logits_processor_mask=is_constrained)
-
-        return mask
+        assert not requried, "compute_logits_mask() cannot produce a token mask, as the provided kwargs do not contain a logits processor. Please make sure to pass a logits processor to decoding function you are using."
+        return namedtuple("LogitsMaskResult", ["logits_mask", "user_data"])([None], user_data)
 
     async def logits(self, seqs, max_batch_size=16, **kwargs):
         with self.stats.timer("logits"):
@@ -278,8 +273,6 @@ class DcModel(DcModelRewriteMixin):
             
             if max_batch_size is None:
                 max_batch_size = DcModel.batch_size
-            
-            completion = [np.array(cont) for cont in tokens]
 
             def make_detseq(s, token_score, completion):
                 # compose deterministic flags
@@ -305,24 +298,36 @@ class DcModel(DcModelRewriteMixin):
                         internal=internal
                 )
             results = []
-
-            for i in range(0, len(sqs), max_batch_size):
-                batch_sqs = sqs[i:i+max_batch_size]
-                batch_input_ids = np.stack([s.input_ids for s in batch_sqs], axis=0)
-                batch_completion = np.stack(self.model.right_pad(completion[i:i+max_batch_size], pad_token_id=self.eos_token_id)["input_ids"], axis=0)
-
-                if noscore:
-                    token_scores = np.zeros_like(batch_completion)
-                else:
-                    token_scores, _ = await self.model.score(
-                        batch_input_ids,
-                        batch_completion,
-                        eos_token_id=self.eos_token_id
-                    )
-                for s,c,ts in zip(batch_sqs,completion[i:i+max_batch_size], token_scores):
-                    results.append(make_detseq(s, ts[:len(c)], c))
-
+            async for s,c,ts in self.score_tokens(sqs, tokens, max_batch_size=max_batch_size, noscore=noscore):
+                results.append(make_detseq(s, ts[:len(c)], c))
             return results
+        
+    async def score_tokens(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, noscore=False):
+        """
+        Iterates the scores for 'tokens' when appended to the sequences in 'sqs', element-wise.
+
+        Returns:
+            List of tuples (sqs[i], tokens[i], scores(token[i]))
+        """
+
+        completion = [np.array(cont) for cont in tokens]
+        results = []
+
+        for i in range(0, len(sqs), max_batch_size):
+            batch_sqs = sqs[i:i+max_batch_size]
+            batch_input_ids = np.stack([s.input_ids for s in batch_sqs], axis=0)
+            batch_completion = np.stack(self.model.right_pad(completion[i:i+max_batch_size], pad_token_id=self.eos_token_id)["input_ids"], axis=0)
+
+            if noscore:
+                token_scores = np.zeros_like(batch_completion)
+            else:
+                token_scores, _ = await self.model.score(
+                    batch_input_ids,
+                    batch_completion,
+                    eos_token_id=self.eos_token_id
+                )
+            for s,c,ts in zip(batch_sqs,completion[i:i+max_batch_size], token_scores):
+                yield (s,c,ts)
 
     async def score_old(self, seqs: Union[DataArray, DecoderSequence], tokens: Union[List[int], List[List[int]]], max_batch_size=4, deterministic=False, stop_phrase=False):
         if type(tokens[0]) is int:

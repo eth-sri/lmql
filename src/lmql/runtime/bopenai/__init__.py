@@ -15,6 +15,17 @@ def get_stats():
         _api = AsyncOpenAIAPI()
     return _api.stats
 
+def reset_latency_stats():
+    global _api
+    if _api is None:
+        _api = AsyncOpenAIAPI()
+    _api.reset_latency_stats()
+
+def get_first_token_latency():
+    global _api
+    if _api is None:
+        _api = AsyncOpenAIAPI()
+    return _api.first_token_latency
 class AsyncConfiguration:
     @staticmethod
     def set_batch_size(bs):

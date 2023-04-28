@@ -191,8 +191,6 @@ class DclibOpenAiModel(DcModel):
     
     async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
-        
-        completion = [np.array(cont) for cont in tokens]
 
         def make_detseq(s, token_score, completion):
             # compose deterministic flags
@@ -219,10 +217,16 @@ class DclibOpenAiModel(DcModel):
             )
         results = []
 
-        for s,compl,result in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
-            results.append(make_detseq(s, result, compl))
+        async for (s, tokens, scores) in self.score_tokens(sqs, tokens, max_batch_size=max_batch_size, noscore=noscore):
+            results.append(make_detseq(s, scores, tokens))
 
         return results
+    
+    async def score_tokens(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, noscore=False):
+        completion = [np.array(cont) for cont in tokens]
+
+        for s, tokens,scores in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
+            yield (s, tokens, scores)
 
     async def async_complete(self, completion_call: Union[CompletionCall, List[CompletionCall]], **kwargs) -> openai.response_buffer:
         assert type(completion_call) is CompletionCall

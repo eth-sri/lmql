@@ -156,7 +156,7 @@ async def beam_search(prompt_ids: np.ndarray, n=4, max_len=None, **kwargs):
     for num_steps in range(0, max_len):
         if len(h) == 0: break
 
-        h = h.extend(await model.topk_continuations(h, k=n))
+        h = h.extend(await model.topk_continuations(h, k=n, **kwargs))
         h = await model.rewrite(h)
         h, done = (h + done).separate_by(not_done)
 

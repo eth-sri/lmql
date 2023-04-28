@@ -3,6 +3,7 @@ import ast
 import types
 import astunparse
 import inspect
+import termcolor
 from lmql.language.fragment_parser import LMQLQuery
 from lmql.language.compiler import PromptScope, SNFList, WhereClauseTransformation
 from lmql.ops.ops import NextToken, digest
@@ -145,10 +146,13 @@ def run_all_tests(g):
     for k in list(g.keys()):
         try:
             if k.startswith("test"): 
+                print("Running", k, "." * (40 - len(k)), end=" ")
                 g[k]()
+                termcolor.cprint("OK", "green")
         except AssertionError as e:
             print(e)
             num_errors += 1
+            termcolor.cprint("FAILED", "red")
     
     if num_errors != 0: 
         print(num_errors, "test(s) failed.")

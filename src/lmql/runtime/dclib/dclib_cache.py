@@ -190,11 +190,16 @@ class CachedDcModel(DcModelRewriteMixin):
             self.calls += len(seqs)
             
             # construct possible cache entries for all seqs (min(k, num_possible))
-            cache_entries_topk = []
+            cache_entries_topk = [] 
             for s in seqs:
                 max_k = k
                 if type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
                     max_k = 1
+                mask = await self.get_mask(s, **kwargs)
+                if mask is not None:
+                    mask = mask.logits_mask[0]
+                    if mask is not None:
+                        max_k = min(k, masks.mask_num_allowed(mask))
                 cache_entries_topk.append([await self.get_cache(s, f'top-{i}', **kwargs) for i in range(1, max_k+1)])
 
             # per seq, top 1-k cached tokens 
@@ -212,6 +217,10 @@ class CachedDcModel(DcModelRewriteMixin):
             for i, (s, key, c) in enumerate(zip(seqs, cache_keys, cached_tokens)):
                 if any(ct is None for ct in c):
                     r = next(non_cached_sample)
+                    if any(ct is not None for ct in c):
+                        mask = (await self.get_mask(s, **kwargs)).logits_mask[0]
+                        print("WARNING: some cache entries are None, but some are not", len(c), len(r.token))
+                        print([await s.text()])
                     results.append(r)
                     next_token_ids = ensure_iterable(r.token)
                     next_token_scores = ensure_iterable(r.logprob)
@@ -219,11 +228,18 @@ class CachedDcModel(DcModelRewriteMixin):
                     assert len(next_token_ids) <= len(key)
                     for i,ck in zip(range(len(next_token_ids)), key):
                         self.set_cache(ck, (next_token_ids[i], next_token_scores[i]))
+                    
+                    # fill remaining top-k slots with empty result
+                    for i in range(len(next_token_ids) + 1, k + 1):
+                        self.set_cache([(self.base_key(s), "top-{}".format(i))], (None, None))
                 else:
                     tokens = []
                     logprobs = []
                     user_data = []
                     for token, logprob in c:
+                        if token is None and logprob is None:
+                            # empty cache slot (top-i is not possible due to masking or truncation)
+                            continue
                         c_user_data = (await self.get_mask(s, **kwargs)).user_data
                         continuation = s.make_successors(token.reshape(1), logprob.reshape(1), logits=None, user_data=c_user_data)
                         tokens.append(continuation.token)
@@ -237,7 +253,7 @@ class CachedDcModel(DcModelRewriteMixin):
 
         return await arr.aelement_wise(op_topk)
     
-    def expand_through_cache(self, sq: DecoderSequence, tok: List[int], det: List[bool], user_data: List[Any]):
+    def expand_through_cache(self, sq: DecoderSequence, tok: List[int], det: List[bool], user_data: List[Any], initial_user_data=None):
         """
         Steps along the cache based on 'tok' until no more cache entries are found.
         """
@@ -252,39 +268,64 @@ class CachedDcModel(DcModelRewriteMixin):
                 return sq, tok, det, user_data
         return sq, tok, det, user_data
 
-    async def prescore(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, 
-                    deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, 
-                    user_data=None, noscore=False):
-        async def op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, user_data, noscore):
-            assert len(user_data) == len(tok)
-            sq, tok, det, user_data = self.expand_through_cache(sq, tok, det, user_data)
+    async def prescore_tokens(self, sq: DecoderSequence, tok: List[int], noscore=False, **kwargs):
+        print("kwargs", kwargs)
+        user_data = sq.user_data
 
-            # handle short and fully cached sequences
+        # expand through cache
+        while (self.base_key(sq), str(tok[0])) in self.cache.keys():
+            token, logprob = self.cache[(self.base_key(sq), str(tok[0]))]
+            c = Continuation(token, logprob, sq.user_data)
+            sq = sq.extend(c, internal=True)
+            tok = tok[1:]
             if len(tok) == 0:
-                return [sq]
-            elif len(tok) <= 1 and not noscore:
-                return
+                break
 
-            # do actual scoring with delegate model
-            result = await self.delegate.score([sq], [tok], max_batch_size, det, stop_phrase, needs_rewrite, None, noscore, internal=True)
+        if len(tok) == 0: return
 
-            # add initial cache entry
-            s = result[0]
-            s.user_data = user_data[0]
-            c = Continuation(np.array([s.input_ids[-1]]), np.array([s.logprobs[-1]]), [user_data[0]])
-            self.set_cache([(self.base_key(sq), str(int(s.input_ids[-1])))], c)
-            user_data_offset = 1
+        # do actual scoring with delegate model
+        sq, tok, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
+        ids = sq.input_ids
+
+        # add cache entries along pre-scored trajectory
+        for tok, score in zip(tok, scores):
+            value = (np.array(tok).reshape(1), np.array(score).reshape(1))
+            self.set_cache([(self.base_key(ids, user_data), str(int(tok)))], value)
+            ids = np.append(ids, tok)
+
+    # async def prescore(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, 
+    #                 deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, 
+    #                 user_data=None, noscore=False):
+    #     async def op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, user_data, noscore):
+    #         assert len(user_data) == len(tok)
+    #         sq, tok, det, user_data = self.expand_through_cache(sq, tok, det, user_data)
+
+    #         # handle short and fully cached sequences
+    #         if len(tok) == 0:
+    #             return [sq]
+    #         elif len(tok) <= 1 and not noscore:
+    #             return
+
+    #         # do actual scoring with delegate model
+    #         result = await self.delegate.score([sq], [tok], max_batch_size, det, stop_phrase, needs_rewrite, None, noscore, internal=True)
+
+    #         # add initial cache entry
+    #         s = result[0]
+    #         s.user_data = user_data[0]
+    #         c = Continuation(np.array([s.input_ids[-1]]), np.array([s.logprobs[-1]]), [user_data[0]])
+    #         self.set_cache([(self.base_key(sq), str(int(s.input_ids[-1])))], c)
+    #         user_data_offset = 1
             
-            # add additional cache entries for deterministic tokens
-            while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
-                c = Continuation(np.array([s.next_ids[0]]), np.array([s.next_logprobs[0]]), [user_data[user_data_offset]])
-                sq = s
-                s = sq.extend(c)
-                user_data_offset += 1
-                self.set_cache([(self.base_key(sq), str(s.input_ids[-1]))], c)
+    #         # add additional cache entries for deterministic tokens
+    #         while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
+    #             c = Continuation(np.array([s.next_ids[0]]), np.array([s.next_logprobs[0]]), [user_data[user_data_offset]])
+    #             sq = s
+    #             s = sq.extend(c)
+    #             user_data_offset += 1
+    #             self.set_cache([(self.base_key(sq), str(s.input_ids[-1]))], c)
         
-        assert len(sqs) == len(tokens)
-        return await asyncio.gather(*[op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, ud, noscore) for sq, tok, det, ud in zip(sqs, tokens, deterministic, user_data)])
+    #     assert len(sqs) == len(tokens)
+    #     return await asyncio.gather(*[op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, ud, noscore) for sq, tok, det, ud in zip(sqs, tokens, deterministic, user_data)])
     
     @property
     def model_args(self):
@@ -323,51 +364,51 @@ class CachedDcModel(DcModelRewriteMixin):
         return self.delegate.log_queries(n)
     
     async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
-        assert len(sqs) == 1, "CacheDecoder can only score one sequence at a time"
-        # extract sequence and tokens
-        sq, tok = sqs[0], tokens[0]
-        # create continuation sequence at cache boundary
-        continued_seq, tok, det, _ = self.expand_through_cache(sq, tok, deterministic, [user_data for _ in tok])
-        
-        if len(tok) == 0:
-            completion = np.array(tokens[0])
-            token_scores = continued_seq.logprobs[-len(completion):]
-        else:
-            # run actual score() call for remaining non-cached part of 'tokens' (tok)
-            result: DeterministicDecoderSequence = (await self.delegate.score([continued_seq], [tok], max_batch_size, det, stop_phrase, needs_rewrite=needs_rewrite, user_data=user_data, noscore=noscore, internal=True))[0]
+        async def op_score(sq, tok):
+            # create continuation sequence at cache boundary
+            continued_seq, tok, det, _ = self.expand_through_cache(sq, tok, deterministic, [user_data for _ in tok])
             
-            # extract scores and tokens for new, scored part of 'tokens'
-            token_scores = np.array(result.logprobs[len(sq.input_ids):].tolist() + result.next_logprobs.tolist())
-            completion = np.array(tokens[0])
-            assert len(token_scores) == len(completion), f"Expected {len(completion)} scores, but got {len(token_scores)}"
+            if len(tok) == 0:
+                completion = np.array(tokens[0])
+                token_scores = continued_seq.logprobs[-len(completion):]
+            else:
+                # run actual score() call for remaining non-cached part of 'tokens' (tok)
+                result: DeterministicDecoderSequence = (await self.delegate.score([continued_seq], [tok], max_batch_size, det, stop_phrase, needs_rewrite=needs_rewrite, user_data=user_data, noscore=noscore, internal=True))[0]
+                
+                # extract scores and tokens for new, scored part of 'tokens'
+                token_scores = np.array(result.logprobs[len(sq.input_ids):].tolist() + result.next_logprobs.tolist())
+                completion = np.array(tokens[0])
+                assert len(token_scores) == len(completion), f"Expected {len(completion)} scores, but got {len(token_scores)}"
 
-            # store in cache
-            ids = continued_seq.input_ids
-            for score, token in zip(token_scores[-len(tok):], tok):
-                # TODO: is this the correct user_data?
-                self.set_cache([(self.base_key(ids, user_data), str(token))], (np.array(token), np.array(score)), verbose=False)
-                ids = np.append(ids, token)
-            
-        # determine detseq deterministic flags
-        if type(deterministic) is bool:
-            deterministic_flags = np.concatenate([sq.deterministic, np.array([deterministic])])
-            next_deterministic = np.array([deterministic] * len(completion[1:]))
-        else:
-            assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
-            deterministic_flags = np.concatenate([sq.deterministic, np.array(deterministic[:1])])
-            next_deterministic = np.array(deterministic[1:])
+                # store in cache
+                ids = continued_seq.input_ids
+                for i, (score, token) in enumerate(zip(token_scores[-len(tok):], tok)):
+                    # TODO: is this the correct user_data?
+                    self.set_cache([(self.base_key(ids, user_data if i > 0 else sq.user_data), str(token))], (np.array(token), np.array(score)))
+                    ids = np.append(ids, token)
+                
+            # determine detseq deterministic flags
+            if type(deterministic) is bool:
+                deterministic_flags = np.concatenate([sq.deterministic, np.array([deterministic])])
+                next_deterministic = np.array([deterministic] * len(completion[1:]))
+            else:
+                assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
+                deterministic_flags = np.concatenate([sq.deterministic, np.array(deterministic[:1])])
+                next_deterministic = np.array(deterministic[1:])
 
-        # create actual detseq
-        return [detseq(ids=np.concatenate([sq.input_ids, completion[:1]], axis=0), 
-                next_ids=completion[1:],
-                logprobs=np.concatenate([sq.logprobs, token_scores[:1]], axis=0),
-                next_logprobs=token_scores[1:],
-                deterministic=deterministic_flags,
-                next_deterministic=next_deterministic,
-                predecessor=sq,
-                user_data=user_data,
-                stop_phrase=np.concatenate([sq.stop_phrase, np.array([stop_phrase])]),
-                needs_rewrite=needs_rewrite,
-                sticky_user_data_keys=sq.sticky_user_data_keys,
-                internal=internal
-        )]
+            # create actual detseq
+            return detseq(ids=np.concatenate([sq.input_ids, completion[:1]], axis=0), 
+                    next_ids=completion[1:],
+                    logprobs=np.concatenate([sq.logprobs, token_scores[:1]], axis=0),
+                    next_logprobs=token_scores[1:],
+                    deterministic=deterministic_flags,
+                    next_deterministic=next_deterministic,
+                    predecessor=sq,
+                    user_data=user_data,
+                    stop_phrase=np.concatenate([sq.stop_phrase, np.array([stop_phrase])]),
+                    needs_rewrite=needs_rewrite,
+                    sticky_user_data_keys=sq.sticky_user_data_keys,
+                    internal=internal
+            )
+
+        return await asyncio.gather(*[op_score(sq, tok) for sq, tok in zip(sqs, tokens)])

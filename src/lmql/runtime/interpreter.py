@@ -14,7 +14,7 @@ from lmql.runtime.interrupt import interrupt
 from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, DistributionVariable
 from lmql.utils.nputil import replace_inf_nan_with_str
 
-from lmql.ops.token_set import VocabularyMatcher
+from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.runtime.model_registry import LMQLModelRegistry
 
 from lmql.ops.token_set import tset
@@ -287,51 +287,61 @@ class PromptInterpreter:
 
     async def where_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
         mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, **kwargs)
+
+        # check for tail and prescore
+        if hasattr(self.dcmodel, "prescore_tokens"):
+            if has_tail(mask):
+                tail_tokenized = self.tokenizer(mask.tail)["input_ids"]
+                await self.dcmodel.prescore_tokens(s, tail_tokenized, noscore=kwargs.get("noscore", False), **kwargs)
         
-        # if we cannot predict the next token deterministically
-        if mask is None or len(mask) > 1 or not needs_masking:
-            # ask the model to predict the next token
-            return logit_mask, state
+        return logit_mask, state
 
-        # otherwise, we can expand the sequence deterministically, until a probabilistic token mask is encountered
-        masks = [mask]
-        logit_masks = [logit_mask]
-        states = [state]
+        # eager follow map expansion (w/o) model prediction in between
 
-        #  checks if current mask can be expanded further
-        mask_can_be_expanded_further = lambda: mask is not None and len(mask) == 1 and mask.mask.argmax() != self.model.get_tokenizer().eos_token_id
+        # # if we cannot predict the next token deterministically
+        # if mask is None or len(mask) > 1 or not needs_masking:
+        #     # ask the model to predict the next token
+        #     return logit_mask, state
 
-        unexpanded_offset = len(s.input_ids)
-        initial_s = s
+        # # otherwise, we can expand the sequence deterministically, until a probabilistic token mask is encountered
+        # masks = [mask]
+        # logit_masks = [logit_mask]
+        # states = [state]
 
-        # expand as far as possible
-        while mask_can_be_expanded_further() and self.eager_followmap_expansion:
-            # extend the sequence with the next token
-            s = s.extend(dc.Continuation(mask.mask.argmax(), np.array([0]), None), internal=True)
-            # do not futher expand sequences at <eos>
-            if s.is_done(): break
+        # #  checks if current mask can be expanded further
+        # mask_can_be_expanded_further = lambda: mask is not None and len(mask) == 1 and mask.mask.argmax() != self.model.get_tokenizer().eos_token_id
 
-            # rewrite to get next-token user data and set it on the sequence
-            rewrite_result: RewrittenInputIds = await self.rewrite_for_sequence(s, True, assert_no_advance=True)
-            s.user_data = rewrite_result.user_data
-            s.user_data["set_by"] = "rewrite"
+        # unexpanded_offset = len(s.input_ids)
+        # initial_s = s
 
-            # call another step of where_for_sequence
-            mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, **kwargs)
+        # # expand as far as possible
+        # while mask_can_be_expanded_further() and self.eager_followmap_expansion:
+        #     # extend the sequence with the next token
+        #     s = s.extend(dc.Continuation(mask.mask.argmax(), np.array([0]), None), internal=True)
+        #     # do not futher expand sequences at <eos>
+        #     if s.is_done(): break
 
-            if mask_can_be_expanded_further():
-                # save the current mask
-                masks.append(mask)
-                logit_masks.append(logit_mask)
-                states.append(state)
+        #     # rewrite to get next-token user data and set it on the sequence
+        #     rewrite_result: RewrittenInputIds = await self.rewrite_for_sequence(s, True, assert_no_advance=True)
+        #     s.user_data = rewrite_result.user_data
+        #     s.user_data["set_by"] = "rewrite"
 
-        # pre-score the expanded sequences
-        if len(s.input_ids) - unexpanded_offset > 0:
-            num_to_score = len(s.input_ids) - unexpanded_offset
-            if hasattr(self.dcmodel, "prescore"):
-                await self.dcmodel.prescore([initial_s], [s.input_ids[-num_to_score:]], deterministic=[[False] * num_to_score], user_data=[states[-num_to_score:]], noscore=kwargs.get("noscore", False))
+        #     # call another step of where_for_sequence
+        #     mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, **kwargs)
 
-        return logit_masks[0], states[0]
+        #     if mask_can_be_expanded_further():
+        #         # save the current mask
+        #         masks.append(mask)
+        #         logit_masks.append(logit_mask)
+        #         states.append(state)
+
+        # # pre-score the expanded sequences
+        # if len(s.input_ids) - unexpanded_offset > 0:
+        #     num_to_score = len(s.input_ids) - unexpanded_offset
+        #     if hasattr(self.dcmodel, "prescore"):
+        #         await self.dcmodel.prescore([initial_s], [s.input_ids[-num_to_score:]], deterministic=[[False] * num_to_score], user_data=[states[-num_to_score:]], noscore=kwargs.get("noscore", False))
+
+        # return logit_masks[0], states[0]
 
     async def where_step_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
         state = self.interpreter_state_from_user_data(s)

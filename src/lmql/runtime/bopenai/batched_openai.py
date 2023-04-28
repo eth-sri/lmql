@@ -517,6 +517,11 @@ class AsyncOpenAIAPI:
         self.futures = set()
         self.restore_cache()
 
+        self.first_token_latency = 0
+
+    def reset_latency_stats(self):
+        self.first_token_latency = 0
+
     def restore_cache(self):
         if not self.use_cache:
             return
