@@ -195,3 +195,7 @@ async def static_prompt(query_fct, *args, **kwargs):
     """
     res = await query_fct(*args, **kwargs, return_prompt_string=True)
     return res[0]
+
+def stdin():
+    import sys
+    return sys.stdin.read()

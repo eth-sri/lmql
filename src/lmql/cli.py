@@ -189,6 +189,31 @@ hidden_commands = {
     "hello": hello
 }
 
+def run_code(code, flags):
+    import asyncio
+    import sys
+
+    output_writer = lmql.silent
+    
+    if "-p" in flags:
+        output_writer = lmql.printing
+    if "-s" in flags:
+        # find flag after -s
+        index = flags.index("-s")
+        if index + 1 < len(flags):
+            output_writer = lmql.stream(flags[index + 1])
+        else:
+            assert False, "missing variable name after -s flag"
+    
+    try:
+        result = asyncio.run(lmql.run(code, output_writer=output_writer))
+    except Exception as e:
+        print("error running lmql query:", e)
+        sys.exit(1)
+
+    print(result[0])
+    sys.exit(0)
+
 def main():
     if len(sys.argv) < 2:
         cmd_usage()
@@ -206,7 +231,13 @@ def main():
         hidden_commands[command_name]()
         sys.exit(0)
     command = [f for f in commands if f.__name__ == "cmd_" + command_name or f.__name__ == "cmd_" + command_name.replace("-", "_")]
+    
+    # run code directly
+    if sys.argv[1] == "-c" and len(sys.argv) > 2: 
+        run_code(sys.argv[2], sys.argv[3:])
+    
     if len(command) == 0:
+        # command not found
         print("Unknown command: " + sys.argv[1])
         cmd_usage()
         sys.exit(1)
