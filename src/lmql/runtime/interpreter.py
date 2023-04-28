@@ -292,7 +292,7 @@ class PromptInterpreter:
         if hasattr(self.dcmodel, "prescore_tokens"):
             if has_tail(mask):
                 tail_tokenized = self.tokenizer(mask.tail)["input_ids"]
-                await self.dcmodel.prescore_tokens(s, tail_tokenized, noscore=kwargs.get("noscore", False), **kwargs)
+                await self.dcmodel.prescore_tokens(s, tail_tokenized, noscore=kwargs.get("noscore", False))
         
         return logit_mask, state
 

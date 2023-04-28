@@ -294,10 +294,10 @@ class TokenSetConcrete:
         # if we in a deterministic long-tailed mask, extract the full tail
         if self.tail is None and prefix and self.mask.sum() == 1 and tokens is not None and len(tokens) == 1:
             tail_str = list(tokens)[0]
-            deterministic_next_id = self.mask.nonzero()[0][0]
-            deterministic_next_subtoken_str = VocabularyMatcher.instance().tokenizer.decode([deterministic_next_id])
-            if len(tail_str) > len(deterministic_next_subtoken_str):
-                self.tail = tail_str
+            # deterministic_next_id = self.mask.nonzero()[0][0]
+            # deterministic_next_subtoken_str = VocabularyMatcher.instance().tokenizer.decode([deterministic_next_id])
+            # if len(tail_str) > len(deterministic_next_subtoken_str):
+            self.tail = tail_str
 
     def merge_tail(self, mask, other):
         """

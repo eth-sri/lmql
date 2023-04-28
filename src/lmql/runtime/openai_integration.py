@@ -237,6 +237,7 @@ class DclibOpenAiModel(DcModel):
 
         temperature = completion_call.kwargs.get("temperature", 0.0)
         logprobs = completion_call.kwargs.get("logprobs", 5)
+        noscore = completion_call.kwargs.get("noscore", False)
 
         kwargs = {
             "model": self.model.model_identifier,
@@ -263,7 +264,8 @@ class DclibOpenAiModel(DcModel):
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=0), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
             else:
                 fixed_next_token = nputil.ensure_array(fixed_next_token, dtype=np.int64)
-                logprob = (await self.api_score(np.concatenate([input_ids, fixed_next_token.reshape(1)], axis=0), len(input_ids)))
+                if noscore: logprob = 0.0
+                else: logprob = (await self.api_score(np.concatenate([input_ids, fixed_next_token.reshape(1)], axis=0), len(input_ids)))
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=logprob), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
         elif len(completion_call.stopping_phrases) > 0:
             if len(completion_call.stopping_phrases) > 4:
@@ -277,7 +279,7 @@ class DclibOpenAiModel(DcModel):
         self.count_billed_tokens(input_ids.size + kwargs.get("max_tokens") * batch_size, self.model_identifier)
         
         if self.model_args.get("chatty_openai", False):
-            print("Completion with", kwargs)
+            print([await self.detokenize(kwargs["prompt"])])
 
         return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     

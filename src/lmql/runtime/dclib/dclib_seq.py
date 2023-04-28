@@ -525,7 +525,7 @@ class DeterministicDecoderSequence(DecoderSequence):
         # additionally add self.user_data for deterministic sequence extensions
         return deepmerge(deepcopy(self.user_data), super().extend_user_data(continuation=continuation, user_data=user_data))
 
-    def extend(self, continuation):
+    def extend(self, continuation, internal=False):
         # if not more predetermined tokens are left, just extend as usual and return a regular seq()
         if len(self.next_ids) <= 0:
             return super().extend(continuation)
@@ -559,7 +559,7 @@ class DeterministicDecoderSequence(DecoderSequence):
             user_data=user_data,
             needs_rewrite=self.needs_rewrite,
             sticky_user_data_keys=self.sticky_user_data_keys,
-            internal=self.internal
+            internal=internal or self.internal
         )
 
     def __repr__(self) -> str:

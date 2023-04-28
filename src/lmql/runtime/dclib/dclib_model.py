@@ -168,8 +168,6 @@ class DcModel(DcModelRewriteMixin):
         else: 
             input_ids_to_process = input_ids
 
-        # print("call model for ", len(input_ids_to_process), " sequences", [len(ids) for ids in input_ids_to_process])
-
         # automatic batching
         results = await asyncio.gather(*[self.model_logits_async(
             model, 
@@ -208,7 +206,7 @@ class DcModel(DcModelRewriteMixin):
             mask = await processor(seqs, additional_logits_processor_mask=is_constrained, **kwargs)
             return mask
 
-        assert not requried, "compute_logits_mask() cannot produce a token mask, as the provided kwargs do not contain a logits processor. Please make sure to pass a logits processor to decoding function you are using."
+        assert not required, "compute_logits_mask() cannot produce a token mask, as the provided kwargs do not contain a logits processor. Please make sure to pass a logits processor to decoding function you are using."
         return namedtuple("LogitsMaskResult", ["logits_mask", "user_data"])([None], user_data)
 
     async def logits(self, seqs, max_batch_size=16, **kwargs):
@@ -310,8 +308,10 @@ class DcModel(DcModelRewriteMixin):
             List of tuples (sqs[i], tokens[i], scores(token[i]))
         """
 
+        if max_batch_size is None:
+            max_batch_size = DcModel.batch_size
+
         completion = [np.array(cont) for cont in tokens]
-        results = []
 
         for i in range(0, len(sqs), max_batch_size):
             batch_sqs = sqs[i:i+max_batch_size]

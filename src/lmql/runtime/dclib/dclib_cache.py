@@ -53,10 +53,10 @@ class CachedDcModel(DcModelRewriteMixin):
             with open(self.cache_file, "wb") as f:
                 pickle.dump(self.cache, f)
 
-    def base_key(self, ids, user_data=None):
+    def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
-            return self.base_key(ids.input_ids, ids.user_data)
-        return str(ids[self.input_id_key_offset:]) + "-" + str(user_data["head"].variable if user_data is not None and "head" in user_data else "None")
+            return self.base_key(ids.input_ids)
+        return str(ids[self.input_id_key_offset:])
 
     async def get_mask(self, s: DecoderSequence, **kwargs):
         if s.id in self.mask_cache:
@@ -268,8 +268,7 @@ class CachedDcModel(DcModelRewriteMixin):
                 return sq, tok, det, user_data
         return sq, tok, det, user_data
 
-    async def prescore_tokens(self, sq: DecoderSequence, tok: List[int], noscore=False, **kwargs):
-        print("kwargs", kwargs)
+    async def prescore_tokens(self, sq: DecoderSequence, tok: List[int], noscore=False):
         user_data = sq.user_data
 
         # expand through cache
@@ -282,13 +281,13 @@ class CachedDcModel(DcModelRewriteMixin):
                 break
 
         if len(tok) == 0: return
-
         # do actual scoring with delegate model
-        sq, tok, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
-        ids = sq.input_ids
-
+        sq, tokens, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
+        self.save_cached(sq.input_ids, tokens, scores, user_data)
+        
+    def save_cached(self, ids: List[int], tokens, scores, user_data):
         # add cache entries along pre-scored trajectory
-        for tok, score in zip(tok, scores):
+        for tok, score in zip(tokens, scores):
             value = (np.array(tok).reshape(1), np.array(score).reshape(1))
             self.set_cache([(self.base_key(ids, user_data), str(int(tok)))], value)
             ids = np.append(ids, tok)
