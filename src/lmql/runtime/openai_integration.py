@@ -400,7 +400,7 @@ class DclibOpenAiModel(DcModel):
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
 
     async def argmax(self, sequences, **kwargs):
-        return await self.sample(sequences, num_samples=1, temperature=0)
+        return await self.sample(sequences, num_samples=1, temperature=0, **kwargs)
 
     def report_stats(self, printer, decoder_step=None):
         if printer is None:
