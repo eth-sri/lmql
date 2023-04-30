@@ -76,6 +76,7 @@ def load(filepath=None, autoconnect=False, force_model=None, output_writer=None)
     return module
 
 async def run_file(filepath, *args, output_writer=None, force_model=None, **kwargs):
+    import inspect
     module = load(filepath, autoconnect=True, output_writer=output_writer, force_model=force_model)
     
     if module is None: 
@@ -85,11 +86,22 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     if output_writer is not None:
         module.query.output_writer = output_writer
 
-    query_kwargs = module.query.args
-    if not (len(args) == 1 and args[0] == ""):
-        for arg, query_kw in zip(args, query_kwargs[:len(args)]):
-            kwargs[query_kw] = arg
+    query_args = module.query.args  
+    output_variables = module.query.output_variables
+    query_args = list(set(query_args) - set(output_variables))
+    print(query_args)
+    query_args = [arg for arg in query_args if arg.islower()]
 
+    print(query_args)
+
+    if len(args) > 0:
+        assert False, "Positional arguments for queries are not supported yet"
+    else:
+        assert len(kwargs) == len(query_args), f"Expected {len(query_args)} keyword arguments for query, got {len(kwargs)}"
+
+        for query_kw in kwargs.keys():
+            assert query_kw in query_args, f"Unknown query argument '{query_kw}'"
+            
     return await module.query(**kwargs)
 
 async def run(code, *args, output_writer=None, **kwargs):
