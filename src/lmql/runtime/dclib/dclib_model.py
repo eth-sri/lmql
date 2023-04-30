@@ -458,6 +458,9 @@ class DcModel(DcModelRewriteMixin):
     def report_stats(self, printer, decoder_step=None):
         self.model.report_stats(printer, decoder_step)
 
+    def save(self):
+        pass
+
 DcModel.batch_size = 1
 
 

@@ -319,7 +319,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             c = Continuation(token, logprob, user_data[0])
             sq = sq.extend(c, internal=True)
             tok = tok[1:]
-            det = det[1:]
+            if type(det) is not bool:
+                det = det[1:]
             user_data = user_data[1:]
             if len(tok) == 0:
                 return sq, tok, det, user_data
@@ -421,11 +422,12 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     
     async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         async def op_score(sq, tok):
+            unexpanded_tok = tok
             # create continuation sequence at cache boundary
             continued_seq, tok, det, _ = self.expand_through_cache(sq, tok, deterministic, [user_data for _ in tok])
-            
+
             if len(tok) == 0:
-                completion = np.array(tokens[0])
+                completion = np.array(unexpanded_tok)
                 token_scores = continued_seq.logprobs[-len(completion):]
             else:
                 # run actual score() call for remaining non-cached part of 'tokens' (tok)
@@ -433,7 +435,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 
                 # extract scores and tokens for new, scored part of 'tokens'
                 token_scores = np.array(result.logprobs[len(sq.input_ids):].tolist() + result.next_logprobs.tolist())
-                completion = np.array(tokens[0])
+                completion = np.array(unexpanded_tok)
                 assert len(token_scores) == len(completion), f"Expected {len(completion)} scores, but got {len(token_scores)}"
 
                 # store in cache
@@ -466,7 +468,6 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                     sticky_user_data_keys=sq.sticky_user_data_keys,
                     internal=internal
             )
-
         return await asyncio.gather(*[op_score(sq, tok) for sq, tok in zip(sqs, tokens)])
 
     def register_token_stream(self, token_iterator: callable):

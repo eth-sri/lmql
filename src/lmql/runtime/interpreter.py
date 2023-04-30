@@ -762,8 +762,8 @@ class PromptInterpreter:
             return results
         finally:
             # make sure token cache is saved if possible
-            if hasattr(self.dcmodel, "save"):
-                self.dcmodel.save()
+            self.dcmodel.save()
+            if hasattr(self.dcmodel, "close"):
                 self.dcmodel.close()
 
     def validate_args(self, decoder_args, decoder_fct):
