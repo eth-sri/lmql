@@ -42,7 +42,7 @@ def get_js_tokenizer(model_identifier):
             # set typed array type of input_ids to int
             return str(js.detokenize_gpt(to_js([int(i) for i in input_ids])))
 
-        def __call__(self, s: str):
+        def __call__(self, s: str, add_special_tokens=False):
             unpack = False
             if type(s) is not list:
                 s = [s]
