@@ -623,8 +623,6 @@ class PromptInterpreter:
 
         # tokenize initial prompt
         prompt_ids = await self.tokenize(self.root_state.prompt)
-        print("bos", self.dcmodel.bos_token_id)
-        print("prompt_ids", prompt_ids)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
         n = len(prompt_ids)
@@ -700,14 +698,14 @@ class PromptInterpreter:
         try:
             import time
 
-            decoder_step = 0
+            self.decoder_step = 0
             average_step_time = None
             start = time.time()
             async for _ in decoder_fct(prompt_ids, **decoder_args):
-                await debug_out(decoder_step)
-                decoder_step += 1
+                await debug_out(self.decoder_step)
+                self.decoder_step += 1
 
-                if step_budget is not None and decoder_step >= step_budget:
+                if step_budget is not None and self.decoder_step >= step_budget:
                     print("warning: step budget exceeded")
                     break
 
@@ -718,9 +716,9 @@ class PromptInterpreter:
                 average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
 
                 if "performance_stats" in decoder_args:
-                    if decoder_step % 10 == 0:
+                    if self.decoder_step % 10 == 0:
                         Stats.print_all()
-                        print("step", decoder_step, "time", average_step_time)
+                        print("step", self.decoder_step, "time", average_step_time)
 
                 start = time.time()
             
@@ -728,7 +726,7 @@ class PromptInterpreter:
                 
         except dc.FinishException as fe:
             # one last call to debug_out to get the final state
-            await debug_out(decoder_step)
+            await debug_out(self.decoder_step)
             # if dc.finish is used, the decoder sets the sequences it considers 
             # finished (return them to prompt interpreter)
             result_sequences = fe.result_sequences
@@ -758,6 +756,9 @@ class PromptInterpreter:
                     assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             
+            # set decoder step +1, for all stats logging that happens in postprocessing
+            self.decoder_step += 1
+
             return results
         finally:
             # make sure token cache is saved if possible
@@ -776,4 +777,4 @@ class PromptInterpreter:
                 raise ValueError("Unknown decoder argument: {}".format(k))
 
     def print_stats(self):
-        pass
+        self.dcmodel.report_stats(self.output_writer, self.decoder_step)
