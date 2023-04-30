@@ -21,7 +21,7 @@
   </p>
 </div>
 
-![https://discord.gg/7eJP4fcyNT](https://img.shields.io/discord/1091288833997410414)
+[![Discord](https://img.shields.io/discord/1091288833997410414)](https://discord.gg/7eJP4fcyNT)
 
 LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python. With only a few lines of LMQL code, users can express advanced, multi-part and tool-augmented LM queries, which then are optimized by the LMQL runtime to run efficiently as part of the LM decoding loop.
 
