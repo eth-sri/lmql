@@ -173,6 +173,7 @@ function layoutDecoderGraph(cy) {
         roots: rootNodes,
         visit: (node, edge, previous, i, depth) => {
             if (node.hasClass("compound")) return;
+            if (node.data("_noUserData")) return;
 
             if (depth >= mostLikelyDepth) {
                 if (depth > mostLikelyDepth) {
@@ -276,6 +277,17 @@ function initDecoderGraphCy(element) {
                     'background-opacity': 1.0,
                     'color': 'white',
                     'border-color': 'green',
+                    'border-width': '0px',
+                }
+            },
+            {
+                selector: 'node[_noUserData]',
+                style: {
+                    // light blue
+                    'background-color': 'rgb(249, 209, 248)',
+                    'background-opacity': 0.7,
+                    'color': 'white',
+                    'border-color': 'red',
                     'border-width': '0px',
                 }
             },

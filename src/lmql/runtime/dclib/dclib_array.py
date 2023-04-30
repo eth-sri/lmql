@@ -12,7 +12,6 @@ class Continuation:
     token: Any
     logprob: Any
     user_data: Any
-
 class criterion: 
     def __and__(self, other):
         return logical_and(self, other)

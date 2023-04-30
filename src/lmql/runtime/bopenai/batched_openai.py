@@ -19,8 +19,8 @@ def set_logit_bias_logging(value):
     logit_bias_logging = value
 
 class EmptyStreamError(Exception): pass
-
 class ChaosException(openai.APIError): pass
+class APIShutDownException(RuntimeError): pass
 class MaximumRetriesExceeded(Exception): 
     def __init__(self, error: Exception, retries: int):
         self.error = error
@@ -364,6 +364,8 @@ class ResponseStreamSliceIterator:
         self.text = ""
         self.consumed_tokens = []
 
+        self.done = asyncio.Event()
+
     async def recover(self):
         recovery_kwargs = self.slice.kwargs.copy()
         # reconstruct the prompt by tokenizing the consumed tokens
@@ -407,22 +409,47 @@ class ResponseStreamSliceIterator:
         # otherwise the chunking aligns with the old stream, so we return the next chunk
         return await self.__anext__()
 
+    async def get_next(self):
+        if self.done.is_set(): 
+            raise StopAsyncIteration
+        check_done_task = asyncio.create_task(self.done.wait())
+        get_next_item_task = asyncio.create_task(self.slice.data_queue.get())
+        done, pending = await asyncio.wait([get_next_item_task, check_done_task], 
+            return_when=asyncio.FIRST_COMPLETED, timeout=2.0)
+        
+        if check_done_task in done:
+            # this indicates the end of this response stream
+            for t in pending: t.cancel()
+            raise StopAsyncIteration
+        elif len(done) > 0:
+            assert get_next_item_task in done, f"expected get_next_item_task to be done, but only {done} is done."
+            # cancel self.done waiting task
+            for t in pending: t.cancel()
+            # return with new data chunk
+            return get_next_item_task.result()
+        else:
+            # if after timeout this response has been fully consumed, we are done
+            if self.done.is_set():
+                raise StopAsyncIteration
+            # otherwise return a RecoveryAttempt for retrying this request
+            return RecoveryAttempt(self.slice.kwargs, TimeoutError(), self.slice.maximum_retries)
+
     async def __anext__(self):
         try:
-            try:
-                data = await asyncio.wait_for(self.slice.data_queue.get(), 2.0)
-            except asyncio.TimeoutError as e:
-                data = RecoveryAttempt(self.slice.kwargs, e, self.slice.maximum_retries)
+            data = await self.get_next()
             # None indicates end of stream
-            if data is None: raise StopAsyncIteration
+            if data is None:
+                raise StopAsyncIteration
             # exceptions that are queued are definitive (all retries failed)
             if isinstance(data, Exception): raise data
             # RecoveryAttempt indicates that the underlying stream errored out and we need to recover (still retries left)
             if isinstance(data, RecoveryAttempt):
+                if not self.slice.stream.scheduler.is_available():
+                    # fail quietly, if parent scheduler is no longer available (results of this query will be discarded anyway)
+                    raise StopAsyncIteration()
                 # if the stream of our self.slice errors out, we can recover by creating a new 
                 # stream via a new call to openai.Completion.create
                 attempt: RecoveryAttempt = data
-                traceback.print_exc()
                 print("OpenAI API: Underlying stream of OpenAI complete() call failed with error", type(attempt.error), attempt.error, f"Retrying... (attempt: {self.retries})", flush=True)
                 self.retries += 1
                 # if we have exceeded the maximum number of retries, raise the error
@@ -517,6 +544,11 @@ class AsyncOpenAIAPI:
         self.futures = set()
         self.restore_cache()
 
+        self.first_token_latency = 0
+
+    def reset_latency_stats(self):
+        self.first_token_latency = 0
+
     def restore_cache(self):
         if not self.use_cache:
             return
@@ -589,8 +621,6 @@ class AsyncOpenAIAPI:
         res = complete(**kwargs)
         first = await anext(res)
         return first_buffered(res, first)
-        
-        return res
 
     def is_definitive_error(self, e):
         if "logit biases, but can provide at most" in str(e):
@@ -624,8 +654,8 @@ class AsyncOpenAIAPI:
                             t = (2.0 * random.random()) ** (self.maximum_retries - retries)
                             print("Backing off for", t , "seconds")
                             await asyncio.sleep(t)
-            except asyncio.CancelledError:
-                return
+            except asyncio.CancelledError as e:
+                break
             except Exception as e:
                 print("error", type(e))
                 for future in futures:
@@ -671,5 +701,9 @@ class AsyncOpenAIAPI:
         r = RequestQueueItem(kwargs, request_id)
         await self.complete_api_call_queue.put(r)
         self.request_ctr += 1
-        
+        if not self.is_available():
+            raise APIShutDownException(f"bopenai requires at least one worker to be running to issue new complete requests.")
         return await result_fut
+
+    def is_available(self):
+        return len([w for w in self.complete_request_workers if not w.done()]) > 0

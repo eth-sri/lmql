@@ -3,10 +3,12 @@ from collections import namedtuple
 from typing import List, Union
 
 from .dclib_array import DataArray
+from .dclib_rewrite import DcModelRewriteMixin
 from .dclib_global import stats
 from .dclib_seq import DecoderSequence, detseq, deepcopy, deepmerge, DecoderSequence, DeterministicDecoderSequence, Continuation
 import numpy as np
 from lmql.utils import nputil
+import lmql.runtime.masks as masks
 from dataclasses import dataclass
 import sys
 
@@ -22,14 +24,15 @@ class DcModelLogitsTask:
 
 class ModelQueue:
     @staticmethod
-    def get(model_identifier):
+    def get(model_identifier, vocab_size):
         if model_identifier not in ModelQueue._instances.keys():
-            ModelQueue._instances[model_identifier] = ModelQueue(model_identifier)
+            ModelQueue._instances[model_identifier] = ModelQueue(model_identifier, vocab_size)
         return ModelQueue._instances[model_identifier]
     
-    def __init__(self, model_identifier):
+    def __init__(self, model_identifier, vocab_size):
         self.model_identifier = model_identifier
         self.logits_queue = asyncio.Queue()
+        self.vocab_size = vocab_size
         self.logits_workers = [asyncio.create_task(self.queue_worker_logits()) for _ in range(8)]
     
     def __del__(self):
@@ -90,14 +93,35 @@ class ModelQueue:
         if all([m is None for m in logit_masks]):
             return None
         else:
-            existing = [m for m in logit_masks if m is not None]
-            vocab_size = existing[0].shape[1] if existing[0].ndim == 2 else existing[0].shape[0]
-            lm = np.stack([m if m is not None else np.zeros((vocab_size), dtype=np.bool) for m in logit_masks])
+            # TODO: return logprob 0 for eos mask
+            for i in range(len(logit_masks)):
+                if masks.is_fixed_int_mask(logit_masks[i]):
+                    logit_masks[i] = masks.to_dense(logit_masks[i], self.vocab_size)
+                elif type(logit_masks[i]) is np.int64:
+                    logit_masks[i] = masks.to_dense(nputil.ensure_array(logit_masks).reshape(1), self.vocab_size)
+                elif type(logit_masks[i]) is int:
+                    logit_masks[i] = masks.to_dense(nputil.ensure_array(logit_masks).reshape(1), self.vocab_size)
+                else:
+                    assert len(logit_masks[i]) == self.vocab_size
+            lm = np.stack([m if m is not None else np.zeros((self.vocab_size), dtype=np.bool) for m in logit_masks])
             return lm
 
 ModelQueue._instances = {}
 
-class DcModel:
+class CacheDelegate:
+    def register_token_stream(self, fut: callable):
+        """
+        Registers an async iterator as an active token stream.
+
+        A token stream is an async generator function of (s, token, score, edge_type) tuples, where 
+        - 's' is a DecoderSequence,
+        - 'token' is the token to be appended to 's',
+        - 'score' is the logprob of 'token' given 's',
+        - 'edge_type' is the type of edge that was used to expand 's' to 's + token'.
+        """
+        pass
+
+class DcModel(DcModelRewriteMixin):
     def __init__(self, model, tokenizer, truncation_threshold=-3e38, init_workers=True, **kwargs):
         """
         Parameters:
@@ -118,8 +142,16 @@ class DcModel:
 
         self.stats = Stats("dcmodel")
 
-        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier)
+        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier, self.tokenizer.vocab_size)
         else: self.logits_queue = None
+
+        # if set, the cache delegate can be called for speculative model scoring results 
+        # (e.g. when sequences are scored in speculatively).
+        self.cache_delegate: CacheDelegate = None
+
+    def register_token_stream(self, task):
+        if self.cache_delegate is not None:
+            self.cache_delegate.register_token_stream(task)
 
     def log_billable_tokens(self, n: int):
         if hasattr(self.model, "billable_tokens"):
@@ -137,17 +169,22 @@ class DcModel:
 
     async def model_logits_async(self, model, input_ids, logits_mask=None, **kwargs):
         loop = asyncio.get_running_loop()
-        result_fut = loop.create_future()
         
         # print(kwargs)
         model_args = {
             "temperature": kwargs.get("temperature", None),
             "eos_token_id": kwargs.get("eos_token_id", None),
         }
-        
-        self.logits_queue.put(DcModelLogitsTask(model, input_ids, logits_mask, model_args, result_fut))
 
-        return await result_fut
+        # with 'noscore' do not compute logprobs of deterministic tokens
+        if logits_mask is not None and masks.mask_num_allowed(logits_mask) == 1 and kwargs.get("noscore", False):
+            logits = np.ones((self.tokenizer.vocab_size), dtype=np.float32) * np.finfo(np.float32).min
+            logits[masks.mask_get_only_allowed(logits_mask)] = 0.0
+            return (logits, logits)
+        else:
+            result_fut = loop.create_future()
+            self.logits_queue.put(DcModelLogitsTask(model, input_ids, logits_mask, model_args, result_fut))
+            return await result_fut
 
     async def autobatch_logits_with_cache(self, model, input_ids, max_batch_size, cache=None, logits_mask=None, **kwargs):
         kwargs = {**self.model_args, **kwargs}
@@ -156,8 +193,6 @@ class DcModel:
             input_ids_to_process = [ids for cache, ids in zip(cache, input_ids) if cache is None]
         else: 
             input_ids_to_process = input_ids
-
-        # print("call model for ", len(input_ids_to_process), " sequences", [len(ids) for ids in input_ids_to_process])
 
         # automatic batching
         results = await asyncio.gather(*[self.model_logits_async(
@@ -191,19 +226,14 @@ class DcModel:
         
         return np.stack(result_logits, axis=0), np.stack(result_raw, axis=0)
 
-    async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, **kwargs):
+    async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, required=False, **kwargs):
         if "modern_logits_processor" in kwargs:
             processor = kwargs["modern_logits_processor"]
-            mask = await processor(seqs, additional_logits_processor_mask=is_constrained)
+            mask = await processor(seqs, additional_logits_processor_mask=is_constrained, **kwargs)
             return mask
 
-        if "dclib_additional_logits_processor" not in kwargs:
-            return namedtuple("LogitsMaskResult", ["logits_mask", "user_data"])([None], user_data)
-        
-        processor = kwargs["dclib_additional_logits_processor"]
-        mask = await processor(input_ids, user_data=user_data, additional_logits_processor_mask=is_constrained)
-
-        return mask
+        assert not required, "compute_logits_mask() cannot produce a token mask, as the provided kwargs do not contain a logits processor. Please make sure to pass a logits processor to decoding function you are using."
+        return namedtuple("LogitsMaskResult", ["logits_mask", "user_data"])([None], user_data)
 
     async def logits(self, seqs, max_batch_size=16, **kwargs):
         with self.stats.timer("logits"):
@@ -261,14 +291,12 @@ class DcModel:
         return await sequences.aelement_wise(op_argmax)
 
 
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         with self.stats.timer("score"):
             assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
             
             if max_batch_size is None:
                 max_batch_size = DcModel.batch_size
-            
-            completion = [np.array(cont) for cont in tokens]
 
             def make_detseq(s, token_score, completion):
                 # compose deterministic flags
@@ -290,26 +318,42 @@ class DcModel:
                         user_data=user_data,
                         stop_phrase=np.concatenate([s.stop_phrase, np.array([stop_phrase])]),
                         needs_rewrite=needs_rewrite,
-                        sticky_user_data_keys=s.sticky_user_data_keys)
+                        sticky_user_data_keys=s.sticky_user_data_keys,
+                        internal=internal
+                )
             results = []
-
-            for i in range(0, len(sqs), max_batch_size):
-                batch_sqs = sqs[i:i+max_batch_size]
-                batch_input_ids = np.stack([s.input_ids for s in batch_sqs], axis=0)
-                batch_completion = np.stack(self.model.right_pad(completion[i:i+max_batch_size], pad_token_id=self.eos_token_id)["input_ids"], axis=0)
-
-                if noscore:
-                    token_scores = np.zeros_like(batch_completion)
-                else:
-                    token_scores, _ = await self.model.score(
-                        batch_input_ids,
-                        batch_completion,
-                        eos_token_id=self.eos_token_id
-                    )
-                for s,c,ts in zip(batch_sqs,completion[i:i+max_batch_size], token_scores):
-                    results.append(make_detseq(s, ts[:len(c)], c))
-
+            async for s,c,ts in self.score_tokens(sqs, tokens, max_batch_size=max_batch_size, noscore=noscore):
+                results.append(make_detseq(s, ts[:len(c)], c))
             return results
+        
+    async def score_tokens(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, noscore=False):
+        """
+        Iterates the scores for 'tokens' when appended to the sequences in 'sqs', element-wise.
+
+        Returns:
+            List of tuples (sqs[i], tokens[i], scores(token[i]))
+        """
+
+        if max_batch_size is None:
+            max_batch_size = DcModel.batch_size
+
+        completion = [np.array(cont) for cont in tokens]
+
+        for i in range(0, len(sqs), max_batch_size):
+            batch_sqs = sqs[i:i+max_batch_size]
+            batch_input_ids = np.stack([s.input_ids for s in batch_sqs], axis=0)
+            batch_completion = np.stack(self.model.right_pad(completion[i:i+max_batch_size], pad_token_id=self.eos_token_id)["input_ids"], axis=0)
+
+            if noscore:
+                token_scores = np.zeros_like(batch_completion)
+            else:
+                token_scores, _ = await self.model.score(
+                    batch_input_ids,
+                    batch_completion,
+                    eos_token_id=self.eos_token_id
+                )
+            for s,c,ts in zip(batch_sqs,completion[i:i+max_batch_size], token_scores):
+                yield (s,c,ts)
 
     async def score_old(self, seqs: Union[DataArray, DecoderSequence], tokens: Union[List[int], List[List[int]]], max_batch_size=4, deterministic=False, stop_phrase=False):
         if type(tokens[0]) is int:
@@ -380,13 +424,14 @@ class DcModel:
             vocab_size = logits.shape[-1]
 
             next_token_ids = []
+            next_token_scores = []
+
             for i in range(len(logits)):
                 probs = np.exp(logits[i])
                 num_possible = (probs > 0).sum()
-                next_token_ids.append(np.random.choice(vocab_size, size=max(num_samples, num_possible), p=probs, replace=False))
-            next_token_ids = np.stack(next_token_ids, axis=0)
-
-            next_token_scores = np.take_along_axis(logits, next_token_ids.reshape(-1,1), axis=-1)
+                token_ids = np.random.choice(vocab_size, size=min(num_samples, num_possible), p=probs, replace=False)
+                next_token_ids.append(token_ids)
+                next_token_scores.append(np.take_along_axis(logits[i], token_ids, axis=-1))
 
             return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=raw_logits[i]) for i,s in enumerate(seqs)]
         
@@ -412,142 +457,6 @@ class DcModel:
     
     def report_stats(self, printer, decoder_step=None):
         self.model.report_stats(printer, decoder_step)
-        
-    async def _rewrite_seq(self, seqs_or_seq, noscore=False):
-        # check self.model_args for a "modern_rewriter" key
-        if "modern_rewriter" not in self.model_args:
-            return seqs_or_seq
-        
-        # accept both a single sequence or a list of sequences
-        unwrap = lambda v: v
-        seqs = seqs_or_seq 
-        if type(seqs_or_seq) is not list:
-            seqs = [seqs_or_seq]
-            unwrap = lambda v: v[0] if type(v) is list and len(v) == 1 else v
-
-        # do not rewrite deterministic sequences (rewrite mask set to False)
-        mask_seq_to_rewrite = np.array([s.needs_rewrite for s in seqs], dtype=np.bool_)
-
-        rewriter = self.model_args["modern_rewriter"]
-        rewritten_ids = await rewriter(seqs, mask_seq_to_rewrite)
-    
-        # update user data, if rewriter provides it
-        for s, user_data in zip(seqs, rewritten_ids.user_data):
-            s.user_data = deepmerge(deepcopy(s.user_data), user_data) if user_data is not None else s.user_data
-            s.user_data["set_by"] = "rewrite"
-
-        all_updated_ids = rewritten_ids.appended_input_ids
-        if all_updated_ids is None:
-            all_updated_ids = [None for _ in range(len(seqs))]
-
-        # extract the offset of value tokens in appended_ids, before the sequence is deterministic
-        value_offset = rewritten_ids.value_offset
-        if value_offset is None:
-            value_offset = [0 for _ in range(len(seqs))]
-
-        # concat existing input_ids (minus eos if strip_eos) with appended input_ids
-        rewriting_tasks = []
-        for seqidx, (s, updated_ids, offset) in enumerate(zip(seqs, all_updated_ids, value_offset)):
-            # run actually rewrites asynchronously
-            rewriting_tasks.append(self._rewrite_seq_task(s, seqidx, seqs, rewritten_ids, updated_ids, offset, noscore=noscore))
-        rewritten_seqs = [s for s in await asyncio.gather(*rewriting_tasks) if s is not None]
-        return unwrap(rewritten_seqs)
-
-    async def _rewrite_seq_task(self, s, seqidx, seqs, rewritten_ids, updated_ids, value_offset, noscore=False):
-        if (updated_ids is None or len(updated_ids) == 0) and not get_strip_eos(seqidx, rewritten_ids.strip_eos):
-            return s
-        else:
-            ids = _stripped_ids(seqs, seqidx, rewritten_ids.strip_eos)
-
-            # if the rewritten sequence is identical to the original sequence, we can just keep the original sequence (with updated user data)
-            if (updated_ids is not None) and (len(ids) == len(s.input_ids) - 1 and len(updated_ids) == 1 and updated_ids[0] == s.input_ids[-1]):
-                return s
-            
-            # find the common prefix between the original sequence and the rewritten sequence
-            continued_seq = s
-            # keep track of current continuation seqs, to potentially traverse forward again (matching updated ids)
-            successors = [] 
-            # traverse backwards until continued_seq matches ids in length - 1
-            while len(continued_seq.input_ids) > len(ids) and continued_seq.predecessor is not None:
-                successors.insert(0, continued_seq)
-                continued_seq = continued_seq.predecessor
-
-            # traverse forward again, until the sequence no longer matches with updated_ids
-            last_rewrite_offset = len(continued_seq.input_ids)
-            offset = last_rewrite_offset
-            while offset < len(successors) + last_rewrite_offset and \
-                updated_ids is not None and \
-                offset < len(updated_ids) and \
-                successors[offset - last_rewrite_offset].input_ids[-1] == updated_ids[offset]:
-                
-                offset += 1
-                continued_seq = successors[offset - last_rewrite_offset - 1]
-
-            assert continued_seq is not None, "error: a rewritten sequence is not a continuation of any sequence already decoded. Going from {} to {} with common text {}".format(
-                await s.text(),
-                await self.detokenize(updated_ids),
-                # common ids
-                await self.detokenize(ids),
-            )
-
-            # align user data
-            user_data = continued_seq.extend_user_data(user_data=s.user_data)
-
-            if updated_ids is None:
-                s = DecoderSequence(continued_seq.input_ids, continued_seq.logprobs, continued_seq.deterministic, stop_phrase=continued_seq.stop_phrase, 
-                                    predecessor=continued_seq, user_data=user_data, sticky_user_data_keys=continued_seq.sticky_user_data_keys, epsilon_node=True)
-                s.needs_rewrite = False
-                return s
-
-            # offset updated_ids to the number of tokens that are already present as continued_seq
-            appended_ids = updated_ids[offset:]
-
-            if len(appended_ids) == 0:
-                return DecoderSequence(continued_seq.input_ids, continued_seq.logprobs, continued_seq.deterministic, stop_phrase=continued_seq.stop_phrase,
-                                    predecessor=continued_seq, user_data=user_data, sticky_user_data_keys=continued_seq.sticky_user_data_keys, epsilon_node=True)
-
-            # check if rewriting action provides user data specifically for the rewritten sequence
-            # user_data = rewritten_ids.rewritten_seq_user_data[seqidx] or user_data
-
-            # value tokens
-            num_value_tokens = value_offset - offset
-            deterministic = [True if i + 1 > num_value_tokens else False for i in range(len(appended_ids))]
-            continuation = (await self.score([continued_seq], [appended_ids], deterministic=deterministic, stop_phrase=False, needs_rewrite=False, user_data=user_data, noscore=noscore))[0]
-            
-            continuation.stop_phrase = s.stop_phrase[:len(continuation.input_ids)]
-            continuation.needs_rewrite = False
-            
-            steps = 0
-            while type(continuation) is DeterministicDecoderSequence and len(continuation.next_ids) > 0 and steps < num_value_tokens:
-                continuation.user_data = deepcopy(s.predecessor.user_data)
-                # print("continuation.user_data", continuation.user_data, flush=True)
-                continuation = continuation.extend(Continuation(continuation.next_ids[0], continuation.next_logprobs[0], continuation.user_data))
-                steps += 1
-            
-            continuation.user_data = rewritten_ids.rewritten_seq_user_data[seqidx] or user_data
-
-            return continuation
-
-    async def rewrite(self, ar: Union[DataArray, List[DecoderSequence], DecoderSequence], noscore=False):
-        """
-        Applies the active rewriting strategy (e.g. the LMQL interpreter) to the provided (array of) sequences.
-        
-        This may add, remove or change tokens in the sequence, including the EOS token.
-        """
-        if type(ar) is not DataArray:
-            return await self._rewrite_seq(ar)
-
-        async def op_rewrite(path, seqs):
-            """
-            Rewrites the sequences in the pool using the rewriting strategy provided in kwargs.
-
-            If no rewriting strategy is provided, no rewriting is performed.
-            """
-            return path, await self._rewrite_seq(seqs, noscore=noscore)
-        
-        with stats.timer("rewrite"):
-            result_items = await asyncio.gather(*[op_rewrite(path, seqs) for path, seqs in ar.sequences.items()])
-        return DataArray(dict(result_items))
 
 DcModel.batch_size = 1
 
@@ -571,26 +480,3 @@ def tokenizer(name, tokenize, detokenize, bos_token_id, eos_token_id):
         async def decode(self, tokens):
             return await detokenize(tokens)
     return AsyncTokenizer(eos_token_id=eos_token_id, bos_token_id=bos_token_id)
-
-def _stripped_ids(seqs, seqidx, strip_eos):
-    if strip_eos == True:
-        return seqs[seqidx].input_ids[:-1]
-    elif type(strip_eos) is list:
-        sequence_strip = strip_eos[seqidx]
-        if sequence_strip == True:
-            return seqs[seqidx].input_ids[:-1]
-        elif type(sequence_strip) is int:
-            return seqs[seqidx].input_ids[:sequence_strip] 
-        else:
-            return seqs[seqidx].input_ids
-    else:
-        return seqs[seqidx].input_ids
-
-def get_strip_eos(seqidx, strip_eos):
-    if strip_eos == True: return True
-    elif type(strip_eos) is list:
-        sequence_strip = strip_eos[seqidx]
-        if sequence_strip == True: return True
-        elif type(sequence_strip) is int: return True
-        else: return False
-    else: return False

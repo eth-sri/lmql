@@ -2,6 +2,7 @@ from .dclib_global import *
 from .dclib_array import *
 from .dclib_model import *
 from .dclib_seq import *
+from .dclib_cache import *
 
 class _Decoders: pass
 _Decoders.registry = {}

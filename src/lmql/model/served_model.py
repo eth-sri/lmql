@@ -131,7 +131,8 @@ class ServedModel:
         # keep stats
         num_input_tokens = sum(len(x) for x in input_ids)
         self.consumed_tokens = self.consumed_tokens + num_input_tokens
-        
+        self.billable_tokens += 1
+
         assert input_ids.dtype == torch.long, "input_ids must be of dtype torch.long"
         # count prompt tokens + 1 generated output token per sequence
         
