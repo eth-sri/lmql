@@ -2033,7 +2033,8 @@ function DecoderPanel(props) {
     return {
       "_finfalse": data.user_data && data.user_data.head && data.user_data.head.valid == "False",
       "_isRoot": data.root,
-      "_isDone": data.user_data && data.user_data.head && data.user_data.head.variable == "__done__"
+      "_isDone": data.user_data && data.user_data.head && data.user_data.head.variable == "__done__",
+      "_noUserData": !data.user_data || (data.user_data && data.user_data == "None")
     }
   }
 

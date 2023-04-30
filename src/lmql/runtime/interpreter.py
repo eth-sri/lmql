@@ -165,6 +165,7 @@ class PromptInterpreter:
         self.prefers_compact_mask  = False
         self.caching = True
         self.cache_file = None
+        self.show_speculative = False
         
         self.eager_followmap_expansion = True
 
@@ -657,6 +658,11 @@ class PromptInterpreter:
         if not "max_len" in decoder_args.keys():
             decoder_args["max_len"] = 2048
         
+        # parse show_speculative argument
+        if "show_speculative" in decoder_args.keys():
+            self.show_speculative = decoder_args.pop("show_speculative")
+            assert self.caching, "warning: show_speculative is only supported when caching is enabled."
+
         # parse cache argument
         if "cache" in decoder_args.keys():
             cache_value = decoder_args.pop("cache")
@@ -673,7 +679,7 @@ class PromptInterpreter:
         # setup dcmodel for use
         self.dcmodel.model_args = decoder_args
         if self.caching:
-            self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids, cache_file=self.cache_file)
+            self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids, cache_file=self.cache_file, show_speculative=self.show_speculative)
         decoder_args["dcmodel"] = self.dcmodel
         dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 
@@ -750,17 +756,15 @@ class PromptInterpreter:
                     assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             
-            if hasattr(self.dcmodel, "save"):
-                self.dcmodel.save()
-
             return results
         finally:
             # make sure token cache is saved if possible
             if hasattr(self.dcmodel, "save"):
                 self.dcmodel.save()
+                self.dcmodel.close()
 
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache"]
+        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args

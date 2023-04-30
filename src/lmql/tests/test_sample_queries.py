@@ -66,8 +66,7 @@ async def main():
                 runtime = time.time() - s
                 # time minus api latency
                 latency = api_stats.times.get("first-chunk-latency", 0)
-                runtime -= latency
-                print(termcolor.colored("[OK]", "green"), f"({runtime:.2f}s, API latency: {latency:.2f}s)")
+                print(termcolor.colored("[OK]", "green"), f"({runtime:.2f}s, w/o latency: {(runtime - latency):.2f}s)")
             except Exception as e:
                 print(error_buffer.getvalue())
                 print(e)

@@ -10,6 +10,7 @@ import numpy as np
 import lmql.runtime.masks as masks
 import lmql.runtime.bopenai as openai
 import lmql.runtime.dclib as dc
+import lmql.utils.nputil as nputil
 from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.dclib.dclib_seq import (DecoderSequence, deepcopy, deepmerge,
                                           detseq, is_deterministic)
@@ -115,8 +116,6 @@ class DclibOpenAiModel(DcModel):
         self.num_requests = 0
 
         self.stats = Stats("openai")
-
-        # openai.Completion.set_chaos(0.05) # for unreliably testing
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
 
     def log_billable_tokens(self, n: int):
@@ -256,6 +255,9 @@ class DclibOpenAiModel(DcModel):
             pass
         elif mode == "complete": # complete with mask
             logit_bias = completion_call.api_mask
+            # reduce chunk size, if logit mask seems very sparse
+            if len(logit_bias) > 0 and max(logit_bias.values()) == 100 and len(logit_bias) < 10:
+                kwargs["max_tokens"] = min(kwargs["max_tokens"], 4)
             kwargs.update({"logit_bias": logit_bias})
         elif mode == "fixed": # complete with fixed token
             fixed_next_token = completion_call.logit_mask_or_fixed_id # special return value case for prepare function
@@ -271,7 +273,8 @@ class DclibOpenAiModel(DcModel):
             if len(completion_call.stopping_phrases) > 4:
                 # same but blaming it more on OpenAI
                 print("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
-            kwargs.update({"stop": completion_call.stopping_phrases[:4]})
+            # skip stopping phrases for more speculative execution
+            # kwargs.update({"stop": completion_call.stopping_phrases[:4]})
         else:
             assert False, f"Internal openai API dispatcher returned an unknown completion mode {mode}"
 
@@ -279,7 +282,9 @@ class DclibOpenAiModel(DcModel):
         self.count_billed_tokens(input_ids.size + kwargs.get("max_tokens") * batch_size, self.model_identifier)
         
         if self.model_args.get("chatty_openai", False):
-            print([await self.detokenize(kwargs["prompt"])])
+            args = kwargs.copy()
+            args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
+            print(f"openai complete: {args}")
 
         return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     
@@ -288,6 +293,9 @@ class DclibOpenAiModel(DcModel):
             return [[t[0]] for t in await self.model.tokenize(tokens)]
         return tokens
     
+    async def openai_cache_delegate(self, kwargs, tokens, scores):
+        print(tokens, scores, self.cache_delegate)
+
     async def _complete(self, completion_call: Union[CompletionCall, List[CompletionCall]], **kwargs):
         if type(completion_call) is list:
             input_ids = np.stack([c.input_ids for c in completion_call], axis=0)
@@ -334,7 +342,7 @@ class DclibOpenAiModel(DcModel):
             if len(completion_call.stopping_phrases) > 4:
                 # same but blaming it more on OpenAI
                 print("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
-            kwargs.update({"stop": completion_call.stopping_phrases[:4]})
+            # kwargs.update({"stop": completion_call.stopping_phrases[:4]})
         else:
             assert False, f"Internal openai API dispatcher returned an unknown completion mode {mode}"
 
@@ -395,9 +403,65 @@ class DclibOpenAiModel(DcModel):
                     None,
                 )
 
-            return await self.async_complete(completion_call)
+            completion_result = await self.async_complete(completion_call)
+            # eagerly expand and cache full completion if a cache_delegate is available
+            if self.cache_delegate is not None:
+                await self.expand_and_cache(s, completion_result, "top-1", logprobs=kwargs.get("logprobs", 1))
+            return completion_result
 
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
+
+    async def expand_and_cache(self, s: DecoderSequence, completion_result: CompletionResult, edge_type, logprobs=1):
+        async def token_stream():
+            nonlocal edge_type, s, completion_result
+            response_buffer = completion_result.buffer
+            
+            try:
+                tokens = []
+                scores = []
+
+                while True:
+                    try:
+                        if await response_buffer.empty():
+                            break
+
+                        res = await response_buffer.get(0)
+                        tokens = nputil.ensure_iterable(res["logprobs"]["tokens"])
+                        scores = res["logprobs"]["token_logprobs"]
+
+                        topprobs = res["logprobs"]["top_logprobs"]
+                        if topprobs is not None and logprobs > 1:
+                            topk_tokens = list(topprobs.items())
+                            topk_tokens = [(tok[0], score) for (tok_str, score), tok in zip(topk_tokens, await self.tokenize_list([s for s,_ in topk_tokens]))]
+                            topk_tokens += [(tokens[0], scores)]
+                            topk_tokens = list(dict.fromkeys(topk_tokens))
+                            topk_tokens = sorted(topk_tokens, key=lambda x: x[1], reverse=True)
+                            topk_tokens = topk_tokens[:logprobs]
+                            
+                            tokens = [tok for tok, _ in topk_tokens]
+                            scores = [score for _, score in topk_tokens]
+                            edge_type = ["top-{}".format(i+1) for i in range(len(topk_tokens))]
+                        
+                        # future continuation
+                        response_buffer = response_buffer[1:]
+                        continuation = CompletionResult(response_buffer, completion_result.continuation_type, completion_result.logit_mask_or_fixed_id)
+
+                        user_data = {
+                            "openai-continuations": {
+                                continuation.continuation_type: continuation
+                            }
+                        }
+                        yield (s, tokens, scores, edge_type, user_data)
+                    except IndexError:
+                        break
+                # print("fully expanded speculativate continuation:", [await self.detokenize(tokens)], flush=True)
+                # if len(tokens) > 1:
+                #     await self.cache(s, tokens, scores, edge_type)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print("error in expand_and_cache worker:", e, flush=True)
+        self.register_token_stream(token_stream)
 
     async def argmax(self, sequences, **kwargs):
         return await self.sample(sequences, num_samples=1, temperature=0, **kwargs)
@@ -424,7 +488,7 @@ class DclibOpenAiModel(DcModel):
         kwargs = {**self.model_args, **kwargs}
 
         async def op_sample(seqs):
-            completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=5, **kwargs)
+            completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=1, **kwargs)
             
             next_token_ids = []
             next_token_scores = []
