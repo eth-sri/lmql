@@ -623,6 +623,8 @@ class PromptInterpreter:
 
         # tokenize initial prompt
         prompt_ids = await self.tokenize(self.root_state.prompt)
+        print("bos", self.dcmodel.bos_token_id)
+        print("prompt_ids", prompt_ids)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
         n = len(prompt_ids)
