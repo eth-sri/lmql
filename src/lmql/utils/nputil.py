@@ -47,3 +47,19 @@ def unsqueeze(a, axis):
         return np.expand_dims(a, axis)
     else:
         return a
+    
+def replace_inf_nan_with_str(d):
+    import math
+
+    if type(d) is dict:
+        for k, v in d.items():
+            d[k] = replace_inf_nan_with_str(v)
+        return d
+    elif type(d) is list:
+        for i, v in enumerate(d):
+            d[i] = replace_inf_nan_with_str(v)
+        return d
+    elif type(d) is float:
+        if math.isinf(d) or math.isnan(d):
+            return str(d)
+    return d

@@ -42,13 +42,12 @@ const ContentContainer = styled.div`
   
   color: white;
   flex: 1;
-  height: calc(100% - 40pt);
-  width: 100%;
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: calc(100% - 4pt);
+  height: calc(100% - 2pt);
+  margin: 2pt;
 `;
 
 const Panel = styled.div.attrs(props => ({ className: "panel" }))`
@@ -58,7 +57,8 @@ const Panel = styled.div.attrs(props => ({ className: "panel" }))`
   padding: 10px;
   display: flex;
   flex-direction: column;
-  margin-left: 2.5pt;
+  margin-left: 1.5pt;
+  margin-right: 1.5pt;
   width: 40%;
   position: relative;
 
@@ -401,7 +401,7 @@ function EditorPanel(props) {
 
   function handleEditorDidMount(editor, monaco) {
     ResizeObservers.addResizeListener(() => {
-      let fontSize = window.innerWidth < 700 ? 10 : 16
+      let fontSize = window.innerWidth < 700 ? 12 : 16
       editor.updateOptions({ "fontSize": fontSize })
       window.setTimeout(() => {
         editor.layout()
@@ -453,6 +453,8 @@ function EditorPanel(props) {
           // tabSize: 6,
           // show whitespace
           renderWhitespace: "all",
+          // set font family
+          fontFamily: "Fira Code, monospace",
           automaticLayout: true
         }}
         // custom language
@@ -550,6 +552,7 @@ const Row = styled.div`
       flex-direction: column;
       height: calc(100%);
       padding: 0;
+      margin-right: 4pt;
     }
 
     &.simple-mode.simple .panel {
@@ -682,6 +685,7 @@ const ModelResultText = styled.div`
   line-height: 1.6em;
   white-space: pre-wrap;
   overflow-y: auto;
+  font-size: 10pt;
 
   &.chat-mode {
     padding-bottom: 50pt;
@@ -797,20 +801,21 @@ const ModelResultText = styled.div`
     background-color: #333;
     opacity: 1.0;
     border-radius: 2pt;
-    margin-left: 1pt;
+    margin-left: 2pt;
   }
 
   div .variable:hover {
     position: relative;
+    transform: scale(1.1);
   }
 
   div .badge {
-    padding: 2.5pt 4pt;
+    padding: 1.0pt 4pt;
     border-radius: 2pt;
-    font-size: 8pt;
+    font-size: 0.9em;
     background-color: rgba(0, 0, 0, 0.5);
     position:relative; 
-    top: -1.25pt;
+    top: -0.05em;
     margin-right: 2pt;
     user-select: none;
     /* exclude from text selection */
@@ -1850,6 +1855,24 @@ const Toolbar = styled.div`
   .bottom {
     margin-top: 40pt;
   }
+
+  >a {
+    display: block;
+    margin: 4pt;
+    margin-left: 8pt;
+    font-size: 10pt;
+    color: black;
+
+    text-decoration: none;
+
+    @media screen and (max-width: 40em) {
+      display: none;
+    }
+
+    :hover {
+      text-decoration: underline;
+    }
+  }
 `
 
 const ButtonGroup = styled.div`
@@ -1905,7 +1928,7 @@ const FancyButton = styled.button`
     }
   }
 
-  @media (max-width: 40em) {
+  @media (max-width: 50em) {
     &.in-toolbar {
       position: absolute;
       bottom: 20pt;
@@ -2431,11 +2454,28 @@ class App extends React.Component {
 
     // when document browser scale is changed
     window.addEventListener("resize", ResizeObservers.notify)
+    
+    this.onKeyDown = this.onKeyDown.bind(this)
+    window.addEventListener("keydown", this.onKeyDown)
+  }
+
+  onKeyDown(event) {
+    /* On R*/
+    if (event.keyCode == 82 && event.ctrlKey) {
+      this.onRun();
+    }
+    /* On Escape */
+    if (event.keyCode == 27) {
+      LMQLProcess.kill();
+    }
   }
 
   componentWillUnmount() {
     LMQLProcess.remove("render", this)
     LMQLProcess.remove("status", this.onStatus.bind(this))
+    
+    window.removeEventListener("resize", ResizeObservers.notify)
+    window.removeEventListener("keydown", this.onKeyDown)
   }
 
   onExportState() {
@@ -2513,7 +2553,7 @@ class App extends React.Component {
       this.state.selectedNodeTrigger.trigger(n)
     };
 
-    const simpleModeClassName = this.state.simpleMode ? "" : "simple-mode";
+    const simpleModeClassName = (this.state.simpleMode && displayState.mode != "embed") ? "" : "simple-mode";
 
     return (
       <ContentContainer className={this.state.graphLayout ? 'graph-layout' : ''}>
@@ -2523,6 +2563,8 @@ class App extends React.Component {
             LMQL Playground
           </Title>
           {configuration.DEMO_MODE && <FancyButton className="in-toolbar" onClick={() => ExploreState.setVisibility(true)}><ExploreIc/> Explore LMQL</FancyButton>}
+          {window.location.hostname.includes("lmql.ai") && <a href={"https://docs.lmql.ai/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
+          Install LMQL Locally </a>}
           <Spacer />
           {/* show tooltip with build time */}
           {/* trigger button */}

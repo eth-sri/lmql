@@ -9,12 +9,12 @@ dependencies:
   - pytorch::torchvision
   - pytorch::torchaudio
   - pytorch::pytorch-cuda=11.7
-  - conda-forge::nodejs=14.20
+  - conda-forge::nodejs=18.15
   - pip:
     - astunparse
     - openai
     - termcolor
     - pydot
-    - transformers==4.25.1
+    - transformers==4.28.1
     - pandas
     - accelerate

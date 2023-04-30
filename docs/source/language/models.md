@@ -30,7 +30,7 @@ Unfortunately, the OpenAI API Completions and Chat API are severely limited in t
 
 ### Configuring OpenAI API Credentials
 
-If you want to use OpenAI models, you have to configure your API credentials. To do so you can either define the `OPENAI_API_KEY` enviornment variable or create a file `api.env` in the active working directory, with the following contents.
+If you want to use OpenAI models, you have to configure your API credentials. To do so you can either define the `OPENAI_API_KEY` environment variable or create a file `api.env` in the active working directory, with the following contents.
 
 ```
 openai-org: <org identifier>
@@ -83,5 +83,3 @@ Now, when executing an LMQL query in the playground or via the CLI, you can simp
 #### Running The Playground Remotely
 
 If you would like to run the LMQL Playground itself remotely (e.g. for latency reasons), you can do so using a similar port forwarding/tunnel setup as described above. For this, make sure you client browser has access to the Playground server ports `3000` and `3004`.
-
-

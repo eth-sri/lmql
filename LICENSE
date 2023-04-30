@@ -203,9 +203,8 @@ Copyright 2022- The LMQL Language Team. All rights reserved.
    limitations under the License.
 ================================================================================
 
-The project also includes two files adapted from the huggingface/tranformers project:
+The project also includes one file adapted from the huggingface/tranformers project:
 
-- hf_beam_search.py
 - async_generation_utils.py
 
 These files are adapted from their original project and redistributed according to the following license agreement:

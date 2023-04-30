@@ -12,8 +12,21 @@ from lmql.language.qstrings import qstring_to_stmts, TemplateVariable
 from lmql.language.validator import LMQLValidator, LMQLValidationError
 from lmql.language.fragment_parser import LMQLDecoderConfiguration, LMQLQuery, LanguageFragmentParser, FragmentParserError
 from lmql.runtime.model_registry import model_name_aliases
+import lmql.runtime.lmql_runtime as lmql_runtime
+from lmql.runtime.dclib import get_all_decoders
 
 OPS_NAMESPACE = "lmql.ops"
+
+class FreeVarCollector(ast.NodeVisitor):
+    def __init__(self, free_vars, exclude=None):
+        self.free_vars = free_vars
+        self.exclude = exclude or set()
+
+    def visit_Name(self, node):
+        if type(node.ctx) is ast.Load:
+            if node.id in self.exclude:
+                return
+            self.free_vars.add(node.id)
 
 class PromptScope(ast.NodeVisitor):
     def scope(self, query: LMQLQuery):
@@ -25,6 +38,16 @@ class PromptScope(ast.NodeVisitor):
         self.written_vars = set()
 
         for p in query.prompt: self.visit(p)
+        
+        # also collect variable reads from where clause
+        if query.where is not None:
+            FreeVarCollector(self.free_vars).visit(query.where)
+        if query.from_ast is not None:
+            FreeVarCollector(self.free_vars).visit(query.from_ast)
+        if query.decode is not None:
+            FreeVarCollector(self.free_vars, exclude=get_all_decoders()).visit(query.decode)
+        if query.distribution is not None:
+            FreeVarCollector(self.free_vars).visit(query.distribution.values)
 
         query.scope = self
 
@@ -39,16 +62,25 @@ class PromptScope(ast.NodeVisitor):
             self.written_vars.add(v)
             if v in self.free_vars: self.free_vars.remove(v)
 
-        # capture set of format vars
-        used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}]+\}", qstring)]
+        # capture set of format vars (exclude {{ and }})
+        # replace {{ and }} with escape sequence \u007b and \u007d 
+        qstring = qstring.replace("{{", "__curly_open__").replace("}}", "__curly_close__")
+        used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}\{]+\}", qstring)]
         for v in used_fstring_expr:
             if v.startswith(":"):
                 continue
-            parsed = ast.parse(v).body[0].value
-            self.visit(parsed)
+            try:
+                parsed = ast.parse(v).body[0].value
+                self.visit(parsed)
+            except:
+                raise RuntimeError("Failed to parse fstring expression: ", v)
+
             
             # if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
             #     self.free_vars.add(v)
+
+        # put double curly braces back in
+        qstring = qstring.replace("__curly_open__", "{{").replace("__curly_close__", "}}")
                 
         template_tags = [v[1:-1] for v in re.findall("\{:[A-z0-9]+\}", qstring)]
         for tt in template_tags:
@@ -89,6 +121,16 @@ class QueryStringTransformation(ast.NodeTransformer):
         else:
             self.generic_visit(expr)
         return expr
+    
+    # translate id access to context
+    def visit_Name(self, node: ast.Name):
+        name = str(node.id)
+        
+        if type(node.ctx) is ast.Load:
+            if name == "context":
+                return ast.parse("(" + yield_call("get_context", ()) + ")").body[0].value
+        return node
+
 
     def transform_Constant(self, constant):
         if type(constant.value) is not str: return constant
@@ -112,10 +154,12 @@ class QueryStringTransformation(ast.NodeTransformer):
         if len(compiled_qstring) == 0:
             return constant
 
-        result_code = f'yield context.query(f"""{compiled_qstring}""")'
+        # result_code = f'yield context.query(f"""{compiled_qstring}""")'
+        result_code = interrupt_call('query', f'f"""{compiled_qstring}"""')
 
         for v in declared_template_vars:
-            result_code += f"\n{v} = context.get_var('{v}')"
+            get_var_call = yield_call('get_var', f'"{v}"')
+            result_code += f"\n{v} = " + get_var_call
         return ast.parse(result_code)
 
     # def transform_prompt_stmt(self, stmt):
@@ -425,6 +469,9 @@ class LMQLModule(object):
     def load(self):
         sys.path.append(os.path.dirname(self.compiled_file))
         m = __import__(os.path.basename(self.compiled_file[:-3]))
+        for v in m.__dict__.values():
+            if type(v) is lmql_runtime.LMQLQueryFunction:
+                v.lmql_code = self.lmql_code
         setattr(m, "code", self.code)
         setattr(m, "lmql_code", self.lmql_code)
         return m
@@ -456,6 +503,12 @@ def preprocess_text(lmql_code):
     lines = lmql_code.split("\n")
     common_indent = min([len(l) - len(l.lstrip()) for l in lines if len(l.strip()) > 0])
     return "\n".join([l[common_indent:] for l in lines])
+
+def yield_call(func, *args):
+    return f"""yield lmql.runtime_support.context_call("{func}", {", ".join([str(a) for a in args])})"""
+
+def interrupt_call(func, *args):
+    return f"""yield lmql.runtime_support.interrupt_call("{func}", {", ".join([str(a) for a in args])})"""
 
 class LMQLCompiler:
     def __init__(self):
@@ -496,21 +549,25 @@ class LMQLCompiler:
             output_variables = "output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
 
             # generate function that runs query
-            with PythonFunctionWriter("query", output_file, list(scope.free_vars) + ["context"], 
+            parameters = list(sorted(list(scope.free_vars.union(set(["context"])))))
+
+            with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
                 
-                writer.add(f"context.set_model({model_name})")
-                writer.add(f"context.set_decoder({astunparse.unparse(q.decode.method).strip()}, {unparse_list(q.decode.decoding_args)})")
+                writer.add(yield_call("set_model", model_name))
+                # writer.add(f"context.set_decoder({})")
+                writer.add(yield_call("set_decoder", astunparse.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))
                 writer.add("# where")
                 writer.add(q.where)
-                writer.add(f"context.set_where_clause({q.where_expr})")
+                writer.add(yield_call("set_where_clause", q.where_expr))
                 writer.add("# prompt")
                 writer.add(astunparse.unparse(q.prompt))
                 if q.distribution:
                     writer.add("# distribution")
-                    writer.add("context.set_distribution('{}', {})".format(q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
+                    # writer.add("context.set_distribution('{}', {})".format(q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
+                    writer.add(yield_call("set_distribution", "\"" + q.distribution.variable_name + "\"", astunparse.unparse(q.distribution.values).strip()))
                 
-                writer.add(f"yield ('result', context.get_return_value())")
+                writer.add(f"yield ('result', (" + yield_call("get_return_value", ()) + "))")
 
             return LMQLModule(output_file, lmql_code=lmql_code, output_variables=[v for v in scope.defined_vars])
         except FragmentParserError as e:

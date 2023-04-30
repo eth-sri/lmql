@@ -1,4 +1,4 @@
-from typing import List, Any, Union, Optional
+from typing import List, Any, Union, Optional, NamedTuple
 
 import asyncio
 import numpy as np
@@ -54,7 +54,7 @@ class DecoderGraph:
             if diff and k in self.json_snapshot.node_hashes:
                 # this will ignore changes to nodes that have not been updated for 3 steps (may miss changes to nodes that 
                 # are not updated for a long time, careful for now)
-                if k in self.json_snapshot.step_not_updated_count and self.json_snapshot.step_not_updated_count[k] > 2:
+                if k in self.json_snapshot.step_not_updated_count and self.json_snapshot.step_not_updated_count[k] > 4:
                     continue
                 hash = await v.json_hash()
                 if self.json_snapshot.node_hashes[k] == str(hash):
@@ -117,7 +117,7 @@ class DecoderSequence:
         # if no stop_phrase is provided assume no tokens to be stop_phrase
         if stop_phrase is None: self.stop_phrase = np.array([False for _ in range(len(input_ids))])
         else: self.stop_phrase = stop_phrase
-        assert len(self.stop_phrase) == len(self.input_ids), "Length of determinism status does not match length of inputs"
+        assert len(self.stop_phrase) == len(self.input_ids), "Length of stop_phrase status does not match length of inputs for {} and {}".format(self.stop_phrase, self.input_ids)
 
         # cache for logits when model is called with this sequence
         self.logits = None
@@ -128,7 +128,7 @@ class DecoderSequence:
 
         self.user_data = user_data
         self.sticky_user_data_keys = sticky_user_data_keys if sticky_user_data_keys is not None else set()
-        self.sticky_user_data_keys.add("head.variable")
+        # self.sticky_user_data_keys.add("head.variable")
 
         # alternative operation that may called to obtain a score in self.score_next_token if self.raw_logits are not available
         self.score_next_tokens_op = None
@@ -272,6 +272,9 @@ class DecoderSequence:
                 except:
                     if hasattr(o, "json") and callable(o.json):
                         return await self.default(await o.json())
+                    # check for NamedTuple
+                    elif hasattr(o, "_asdict") and callable(o._asdict):
+                        return await self.default(o._asdict())
                     elif type(o) is int:
                         return o
                     elif type(o) is float:
@@ -316,7 +319,9 @@ class DecoderSequence:
     def detect_stop_phrase(self, continuation):
         old_stop_phrase = self.stop_phrase
         new_stop_phrase = np.concatenate([old_stop_phrase, np.array([False])])
-        stop_phrases = self.data("head.stopping_phrases.tokenized")
+        if self.data("head") is None:
+            return new_stop_phrase
+        stop_phrases = self.data("head").stopping_phrases["tokenized"]
 
         if stop_phrases is None:
             return new_stop_phrase
@@ -337,8 +342,14 @@ class DecoderSequence:
         ids = ", ".join([str(i) for i in self.input_ids[-10:]])
         return f"<seq token_len={len(self.input_ids)} ids=[... {ids}]>"
 
-    async def text(self) -> str:
-        return str([await get_tokenizer().decode(self.input_ids)])
+    async def text(self, offset:int=None, limit:int=None, pretty=True) -> str:
+        offset = offset or 0
+        limit = limit or len(self.input_ids)
+        raw_text = await get_tokenizer().decode(self.input_ids[offset:limit])
+        if not pretty: 
+            return raw_text
+        else:
+            return str([raw_text])[2:-2]
 
     async def str(self, full=False) -> str:
         ids = ", ".join([str(i) for i in self.input_ids[-10:]])
@@ -375,6 +386,8 @@ def resolve_path(d, path):
         return None
     segments = path.split(".")
     for segment in segments:
+        if hasattr(d, "_asdict") and callable(d._asdict):
+            d = d._asdict()
         if segment not in d:
             return None
         d = d[segment]
@@ -428,27 +441,34 @@ class DeterministicDecoderSequence(DecoderSequence):
 
         self.align_user_data()
 
+    # async def text(self, offset: int = None, limit: int = None, pretty=True) -> str:
+    #     return "<detseq> " + await super().text(offset, limit, pretty)
+
     def align_user_data(self):
+        if self.user_data is None: return
+
         # lmql-specific user data should be different for deterministic sequences
         head_variable = resolve_path(self.user_data, "head.variable")
+
         if head_variable is not None:
-            if "before(" in head_variable:
-                head_variable = head_variable.split(":before(", 1)[0]
-            if head_variable == "__done__":
-                set_path(self.user_data, "head.variable", "__done__")
-            else:
-                if len(self.next_ids) > 0:
-                    set_path(self.user_data, "head.variable", head_variable + ":before(" + str(len(self.next_ids)) + ")")
-                else:
-                    set_path(self.user_data, "head.variable", head_variable)
+            # if "before(" in head_variable:
+            #     head_variable = head_variable.split(":before(", 1)[0]
+            # if head_variable == "__done__":
+            #     set_path(self.user_data, "head", self.user_data["head"].updated(variable="__done__"))
+            # else:
+            #     if len(self.next_ids) > 0:
+            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable + ":before(" + str(len(self.next_ids)) + ")"))
+            #     else:
+            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable))
             # deterministic sequences don't have stopping phrases
-            set_path(self.user_data, "head.stopping_phrases", {"tokenized": [], "text": []})
+            set_path(self.user_data, "head", self.user_data["head"].updated(stopping_phrases={"tokenized": [], "text": []}))
         else:
-            set_path(self.user_data, "head.variable", "<prompt>")
+            set_path(self.user_data, "head", self.user_data["head"].updated(variable="<prompt>"))
+        
         if len(self.next_ids) > 0:
-            set_path(self.user_data, "head.mask", "{token_id=" + str(self.next_ids[0]) + "}")
+            set_path(self.user_data, "head", self.user_data["head"].updated(mask="{token_id=" + str(self.next_ids[0]) + "}"))
         else:
-            set_path(self.user_data, "head.mask", "<not available yet>")
+            set_path(self.user_data, "head", self.user_data["head"].updated(mask="<not available yet>"))
     
     @property
     def is_query_constrained(self):
@@ -473,7 +493,7 @@ class DeterministicDecoderSequence(DecoderSequence):
             "logprob": self.logprobs[-1],
             "seqlogprob": self.logprobs.sum(),
             "pool": self.pool,
-            "deterministic": True,
+            **({"deterministic": True} if self.deterministic[-1] else {}),
             "next_ids": self.next_ids.tolist(),
             "next_logprobs": self.next_logprobs.tolist() if self.next_logprobs is not None else None,
             "user_data": await self.user_data_json(),
@@ -487,10 +507,11 @@ class DeterministicDecoderSequence(DecoderSequence):
             "sticky_user_data_keys": list(self.sticky_user_data_keys)
         }
 
-    def expand(self):
+    def expand(self, limit=None):
         """ Returns the sequence that corresponds to the full expansion of this pre-determined deterministic sequence. """
         s = self
-        while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
+        steps = 0
+        while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0 and (limit is None or steps < limit):
             s = s.extend(Continuation(s.next_ids[0], s.next_logprobs[0], s.user_data))
         return s
 

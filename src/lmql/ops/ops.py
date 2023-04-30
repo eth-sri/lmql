@@ -23,8 +23,6 @@ class Node:
         assert type(predecessors) is list, "Predecessors must be a list, not {}".format(type(predecessors))
         self.predecessors = predecessors
         self.depends_on_context = False
-        
-        self.follow_map = None
     
     def execute_predecessors(self, trace, context):
         return [execute_op(p, trace=trace, context=context) for p in self.predecessors]
@@ -42,6 +40,29 @@ class Node:
 
     def __nodelabel__(self):
         return str(type(self))
+    
+    def postprocess_var(self, var_name):
+        """
+        Returns true if this operations provides postprocessing semantics for complete values for the given variable name.
+        """
+        return False
+
+    def postprocess(self, operands, value):
+        """
+        Returns the postprocessed variant of `value`. Only called if `postprocess_var` returns true for variable name of value.
+        
+        You can return a tuple of postprocessed_rewrite (prompt) and postprocessed_value (variable value), to additionally 
+        provide different postprocessing semantics for the variable value and the rewrite of the prompt.
+        """
+        pass
+
+    def postprocess_order(self, other, **kwargs):
+        """
+        Orders application of postprocessing operations. Returns "before", "after" or 0 if order is not defined.
+        
+        Only invoked for `other` operations, that return true for the same `postprocess_var`.
+        """
+        return 0 # by default, no order is defined (only one postprocessing operation per variable can be applied)
 
 def DynamicTypeDispatch(name, type_map):
     def get_handler(args):
@@ -90,13 +111,23 @@ def strip_next_token(x):
         return [i for i in x if not is_next_token(i)]
     elif type(x) is tuple:
         return tuple(i for i in x if not is_next_token(i))
+    if type(x) is not str:
+        return x
     if x.endswith(NextToken):
         x = x[:-len(NextToken)]
     return x
 
+class postprocessed_value:
+    def __init__(self, value):
+        self.value = value
+class postprocessed_rewrite:
+    def __init__(self, rewrite):
+        self.rewrite = rewrite
+
+
 @LMQLOp("SENTENCES")
 class Sentences(Node):
-    def forward(self, v):
+    def forward(self, v, **kwargs):
         sentences = tuple(self.split(v, separator=["."]))
         return self.strip(sentences)
     
@@ -155,9 +186,10 @@ class Sentences(Node):
 
 @LMQLOp("INT")
 class IntOp(Node):
-    def forward(self, x):
+    def forward(self, x, final=None, **kwargs):
         if x is None: return None
         if x == "": return None
+        if final is not None and all(f == "fin" for f in final): return True
 
         # check int contains digits only
         if x.startswith(" "):
@@ -175,11 +207,11 @@ class IntOp(Node):
 
         context = kwargs.get("context", None)
         if context.runtime.prefers_compact_mask:
-            number_tokens = tset("1","2","3","4","5","6","7","8","9","Ġ2","Ġ3","Ġ4","Ġ5","Ġ0","Ġ6","Ġ7","Ġ8","Ġ9","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","37","48","66","55","47","49","65","68","31","67","59","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True)
-            number_continuation_tokens = tset("0","1","2","3","4","5","6","7","8","9","00","01","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","05","37","48","66","55","47","08","49","09","65","07","02","04","03","68","31","67","59","06","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True)
+            number_tokens = tset("1","2","3","4","5","6","7","8","9","Ġ2","Ġ3","Ġ4","Ġ5","Ġ0","Ġ6","Ġ7","Ġ8","Ġ9","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","37","48","66","55","47","49","65","68","31","67","59","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True, name="number_tokens")
+            number_continuation_tokens = tset("0","1","2","3","4","5","6","7","8","9","00","01","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","05","37","48","66","55","47","08","49","09","65","07","02","04","03","68","31","67","59","06","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True, name="number_continuation_tokens")
         else:
-            number_tokens = tset("[ 1-9][0-9]*$", regex=True)
-            number_continuation_tokens = tset("[0-9]+$", regex=True)
+            number_tokens = tset("[ 1-9][0-9]*$", regex=True, name="full_number_tokens")
+            number_continuation_tokens = tset("[0-9]+$", regex=True, name="full_number_continuation_tokens")
 
         if not has_next_token:
             return fmap(
@@ -207,6 +239,19 @@ class IntOp(Node):
                 ("*", False)
             )
         
+    def postprocess_var(self, var_name):
+        return var_name == self.predecessors[0].name
+
+    def postprocess(self, operands, raw):
+        value = int(raw)
+        return postprocessed_rewrite(str(value)), postprocessed_value(value)
+
+    def postprocess_order(self, other, **kwargs):
+        if isinstance(other, StopAtOp):
+            return "after" # apply Int after StopAt
+        else:
+            return 0 # cannot be compared
+
     def final(self, x, operands=None, result=None, **kwargs):
         if result == False and x[0] == "inc":
             return "fin"
@@ -219,11 +264,13 @@ class TokensOp(Node):
         
         self.depends_on_context = True
 
-    def forward(self, x, context):
+    def forward(self, x, context, **kwargs):
         import asyncio
         if x is None: return None
         if x == "": return []
-        
+
+        assert False, "TOKENS() operation is currently not supported"
+
         tokens = context.runtime.model.sync_tokenize(x)
         return tokens
 
@@ -247,7 +294,7 @@ class TokensOp(Node):
 
 @LMQLOp("WORDS")
 class WordsOp(Node):
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         if x is None: return None
         if x == "": return []
         # split on " " or "\n"
@@ -283,8 +330,10 @@ class WordsOp(Node):
 
 @LMQLOp("len")
 class LenOp(Node):
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         if x is None: return None
+        if type(x) is not str: 
+            x = str(x)
         return len(x)
     
     def follow(self, v, **kwargs):
@@ -292,23 +341,15 @@ class LenOp(Node):
         if type(v) is list or type(v) is tuple:
             return len(v)
         else:
+            v = str(v)
             assert type(v) is str, "len() can only be applied to strings, lists, or tuples"
             if NextToken not in v:
                 return len(v)
             v = strip_next_token(v)
             
             len_masks = []
-            all = "∅"
-            l = 1
-            while True:
-                tmask = tset(charlen=l)
-                all = tmask.union(all)
-                # if 'all' encompasses all possible tokens, then we have enumerated all possible lengths
-                if len(all) == VocabularyMatcher.instance().vocab_size:
-                    break
-                if len(tmask) > 0:
-                    len_masks.append((tmask, len(v) + l))
-                l += 1
+            for l,tmask in charlen_tsets().items():
+                len_masks.append((tmask, len(v) + l))
             
             return fmap(*len_masks)
 
@@ -316,14 +357,14 @@ class LenOp(Node):
         return x[0]
 
 class NotOp(Node):
-    def forward(self, op):
+    def forward(self, op, **kwargs):
         return not op
 
     def follow(self, v, **kwargs):
         return not v
 
 class Lt(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
         return args[0] < args[1]
     
@@ -358,7 +399,7 @@ class EqOp(Node):
     def __init__(self, predecessors):
         super().__init__(predecessors)
 
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         return all([a == args[0] for a in args])
 
     def follow(self, *args, **kwargs):
@@ -440,7 +481,7 @@ class EqOp(Node):
         return super().final(operand_final, operands=operands, result=result, **kwargs)
 
 class SelectOp(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if len(args[0]) <= args[1]:
             return None
         return args[0][args[1]]
@@ -485,7 +526,7 @@ class Var(Node):
     async def json(self):
         return self.name
 
-    def forward(self, context):
+    def forward(self, context, **kwargs):
         if self.diff_aware_read:
             return (context.get(self.name, None), context.get_diff(self.name, None))
         return context.get(self.name, None)
@@ -522,7 +563,7 @@ class RawValueOp(Node):
         self.value = value
         self.final_value = final
 
-    def forward(self):
+    def forward(self, **kwargs):
         return self.value
 
     def follow(self, **kwargs):
@@ -546,7 +587,7 @@ def matching_phrases_suffixes(x, allowed_phrases, allow_full_matches=False):
                 yield ""
 
 class InOpStrInStr(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
 
         return args[0] in args[1]
@@ -589,7 +630,7 @@ class InOpStrInStr(Node):
         return super().final(op_final, result=result, **kwargs)
 
 class InOpStrInSet(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
         
         x = args[0]
@@ -648,7 +689,7 @@ InOp = DynamicTypeDispatch("InOp", (
 ))
 
 class OrOp(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if any([a == True for a in args]):
             return True
         elif all([a == False for a in args]):
@@ -672,7 +713,7 @@ class OrOp(Node):
             return "fin"
 
 class AndOp(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if type(args[0]) is tuple and len(args) == 1:
             args = args[0]
 
@@ -713,7 +754,7 @@ def remainder(seq: str, phrase: str):
 
 @LMQLOp("STARTS_WITH")
 class StartsWithOp(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
         
         x = args[0]
@@ -811,8 +852,11 @@ class StopAtOp(Node):
             self._tokenized_stopping_phrase_cache[tokenizer] = result
             return result
 
-    def forward(self, *args):
+    def forward(self, *args, final, **kwargs):
         if any([a is None for a in args]): return None
+
+        if all([a == "fin" for a in final]):
+            return True
 
         op1, op1_diff = args[0]
         op2 = args[1]
@@ -830,12 +874,11 @@ class StopAtOp(Node):
             return None
 
         op1, op1_diff = args[0]
-        if op1 is None:return None
+        if op1 is None: return None
         if op1_diff is None: op1_diff = ""
 
         op1 = strip_next_token(op1)
         op2 = args[1]
-
 
         matched_phrase_index = op1.rfind(op2)
         op2_in_op1 = matched_phrase_index != -1 and matched_phrase_index + len(op2) > len(op1) - len(op1_diff)
@@ -866,8 +909,49 @@ class StopAtOp(Node):
                 r = "fin"
             return r
 
+    def postprocess_var(self, var_name):
+        return var_name == self.predecessors[0].name
+
+    def postprocess(self, operands, value):
+        op2 = operands[1]
+        matched_phrase_index = value.rfind(op2)
+        if matched_phrase_index != -1:
+            value = value[:matched_phrase_index + len(op2)]
+
+        return postprocessed_rewrite(value), postprocessed_value(value)
+    
+    def postprocess_order(self, other, operands, other_inputs, **kwargs):
+        if type(other) is IntOp:
+            return "before"
+        if type(other) is StopAtOp:
+            value, value_diff = operands[0]
+            op2 = operands[1]
+            assert value == other_inputs[0][0], "internal error: comparing postprocess_order with two StopAtOps with different values (do they refer to different variables) {}".format((value, other_inputs[0]))
+            matched_phrase_index = value.rfind(op2)
+            other_matched_phrase_index = other_inputs[0][0].rfind(other_inputs[1])
+            if matched_phrase_index == -1:
+                return "before" # this operator does not match, so order does not matter
+            if other_matched_phrase_index == -1:
+                return "after" # other operator does not match, so order does not matter
+            if matched_phrase_index < other_matched_phrase_index:
+                return "before"
+            else:
+                return "after"
+        
+        return 0 # other constraints cannot be compared
+
+@LMQLOp(["STOPS_BEFORE", "stops_before"])
+class StopBeforeOp(StopAtOp):
+    def postprocess(self, operands, value):
+        op2 = operands[1]
+        matched_phrase_index = value.find(op2)
+        if matched_phrase_index != -1:
+            value = value[:matched_phrase_index]
+
+        return postprocessed_rewrite(value), postprocessed_value(value)
+
 class OpaqueLambdaOp(Node):
-    def forward(self, *args):
+    def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
         fct, *args = args
         return fct(*args)
@@ -925,14 +1009,16 @@ def create_mask(follow_map, valid, final):
 def is_node(op):
     return issubclass(type(op), Node)
 
-def derive_final(op, trace, context, result):
+def derive_predecessor_final(op, trace):
     def get_final(v):
         # for nodes, get final value from trace
         if is_node(v): return trace[v][1]
         # for constants, final value is always "fin"
         return "fin"
+    return [get_final(p) for p in op.predecessors]
 
-    predecessor_final = [get_final(p) for p in op.predecessors]
+def derive_final(op, trace, context, result):
+    predecessor_final = derive_predecessor_final(op, trace)
 
     def get_predecessor_result(v):
         if is_node(v): return trace[v][0]
@@ -967,6 +1053,69 @@ def execute_op_stops_at_only(op: Node, result=None):
         return []
     return result
 
+def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context=None):
+    """
+    Applies any postprocess() operations of the provided constraints
+    to the specified variable and value.
+
+    Returns a tuple of (postprocessed_value, rewritten_prompt)
+    """
+    if op is None: return value, value
+
+    nodes = [op]
+
+    trace = {}
+    postprocessors = []
+
+    # collect and sort set of postprocessing operations
+    while len(nodes) > 0:
+        op = nodes.pop()
+        nodes += [p for p in op.predecessors if isinstance(p, Node)]
+
+        if op.postprocess_var(var_name):
+            # compute operation inputs
+            inputs = op.execute_predecessors(trace, context)
+            # determine insertion index in postprocessors
+            i = 0
+            while i < len(postprocessors):
+                current_op, current_op_inputs = postprocessors[i]
+                relative_order = op.postprocess_order(current_op, operands=inputs, other_inputs=current_op_inputs)
+                if relative_order == "before":
+                    break
+                elif relative_order == "after":
+                    i += 1
+                else:
+                    assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
+            postprocessors.insert(i, (op, inputs))
+    
+    rewritten_value = None
+    rewritten_prompt = value
+
+    # apply postprocessing operations
+    for pop in postprocessors:
+        pop, inputs = pop # unpack to get op and inputs
+        result = pop.postprocess(inputs, rewritten_prompt)
+
+        if result is not None:
+            
+            if type(result) is tuple:
+                for v in result:
+                    if type(v) is postprocessed_value:
+                        rewritten_value = v.value
+                    elif type(v) is postprocessed_rewrite:
+                        rewritten_prompt = v.rewrite
+                    else:
+                        assert False, "Invalid postprocess() return value: {} for {}".format(v, op)
+            else:
+                rewritten_value = result
+    
+    if rewritten_prompt is None:
+        rewritten_prompt = str(value)
+    if rewritten_value is None:
+        rewritten_value = value
+    
+    return rewritten_value, rewritten_prompt
+
 def execute_op(op: Node, trace=None, context=None, return_final=False):
     # for constant dependencies, just return their value
     if not is_node(op): 
@@ -981,8 +1130,9 @@ def execute_op(op: Node, trace=None, context=None, return_final=False):
     
     if op.depends_on_context: 
         inputs += (context,)
-    
-    result = op.forward(*inputs)
+
+    inputs_final = derive_predecessor_final(op, trace)
+    result = op.forward(*inputs, final=inputs_final)
     is_final = derive_final(op, trace, context, result)
     
     if trace is not None: 
@@ -994,13 +1144,14 @@ def execute_op(op: Node, trace=None, context=None, return_final=False):
     return result
 
 def digest(expr, context, follow_context, no_follow=False):
-    if expr is None: return True, "fin", {}
+    if expr is None: return True, "fin", {}, {}
 
     trace = {}
+    follow_trace = {}
     expr_value, is_final = execute_op(expr, trace=trace, context=context, return_final=True)
 
     if no_follow:
-        return expr_value, is_final, trace
+        return expr_value, is_final, trace, follow_trace
 
     for op, value in trace.items():
         # determine follow map of predecessors
@@ -1010,7 +1161,7 @@ def digest(expr, context, follow_context, no_follow=False):
         else:
             # use * -> value, for constant value predecessor nodes
             def follow_map(p):
-                if is_node(p): return p.follow_map
+                if is_node(p): return follow_trace[p]
                 else: return fmap(("*", (p, ("fin",))))
             intm = fmap_product(*[follow_map(p) for p in op.predecessors])
         
@@ -1021,6 +1172,6 @@ def digest(expr, context, follow_context, no_follow=False):
         # print(name, value)
         # print("follow({}) = {}".format(name, op_follow_map))
 
-        setattr(op, "follow_map", op_follow_map)
+        follow_trace[op] = op_follow_map
     
-    return expr_value, is_final, trace
+    return expr_value, is_final, trace, follow_trace
