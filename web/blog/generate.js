@@ -166,7 +166,13 @@ function render_page(page) {
 
     let description = "Regular updates on the LMQL project."
     if (article != null) {
-        description = article.content.split("\n").filter((line) => !line.startsWith("#") && line.trim() != "").slice(0, 3).join(" ")
+        let dom = jsdom.JSDOM.fragment(article.content)
+        let firstParagraph = dom.querySelector("p")
+        if (firstParagraph != null) {
+            description = firstParagraph.textContent
+        } else {
+            description = ""
+        }
     }
 
     // replace all <%TITLE%> with title
