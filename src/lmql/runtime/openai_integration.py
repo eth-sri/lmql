@@ -141,7 +141,7 @@ class DclibOpenAiModel(DcModel):
 
         invert = False
         num_allowed = masks.mask_num_allowed(mask)
-        assert num_allowed > 0, "DclibOpenAiModel: encountered logits mask with no allowed tokens"
+        assert num_allowed > 0, "DclibOpenAiModel: encountered logits mask with no allowed tokens: mask: {} mask type:{}".format(mask, type(mask))
 
         if num_allowed == 1:
             # check for <eos> case
