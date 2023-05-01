@@ -741,8 +741,6 @@ class PromptInterpreter:
                 # +1 for the eos token
                 billable_tokens += upper + (1 if has_deterministic_tail else 0)
             
-            self.dcmodel.log_billable_tokens(billable_tokens)
-
             results = []
 
             for i,s in enumerate(result_sequences):
