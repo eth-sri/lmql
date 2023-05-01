@@ -10,20 +10,20 @@
   <!-- Primary Meta Tags -->
   <title>LMQL Release 0.0.5</title>
   <meta name="title" content="LMQL Release 0.0.5">
-  <meta name="description" content="Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works. `lmql==0.0.5` has been published on [PyPI](https://pypi.org/project/lmql/), based the current `main` branch of the [GitHub repository](https://github.com/eth-sri/lmql). The updated version has also been deployed to the browser-based [lmql.ai/playground](http://lmql.ai/playground). * **Decoder Performance** The `argmax` and `sample` decoders have undergone some optimizations, allowing them to run faster. This results in a *20-30% speed-up* on common query workloads. [#24](https://github.com/eth-sri/lmql/pull/24).">
+  <meta name="description" content="Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://lmql.ai/">
   <meta property="og:title" content="LMQL Release 0.0.5">
-  <meta property="og:description" content="Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works. `lmql==0.0.5` has been published on [PyPI](https://pypi.org/project/lmql/), based the current `main` branch of the [GitHub repository](https://github.com/eth-sri/lmql). The updated version has also been deployed to the browser-based [lmql.ai/playground](http://lmql.ai/playground). * **Decoder Performance** The `argmax` and `sample` decoders have undergone some optimizations, allowing them to run faster. This results in a *20-30% speed-up* on common query workloads. [#24](https://github.com/eth-sri/lmql/pull/24).">
+  <meta property="og:description" content="Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.">
   <meta property="og:image" content="https://lmql.ai/static/images/lmql-social.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://lmql.ai/">
   <meta property="twitter:title" content="LMQL Release 0.0.5">
-  <meta property="twitter:description" content="Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works. `lmql==0.0.5` has been published on [PyPI](https://pypi.org/project/lmql/), based the current `main` branch of the [GitHub repository](https://github.com/eth-sri/lmql). The updated version has also been deployed to the browser-based [lmql.ai/playground](http://lmql.ai/playground). * **Decoder Performance** The `argmax` and `sample` decoders have undergone some optimizations, allowing them to run faster. This results in a *20-30% speed-up* on common query workloads. [#24](https://github.com/eth-sri/lmql/pull/24).">
+  <meta property="twitter:description" content="Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.">
   <meta property="twitter:image" content="https://lmql.ai/static/images/lmql-social.png"">
   
   
@@ -121,16 +121,20 @@ function openPlaygroundSnippet(link, snippet) {
     <a href="/">
       <img src="./static/images/lmql-text.png" alt="LMQL logo" class="logo">
     </a>
+    <a href="https://discord.gg/7eJP4fcyNT" class="hide-on-small">
+      💬
+      Discord
+    </a>
     <a href="blog">
       📝
       Blog
     </a>
     <a href="https://docs.lmql.ai">
-      <i class="fa fa-book"></i>
+      📖
       Docs
     </a>
     <a href="https://github.com/eth-sri/lmql">
-      <i class="fa fa-github"></i>
+      📦
       GitHub</a>
   </div>
 
@@ -149,21 +153,23 @@ function openPlaygroundSnippet(link, snippet) {
           <div class="authors">
             <div class="is-size-5 publication-authors">
               <span class="author-block">
-            <a href="https://www.sri.inf.ethz.ch/people/luca">Luca Beurer-Kellner</a>
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
         </span>
             </div>
           </div>
             <div class="date">
                 Mon, Apr 17, 2023
             </div>
-            <p>Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.</p>
-<p><code>lmql==0.0.5</code> has been published on <a href="https://pypi.org/project/lmql/">PyPI</a>, based the current <code>main</code> branch of the <a href="https://github.com/eth-sri/lmql">GitHub repository</a>. The updated version has also been deployed to the browser-based <a href="http://lmql.ai/playground">lmql.ai/playground</a>.</p>
-<h3 id="changelog">Changelog</h3>
+            <section id="lmql-release-0-0-5">
+
+<p>Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.</p>
+<p><code class="docutils literal notranslate"><span class="pre">lmql==0.0.5</span></code> has been published on <a class="reference external" href="https://pypi.org/project/lmql/">PyPI</a>, based the current <code class="docutils literal notranslate"><span class="pre">main</span></code> branch of the <a class="reference external" href="https://github.com/eth-sri/lmql">GitHub repository</a>. The updated version has also been deployed to the browser-based <a class="reference external" href="http://lmql.ai/playground">lmql.ai/playground</a>.</p>
+<section id="changelog">
+<h2>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h2>
 <ul>
-<li><p><strong>Decoder Performance</strong> The <code>argmax</code> and <code>sample</code> decoders have undergone some optimizations, allowing them to run faster. This results in a <em>20-30% speed-up</em> on common query workloads. <a href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p>
-</li>
-<li><p><strong>Postprocessing Semantics</strong> Internally, LMQL now allows constraints to implement postprocessing semantics. This is used to convert variable values after they have been completed, to a more normalized form in the prompt, and to a semantically meaningful data type in the context of the query code. <a href="https://github.com/eth-sri/lmql/pull/24">#24</a>. </p>
-<p> For example, when using an <code>INT(&lt;var&gt;)</code> constraint on a generated number, the model will be restricted to only generate valid integers, and now, the resulting <code>NUM</code> value will additionally be converted to an <code>int</code> value:</p>
+<li><p><strong>Decoder Performance</strong> The <code class="docutils literal notranslate"><span class="pre">argmax</span></code> and <code class="docutils literal notranslate"><span class="pre">sample</span></code> decoders have undergone some optimizations, allowing them to run faster. This results in a <em>20-30% speed-up</em> on common query workloads. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p></li>
+<li><p><strong>Postprocessing Semantics</strong> Internally, LMQL now allows constraints to implement postprocessing semantics. This is used to convert variable values after they have been completed, to a more normalized form in the prompt, and to a semantically meaningful data type in the context of the query code. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p>
+<p>For example, when using an <code class="docutils literal notranslate"><span class="pre">INT(&lt;var&gt;)</span></code> constraint on a generated number, the model will be restricted to only generate valid integers, and now, the resulting <code class="docutils literal notranslate"><span class="pre">NUM</span></code> value will additionally be converted to an <code class="docutils literal notranslate"><span class="pre">int</span></code> value:</p>
  <div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/releases-release-0-0-5-md-postprocessing-int-value')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
  <span class="s2">"My favorite number is: [NUM]</span><span class="se">\n</span><span class="s2">"</span>
  <span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">NUM</span><span class="p">),</span> <span class="n">NUM</span> <span class="o">*</span> <span class="mi">2</span><span class="p">)</span> <span class="c1"># &lt;class 'int'&gt; 4</span>
@@ -173,30 +179,30 @@ function openPlaygroundSnippet(link, snippet) {
  <span class="kp">where</span>
     <span class="n">INT</span><span class="p">(</span><span class="n">NUM</span><span class="p">)</span> </pre></div>
 </li>
-<li><p><strong>Core Interpreter</strong> A complete reimplementation of the LMQL core interpreter has been completed. This fixes a couple of minor issues and overall, improves reliability and performance when dealing with <em>branching</em> decoding algorithms. <a href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p>
-</li>
-<li><p><strong>Playground</strong> Locally and when used in-browser, the <a href="http://lmql.ai/playground">LMQL Playground</a> now <em>streams debugger information</em> from the LMQL interpreter incrementally. This leads to speed-ups when running in the Playground, especially with longer outputs. <a href="https://github.com/eth-sri/lmql/commit/27f9a8adb819f732608ef61c9aca9dca579dc536">#27f9a8ad</a>.</p>
-</li>
+<li><p><strong>Core Interpreter</strong> A complete reimplementation of the LMQL core interpreter has been completed. This fixes a couple of minor issues and overall, improves reliability and performance when dealing with <em>branching</em> decoding algorithms. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p></li>
+<li><p><strong>Playground</strong> Locally and when used in-browser, the <a class="reference external" href="http://lmql.ai/playground">LMQL Playground</a> now <em>streams debugger information</em> from the LMQL interpreter incrementally. This leads to speed-ups when running in the Playground, especially with longer outputs. <a class="reference external" href="https://github.com/eth-sri/lmql/commit/27f9a8adb819f732608ef61c9aca9dca579dc536">#27f9a8ad</a>.</p></li>
 <li><p><strong>Other Fixes</strong>:</p>
-<ul>
-<li>When used from within Python (as decorated function), LMQL code no longer has to be doubly-escaped, e.g. you can now write <code>STOPS_AT(VAR, &quot;\n&quot;)</code> instead of <code>STOPS_AT(VAR, &quot;\\n&quot;)</code></li>
-<li>The LMQL inference API buffers requests that come in during startup, to avoid errors when the server is not yet ready. <a href="https://github.com/eth-sri/lmql/pull/15">#15</a>, thanks to <a href="https://github.com/chrispan">@chrispan</a>.</li>
-<li>OpenAI request parallelization no longer leads to an error on Linux systems, with regards to worker processes <a href="https://github.com/eth-sri/lmql/issues/6">#6</a>.</li>
+<ul class="simple">
+<li><p>When used from within Python (as decorated function), LMQL code no longer has to be doubly-escaped, e.g. you can now write <code class="docutils literal notranslate"><span class="pre">STOPS_AT(VAR,</span> <span class="pre">"\n")</span></code> instead of <code class="docutils literal notranslate"><span class="pre">STOPS_AT(VAR,</span> <span class="pre">"\\n")</span></code></p></li>
+<li><p>The LMQL inference API buffers requests that come in during startup, to avoid errors when the server is not yet ready. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/15">#15</a>, thanks to <a class="reference external" href="https://github.com/chrispan">@chrispan</a>.</p></li>
+<li><p>OpenAI request parallelization no longer leads to an error on Linux systems, with regards to worker processes <a class="reference external" href="https://github.com/eth-sri/lmql/issues/6">#6</a>.</p></li>
 </ul>
 </li>
 </ul>
-<h3 id="preview">Preview</h3>
+</section>
+<section id="preview">
+<h2>Preview<a class="headerlink" href="#preview" title="Permalink to this heading">#</a></h2>
 <p>Apart from the changes above, we are also working on a number of other features, including:</p>
-<ul>
-<li><p><strong>llama.cpp support</strong> as started in <a href="https://github.com/eth-sri/lmql/pull/18">this PR</a>, thanks to <a href="https://github.com/CircArgs">@CircArgs</a>.</p>
-</li>
-<li><p>Support for <strong>Type Constraints</strong>, e.g.  <code>type(VAR) is DataClass</code>, that automatically force the model to produce a value that structurally conforms to the given type. See this <a href="https://twitter.com/lbeurerkellner/status/1646187597901733889">Twitter thread</a> for more details.</p>
-</li>
-<li><p>Support for using <strong>Antlr parsers</strong> during query execution, to force the model to produce a value that conforms to a given grammar. </p>
-</li>
-<li><p><strong>Extending Logit Masking to OpenAI Chat Models</strong>. This will enable full support for LMQL constraints with e.g. <code>chatgpt</code> and <code>gpt-4</code> models. See <a href="https://github.com/eth-sri/lmql/pull/25">#25</a>, thanks to <a href="https://github.com/kharvd">@kharvd</a>.</p>
-</li>
+<ul class="simple">
+<li><p><strong>llama.cpp support</strong> as started in <a class="reference external" href="https://github.com/eth-sri/lmql/pull/18">this PR</a>, thanks to <a class="reference external" href="https://github.com/CircArgs">@CircArgs</a>.</p></li>
+<li><p>Support for <strong>Type Constraints</strong>, e.g.  <code class="docutils literal notranslate"><span class="pre">type(VAR)</span> <span class="pre">is</span> <span class="pre">DataClass</span></code>, that automatically force the model to produce a value that structurally conforms to the given type. See this <a class="reference external" href="https://twitter.com/lbeurerkellner/status/1646187597901733889">Twitter thread</a> for more details.</p></li>
+<li><p>Support for using <strong>Antlr parsers</strong> during query execution, to force the model to produce a value that conforms to a given grammar.</p></li>
+<li><p><strong>Extending Logit Masking to OpenAI Chat Models</strong>. This will enable full support for LMQL constraints with e.g. <code class="docutils literal notranslate"><span class="pre">chatgpt</span></code> and <code class="docutils literal notranslate"><span class="pre">gpt-4</span></code> models. See <a class="reference external" href="https://github.com/eth-sri/lmql/pull/25">#25</a>, thanks to <a class="reference external" href="https://github.com/kharvd">@kharvd</a>.</p></li>
 </ul>
+</section>
+</section>
+
+
 
           </div>
         </div>
@@ -213,7 +219,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Mon, May 1, 9:54 AM (UTC)<br/>
+        Last updated on Mon, May 1, 1:40 PM (UTC)<br/>
       </div>
     </div>
   </div>

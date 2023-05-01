@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax\n    \"A list of things not to forget when going to the sea (not travelling): \\n\"\n    \"- Sunglasses \\n\"\n    \"-[THING]\"\n    \"-[THING]\"\n    \"-[THING]\"\n    \"-[THING]\"\nfrom\n    'openai/text-ada-001'\nwhere\n    STOPS_AT(THING, \"\\n\")", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

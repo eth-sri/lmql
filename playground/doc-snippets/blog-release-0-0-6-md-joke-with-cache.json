@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax(cache=\"joke.tokens\")\n   \"\"\"A good dad joke. A indicates the punchline\n   Q:[JOKE]\n   A:[PUNCHLINE]\"\"\"\nfrom\n   \"openai/text-davinci-003\"\nwhere\n   len(JOKE) < 120 and \n   STOPS_AT(JOKE, \"?\") and \n   STOPS_AT(PUNCHLINE, \"\\n\") and \n   len(PUNCHLINE) > 1", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

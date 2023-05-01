@@ -121,20 +121,144 @@ function openPlaygroundSnippet(link, snippet) {
     <a href="/">
       <img src="./static/images/lmql-text.png" alt="LMQL logo" class="logo">
     </a>
+    <a href="https://discord.gg/7eJP4fcyNT" class="hide-on-small">
+      💬
+      Discord
+    </a>
     <a href="blog">
       📝
       Blog
     </a>
     <a href="https://docs.lmql.ai">
-      <i class="fa fa-book"></i>
+      📖
       Docs
     </a>
     <a href="https://github.com/eth-sri/lmql">
-      <i class="fa fa-github"></i>
+      📦
       GitHub</a>
   </div>
 
 
+<section class="section blog startpage" id="release-0.0.6">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column">
+          <h5 class="title is-2 has-text-left" style="margin-bottom: 2pt;">
+            <a href="blog/release-0.0.6.html" class="anchor">
+                Releasing the LMQL Caching Layer (v0.0.6)
+            </a>
+          </h5>
+          <div class="content has-text-justified">
+          <div class="authors">
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
+        </span>
+            </div>
+          </div>
+            <div class="date">
+                Mon, May 1, 2023
+            </div>
+            <section id="releasing-the-lmql-caching-layer-v0-0-6">
+
+<p>Today we are releasing LMQL 0.0.6, the first version of LMQL that integrates the <em>LMQL Caching Layer</em>. The caching layer can drastically reduce token use of LLM interaction, lowering both the cost and latency of running queries. In this blog post, we provide a quick overview of the caching layer and demonstrate how it can reduce token use, latency and the number of requests needed to run queries by up to 80%. We observe improvements across a wide range of different scenarios, including <strong>template-based queries, long-form constraints and tool augmentation.</strong></p>
+<p>You can experiment with LMQL in the browser-based <a class="reference external" href="http://lmql.ai/playground">Playground IDE</a> or install the latest version locally, via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql</span></code>.</p>
+<section id="caching-layer">
+<h2>Caching Layer<a class="headerlink" href="#caching-layer" title="Permalink to this heading">#</a></h2>
+<p>The caching layer is implemented as a <strong>tree-based data structure</strong> that caches all model output including logits, tokens, and metadata, allowing the runtime to more efficiently explore the token space of an LLM, even in the presence of multiple variables, constraints and tool augmentation. The cache can be considered an append-only tree, that is explored during query execution, expanding branches according to query code, constraints and speculative execution.</p>
+<p>To illustrate the effect of a caching layer, we consider the following example scenarios, all of which now run in a fraction of the time and with a fraction of the tokens needed with traditional querying methods.</p>
+<section id="template-based-queries">
+<h3>Template-Based Queries<a class="headerlink" href="#template-based-queries" title="Permalink to this heading">#</a></h3>
+<p>When specifying a prompt template with multiple variables to fill in, an LLM typically needs to be invoked once per variable. For instance, consider the following template that guides an LLM in generating a list of things:</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-list-of-things-speculative')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
+    <span class="s2">"A list of things not to forget when going to the sea (not travelling): </span><span class="se">\n</span><span class="s2">"</span>
+    <span class="s2">"- Sunglasses </span><span class="se">\n</span><span class="s2">"</span>
+    <span class="s2">"-[THING]"</span>
+    <span class="s2">"-[THING]"</span>
+    <span class="s2">"-[THING]"</span>
+    <span class="s2">"-[THING]"</span>
+<span class="kn">from</span>
+    <span class="s1">'openai/text-ada-001'</span>
+<span class="kp">where</span>
+    <span class="n">STOPS_AT</span><span class="p">(</span><span class="n">THING</span><span class="p">,</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+<p></p>
+<p><strong>Without Caching:</strong> Tokens: 390, Requests: 4 | <strong>With Caching Layer:</strong> Tokens: 89 (<span style="color: green">-77%</span>), Requests: 1 (<span style="color: green">-75%</span>)</p>
+<p>Here, the LLM typically needs to be invoked 4 times, once per <code class="docutils literal notranslate"><span class="pre">[THING]</span></code> variable. On each call, this incurs a token and latency cost (both with OpenAI and local models). Separate calls are needed, because our template dictates the <code class="docutils literal notranslate"><span class="pre">-</span></code> token to be inserted before each <code class="docutils literal notranslate"><span class="pre">[THING]</span></code>.</p>
+<p>With the caching layer, LMQL can now invoke the LLM only once, and fill in all variables with the resulting tokens, as long as the LLM output already aligns naturally with your template. In case the LLM result of the initial invocation at some point no longer aligns with the template, LMQL will automatically re-invoke the LLM from this point on, guaranteeing an overall consistent result that is already parsed into separate <code class="docutils literal notranslate"><span class="pre">[THING]</span></code> variables.</p>
+</section>
+<section id="short-circuiting-long-constraints">
+<h3>Short-Circuiting Long Constraints<a class="headerlink" href="#short-circuiting-long-constraints" title="Permalink to this heading">#</a></h3>
+<p>When you specify long constraints like <code class="docutils literal notranslate"><span class="pre">A</span> <span class="pre">in</span> <span class="pre">["ABCDE",</span> <span class="pre">"FGHIJK"]</span></code>, the LMQL runtime guides the LLM to choose one of the provided options and then continues enforcing the sequence until the chosen values is fully decoded. To illustrate, consider the following query:</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-long-form-constraints-speculative')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
+    <span class="s2">"If we have the choice we choose[OPTION]"</span>
+<span class="kn">from</span> 
+    <span class="s2">"openai/text-ada-001"</span>
+<span class="kp">where</span>
+    <span class="n">OPTION</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"Option A with a whole lot of extra context"</span><span class="p">,</span> 
+        <span class="s2">"Option B with context"</span><span class="p">,</span> 
+        <span class="s2">"Another Option, also with a lot of additional text"</span>
+    <span class="p">]</span>
+</pre></div>
+<div class="highlight-model-output notranslate"><div class="highlight">If we have the choice we choose <span class="variable val1"><span class="variable-name">OPTION</span> Option A with a whole lot of extra context</span></div></div><p></p>
+<p><strong>Without Caching:</strong> Tokens: 123, Requests: 9 | <strong>With Caching Layer:</strong> Tokens: 25 (<span style="color: green">-80%</span>), Requests: 2 (<span style="color: green">-78%</span>)</p>
+<p>Here, after the LLM has produced <code class="docutils literal notranslate"><span class="pre">"Option"</span></code> and then <code class="docutils literal notranslate"><span class="pre">"</span> <span class="pre">A"</span></code>, LMQL short-circuits further model calls and automatically completes the resulting sequence to <code class="docutils literal notranslate"><span class="pre">"Option</span> <span class="pre">A</span> <span class="pre">with</span> <span class="pre">a</span> <span class="pre">whole</span> <span class="pre">lot</span> <span class="pre">of</span> <span class="pre">extra</span> <span class="pre">context"</span></code>. This is possible because once <code class="docutils literal notranslate"><span class="pre">Option</span> <span class="pre">A</span></code> has been predicted, the remaining tokens are fully determined by the constraints.</p>
+</section>
+<section id="tool-augmented-queries">
+<h3>Tool-Augmented Queries<a class="headerlink" href="#tool-augmented-queries" title="Permalink to this heading">#</a></h3>
+<p>Lastly, we consider tool augmented queries. LLM agents and tool augmentation are very powerful paradigms, that allow LLMs to incorporate external knowledge and reasoning into their predictions. However, this comes at a cost: On each tool invocation, the LLM needs to be re-invoked to continue decoding after the tool output has been inserted. This impacts both the token cost and latency of running queries, as many requests have to be send forth and back between the LLM and the tool.</p>
+<p>As an example, consider the following query that augments an LLM with the ability to use a key-value storage, <a class="reference external" href="http://lmql.ai/playground?snippet=kv">also runnable in the browser-based LMQL Playground</a>.</p>
+<center>
+<a href="http://lmql.ai/playground?snippet=kv">
+    <img src="https://user-images.githubusercontent.com/17903049/235436824-0150f73f-0ac6-4cd9-8cc9-d13343da54f0.png" alt="Key-Storage Augmented LLM implemented in LMQL" style="height:320pt;">
+</a>
+</center>
+<p><strong>Without Caching:</strong> Tokens: 5,162, Requests: 12 | <strong>With Caching Layer:</strong> Tokens: 3,481 (<span style="color: green">-33%</span>), Requests: 8 (<span style="color: green">-33%</span>)</p>
+<p>Here, whenever the LLM produces an action relating to our key-value storage, we invoke a tool that handles the storage and return the result (to <code class="docutils literal notranslate"><span class="pre">assign</span></code> and <code class="docutils literal notranslate"><span class="pre">get</span></code> stored values). The result of each tool invocation is then inserted into the LLM output, and the LLM is re-invoked to continue decoding.</p>
+<p>We count 10 tool interactions which results in 12 requests if we run without caching. However, using the new caching layer, we can reduce this to 8 requests, even undercutting the number of tool interactions. This is possible because the caching layer will not abort LLM generation, if the LLM already correctly predicts the tool output.</p>
+<p>This scenario demonstrates that the natural ability of LLMs to complete sequences can be leveraged to reduce the number of tool interactions, by relying on speculative execution.</p>
+</section>
+</section>
+<section id="persisting-the-cache">
+<h2>Persisting the Cache<a class="headerlink" href="#persisting-the-cache" title="Permalink to this heading">#</a></h2>
+<p>Of course, the in-memory cache of the LMQL runtime can also be persisted to disk, allowing you to reuse the cache tree across multiple queries, automatically reducing token cost and latency. In some cases this can even be used to reduce the number of requests to the LLM to 0, e.g. if the cache already contains the desired result.</p>
+<p>To do so, you can simply specify a <code class="docutils literal notranslate"><span class="pre">cache="file.tokens"</span></code> parameter in your query code:</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-joke-with-cache')">Open In Playground</button><pre><span></span><span class="kp">argmax</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="s2">"joke.tokens"</span><span class="p">)</span>
+<span class="w">   </span><span class="sd">"""A good dad joke. A indicates the punchline</span>
+<span class="sd">   Q:[JOKE]</span>
+<span class="sd">   A:[PUNCHLINE]"""</span>
+<span class="kn">from</span>
+   <span class="s2">"openai/text-davinci-003"</span>
+<span class="kp">where</span>
+   <span class="nb">len</span><span class="p">(</span><span class="n">JOKE</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">120</span> <span class="ow">and</span> 
+   <span class="n">STOPS_AT</span><span class="p">(</span><span class="n">JOKE</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">)</span> <span class="ow">and</span> 
+   <span class="n">STOPS_AT</span><span class="p">(</span><span class="n">PUNCHLINE</span><span class="p">,</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span> <span class="ow">and</span> 
+   <span class="nb">len</span><span class="p">(</span><span class="n">PUNCHLINE</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span>
+</pre></div>
+<p></p>
+<p>The first successful run of this query will persist the cache to <code class="docutils literal notranslate"><span class="pre">joke.tokens</span></code>. Subsequent runs will then automatically load the cache from disk, and only invoke the LLM if the cache does not contain a match. This also works for queries whose underlying LLM requests only partially overlap, as the tree-based cache data structure will automatically identify matching subtrees.</p>
+<p><strong>Caching During Query Development</strong>: Persisting the cache can be particularly useful during query development, as it allows you to reuse the cache across multiple runs of the same query. A persistent cache will reduce token cost and latency of your query, even if you slightly change the query between runs.</p>
+</section>
+<section id="caveats-and-disabling-the-cache">
+<h2>Caveats and Disabling the Cache<a class="headerlink" href="#caveats-and-disabling-the-cache" title="Permalink to this heading">#</a></h2>
+<p>You can disable the caching layer by specifying <code class="docutils literal notranslate"><span class="pre">cache=False</span></code> in your query code. This will cause the LMQL runtime to always invoke the LLM, and never use the cache. This is useful for debugging purposes, or if you want to ensure that the LLM is always invoked.</p>
+<p>Further, as the cache currently is implemented as an append-only data structure, it will grow indefinitely. This may be problematic for long-running applications, as the cache will eventually grow to relatively large sizes. In the future, we plan to implement simple strategies to limit the cache size, such as a least-recently-used eviction policy.</p>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this heading">#</a></h2>
+<p>In this post, we introduced the new caching layer of the LMQL runtime, which allows you to reduce the token cost and latency of your queries by reusing previously generated LLM outputs. We demonstrated how the caching layer can be used to reduce the number of LLM invocations in a variety of scenarios, including long constraints, short-circuiting, and tool-augmented queries. We also showed how the cache can be persisted to disk, allowing you to reuse the cache across multiple queries.</p>
+<p>To learn more about LMQL please also check out our <a class="reference external" href="https://docs.lmql.ai">documentation</a>, or join our <a class="reference external" href="https://discord.gg/2Y3Wz2Q">Discord</a> to chat with us directly. We are looking forward to hearing from you!</p>
+</section>
+</section>
+
+
+
+          </div>
+        </div>
+    </div>
+  </section>
+    
 <section class="section blog startpage" id="release-0.0.5">
     <div class="container is-max-desktop">
       <!-- Abstract. -->
@@ -149,21 +273,23 @@ function openPlaygroundSnippet(link, snippet) {
           <div class="authors">
             <div class="is-size-5 publication-authors">
               <span class="author-block">
-            <a href="https://www.sri.inf.ethz.ch/people/luca">Luca Beurer-Kellner</a>
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
         </span>
             </div>
           </div>
             <div class="date">
                 Mon, Apr 17, 2023
             </div>
-            <p>Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.</p>
-<p><code>lmql==0.0.5</code> has been published on <a href="https://pypi.org/project/lmql/">PyPI</a>, based the current <code>main</code> branch of the <a href="https://github.com/eth-sri/lmql">GitHub repository</a>. The updated version has also been deployed to the browser-based <a href="http://lmql.ai/playground">lmql.ai/playground</a>.</p>
-<h3 id="changelog">Changelog</h3>
+            <section id="lmql-release-0-0-5">
+
+<p>Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.</p>
+<p><code class="docutils literal notranslate"><span class="pre">lmql==0.0.5</span></code> has been published on <a class="reference external" href="https://pypi.org/project/lmql/">PyPI</a>, based the current <code class="docutils literal notranslate"><span class="pre">main</span></code> branch of the <a class="reference external" href="https://github.com/eth-sri/lmql">GitHub repository</a>. The updated version has also been deployed to the browser-based <a class="reference external" href="http://lmql.ai/playground">lmql.ai/playground</a>.</p>
+<section id="changelog">
+<h2>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h2>
 <ul>
-<li><p><strong>Decoder Performance</strong> The <code>argmax</code> and <code>sample</code> decoders have undergone some optimizations, allowing them to run faster. This results in a <em>20-30% speed-up</em> on common query workloads. <a href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p>
-</li>
-<li><p><strong>Postprocessing Semantics</strong> Internally, LMQL now allows constraints to implement postprocessing semantics. This is used to convert variable values after they have been completed, to a more normalized form in the prompt, and to a semantically meaningful data type in the context of the query code. <a href="https://github.com/eth-sri/lmql/pull/24">#24</a>. </p>
-<p> For example, when using an <code>INT(&lt;var&gt;)</code> constraint on a generated number, the model will be restricted to only generate valid integers, and now, the resulting <code>NUM</code> value will additionally be converted to an <code>int</code> value:</p>
+<li><p><strong>Decoder Performance</strong> The <code class="docutils literal notranslate"><span class="pre">argmax</span></code> and <code class="docutils literal notranslate"><span class="pre">sample</span></code> decoders have undergone some optimizations, allowing them to run faster. This results in a <em>20-30% speed-up</em> on common query workloads. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p></li>
+<li><p><strong>Postprocessing Semantics</strong> Internally, LMQL now allows constraints to implement postprocessing semantics. This is used to convert variable values after they have been completed, to a more normalized form in the prompt, and to a semantically meaningful data type in the context of the query code. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p>
+<p>For example, when using an <code class="docutils literal notranslate"><span class="pre">INT(&lt;var&gt;)</span></code> constraint on a generated number, the model will be restricted to only generate valid integers, and now, the resulting <code class="docutils literal notranslate"><span class="pre">NUM</span></code> value will additionally be converted to an <code class="docutils literal notranslate"><span class="pre">int</span></code> value:</p>
  <div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/releases-release-0-0-5-md-postprocessing-int-value')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
  <span class="s2">"My favorite number is: [NUM]</span><span class="se">\n</span><span class="s2">"</span>
  <span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">NUM</span><span class="p">),</span> <span class="n">NUM</span> <span class="o">*</span> <span class="mi">2</span><span class="p">)</span> <span class="c1"># &lt;class 'int'&gt; 4</span>
@@ -173,30 +299,30 @@ function openPlaygroundSnippet(link, snippet) {
  <span class="kp">where</span>
     <span class="n">INT</span><span class="p">(</span><span class="n">NUM</span><span class="p">)</span> </pre></div>
 </li>
-<li><p><strong>Core Interpreter</strong> A complete reimplementation of the LMQL core interpreter has been completed. This fixes a couple of minor issues and overall, improves reliability and performance when dealing with <em>branching</em> decoding algorithms. <a href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p>
-</li>
-<li><p><strong>Playground</strong> Locally and when used in-browser, the <a href="http://lmql.ai/playground">LMQL Playground</a> now <em>streams debugger information</em> from the LMQL interpreter incrementally. This leads to speed-ups when running in the Playground, especially with longer outputs. <a href="https://github.com/eth-sri/lmql/commit/27f9a8adb819f732608ef61c9aca9dca579dc536">#27f9a8ad</a>.</p>
-</li>
+<li><p><strong>Core Interpreter</strong> A complete reimplementation of the LMQL core interpreter has been completed. This fixes a couple of minor issues and overall, improves reliability and performance when dealing with <em>branching</em> decoding algorithms. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p></li>
+<li><p><strong>Playground</strong> Locally and when used in-browser, the <a class="reference external" href="http://lmql.ai/playground">LMQL Playground</a> now <em>streams debugger information</em> from the LMQL interpreter incrementally. This leads to speed-ups when running in the Playground, especially with longer outputs. <a class="reference external" href="https://github.com/eth-sri/lmql/commit/27f9a8adb819f732608ef61c9aca9dca579dc536">#27f9a8ad</a>.</p></li>
 <li><p><strong>Other Fixes</strong>:</p>
-<ul>
-<li>When used from within Python (as decorated function), LMQL code no longer has to be doubly-escaped, e.g. you can now write <code>STOPS_AT(VAR, &quot;\n&quot;)</code> instead of <code>STOPS_AT(VAR, &quot;\\n&quot;)</code></li>
-<li>The LMQL inference API buffers requests that come in during startup, to avoid errors when the server is not yet ready. <a href="https://github.com/eth-sri/lmql/pull/15">#15</a>, thanks to <a href="https://github.com/chrispan">@chrispan</a>.</li>
-<li>OpenAI request parallelization no longer leads to an error on Linux systems, with regards to worker processes <a href="https://github.com/eth-sri/lmql/issues/6">#6</a>.</li>
+<ul class="simple">
+<li><p>When used from within Python (as decorated function), LMQL code no longer has to be doubly-escaped, e.g. you can now write <code class="docutils literal notranslate"><span class="pre">STOPS_AT(VAR,</span> <span class="pre">"\n")</span></code> instead of <code class="docutils literal notranslate"><span class="pre">STOPS_AT(VAR,</span> <span class="pre">"\\n")</span></code></p></li>
+<li><p>The LMQL inference API buffers requests that come in during startup, to avoid errors when the server is not yet ready. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/15">#15</a>, thanks to <a class="reference external" href="https://github.com/chrispan">@chrispan</a>.</p></li>
+<li><p>OpenAI request parallelization no longer leads to an error on Linux systems, with regards to worker processes <a class="reference external" href="https://github.com/eth-sri/lmql/issues/6">#6</a>.</p></li>
 </ul>
 </li>
 </ul>
-<h3 id="preview">Preview</h3>
+</section>
+<section id="preview">
+<h2>Preview<a class="headerlink" href="#preview" title="Permalink to this heading">#</a></h2>
 <p>Apart from the changes above, we are also working on a number of other features, including:</p>
-<ul>
-<li><p><strong>llama.cpp support</strong> as started in <a href="https://github.com/eth-sri/lmql/pull/18">this PR</a>, thanks to <a href="https://github.com/CircArgs">@CircArgs</a>.</p>
-</li>
-<li><p>Support for <strong>Type Constraints</strong>, e.g.  <code>type(VAR) is DataClass</code>, that automatically force the model to produce a value that structurally conforms to the given type. See this <a href="https://twitter.com/lbeurerkellner/status/1646187597901733889">Twitter thread</a> for more details.</p>
-</li>
-<li><p>Support for using <strong>Antlr parsers</strong> during query execution, to force the model to produce a value that conforms to a given grammar. </p>
-</li>
-<li><p><strong>Extending Logit Masking to OpenAI Chat Models</strong>. This will enable full support for LMQL constraints with e.g. <code>chatgpt</code> and <code>gpt-4</code> models. See <a href="https://github.com/eth-sri/lmql/pull/25">#25</a>, thanks to <a href="https://github.com/kharvd">@kharvd</a>.</p>
-</li>
+<ul class="simple">
+<li><p><strong>llama.cpp support</strong> as started in <a class="reference external" href="https://github.com/eth-sri/lmql/pull/18">this PR</a>, thanks to <a class="reference external" href="https://github.com/CircArgs">@CircArgs</a>.</p></li>
+<li><p>Support for <strong>Type Constraints</strong>, e.g.  <code class="docutils literal notranslate"><span class="pre">type(VAR)</span> <span class="pre">is</span> <span class="pre">DataClass</span></code>, that automatically force the model to produce a value that structurally conforms to the given type. See this <a class="reference external" href="https://twitter.com/lbeurerkellner/status/1646187597901733889">Twitter thread</a> for more details.</p></li>
+<li><p>Support for using <strong>Antlr parsers</strong> during query execution, to force the model to produce a value that conforms to a given grammar.</p></li>
+<li><p><strong>Extending Logit Masking to OpenAI Chat Models</strong>. This will enable full support for LMQL constraints with e.g. <code class="docutils literal notranslate"><span class="pre">chatgpt</span></code> and <code class="docutils literal notranslate"><span class="pre">gpt-4</span></code> models. See <a class="reference external" href="https://github.com/eth-sri/lmql/pull/25">#25</a>, thanks to <a class="reference external" href="https://github.com/kharvd">@kharvd</a>.</p></li>
 </ul>
+</section>
+</section>
+
+
 
           </div>
         </div>
@@ -213,7 +339,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Mon, May 1, 9:54 AM (UTC)<br/>
+        Last updated on Mon, May 1, 1:40 PM (UTC)<br/>
       </div>
     </div>
   </div>

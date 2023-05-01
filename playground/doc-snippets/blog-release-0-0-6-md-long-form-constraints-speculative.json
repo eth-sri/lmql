@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax\n    \"If we have the choice we choose[OPTION]\"\nfrom \n    \"openai/text-ada-001\"\nwhere\n    OPTION in [\"Option A with a whole lot of extra context\", \n        \"Option B with context\", \n        \"Another Option, also with a lot of additional text\"\n    ]", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
