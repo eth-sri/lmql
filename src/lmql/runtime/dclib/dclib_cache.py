@@ -482,7 +482,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                     if type(tokens) is int or len(tokens) == 1:
                         tokens = ensure_iterable(tokens)
                         scores = ensure_iterable(scores)
-                        if type(edge_types) is str:
+                        if type(edge_types) is str or edge_types is None:
                             edge_types = [edge_types]
                     else:
                         assert len(tokens) == len(scores) == len(edge_types), f"token_consumer: expected all lists to have the same length, but got {len(tokens)}, {len(scores)}, {len(edge_type)}"
@@ -492,13 +492,16 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                     
                     async with self.cache_lock:
                         for token, score, edge_type in zip(tokens, scores, edge_types):
-                            assert type(edge_type) is str, "edge_types is {}".format(edge_types)
+                            assert type(edge_type) is str or edge_type is None, "edge_types is {}".format(edge_types)
+                            
                             if ids is None:
                                 ids = s.input_ids
                                 keys = await self.get_keys(s, edge_type, **self.model_args)
                                 sq = s
                             token_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
                             token_keys += [(self.base_key(ids), str(token))]
+                            # filter out keys with edge_type=None
+                            token_keys = [k for k in token_keys if k[1] is not None]
 
                             # for tk in token_keys:
                             #     if tk in self.cache and type(self.cache[tk][0]) is not asyncio.Future:

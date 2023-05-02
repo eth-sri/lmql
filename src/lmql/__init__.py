@@ -195,3 +195,13 @@ async def static_prompt(query_fct, *args, **kwargs):
     """
     res = await query_fct(*args, **kwargs, return_prompt_string=True)
     return res[0]
+
+def main(query_fct):
+    """
+    Runs the provided query function in the main thread
+    and returns the result.
+
+    This call is blocking.
+    """
+    import asyncio
+    return asyncio.run(query_fct())

@@ -446,6 +446,9 @@ class DclibOpenAiModel(DcModel):
                         response_buffer = response_buffer[1:]
                         continuation = CompletionResult(response_buffer, completion_result.continuation_type, completion_result.logit_mask_or_fixed_id)
 
+                        if continuation.continuation_type is None:
+                            edge_type = None
+
                         user_data = {
                             "openai-continuations": {
                                 continuation.continuation_type: continuation
