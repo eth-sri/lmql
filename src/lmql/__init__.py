@@ -86,13 +86,17 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     if output_writer is not None:
         module.query.output_writer = output_writer
 
-    query_args = module.query.args  
+    compiled_fct_args = module.query.args
+    query_args = []
+
+    calling_frame = inspect.stack()[1]
+    scope = LMQLInputVariableScope(module.query.fct, calling_frame)
+    for arg in compiled_fct_args:
+        if scope.resolve(arg) == None:
+            query_args.append(arg)
+
     output_variables = module.query.output_variables
     query_args = list(set(query_args) - set(output_variables))
-    print(query_args)
-    query_args = [arg for arg in query_args if arg.islower()]
-
-    print(query_args)
 
     if len(args) > 0:
         assert False, "Positional arguments for queries are not supported yet"
