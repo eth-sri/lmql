@@ -6,11 +6,42 @@ class BaseOutputWriter:
         self.allows_input = allows_input
 
     async def input(self, *args):
+        """
+        Handle user input with an input prompt of *args. This is invoked when a query asks for user input via `await input()`.
+
+        Returns:
+            str: The user input.
+        """
         if not self.allows_input:
             assert False, "current LMQL output writer does not allow input"
         return input(*args)
 
     async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables): 
+        """
+        Called whenever the query interpreter progresses in a meaningful way (e.g. new token added, new variable added, variable updated, etc.).
+
+        Parameters:
+            variable (str): 
+                The name of the currently active variable.
+            head (int): 
+                The index of the current interpretation head (deprecated, will always be 0).
+            prompt (str): 
+                The full interaction trace/prompt of the query.
+            where (object): 
+                The AST representation of the queries validation condition.
+            trace (object): 
+                The evaluation trace of evaluating 'where' on the current program variables during generation.
+            is_valid (bool): 
+                Whether the current program variables satisfy the validation condition.
+            is_final (bool): 
+                Whether the value of 'valid' can be considered final (i.e. decoding more tokens will not change the value of 'valid').
+            mask (np.ndarray): 
+                Currently active token mask.
+            num_tokens (int): 
+                Number of tokens in the current 'prompt'.
+            program_variables (ProgramState): 
+                The current program state (lmql.runtime.program_state). E.g. program_variables.variable_values is a mapping of variable names to their current values.
+        """
         pass
     
     def add_compiler_output(self, code): 
