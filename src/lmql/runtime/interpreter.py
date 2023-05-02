@@ -135,11 +135,9 @@ class PromptInterpreter:
     """
 
     def __init__(self, force_model=None) -> None:
-        assert force_model is None, "force_model is not supported in P2"
-        
         # model-specific components
-        self.model = None
-        self.model_identifier = None
+        self.model = force_model
+        self.model_identifier = force_model
         self.tokenizer: LMQLTokenizer = None
 
         # decoder configuration
@@ -182,8 +180,9 @@ class PromptInterpreter:
         self.decoder_kwargs["decoder"] = method
 
     def set_model(self, model_name):
-        self.model = model_name
-        self.model_identifier = model_name
+        if self.model is None:
+            self.model = model_name
+            self.model_identifier = model_name
 
         client = LMQLModelRegistry.get(self.model)
 

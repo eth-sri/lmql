@@ -82,6 +82,7 @@ class ModelQueue:
                         **kwargs
                     )
                     for logits, raw, fut in zip(logits, raw, [task.result_fut for task in group]):
+                        if fut.cancelled(): continue
                         fut.set_result((logits, raw))
                     # print("batch of size", len(group), len(batch), self.logits_queue.qsize(), flush=True)
             except Exception as e:
