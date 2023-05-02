@@ -24,7 +24,7 @@ class LiveDebuggerOutputWriter:
         add_debugger_output("stdin-request", {})
         return await LiveApp.ainput(*args, web=self.web)
 
-    def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
+    async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
         from lmql.utils.graph import CytoscapeGraphWriter
         
         def node_data(op):

@@ -16,6 +16,7 @@ import tempfile
 
 import lmql.runtime.lmql_runtime as lmql_runtime
 import lmql.runtime.lmql_runtime as runtime_support
+from lmql.utils.docstring_parser import *
 from lmql.language.compiler import LMQLCompiler
 # re-export lmql runtime functions
 from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
@@ -110,64 +111,18 @@ def _query_from_string(s):
         f.write(s)
     module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
     return module.query
-        
-def _get_decorated_function_code(fct):
-    import ast
-    import inspect
-
-    source = ""
-
-    try:
-        source = inspect.getsource(fct)
-        tree = ast.parse(source)
-        docstring_element = tree.body[0].body[0].value
-        docstring = docstring_element.s
-        # get range of source that corresonds to the docstring
-        start = docstring_element.lineno
-        end = docstring_element.end_lineno
-        startcol = docstring_element.col_offset
-        endcol = docstring_element.end_col_offset
-        
-        # get source code of the function
-        source = source.splitlines()
-
-        # remove common indent
-        common_indent = None
-        lines = []
-        for line in source[start-1:end]:
-            if line.strip() == "" or line.strip() == '"""lmql' or line.strip() == "'''lmql":
-                lines.append(line)
-                continue
-            if common_indent is None:
-                common_indent = len(line) - len(line.lstrip())
-            else:
-                common_indent = min(common_indent, len(line) - len(line.lstrip()))
-            lines.append(line[common_indent:])
-        lines[0] = lines[0][startcol - common_indent:]
-        lines[-1] = lines[-1][:endcol]
-
-        source = "\n".join(lines)
-
-        quote_types = "'''" if source.endswith("'''") else '"""'
-        if source.lstrip().startswith(quote_types):
-            source = source.lstrip()[len(quote_types):]
-        assert source.endswith(quote_types), f"Docstring of @lmql.query function {fct.__name__} must be on the first line of the function, but is:\n {source}"
-        source = source[:-len(quote_types)].strip("\n")
-    except:
-        raise RuntimeError("Failed to parse docstring of query function as LMQL code:\n\n" + str(source))
-
-    return source
-
 
 def query(fct):
     import inspect
+
+    if type(fct) is LMQLQueryFunction: return fct
 
     # support for lmql.query(<query string>)
     if type(fct) is str: return _query_from_string(fct)
     
     calling_frame = inspect.stack()[1]
     scope = LMQLInputVariableScope(fct, calling_frame)
-    code = _get_decorated_function_code(fct)
+    code = get_decorated_function_code(fct)
 
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:

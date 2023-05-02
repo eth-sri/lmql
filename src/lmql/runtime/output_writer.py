@@ -1,7 +1,7 @@
 import os
 import termcolor
 
-class DebuggerOutputWriter:
+class BaseOutputWriter:
     def __init__(self, allows_input=True):
         self.allows_input = allows_input
 
@@ -10,10 +10,13 @@ class DebuggerOutputWriter:
             assert False, "current LMQL output writer does not allow input"
         return input(*args)
 
-    def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables): pass
-    def add_compiler_output(self, code): pass
+    async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables): 
+        pass
+    
+    def add_compiler_output(self, code): 
+        pass
 
-class PrintingDebuggerOutputWriter:
+class PrintingOutputWriter:
     def __init__(self, clear=False):
         self.clear = clear
         self.print_output = True
@@ -21,24 +24,24 @@ class PrintingDebuggerOutputWriter:
     def add_decoder_state(*args, **kwargs): 
         pass
 
-    def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
+    async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
         if head == 0:
             if self.clear:
                 os.system("clear")
             if self.print_output:
                 print(f"{prompt}\n\n valid={is_valid}, final={is_final}")
+    
     def add_compiler_output(self, code): pass
     
 class StreamingOutputWriter:
     def __init__(self, variable=None):
         self.variable = variable
-        
         self.last_value = None
     
     def add_decoder_state(*args, **kwargs): 
         pass
 
-    def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
+    async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
         if head == 0:
             if self.variable is not None:
                 vars = self.variable
@@ -62,8 +65,7 @@ class StreamingOutputWriter:
     def add_compiler_output(self, code): pass
 
 # ready to use output writer configurations
-
-silent = DebuggerOutputWriter()
-headless = DebuggerOutputWriter(allows_input=False)
+silent = BaseOutputWriter()
+headless = BaseOutputWriter(allows_input=False)
 stream = StreamingOutputWriter
-printing = PrintingDebuggerOutputWriter(clear=True)
+printing = PrintingOutputWriter(clear=True)
