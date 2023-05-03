@@ -3,7 +3,7 @@ metadata:authors: team
 
 # LMQL v0.0.6.1
 
-### Changelog
+We released LMQL v0.0.6.1, which contains several bug fixes and improvements. The most notable changes are:
 
 * **Cache Layer Bug Fixes** This release contains several fixes and improvements to the recently introduced cache layer.
 
