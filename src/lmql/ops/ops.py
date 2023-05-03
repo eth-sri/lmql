@@ -1044,9 +1044,14 @@ def execute_op_stops_at_only(op: Node, result=None):
         for p in op.predecessors:
             execute_op_stops_at_only(p, result=result)
     elif type(op) is OrOp:
-        # TODO: actually STOPS_AT in OR is not really supported yet
+        subresults = []
         for p in op.predecessors:
-            execute_op_stops_at_only(p, result=result)
+            subresult = []
+            execute_op_stops_at_only(p, result=subresult)
+            subresults.append(subresult)
+        # intersect subresults
+        result += list(set.intersection(*[set(r) for r in subresults]))
+
     else:
         # other ops are no-ops from a STOPS_AT perspective (cannot contain additional STOPS_AT ops)
         # TODO: what about not
