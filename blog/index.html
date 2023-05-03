@@ -139,6 +139,47 @@ function openPlaygroundSnippet(link, snippet) {
   </div>
 
 
+<section class="section blog startpage" id="release-0.0.6.1">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column">
+          <h5 class="title is-2 has-text-left" style="margin-bottom: 2pt;">
+            <a href="blog/release-0.0.6.1.html" class="anchor">
+                LMQL v0.0.6.1
+            </a>
+          </h5>
+          <div class="content has-text-justified">
+          <div class="authors">
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
+        </span>
+            </div>
+          </div>
+            <div class="date">
+                Wed, May 3, 2023
+            </div>
+            <section id="lmql-v0-0-6-1">
+
+<section id="changelog">
+<h2>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong>Cache Layer Bug Fixes</strong> This release contains several fixes and improvements to the recently introduced cache layer.</p></li>
+<li><p><strong>Stopping Phrases</strong> Stopping phrases specified via <code class="docutils literal notranslate"><span class="pre">STOPS_BEFORE</span></code> are now passed to the OpenAI API as <code class="docutils literal notranslate"><span class="pre">"stop"</span></code> parameter, decreasing the number of tokens used for the request. If you want to disable this (e.g. to allow speculative execution), you can specify the new decoder parameter <code class="docutils literal notranslate"><span class="pre">openai_nonstop=True</span></code>.</p></li>
+<li><p><strong>Asyncronous Output Writers</strong> All output writers have been refactored to use asyncronous I/O. This should simplify integration with other asyncronous frameworks, e.g. for HTTP or Websocket APIs. We also added a new chapter on <a class="reference external" href="https://docs.lmql.ai/en/latest/python/output.html">Output Streaming</a> to the documentation.</p></li>
+<li><p><strong>Output Writers for HTTP endpoints, WebSockets and Server-Sent Events</strong> Based on the updated output writer interface, we added three new output writers for serving LMQL queries as HTTP endpoints, WebSockets and via Server-Sent Events (SSE). To learn more, check their relatively simple implementations in the new <a class="reference external" href="https://github.com/eth-sri/lmql/tree/main/src/lmql/output">lmql.output</a> module. We will also provide more documentation on how to use them, e.g. with <code class="docutils literal notranslate"><span class="pre">aiohttp</span></code> in the future.</p></li>
+</ul>
+</section>
+</section>
+
+
+
+          </div>
+        </div>
+    </div>
+  </section>
+    
 <section class="section blog startpage" id="release-0.0.6">
     <div class="container is-max-desktop">
       <!-- Abstract. -->
@@ -339,7 +380,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Wed, May 3, 4:22 PM (UTC)<br/>
+        Last updated on Wed, May 3, 4:34 PM (UTC)<br/>
       </div>
     </div>
   </div>

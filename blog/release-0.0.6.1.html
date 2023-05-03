@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="LMQL: A query language for programming (large) language models.">
+  <meta name="keywords" content="GPT-3, language models, LMQL, programming language, query language, ChatGPT">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+  
+  <!-- Primary Meta Tags -->
+  <title>LMQL v0.0.6.1</title>
+  <meta name="title" content="LMQL v0.0.6.1">
+  <meta name="description" content="Cache Layer Bug Fixes This release contains several fixes and improvements to the recently introduced cache layer.">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lmql.ai/">
+  <meta property="og:title" content="LMQL v0.0.6.1">
+  <meta property="og:description" content="Cache Layer Bug Fixes This release contains several fixes and improvements to the recently introduced cache layer.">
+  <meta property="og:image" content="https://lmql.ai/static/images/lmql-social.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://lmql.ai/">
+  <meta property="twitter:title" content="LMQL v0.0.6.1">
+  <meta property="twitter:description" content="Cache Layer Bug Fixes This release contains several fixes and improvements to the recently introduced cache layer.">
+  <meta property="twitter:image" content="https://lmql.ai/static/images/lmql-social.png"">
+  
+  
+  <!--  set relative path to be / -->
+  <base href="/">
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.svg">
+  <link rel="stylesheet" href="./static/css/val.gen.css">
+  <link rel="stylesheet" href="./static/css/lmql.css">
+  <link rel="stylesheet" href="./static/css/highlight.min.css">
+  <script src="https://kit.fontawesome.com/06bb68d804.js" crossorigin="anonymous"></script>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="./static/js/highlight.min.js"></script>
+  <script src="./static/js/lmql.js"></script>
+  <script>
+    var openPlaygroundElement = null;
+
+function getPlaygroundUrl() {
+    const host = window.location.host;
+    if (host.includes("lmql.ai")) {
+        return "https://lmql.ai/playground";
+    } else if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
+        return "http://localhost:3000/playground";
+    } else {
+        return "https://lbeurerkellner.github.io/green-gold-dachshund-web/playground";
+    }
+}
+
+function closePlaygroundSnippet() {
+    if (openPlaygroundElement) {
+        openPlaygroundElement.innerHTML = openPlaygroundElement.originalHTML;
+        openPlaygroundElement.classList.remove('playground');
+        openPlaygroundElement.style.height = 'auto';
+
+        // show model output div if it exists
+        let next = openPlaygroundElement.nextElementSibling;
+        while(next.tagName !== 'DIV' && next) {
+            next = next.nextElementSibling;
+        }
+
+        if (next.classList.contains('highlight-model-output')) {
+            next.style.display = 'block';
+        }
+
+            openPlaygroundElement = null;
+        }
+}
+
+function openPlaygroundSnippet(link, snippet) {
+    closePlaygroundSnippet();
+
+    const playground = getPlaygroundUrl();
+    console.log("playground url: " + playground);
+
+    // this is a that was clicked, replace parent div with iframe (temporarily)
+    const container = link.parentElement;
+    container.classList.add('playground');
+    const iframe = document.createElement('iframe');
+    iframe.src = ""
+    iframe.src = playground + '?embed=' + snippet + ".json"
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    
+    const height = Math.max(400, container.clientHeight);
+    container.originalHTML = container.innerHTML;
+    container.innerHTML = '';
+    container.style.height = height + 'px';
+    container.appendChild(iframe);
+
+    // hide the model output div if it exists
+    let next = container.nextElementSibling;
+    while(next.tagName !== 'DIV' && next) {
+        next = next.nextElementSibling;
+    }
+
+    if (next.classList.contains('highlight-model-output')) {
+        next.style.display = 'none';
+    }
+
+    openPlaygroundElement = container;
+}
+  </script>
+
+  <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "f7d2a6b1a0624c51ae4dab9a4239b77d"}'></script><!-- End Cloudflare Web Analytics -->
+</head>
+<body>
+  <div class="topnav">
+    <a href="/">
+      <img src="./static/images/lmql-text.png" alt="LMQL logo" class="logo">
+    </a>
+    <a href="https://discord.gg/7eJP4fcyNT" class="hide-on-small">
+      💬
+      Discord
+    </a>
+    <a href="blog">
+      📝
+      Blog
+    </a>
+    <a href="https://docs.lmql.ai">
+      📖
+      Docs
+    </a>
+    <a href="https://github.com/eth-sri/lmql">
+      📦
+      GitHub</a>
+  </div>
+
+
+<section class="section blog " id="release-0.0.6.1">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column">
+          <h5 class="title is-2 has-text-left" style="margin-bottom: 2pt;">
+            <a href="blog/release-0.0.6.1.html" class="anchor">
+                LMQL v0.0.6.1
+            </a>
+          </h5>
+          <div class="content has-text-justified">
+          <div class="authors">
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
+        </span>
+            </div>
+          </div>
+            <div class="date">
+                Wed, May 3, 2023
+            </div>
+            <section id="lmql-v0-0-6-1">
+
+<section id="changelog">
+<h2>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong>Cache Layer Bug Fixes</strong> This release contains several fixes and improvements to the recently introduced cache layer.</p></li>
+<li><p><strong>Stopping Phrases</strong> Stopping phrases specified via <code class="docutils literal notranslate"><span class="pre">STOPS_BEFORE</span></code> are now passed to the OpenAI API as <code class="docutils literal notranslate"><span class="pre">"stop"</span></code> parameter, decreasing the number of tokens used for the request. If you want to disable this (e.g. to allow speculative execution), you can specify the new decoder parameter <code class="docutils literal notranslate"><span class="pre">openai_nonstop=True</span></code>.</p></li>
+<li><p><strong>Asyncronous Output Writers</strong> All output writers have been refactored to use asyncronous I/O. This should simplify integration with other asyncronous frameworks, e.g. for HTTP or Websocket APIs. We also added a new chapter on <a class="reference external" href="https://docs.lmql.ai/en/latest/python/output.html">Output Streaming</a> to the documentation.</p></li>
+<li><p><strong>Output Writers for HTTP endpoints, WebSockets and Server-Sent Events</strong> Based on the updated output writer interface, we added three new output writers for serving LMQL queries as HTTP endpoints, WebSockets and via Server-Sent Events (SSE). To learn more, check their relatively simple implementations in the new <a class="reference external" href="https://github.com/eth-sri/lmql/tree/main/src/lmql/output">lmql.output</a> module. We will also provide more documentation on how to use them, e.g. with <code class="docutils literal notranslate"><span class="pre">aiohttp</span></code> in the future.</p></li>
+</ul>
+</section>
+</section>
+
+
+
+          </div>
+        </div>
+    </div>
+  </section>
+    <a class='blog see-all' href="/blog">See all blog posts</a>
+
+<section class="section custom-footer">
+  <div class="container is-max-desktop content">
+    <div class="columns">
+      <div class="column" style="text-align: left;">
+        LMQL is a project by the <a href="https://www.sri.inf.ethz.ch/">Secure, Reliable, and Intelligent Systems Lab</a> at ETH Zürich.<br/>
+        <img src="static/images/institution-logos.svg"/>
+      </div>
+      <div class="column" style="text-align: left;">
+        Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
+        Last updated on Wed, May 3, 4:34 PM (UTC)<br/>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
