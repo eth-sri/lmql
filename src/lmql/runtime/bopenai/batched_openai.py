@@ -363,8 +363,7 @@ class ResponseStreamSliceIterator:
         self.retries = 0
         self.text = ""
         self.consumed_tokens = []
-
-        self.done = asyncio.Event()
+        self.n = 0
 
     async def recover(self):
         recovery_kwargs = self.slice.kwargs.copy()
@@ -410,26 +409,33 @@ class ResponseStreamSliceIterator:
         return await self.__anext__()
 
     async def get_next(self):
-        if self.done.is_set(): 
+        if self.slice.done.is_set(): 
+            if self.n == 0:
+                return RecoveryAttempt(self.slice.kwargs, TimeoutError(), self.slice.maximum_retries)
             raise StopAsyncIteration
-        check_done_task = asyncio.create_task(self.done.wait())
+        check_done_task = asyncio.create_task(self.slice.done.wait())
         get_next_item_task = asyncio.create_task(self.slice.data_queue.get())
         done, pending = await asyncio.wait([get_next_item_task, check_done_task], 
             return_when=asyncio.FIRST_COMPLETED, timeout=2.0)
         
+
         if check_done_task in done:
             # this indicates the end of this response stream
             for t in pending: t.cancel()
+            if self.n == 0:
+                return RecoveryAttempt(self.slice.kwargs, TimeoutError(), self.slice.maximum_retries)
             raise StopAsyncIteration
         elif len(done) > 0:
             assert get_next_item_task in done, f"expected get_next_item_task to be done, but only {done} is done."
             # cancel self.done waiting task
             for t in pending: t.cancel()
             # return with new data chunk
+            self.n += 1
             return get_next_item_task.result()
         else:
+            for t in pending: t.cancel()
             # if after timeout this response has been fully consumed, we are done
-            if self.done.is_set():
+            if self.slice.done.is_set() and self.n > 0:
                 raise StopAsyncIteration
             # otherwise return a RecoveryAttempt for retrying this request
             return RecoveryAttempt(self.slice.kwargs, TimeoutError(), self.slice.maximum_retries)
@@ -439,6 +445,7 @@ class ResponseStreamSliceIterator:
             data = await self.get_next()
             # None indicates end of stream
             if data is None:
+                self.slice.done.set()
                 raise StopAsyncIteration
             # exceptions that are queued are definitive (all retries failed)
             if isinstance(data, Exception): raise data
@@ -476,6 +483,7 @@ class ResponseStreamSlice:
 
         self.data_queue = asyncio.Queue()
         self.failed = False
+        self.done = asyncio.Event()
 
     def digest(self, data):
         assert not self.failed, f"digest called on failed slice"

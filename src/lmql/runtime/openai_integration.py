@@ -407,6 +407,8 @@ class DclibOpenAiModel(DcModel):
             # eagerly expand and cache full completion if a cache_delegate is available
             if self.cache_delegate is not None:
                 await self.expand_and_cache(s, completion_result, "top-1", logprobs=kwargs.get("logprobs", 1))
+            
+            assert not await completion_result.buffer.empty(), "Completion result is empty on arrival"
             return completion_result
 
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
