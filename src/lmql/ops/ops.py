@@ -840,10 +840,6 @@ class StopAtOp(Node):
     def variable(self):
         return self.predecessors[0]
 
-    @property
-    def stopping_phrase(self):
-        return self.predecessors[1]
-
     async def stopping_phrase_tokenized(self, tokenizer):
         if tokenizer in self._tokenized_stopping_phrase_cache:
             return self._tokenized_stopping_phrase_cache[tokenizer]
@@ -949,6 +945,10 @@ class StopBeforeOp(StopAtOp):
             value = value[:matched_phrase_index]
 
         return postprocessed_rewrite(value), postprocessed_value(value)
+    
+    @property
+    def stopping_phrase(self):
+        return self.predecessors[1]
 
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):
@@ -1038,7 +1038,7 @@ def execute_op_stops_at_only(op: Node, result=None):
     """
     if result is None: result = []
 
-    if type(op) is StopAtOp:
+    if type(op) is StopBeforeOp:
         result.append(op)
     elif type(op) is AndOp:
         for p in op.predecessors:

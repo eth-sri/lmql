@@ -289,6 +289,7 @@ function initDecoderGraphCy(element) {
                     'color': 'white',
                     'border-color': 'red',
                     'border-width': '0px',
+                    'opacity': 0.4
                 }
             },
             {

@@ -182,21 +182,21 @@ class ResponseStream:
                     self.stats.tokens += len(c["logprobs"]["tokens"])
                     assert c is not None
                     self.slices[index].digest(c)
-                    
-                    if c["finish_reason"] == "stop":
-                        # "<|endoftext|>", "<|endoftext|>", 0.0
-                        self.slices[index].digest({
-                            "text": "<|endoftext|>",
-                            "logprobs": {
-                                "text_offset": [0],
-                                "token_logprobs": [0.0],
-                                "tokens": ["<|endoftext|>"],
-                                "top_logprobs": [{"<|endoftext|>": 0.0}]
-                            }
-                        })
+                    self.slices[index].finish_reason = c["finish_reason"]
                     
                     # logprobs.tokens, text, logprobs.token_logprobs
             for c in self.slices:
+                if c.finish_reason != "length":
+                    # queue eos token
+                    self.slices[index].digest({
+                        "text": "<|endoftext|>",
+                        "logprobs": {
+                            "text_offset": [0],
+                            "token_logprobs": [0.0],
+                            "tokens": ["<|endoftext|>"],
+                            "top_logprobs": [{"<|endoftext|>": 0.0}]
+                        }
+                    })
                 c.finish()
         except Exception as e:
             print("Failed with", e)
@@ -484,11 +484,12 @@ class ResponseStreamSlice:
         self.data_queue = asyncio.Queue()
         self.failed = False
         self.done = asyncio.Event()
+        self.finish_reason = None
 
     def digest(self, data):
         assert not self.failed, f"digest called on failed slice"
         self.data_queue.put_nowait(data)
-    
+
     def finish(self):
         assert not self.failed, f"finish called on failed slice"
         self.data_queue.put_nowait(None)
