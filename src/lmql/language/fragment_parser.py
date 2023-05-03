@@ -98,6 +98,8 @@ def transform_token(t):
     return t
 
 def ast_parse(s, unindent=False, oneline=False, loc=None):
+    # for special symbols
+    if len(s) > 0 and all(type(e) is str for e in s): return ast.parse('"' + " ".join(s) + '"')
     try:
         s = remove_comments(s)
         if unindent: s = remove_indentation(s, oneline=oneline)
@@ -187,6 +189,9 @@ class LanguageFragmentParser:
         # parse decode, prompt and from
         self.query.decode = ast_parse(self.query.decode_str, loc="decode").body[0].value
         self.query.prompt = ast_parse(self.query.prompt_str, unindent=True, loc="prompt").body
+        
+        # if 'from' is omitted, the model is chosen dynamically based on context
+        if len(self.query.from_str) == 0: self.query.from_str = ['<dynamic>']
         self.query.from_ast = ast_parse(self.query.from_str, unindent=True, loc="from").body[0]
 
         where_body = ast_parse(self.query.where_str, unindent=True, oneline=True, loc="where").body
@@ -211,6 +216,11 @@ class LanguageFragmentParser:
     def digest(self, tok):
         if self.state == "start":
             if tok.type == tokenize.NAME:
+                # for constraints you cannot specify parameters, and we directly switch to the prompt parsing state
+                if tok.string.lower() == "strategy":
+                    self.query.decode_str += [tok]
+                    self.state = "prompt"
+                    return
                 # when we encounter the first decoder keyword, we switch to the query parsing state
                 if tok.string.lower() in get_all_decoders():
                     self.query.decode_str += [tok]

@@ -453,29 +453,25 @@ class DeterministicDecoderSequence(DecoderSequence):
     def align_user_data(self):
         if self.user_data is None: return
 
-        # lmql-specific user data should be different for deterministic sequences
-        head_variable = resolve_path(self.user_data, "head.variable")
-
-        if head_variable is not None:
-            # if "before(" in head_variable:
-            #     head_variable = head_variable.split(":before(", 1)[0]
-            # if head_variable == "__done__":
-            #     set_path(self.user_data, "head", self.user_data["head"].updated(variable="__done__"))
-            # else:
-            #     if len(self.next_ids) > 0:
-            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable + ":before(" + str(len(self.next_ids)) + ")"))
-            #     else:
-            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable))
-            # deterministic sequences don't have stopping phrases
-            set_path(self.user_data, "head", self.user_data["head"].updated(stopping_phrases={"tokenized": [], "text": []}))
-        else:
-            set_path(self.user_data, "head", self.user_data["head"].updated(variable="<prompt>"))
+        # lmql-specific user data has to be different for deterministic sequences
         
-        if len(self.next_ids) > 0:
-            set_path(self.user_data, "head", self.user_data["head"].updated(mask="{token_id=" + str(self.next_ids[0]) + "}"))
-        else:
-            set_path(self.user_data, "head", self.user_data["head"].updated(mask="<not available yet>"))
-    
+        # make sure to update all "head" an "head[...]" user data keys (head[...] belong to subinterpreters)
+        head_user_data_keys = [k for k in self.user_data.keys() if k.startswith("head[") or k == "head"]
+        
+        for head_key in head_user_data_keys:
+            head_variable = resolve_path(self.user_data, f"{head_key}.variable")
+            
+            if head_variable is not None:
+                # deterministic sequences don't have stopping phrases
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(stopping_phrases={"tokenized": [], "text": []}))
+            else:
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(variable="<prompt>"))
+            
+            if len(self.next_ids) > 0:
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(mask="{token_id=" + str(self.next_ids[0]) + "}"))
+            else:
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(mask="<not available yet>"))
+
     @property
     def is_query_constrained(self):
         """Deterministic sequences are not query constrained, as long as they are fixed to their predetermined content."""

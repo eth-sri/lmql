@@ -254,11 +254,6 @@ class WhereClauseTransformation():
                 
                 Op = "lmql.runtime_support.AndOp" if type(expr.op) is ast.And else "lmql.OrOp"
                 return snf.add(f"{Op}([\n  {tops_list}\n])")
-        # elif type(expr) is ast.Call:
-        #     tfunc = self.transform_node(expr.func, snf)
-        #     targs = [self.transform_node(a, snf) for a in expr.args]
-        #     targs_list = ", ".join(targs)
-        #     return f"{tfunc}({targs_list})"
         elif type(expr) is ast.Name:
             return self.transform_name(expr)
         elif type(expr) is ast.UnaryOp:
@@ -272,7 +267,7 @@ class WhereClauseTransformation():
                 if type(op) is OpT:
                     operand = self.transform_node(expr.operand, snf).strip()
                     return snf.add(f"{impl}([{operand}])")
-            
+
             assert False, "unary operator {} not supported.".format(type(expr.op))
         elif type(expr) is ast.Compare:
             op = expr.ops[0]
@@ -309,6 +304,11 @@ class WhereClauseTransformation():
                 return f"{bn}([{args_list}])"
             if is_allowed_builtin_python_call(expr.func):
                 return self.default_transform_node(expr, snf).strip()
+            
+            tfunc = self.transform_node(expr.func, snf)
+            targs = [self.transform_node(a, snf) for a in expr.args]
+            targs_list = ", ".join(targs)
+            return f"{OPS_NAMESPACE}.CallOp([{tfunc}, [{targs_list}]])"
         elif type(expr) is ast.List:
             return self.default_transform_node(expr, snf).strip()
 

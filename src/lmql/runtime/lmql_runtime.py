@@ -59,6 +59,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     is_langchain_use: bool = False
 
     lmql_code: str = None
+
+    __lmql_query_function__ = True
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
         # check for pydantic base class and do kw initialization then
@@ -76,6 +78,9 @@ class LMQLQueryFunction(LMQLChainMixIn):
         self.model = None
         # only set if the query is defined inline of a Python file
         self.function_context = None
+
+    def __hash__(self):
+        return hash(self.fct)
 
     @property
     def input_keys(self) -> List[str]:

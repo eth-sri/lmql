@@ -49,7 +49,10 @@ class DcModelRewriteMixin:
 
         rewriter = self.model_args["modern_rewriter"]
         rewritten_ids = await rewriter(seqs, mask_seq_to_rewrite)
+
+        return await self.apply_rewrite(seqs, rewritten_ids, noscore=noscore, unwrap=unwrap)
     
+    async def apply_rewrite(self, seqs, rewritten_ids, noscore=False, unwrap=lambda v: v):
         # update user data, if rewriter provides it
         for s, user_data in zip(seqs, rewritten_ids.user_data):
             s.user_data = deepmerge(deepcopy(s.user_data), user_data) if user_data is not None else s.user_data

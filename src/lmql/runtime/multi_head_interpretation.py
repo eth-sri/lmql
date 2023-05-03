@@ -146,4 +146,4 @@ class InterpretationHead:
         return str(self)
     
     def __str__(self):
-        return f"<InterpretationHead {self.fct.__name__}, {self.args}, {self.kwargs}>"
+        return f"<InterpretationHead {self.fct.__name__}, {self.args}, {self.kwargs}, result={self.result}>"
