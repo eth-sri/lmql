@@ -9,15 +9,7 @@ from lmql.utils import nputil
 import numpy as np
 from lmql.runtime.stats import Stats
 
-def get_vocab(tokenizer):
-    if hasattr(tokenizer, "vocab"):
-        return tokenizer.vocab
-    elif hasattr(tokenizer, "get_vocab"):
-        return tokenizer.get_vocab()
-    elif hasattr(tokenizer, "tokenizer_impl"):
-        return get_vocab(tokenizer.tokenizer_impl)
-    else:
-        assert False, "Could not obtain full vocabulary from unknown tokenizer type: {}".format(type(tokenizer))
+from lmql.runtime.tokenizer import get_vocab
 
 class VocabularyMatcher:
     """
@@ -115,10 +107,6 @@ class VocabularyMatcher:
     def ensure_ready():
         VocabularyMatcher.instance()
 
-    @property
-    def vocab_size(self):
-        return len(self.vocab)
-
     @staticmethod
     def with_cache(keys, provider):
         keys = [k for k in keys if k is not None]
@@ -168,7 +156,7 @@ class VocabularyMatcher:
 
         regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
 
-        mask = np.zeros([self.tokenizer.vocab_size], dtype=np.bool_)
+        mask = np.zeros([self.vocab_size], dtype=np.bool_)
 
         pattern = re.compile(regex, re.UNICODE)
         for id, subtoken in self.vocab.items():
@@ -183,7 +171,7 @@ class VocabularyMatcher:
 
     def _make_mask_from_char_length(self, length):
         if self.token_lengths is None:
-            token_lengths = np.zeros([self.tokenizer.vocab_size], dtype=np.int32)
+            token_lengths = np.zeros([self.vocab_size], dtype=np.int32)
             for id, subtoken in self.vocab.items():
                 token_lengths[id] = len(subtoken)
             self.token_lengths = token_lengths
@@ -191,7 +179,7 @@ class VocabularyMatcher:
         return self.token_lengths == length
 
     def _make_mask_from_tokens(self, tokens, prefix, exact=False):
-        mask = np.zeros([self.tokenizer.vocab_size], dtype=np.bool_)
+        mask = np.zeros([self.vocab_size], dtype=np.bool_)
 
         if "*" in tokens:
             mask[:] = True
@@ -270,8 +258,13 @@ class VocabularyMatcher:
 VocabularyMatcher._instance = None
 VocabularyMatcher.cache = {}
 
+def has_tail(mask):
+    if mask is None: return False
+    if type(mask) is str: return False
+    assert type(mask) is TokenSet
+    return mask.tail is not None
 class TokenSetConcrete:
-    def __init__(self, tokens=None, minus=False, mask=None, regex=None, prefix=False, exact=False, charlen=None, name=None):
+    def __init__(self, tokens=None, minus=False, mask=None, regex=None, prefix=False, exact=False, charlen=None, name=None, tail=None):
         VocabularyMatcher.ensure_ready()
 
         if mask is not None:
@@ -283,15 +276,68 @@ class TokenSetConcrete:
         # for TokenSetSymbolic compatibility
         self.minusset = False
 
+        # long tail, if mask models deterministic token sequence
+        self.tail = tail
+
+        # if we in a deterministic long-tailed mask, extract the full tail
+        if self.tail is None and prefix and self.mask.sum() == 1 and tokens is not None and len(tokens) == 1:
+            tail_str = list(tokens)[0]
+            # deterministic_next_id = self.mask.nonzero()[0][0]
+            # deterministic_next_subtoken_str = VocabularyMatcher.instance().tokenizer.decode([deterministic_next_id])
+            # if len(tail_str) > len(deterministic_next_subtoken_str):
+            self.tail = tail_str
+
+    def merge_tail(self, mask, other):
+        """
+        Check which of the self.tail and other.tail are still valid under 'mask' and 
+        returns the merged tail. If no tail is valid, returns None.
+        """
+
+        # tails are only defined for deterministic masks
+        if mask.sum() != 1:
+            return None
+        deterministic_id = mask.nonzero()[0][0]
+
+        # check which of self.tail and other.tail are still valid under 'mask'
+        available_tails = []
+        for m,t in [(self.mask, self.tail), (other.mask, other.tail)]:
+            if t is None: 
+                continue
+            if m[deterministic_id]: 
+                available_tails.append(t)
+        
+        if len(available_tails) == 0: 
+            return None
+        elif len(available_tails) == 1: 
+            return available_tails[0]
+        else:
+            assert len(available_tails) == 2
+            if available_tails[0] != available_tails[1]:
+                # find common tail
+                for i in range(min(len(available_tails[0]), len(available_tails[1]))):
+                    if available_tails[0][i] != available_tails[1][i]:
+                        break
+                tail_str = available_tails[0][:i]
+                if len(tail_str) == 0: return None
+
+                deterministic_next_id = self.mask.nonzero()[0][0]
+                deterministic_next_subtoken_str = VocabularyMatcher.instance().tokenizer.decode([deterministic_next_id])
+                if len(tail_str) <= len(deterministic_next_subtoken_str):
+                    return None
+                else: 
+                    return tail_str
+            return available_tails[0]
+
     def union(self, other):
         if other == "∅": 
-            return TokenSetConcrete(mask=self.mask)
+            return TokenSetConcrete(mask=self.mask, tail=self.merge_tail(self.mask, other))
         if other == "*": 
             return "*"
 
         assert type(other) is TokenSetConcrete, "Can only union over two TokenSetConcrete."
 
-        return TokenSetConcrete(mask=np.logical_or(self.mask, other.mask))
+        mask = np.logical_or(self.mask, other.mask)
+        return TokenSetConcrete(mask=mask, tail=self.merge_tail(mask, other))
 
     def intersect(self, other):
         if other == "∅": return "∅"
@@ -299,7 +345,9 @@ class TokenSetConcrete:
 
         assert type(other) is TokenSetConcrete, "Can only intersect two TokenSetConcrete."
 
-        return TokenSetConcrete(mask=np.logical_and(self.mask, other.mask))
+
+        mask = np.logical_and(self.mask, other.mask)
+        return TokenSetConcrete(mask=mask, tail=self.merge_tail(mask, other))
      
     def setminus(self, other):
         if other == "*": 
@@ -309,7 +357,8 @@ class TokenSetConcrete:
         
         assert type(other) is TokenSetConcrete, "Can only setminus two TokenSetConcrete."
 
-        return TokenSetConcrete(mask=np.logical_and(self.mask, np.logical_not(other.mask)))
+        mask = np.logical_and(self.mask, np.logical_not(other.mask))
+        return TokenSetConcrete(mask=mask, tail=self.merge_tail(mask, other))
     
 
     def starts_with(self, s):
@@ -332,6 +381,9 @@ class TokenSetConcrete:
             return self._token_str
 
         self._token_str = VocabularyMatcher.instance().str(self.mask, full=full)
+
+        if self.tail is not None:
+            self._token_str += f" ⤖ '{self.tail}'"
         
         return self._token_str
 
@@ -347,7 +399,7 @@ class TokenSetConcrete:
 
         assert type(other) is TokenSetConcrete, "Can only compare (==) two TokenSets."
 
-        return np.all(self.mask == other.mask)
+        return np.all(self.mask == other.mask) and self.tail == other.tail
 TokenSetConcrete.cache = {}
 
 class TokenSetSymbolic:

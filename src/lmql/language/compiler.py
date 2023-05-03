@@ -260,7 +260,7 @@ class WhereClauseTransformation():
                 tops = [self.transform_node(op, snf) for op in ops]
                 tops_list = ",\n  ".join([t.strip() or "None" for t in tops])
                 
-                Op = "lmql.runtime_support.AndOp" if type(expr.op) is ast.And else "lmql.OrOp"
+                Op = f"{OPS_NAMESPACE}.AndOp" if type(expr.op) is ast.And else f"{OPS_NAMESPACE}.OrOp"
                 return snf.add(f"{Op}([\n  {tops_list}\n])")
         # elif type(expr) is ast.Call:
         #     tfunc = self.transform_node(expr.func, snf)

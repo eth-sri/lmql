@@ -81,7 +81,7 @@ class DecoderGraph:
         }
 
 class DecoderSequence:
-    def __init__(self, input_ids_or_str, logprobs=None, deterministic=None, stop_phrase=None, predecessor=None, user_data=None, sticky_user_data_keys=None, epsilon_node=False):
+    def __init__(self, input_ids_or_str, logprobs=None, deterministic=None, stop_phrase=None, predecessor=None, user_data=None, sticky_user_data_keys=None, epsilon_node=False, internal=False):
         assert all([p > DecoderSequence.truncation_threshold for p in logprobs]) if logprobs is not None else True
 
         if type(input_ids_or_str) == str:
@@ -150,7 +150,7 @@ class DecoderSequence:
 
         setattr(s, "_id", f"s_{DecoderSequence.seq_ctr}")
 
-        if DecoderSequence.graph is not None:
+        if DecoderSequence.graph is not None and not kwargs.get("internal"):
             DecoderSequence.graph.add_node(s)
 
             predecessor = kwargs.get("predecessor")
@@ -291,7 +291,11 @@ class DecoderSequence:
         if continuation is None and user_data is None:
             user_data = {}
         elif continuation is not None:
-            user_data = deepcopy(continuation.user_data)
+            if type(continuation.user_data) is list:
+                assert len(continuation.user_data) == 1, f"continuation.user_data is a list of length {len(continuation.user_data)} but should be a list of length 1"
+                user_data = deepcopy(continuation.user_data[0])
+            else:
+                user_data = deepcopy(continuation.user_data)
         elif user_data is not None:
             user_data = deepcopy(user_data)
         else:
@@ -302,8 +306,9 @@ class DecoderSequence:
             set_path(user_data, sk, self.data(sk), create_missing=True, replace=False)
         return user_data
 
-    def extend(self, continuation):
+    def extend(self, continuation, internal=False):
         stop_phrase = self.detect_stop_phrase(continuation)
+
         return DecoderSequence(
             input_ids_or_str=np.concatenate([self.input_ids, continuation.token.reshape(1)]), 
             logprobs=np.concatenate([self.logprobs, continuation.logprob.reshape(1)]),
@@ -313,15 +318,15 @@ class DecoderSequence:
             stop_phrase=stop_phrase,
             predecessor=self,
             user_data=self.extend_user_data(continuation),
-            sticky_user_data_keys=self.sticky_user_data_keys
+            sticky_user_data_keys=self.sticky_user_data_keys,
+            internal=internal
         )
 
     def detect_stop_phrase(self, continuation):
         old_stop_phrase = self.stop_phrase
         new_stop_phrase = np.concatenate([old_stop_phrase, np.array([False])])
-        if self.data("head") is None:
-            return new_stop_phrase
-        stop_phrases = self.data("head").stopping_phrases["tokenized"]
+        
+        stop_phrases = self.data("head").stopping_phrases["tokenized"] if self.data("head") is not None else []
 
         if stop_phrases is None:
             return new_stop_phrase
@@ -428,13 +433,14 @@ def deepmerge(a, b):
     return a
 
 class DeterministicDecoderSequence(DecoderSequence):
-    def __init__(self, input_ids, logprobs, deterministic, stop_phrase, next_ids, next_logprobs=None, next_deterministic=None, predecessor=None, user_data=None, needs_rewrite=False, sticky_user_data_keys=None):
-        super().__init__(input_ids, logprobs, deterministic, stop_phrase, predecessor, user_data=user_data.copy() if user_data is not None else None, sticky_user_data_keys=sticky_user_data_keys)
+    def __init__(self, input_ids, logprobs, deterministic, stop_phrase, next_ids, next_logprobs=None, next_deterministic=None, predecessor=None, user_data=None, needs_rewrite=False, sticky_user_data_keys=None, internal=False):
+        super().__init__(input_ids, logprobs, deterministic, stop_phrase, predecessor, user_data=user_data.copy() if user_data is not None else None, sticky_user_data_keys=sticky_user_data_keys, internal=internal)
         self.next_ids = next_ids
         self.next_logprobs = next_logprobs
         self.next_deterministic = next_deterministic
 
         self.needs_rewrite = needs_rewrite
+        self.internal = internal
 
         if next_logprobs is not None: assert len(next_logprobs) == len(next_ids), "Length of deterministic continuation did not match length of provided logprobs"
         if next_deterministic is not None: assert len(next_deterministic) == len(next_ids), "Length of determinism status did not match length of provided logrprobs"
@@ -519,7 +525,7 @@ class DeterministicDecoderSequence(DecoderSequence):
         # additionally add self.user_data for deterministic sequence extensions
         return deepmerge(deepcopy(self.user_data), super().extend_user_data(continuation=continuation, user_data=user_data))
 
-    def extend(self, continuation):
+    def extend(self, continuation, internal=False):
         # if not more predetermined tokens are left, just extend as usual and return a regular seq()
         if len(self.next_ids) <= 0:
             return super().extend(continuation)
@@ -553,6 +559,7 @@ class DeterministicDecoderSequence(DecoderSequence):
             user_data=user_data,
             needs_rewrite=self.needs_rewrite,
             sticky_user_data_keys=self.sticky_user_data_keys,
+            internal=internal or self.internal
         )
 
     def __repr__(self) -> str:
@@ -627,7 +634,8 @@ def detseq(
     predecessor=None, 
     user_data=None,
     needs_rewrite=True,
-    sticky_user_data_keys=None):
+    sticky_user_data_keys=None,
+    internal=False):
     
     return DeterministicDecoderSequence(
         input_ids=ids, 
@@ -641,6 +649,7 @@ def detseq(
         user_data=user_data,
         needs_rewrite=needs_rewrite,
         sticky_user_data_keys=sticky_user_data_keys,
+        internal=internal
     )
 
 def seq(ids: List[int], logprobs:Optional[np.ndarray]=None, deterministic:Optional[np.ndarray]=None):

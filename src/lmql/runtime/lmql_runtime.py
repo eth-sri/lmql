@@ -100,15 +100,20 @@ class LMQLQueryFunction(LMQLChainMixIn):
             args_of_query = self.function_context.args_of_query
             scope = self.function_context.scope
 
+        # do not consider kwargs that are already set
+        argnames = [a for a in argnames if a not in kwargs.keys()]
+
         assert len(args) == len(argnames), f"@lmql.query {self.fct.__name__} expects {len(argnames)} positional arguments, but got {len(args)}."
         captured_variables = set(args_of_query)
         for name, value in zip(argnames, args):
             if name in args_of_query:
                 kwargs[name] = value
                 captured_variables.remove(name)
-    
+
+        # resolve remaining unset args from scope
         for v in captured_variables:
-            kwargs[v] = scope.resolve(v)
+            if not v in kwargs:
+                kwargs[v] = scope.resolve(v)
         
         if "output_writer" in kwargs:
             self.output_writer = kwargs["output_writer"]
@@ -128,10 +133,10 @@ class LMQLQueryFunction(LMQLChainMixIn):
         kwargs = self.make_kwargs(*args, **kwargs)
 
         interpreter = PromptInterpreter(force_model=self.model)
-        interpreter.set_extra_args(
-            output_writer = self.output_writer,
-            **kwargs
-        )
+        
+        if self.output_writer is not None:
+            kwargs["output_writer"] = self.output_writer
+        interpreter.set_extra_args(**kwargs)
 
         query_kwargs = {}
         for a in self.args:
@@ -152,6 +157,7 @@ class LMQLQueryFunction(LMQLChainMixIn):
                 results = await postprocessor.process(results, self.output_writer)
         
         interpreter.print_stats()
+        interpreter.dcmodel.save()
 
         return results
 

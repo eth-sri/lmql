@@ -32,9 +32,8 @@ def cmd_run():
     args = parser.parse_args(sys.argv[2:])
 
     absolute_path = os.path.abspath(args.lmql_file)
-    from lmql.runtime.output_writer import PrintingDebuggerOutputWriter
 
-    writer = PrintingDebuggerOutputWriter()
+    writer = lmql.printing
     writer.clear = not args.no_clear
     writer.print_output = not args.no_realtime
 

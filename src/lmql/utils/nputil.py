@@ -14,6 +14,21 @@ def ensure_array(v, dtype=None):
     if is_array(v): return v
     else: return np.array(v, dtype=dtype)
 
+def ensure_iterable(v):
+    if type(v) is np.float32 or type(v) is np.float64 or type(v) is np.int32 or type(v) is np.int64 or type(v) is float or type(v) is int:
+        return [v]
+    elif type(v) is np.ndarray:
+        if v.ndim == 0:
+            return [v.item()]
+        else:
+            return v
+    elif type(v) is list:
+        return v
+    elif hasattr(v, "numpy"):
+        return ensure_iterable(v.numpy())
+    else:
+        assert False, f"ensure_iterable(): type {type(v)} cannot be converted to iterable"
+
 
 def log_softmax(a):
     return a - np.log(np.sum(np.exp(a)))

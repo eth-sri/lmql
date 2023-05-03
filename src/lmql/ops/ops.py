@@ -265,28 +265,24 @@ class TokensOp(Node):
         self.depends_on_context = True
 
     def forward(self, x, context, **kwargs):
-        import asyncio
         if x is None: return None
         if x == "": return []
 
-        assert False, "TOKENS() operation is currently not supported"
-
-        tokens = context.runtime.model.sync_tokenize(x)
-        return tokens
+        return tuple(context.runtime.model.sync_tokenize(x))
 
     def follow(self, v, context=None, **kwargs):
         if v is None: return None
         contains_next_token = v != strip_next_token(v)
-        words = self.forward(strip_next_token(v), context)
 
-        # if len(words) > 0 and contains_next_token:
-        #     # allow continuation sub-tokens
-        #     continuation_tokens = tset("[^\u0120].*", regex=True)
-        #     valid_continuations = union(tset("eos"), continuation_tokens)
-        #     components = [((valid_continuations, (words[:-1] + [words[-1] + NextToken])))] + components
-        
+        if not contains_next_token:
+            tokens = tuple(context.runtime.model.sync_tokenize(v))
+            return tokens
+        v = strip_next_token(v)
+        tokens = tuple(context.runtime.model.sync_tokenize(v))
+
         return fmap(
-            ("*", (words + [NextToken]) if contains_next_token else words)
+            ("eos", tokens),
+            ("*", (*tokens, NextToken))
         )
 
     def final(self, x, context, operands=None, result=None, **kwargs):
@@ -332,6 +328,8 @@ class WordsOp(Node):
 class LenOp(Node):
     def forward(self, x, **kwargs):
         if x is None: return None
+        if type(x) is list or type(x) is tuple:
+            return len(x)
         if type(x) is not str: 
             x = str(x)
         return len(x)
@@ -840,10 +838,6 @@ class StopAtOp(Node):
     def variable(self):
         return self.predecessors[0]
 
-    @property
-    def stopping_phrase(self):
-        return self.predecessors[1]
-
     async def stopping_phrase_tokenized(self, tokenizer):
         if tokenizer in self._tokenized_stopping_phrase_cache:
             return self._tokenized_stopping_phrase_cache[tokenizer]
@@ -923,7 +917,7 @@ class StopAtOp(Node):
     def postprocess_order(self, other, operands, other_inputs, **kwargs):
         if type(other) is IntOp:
             return "before"
-        if type(other) is StopAtOp:
+        if isinstance(other, StopAtOp):
             value, value_diff = operands[0]
             op2 = operands[1]
             assert value == other_inputs[0][0], "internal error: comparing postprocess_order with two StopAtOps with different values (do they refer to different variables) {}".format((value, other_inputs[0]))
@@ -949,6 +943,10 @@ class StopBeforeOp(StopAtOp):
             value = value[:matched_phrase_index]
 
         return postprocessed_rewrite(value), postprocessed_value(value)
+    
+    @property
+    def stopping_phrase(self):
+        return self.predecessors[1]
 
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):
@@ -1038,15 +1036,20 @@ def execute_op_stops_at_only(op: Node, result=None):
     """
     if result is None: result = []
 
-    if type(op) is StopAtOp:
+    if type(op) is StopBeforeOp:
         result.append(op)
     elif type(op) is AndOp:
         for p in op.predecessors:
             execute_op_stops_at_only(p, result=result)
     elif type(op) is OrOp:
-        # TODO: actually STOPS_AT in OR is not really supported yet
+        subresults = []
         for p in op.predecessors:
-            execute_op_stops_at_only(p, result=result)
+            subresult = []
+            execute_op_stops_at_only(p, result=subresult)
+            subresults.append(subresult)
+        # intersect subresults
+        result += list(set.intersection(*[set(r) for r in subresults]))
+
     else:
         # other ops are no-ops from a STOPS_AT perspective (cannot contain additional STOPS_AT ops)
         # TODO: what about not
