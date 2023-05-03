@@ -184,8 +184,14 @@ def hello():
     """
         asyncio.run(lmql.run(code_openai, output_writer=lmql.printing))
 
+def basic_samples():
+    from lmql.tests.test_sample_queries import main
+    import asyncio
+    asyncio.run(main())
+
 hidden_commands = {
-    "hello": hello
+    "hello": hello,
+    "test": basic_samples
 }
 
 def main():

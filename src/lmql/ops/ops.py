@@ -65,38 +65,58 @@ class Node:
         return 0 # by default, no order is defined (only one postprocessing operation per variable can be applied)
 
 def DynamicTypeDispatch(name, type_map):
-    def get_handler(args):
-        for signature, op in type_map:
-            # fallback implementation
-            if signature == "*": return op
-            
-            # check for matching signature
-            is_match = True
-            if type(signature) is tuple:
-                for arg, t in zip(args, signature):
-                    is_match = is_match and isinstance(arg, t)
-            else:
-                is_match = isinstance(args, signature)
-            if is_match: return op
-        raise NotImplementedError("error: no matching implemntation of {} for arguments of type {}".format(name, [type(arg) for arg in args]))
-    
     class TypeDispatchingNode(Node):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            
+            self.delegate_args = args
+            self.delegate_kwargs = kwargs
+            self.delegate = None
+
+        def get_handler(self, args):
+            if self.delegate is not None:
+                return self.delegate
+
+            for signature, op in type_map:
+                # fallback implementation
+                if signature == "*": 
+                    self.delegate = op(*self.delegate_args, **self.delegate_kwargs)
+                    return self.delegate
+                
+                # check for matching signature
+                is_match = True
+                if type(signature) is tuple:
+                    for arg, t in zip(args, signature):
+                        is_match = is_match and isinstance(arg, t)
+                else:
+                    is_match = isinstance(args, signature)
+                if is_match: 
+                    self.delegate = op(*self.delegate_args, **self.delegate_kwargs)
+                    return self.delegate
+            raise NotImplementedError("error: no matching implemntation of {} for arguments of type {}".format(name, [type(arg) for arg in args]))
+
         def forward(self, *args, **kwargs):
-            return get_handler(args).forward(self, *args, **kwargs)
+            return self.get_handler(args).forward(*args, **kwargs)
         
         def follow(self, *args, **kwargs):
-            return get_handler(args).follow(self, *args, **kwargs)
+            return self.get_handler(args).follow(*args, **kwargs)
         
         def final(self, *args, **kwargs):
-            return get_handler(args).final(self, *args, **kwargs)
+            return self.get_handler(kwargs.get("operands")).final(*args, **kwargs)
         
         def __str__(self):
+            if self.delegate is not None:
+                return str(self.delegate)
             return f"<{name}>"
         
         def __repr__(self):
+            if self.delegate is not None:
+                return repr(self.delegate)
             return f"<{name}>"
         
         def __nodelabel__(self):
+            if self.delegate is not None:
+                return self.delegate.__nodelabel__()
             return name
 
     return TypeDispatchingNode
@@ -348,7 +368,7 @@ class LenOp(Node):
             len_masks = []
             for l,tmask in charlen_tsets().items():
                 len_masks.append((tmask, len(v) + l))
-            
+
             return fmap(*len_masks)
 
     def final(self, x, operands=None, result=None, **kwargs):
@@ -393,7 +413,7 @@ class Lt(Node):
 
 def Gt(preds): return Lt(list(reversed(preds)))
 
-class EqOp(Node):
+class EqOpGeneric(Node):
     def __init__(self, predecessors):
         super().__init__(predecessors)
 
@@ -407,26 +427,21 @@ class EqOp(Node):
         if op1 is None or op2 is None:
             return None
         
+        
         if is_next_token(op1):
             if is_next_token(op2): 
                 return fmap(
                     ("*", True)
                 )
             else:
-                return fmap(
-                    (op2, True),
-                    ("*", False)
-                )
+                return InOpStrInSet([]).follow(op1, [op2])
         if is_next_token(op2):
             if is_next_token(op1): 
                 return fmap(
                     ("*", True)
                 )
             else:
-                return fmap(
-                    (op1, True),
-                    ("*", False)
-                )
+                return InOpStrInSet([]).follow(op2, [op1])
 
         if type(op1) is str or type(op1) is str:
             op_shorter = op1 if len(strip_next_token(op1)) < len(strip_next_token(op2)) else op2
@@ -477,6 +492,44 @@ class EqOp(Node):
                 continue
         
         return super().final(operand_final, operands=operands, result=result, **kwargs)
+
+class EqOpInt(Node):
+    def __init__(self, predecessors):
+        super().__init__(predecessors)
+
+    def forward(self, *args, **kwargs):
+        return all([a == args[0] for a in args])
+
+    def follow(self, *args, **kwargs):
+        op1 = args[0]
+        op2 = args[1]
+        
+        if op1 is None or op2 is None:
+            return None
+        
+        return op1 == op2
+
+    def final(self, operand_final, operands=None, result=None, **kwargs):
+        op1f = operand_final[0]
+        op1 = operands[0]
+        op2f = operand_final[1]
+        op2 = operands[1]
+
+        if op1f == "fin" and op1 < op2 and op2f != "var":
+            return "fin"
+        if op2f == "fin" and op2 <= op1 and op1f != "var":
+            return "fin"
+
+        # default behavior
+        if all([a == "fin" for a in operand_final]):
+            return "fin"
+        return "var"
+
+EqOp = DynamicTypeDispatch("EqOp", (
+    ((int, int), EqOpInt),
+    ((int, int), EqOpInt),
+    ("*", EqOpGeneric),
+))
 
 class SelectOp(Node):
     def forward(self, *args, **kwargs):
@@ -620,7 +673,7 @@ class InOpStrInStr(Node):
             (setminus("*", allowed_subtokens), False)
         )
 
-    def final(self, op_final, result=None, **kwargs):
+    def final(self, op_final, operands=None, result=None, **kwargs):
         if not result:
             return super().final(op_final, result=result, **kwargs)
         if op_final[1] == "inc" and op_final[0] == "fin":
@@ -795,31 +848,6 @@ class StartsWithOp(Node):
             return "fin"
         
         return super().final(ops_final, **kwargs)
-
-    # def final(self, args, operands=None, result=None, pattern: TokenSet=None, **kwargs):
-    #     x_final = args[0]
-
-    #     if result is None:
-    #         return "var"
-    #     elif result == False:
-    #         x = operands[0]
-    #         allowed_phrases = operands[1]
-
-    #         if x_final == "inc":
-    #             # check whether there are suffixes which could be matched
-    #             suffixes = list(matching_phrases_suffixes(x, allowed_phrases))
-    #             suffixes = [s for s in suffixes if pattern is None or pattern.starts_with(s)]
-    #             # print("final() with x_final inc", x, allowed_phrases)
-    #             if len(suffixes) > 0: return "var"
-    #             else: return "fin"
-    #         elif x_final == "fin":
-    #             return "fin"
-    #         else:
-    #             return "var"
-    #     else: # result == True
-    #         if x_final == "inc" or x_final == "fin":
-    #             return "fin"
-    #         return "var"
 
 @LMQLOp(["STOPS_AT", "stops_at"])
 class StopAtOp(Node):

@@ -1,5 +1,6 @@
 import sys
 import ast
+import asyncio
 import types
 import astunparse
 import inspect
@@ -143,11 +144,16 @@ def dec(v):
 def run_all_tests(g):
     g = g.copy()
     num_errors = 0
+    loop = asyncio.get_event_loop()
+
     for k in list(g.keys()):
         try:
             if k.startswith("test"): 
                 print("Running", k, "." * (40 - len(k)), end=" ")
-                g[k]()
+                if inspect.iscoroutinefunction(g[k]):
+                    loop.run_until_complete(g[k]())
+                else:
+                    g[k]()
                 termcolor.cprint("OK", "green")
         except AssertionError as e:
             print(e)

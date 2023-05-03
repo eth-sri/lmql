@@ -549,7 +549,7 @@ def charlen_tsets():
     assert token_lengths is not None, "VocabularyMatcher.instance().token_lengths is None even though it should be fully initialized."
     # get unique values in token_lengths (numpy)
     length_values = np.unique(token_lengths)
-    return {l: tset(charlen=l) for l in length_values}
+    return {int(l): tset(charlen=l) for l in length_values}
 
 def ntset(*tokens):
     if len(tokens) == 1 and type(tokens[0]) is set:
