@@ -35,6 +35,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         mc.show_speculative = show_speculative
         
         mc.input_id_key_offset = len(initial_prompt_ids) if initial_prompt_ids else 0
+        mc.initial_prompt_ids = initial_prompt_ids
         mc.cache["initial_prompt_ids"] = str(initial_prompt_ids) if initial_prompt_ids is not None else None
         mc.cache["model"] = delegate.model_identifier
     
@@ -47,12 +48,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             if cache_file is not None and os.path.exists(cache_file):
                 with open(cache_file, "rb") as f:
                     cache = pickle.load(f)
-                    if cache["initial_prompt_ids"] != str(initial_prompt_ids):
-                        print("warning: cache file is from a different query (revision). Its contents will be overwritten.")
-                    elif cache["model"] != delegate.model_identifier:
+                    if cache["model"] != delegate.model_identifier:
                         print("warning: cache file is from a different model. Its contents will be overwritten.")
                     else:
-                        mc.cache = cache
+                        mc.cache = cache.get(str(initial_prompt_ids), {})
         except Exception as e:
             print("error: failed to load token cache from file", e)
             pass
@@ -67,9 +66,13 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
     def save(self):
         if self.cache_file is not None:
+            if os.path.exists(self.cache_file):
+                with open(self.cache_file, "rb") as f:
+                    cache = pickle.load(f)
+            cache[str(self.initial_prompt_ids)] = self.cache
             with open(self.cache_file, "wb") as f:
-                pickle.dump(self.cache, f)
-
+                pickle.dump(cache, f)
+    
     def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
             return self.base_key(ids.input_ids)
