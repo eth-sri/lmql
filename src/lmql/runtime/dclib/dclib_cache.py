@@ -48,7 +48,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             if cache_file is not None and os.path.exists(cache_file):
                 with open(cache_file, "rb") as f:
                     cache = pickle.load(f)
-                    if cache["model"] != delegate.model_identifier:
+                    if cache.get("model") != delegate.model_identifier:
                         print("warning: cache file is from a different model. Its contents will be overwritten.")
                     else:
                         mc.cache = cache.get(str(initial_prompt_ids), {})
@@ -69,7 +69,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             if os.path.exists(self.cache_file):
                 with open(self.cache_file, "rb") as f:
                     cache = pickle.load(f)
+            else:
+                cache = {}
             cache[str(self.initial_prompt_ids)] = self.cache
+            cache["model"] = self.cache["model"]
             with open(self.cache_file, "wb") as f:
                 pickle.dump(cache, f)
     
@@ -279,8 +282,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                     r = next(non_cached_sample)
                     if any(ct is not None for ct in c):
                         mask = (await self.get_mask(s, **kwargs)).logits_mask[0]
-                        print("WARNING: some cache entries are None, but some are not", len([e for e in c if e is not None]), len(r.token))
-                        print([await s.text()])
+                        # print("WARNING: some cache entries are None, but some are not", len([e for e in c if e is not None]), len(r.token))
+                        # print([await s.text()])
                     results.append(r)
                     next_token_ids = ensure_iterable(r.token)
                     next_token_scores = ensure_iterable(r.logprob)

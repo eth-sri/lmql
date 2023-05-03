@@ -186,17 +186,6 @@ class ResponseStream:
                     
                     # logprobs.tokens, text, logprobs.token_logprobs
             for c in self.slices:
-                if c.finish_reason != "length":
-                    # queue eos token
-                    self.slices[index].digest({
-                        "text": "<|endoftext|>",
-                        "logprobs": {
-                            "text_offset": [0],
-                            "token_logprobs": [0.0],
-                            "tokens": ["<|endoftext|>"],
-                            "top_logprobs": [{"<|endoftext|>": 0.0}]
-                        }
-                    })
                 c.finish()
         except Exception as e:
             print("Failed with", e)
@@ -445,8 +434,24 @@ class ResponseStreamSliceIterator:
             data = await self.get_next()
             # None indicates end of stream
             if data is None:
-                self.slice.done.set()
-                raise StopAsyncIteration
+                if self.slice.done.is_set():
+                    raise StopAsyncIteration
+                else:
+                    if self.slice.finish_reason != "length":
+                        # return eos token as last item, if stream did not finish due to length
+                        data = {
+                            "text": "<|endoftext|>",
+                            "logprobs": {
+                                "text_offset": [0],
+                                "token_logprobs": [0.0],
+                                "tokens": ["<|endoftext|>"],
+                                "top_logprobs": [{"<|endoftext|>": 0.0}]
+                            }
+                        }
+                        self.slice.done.set()
+                    else:
+                        self.slice.done.set()
+                        raise StopAsyncIteration
             # exceptions that are queued are definitive (all retries failed)
             if isinstance(data, Exception): raise data
             # RecoveryAttempt indicates that the underlying stream errored out and we need to recover (still retries left)
@@ -474,7 +479,6 @@ class ResponseStreamSliceIterator:
         except asyncio.CancelledError:
             raise StopAsyncIteration
 
-
 class ResponseStreamSlice:
     def __init__(self, stream, kwargs, maximum_retries=3):
         self.stream: ResponseStream = stream
@@ -485,6 +489,8 @@ class ResponseStreamSlice:
         self.failed = False
         self.done = asyncio.Event()
         self.finish_reason = None
+
+        self.itr = None
 
     def digest(self, data):
         assert not self.failed, f"digest called on failed slice"
