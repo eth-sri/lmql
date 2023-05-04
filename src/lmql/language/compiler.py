@@ -26,6 +26,8 @@ class FreeVarCollector(ast.NodeVisitor):
         if type(node.ctx) is ast.Load:
             if node.id in self.exclude:
                 return
+            if get_builtin_name(node) is not None:
+                return
             self.free_vars.add(node.id)
 
 class PromptScope(ast.NodeVisitor):
