@@ -3,7 +3,7 @@ import asyncio
 from collections import namedtuple
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, List, Union, NamedTuple
+from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple
 import numpy as np
 from lmql.runtime.multi_head_interpretation import InterpretationHead, InterpreterCall, InterpretationHeadDone
 from lmql.runtime.program_state import ProgramState
@@ -143,6 +143,7 @@ class PromptInterpreter:
         # decoder configuration
         self.decoder = None
         self.decoder_kwargs = {}
+        self.decoder_step = 0
         
         # extra interpreter flags passed via @lmql.query/@lmql.compiled_query
         self.extra_kwargs = {}
@@ -389,12 +390,6 @@ class PromptInterpreter:
                 follow_context=follow_program_state
             )
 
-            stopping_conditions: List[ops.StopAtOp] = ops.execute_op_stops_at_only(self.where)
-            stopping_phrases = {
-                "tokenized": [await self.tokenize(sc.stopping_phrase) for sc in stopping_conditions if sc.variable.name == variable],
-                "text": [sc.stopping_phrase for sc in stopping_conditions if sc.variable.name == variable],
-            }
-
             # obtain where follow map
             follow_map = follow_trace[self.where] if self.where is not None else None
             # print(id(self), self.variable, [text], "mask", follow_map)
@@ -404,6 +399,23 @@ class PromptInterpreter:
                 logit_mask = None
             else:
                 logit_mask = mask.mask
+            
+            # check stopping conditions
+            stopping_conditions: List[ops.StopAtOp] = ops.execute_op_stops_at_only(state.variable, self.where, trace)
+            for sc in stopping_conditions:
+                stop_trace = trace.copy()
+                del stop_trace[sc]
+                # check if stopping phrase applies in this step
+                if ops.execute_op(sc, stop_trace, context=program_state, semantics="stop"):
+                    # print("apply stop", sc, [text], [diff_text])
+                    mask = tset("eos")
+                    logit_mask = mask.mask
+                    trace[sc] = (sc.stopping_phrase(trace), "stopped")
+            stopping_phrases = {
+                "text": [sc.stopping_phrase(trace) for sc in stopping_conditions if type(sc) is ops.StopBeforeOp],
+                "tokenized": [self.tokenizer(sc.stopping_phrase(trace))["input_ids"] for sc in stopping_conditions if type(sc) is ops.StopBeforeOp]
+            }
+
         else:
             assert False, f"error: where() is called but current variable and current prompt are None and query head has result {state.query_head.result}"
 
@@ -478,11 +490,13 @@ class PromptInterpreter:
             variable = state.variable
             
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
+            text_diff = text[len(await seq.text(state.variable_offset, limit=-2, pretty=False)):]
+            
             assert seq.input_ids[-1] == self.tokenizer.eos_token_id, "last token must be eos token"
             variable_value = text
-            raw = variable_value
             # set raw variable value
-            program_state.set(variable, variable_value, scores=(), diff="", montonicity="fin")
+            program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin")
+            
             # apply postprocessing, if constraints specify it
             # - variable_value is the postprocessed, converted value (does not have to be a string)
             # - postprocessed_prompt is the string in the prompt that corresponds to the variable value
@@ -636,6 +650,9 @@ class PromptInterpreter:
         
         # pass rewriter as decoder argument
         decoder_args["modern_rewriter"] = self.rewrite_processor
+
+        if "__get_where__" in decoder_args:
+            return self.where
 
         if "output_writer" in decoder_args:
             set_dclib_debug_printer(decoder_args["output_writer"])
