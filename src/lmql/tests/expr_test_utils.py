@@ -9,6 +9,7 @@ from lmql.language.fragment_parser import LMQLQuery
 from lmql.language.compiler import PromptScope, SNFList, WhereClauseTransformation
 from lmql.ops.ops import NextToken, digest
 from lmql.runtime.program_state import ProgramState
+from lmql.runtime.lmql_runtime import LMQLQueryFunction
 
 
 global show_transformed
@@ -49,7 +50,7 @@ class LMQLExpr:
             follow_program_variables.set(variable_name, text + NextToken, "inc")
 
             # digest token with where expr
-            result, is_final, trace = digest(self.node,
+            result, is_final, trace, follow_trace = digest(self.node,
                 context=program_variables,
                 follow_context=follow_program_variables
             )
@@ -96,7 +97,7 @@ class LMQLExpressionCompiler(ast.NodeTransformer):
                 value = ast.Name(snf.last_var()) if snf.var_counter > 0 else ast.parse(direct_result.strip())
 
                 return ast.copy_location(ast.Expr([
-                    ast.parse("import lmql.runtime.lmql_runtime as lmql"),
+                    # ast.parse("import lmql.runtime.lmql_runtime as lmql"),
                     snf.ast(),
                     ast.Assign(
                         node.targets, 
@@ -150,7 +151,10 @@ def run_all_tests(g):
         try:
             if k.startswith("test"): 
                 print("Running", k, "." * (40 - len(k)), end=" ")
-                if inspect.iscoroutinefunction(g[k]):
+                
+                if type(g[k]) is LMQLQueryFunction:
+                    loop.run_until_complete(g[k]())
+                elif inspect.iscoroutinefunction(g[k]):
                     loop.run_until_complete(g[k]())
                 else:
                     g[k]()
@@ -159,7 +163,13 @@ def run_all_tests(g):
             print(e)
             num_errors += 1
             termcolor.cprint("FAILED", "red")
-    
+
+    # wait for all tasks to finish
+    try:
+        loop.close()
+    except RuntimeError:
+        pass
+
     if num_errors != 0: 
         print(num_errors, "test(s) failed.")
         sys.exit(1)

@@ -33,7 +33,7 @@ class LiveDebuggerOutputWriter:
             result = "-"
             if trace is not None and op in trace:
                 result = trace[op]
-            
+
             return {
                 "result": result,
                 "follow_map": follow_map,
