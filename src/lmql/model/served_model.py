@@ -61,17 +61,6 @@ class ServedModel:
                 data["_step"] = decoder_step
             printer.report_model_stats(**data)
 
-    async def generate(self, input_ids=None, *args, **kwargs):
-        self.num_generate_calls += 1
-        
-        result = await super().generate(*args, input_ids=input_ids, **kwargs)
-        
-        if torch.is_tensor(result): ids = result
-        else: ids = result["sequences"]
-        self.billable_tokens += ids.numel()
-        
-        return result
-
     def create_result_processor_task_if_required(self):
         if self.result_process_running: 
             return

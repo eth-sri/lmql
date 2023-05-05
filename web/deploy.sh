@@ -35,8 +35,12 @@ popd
 cp -r ../src/lmql/ui/playground/build/* ../web-deploy/playground/
 
 # copy documentation snippets
+echo "📦  Copying documentation snippets..."
 pushd ../docs
-cp -r build/html/doc-snippets/* ../web-deploy/playground/doc-snippets/
+# check if any doc-snippets exist at all (check for *)
+if [ -n "$(ls -A build/html/doc-snippets/*)" ]; then
+    cp -r build/html/doc-snippets/* ../web-deploy/playground/doc-snippets/
+fi
 popd
 
 echo "📦  Packaging LMQL for In-Browser use..."

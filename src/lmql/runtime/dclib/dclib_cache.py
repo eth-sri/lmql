@@ -1,4 +1,5 @@
 import asyncio
+from lmql.runtime.dclib.dclib_seq import DecoderSequence
 import numpy as np
 import pickle
 import os
@@ -7,23 +8,34 @@ from dataclasses import dataclass
 
 from .dclib_array import DataArray
 from .dclib_seq import DecoderSequence, Continuation, DeterministicDecoderSequence, deepcopy, deepmerge, detseq
-from .dclib_model import DcModel
+from .dclib_model import DcModel, CacheDelegate
 from .dclib_rewrite import DcModelRewriteMixin
 import lmql.runtime.masks as masks
 from lmql.utils.nputil import ensure_iterable
 
-class CachedDcModel(DcModelRewriteMixin):
+class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     delegate: DcModel
     
-    def __new__(cls, delegate, initial_prompt_ids=None, cache_file=None):
+    def __new__(cls, delegate: DcModel, initial_prompt_ids=None, cache_file=None, show_speculative=False):
         mc = super().__new__(cls)
         
         mc.delegate: DcModel = delegate
+
+        # setup cache delegate
+        assert delegate.cache_delegate is None, "cannot cache a model that is already cached by another cache_delegate"
+        delegate.cache_delegate = mc
+
+        mc.token_streams = []
         
         mc.cache = {}
+        mc.user_data_cache = {}
+        mc.cache_lock = asyncio.Lock()
+
         mc.mask_cache = {}
+        mc.show_speculative = show_speculative
         
         mc.input_id_key_offset = len(initial_prompt_ids) if initial_prompt_ids else 0
+        mc.initial_prompt_ids = initial_prompt_ids
         mc.cache["initial_prompt_ids"] = str(initial_prompt_ids) if initial_prompt_ids is not None else None
         mc.cache["model"] = delegate.model_identifier
     
@@ -36,23 +48,34 @@ class CachedDcModel(DcModelRewriteMixin):
             if cache_file is not None and os.path.exists(cache_file):
                 with open(cache_file, "rb") as f:
                     cache = pickle.load(f)
-                    if cache["initial_prompt_ids"] != str(initial_prompt_ids):
-                        print("warning: cache file is from a different query (revision). Its contents will be overwritten.")
-                    elif cache["model"] != delegate.model_identifier:
+                    if cache.get("model") != delegate.model_identifier:
                         print("warning: cache file is from a different model. Its contents will be overwritten.")
                     else:
-                        mc.cache = cache
+                        mc.cache = cache.get(str(initial_prompt_ids), {})
         except Exception as e:
             print("error: failed to load token cache from file", e)
             pass
 
         return mc
     
+    def close(self):
+        self.model.cache_delegate = None
+        for ts in self.token_streams:
+            ts.cancel()
+        self.token_streams = []
+
     def save(self):
         if self.cache_file is not None:
+            if os.path.exists(self.cache_file):
+                with open(self.cache_file, "rb") as f:
+                    cache = pickle.load(f)
+            else:
+                cache = {}
+            cache[str(self.initial_prompt_ids)] = self.cache
+            cache["model"] = self.cache["model"]
             with open(self.cache_file, "wb") as f:
-                pickle.dump(self.cache, f)
-
+                pickle.dump(cache, f)
+    
     def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
             return self.base_key(ids.input_ids)
@@ -65,7 +88,7 @@ class CachedDcModel(DcModelRewriteMixin):
             return s.logits_mask
 
         constrained_seqs = np.array([True], dtype=np.bool_)
-        logits_mask_result = await self.delegate.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
+        logits_mask_result = await self.delegate.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs, required=True)
         self.mask_cache[s.id] = logits_mask_result
 
         if s.user_data is None:
@@ -77,7 +100,7 @@ class CachedDcModel(DcModelRewriteMixin):
 
         return logits_mask_result
 
-    async def get_cache(self, s: DecoderSequence, edge_type: str, **kwargs):
+    async def get_keys(self, s: DecoderSequence, edge_type: str, **kwargs):
         kwargs = {**self.delegate.model_args, **kwargs}
 
         keys = []
@@ -94,39 +117,78 @@ class CachedDcModel(DcModelRewriteMixin):
             else:
                 if masks.is_fixed_int_mask(mask):
                     keys.append((self.base_key(s), edge_type, "-".join([str(i) for i in mask])))
+
+                    if edge_type == "top-1":
+                        argmax_token, argmax_score = self.cache.get((self.base_key(s), "top-1"), (None, None))
+                        if type(argmax_token) is int and argmax_token in mask:
+                            keys.append((self.base_key(s), str(argmax_token)))
                 else:
                     keys.append((self.base_key(s), edge_type, "-".join([str(i) for i in np.where(mask >= 0)[0]])))
+        else:
+            if edge_type != "sample":
+                # standard key is sequence id + edge type
+                keys.append((self.base_key(s), edge_type))
 
-        # standard key is sequence id + edge type
-        keys += [(self.base_key(s), edge_type)] if edge_type != "sample" and mask is None else []
+        return keys
+    
+    async def get_cache(self, s: DecoderSequence, edge_type: str, user_data=False, **kwargs):
+        keys = await self.get_keys(s, edge_type, **kwargs)
 
         for k in keys:
-            if k in self.cache:
-                return keys, self.cache[k]
+            token, score = None, None
+            
+            async with self.cache_lock:
+                if k in self.cache:
+                    token, score = self.cache[k]
+            
+            if token is None:
+                continue
 
-        # print(keys)
+            if type(token) is asyncio.Future: 
+                awaited_result = await token
+                if awaited_result is None:
+                    continue
+                else:
+                    assert type(awaited_result) is tuple and len(awaited_result) == 2
+                    token, score = awaited_result
+            if user_data:
+                return keys, (token, score, self.user_data_cache.get(k, None))
+            return keys, (token, score)
 
         return keys, None
     
-    def set_cache(self, key, c: Union[Continuation, tuple], verbose=False):
+    def set_cache(self, key, c: Union[Continuation, tuple], user_data=None, verbose=False):
         for k in key:
             if verbose:
                 print("    cached", k)
+            
+            # check if the existing entry is a future
+            existing = self.cache.get(k, (None, None))[0]
+            fut = existing if type(existing) is asyncio.Future else None
+            
             if type(c) is Continuation:
                 self.cache[k] = (c.token, c.logprob)
+                if user_data is not None:
+                    self.user_data_cache[k] = user_data
+                if fut is not None and not fut.done():
+                    fut.set_result((c.token, c.logprob))
             else:
                 assert type(c) is tuple and len(c) == 2
                 self.cache[k] = c
+                if user_data is not None:
+                    self.user_data_cache[k] = user_data
+                if fut is not None and not fut.done():
+                    fut.set_result(c)
 
     async def argmax(self, arr: DataArray, **kwargs):
         async def op_argmax(seqs):
             self.calls += len(seqs)
 
             # check cache for all
-            cache_entries = [await self.get_cache(s, 'top-1', **kwargs) for s in seqs]
+            cache_entries = [await self.get_cache(s, 'top-1', user_data=True, **kwargs) for s in seqs]
             cached_tokens = [e[1] for e in cache_entries]
             cache_keys = [e[0] for e in cache_entries]
-            
+
             # apply operation for non-cached
             non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
             # generator over new results
@@ -140,9 +202,10 @@ class CachedDcModel(DcModelRewriteMixin):
                     results.append(r)
                     self.set_cache(key, r)
                 else:
-                    token, logprob = c
-                    user_data = (await self.get_mask(s, **kwargs)).user_data
-                    continuation = s.make_successors(token.reshape(1), logprob.reshape(1), logits=None, user_data=user_data)
+                    token, logprob, cached_user_data = c
+                    logit_mask_result = await self.get_mask(s, **kwargs)
+                    user_data = deepmerge(logit_mask_result.user_data[0], cached_user_data) if cached_user_data is not None else logit_mask_result.user_data[0]
+                    continuation = s.make_successors(token.reshape(1), logprob.reshape(1), logits=None, user_data=[user_data])
                     results.append(continuation)
 
                     self.hits += 1
@@ -219,8 +282,8 @@ class CachedDcModel(DcModelRewriteMixin):
                     r = next(non_cached_sample)
                     if any(ct is not None for ct in c):
                         mask = (await self.get_mask(s, **kwargs)).logits_mask[0]
-                        print("WARNING: some cache entries are None, but some are not", len(c), len(r.token))
-                        print([await s.text()])
+                        # print("WARNING: some cache entries are None, but some are not", len([e for e in c if e is not None]), len(r.token))
+                        # print([await s.text()])
                     results.append(r)
                     next_token_ids = ensure_iterable(r.token)
                     next_token_scores = ensure_iterable(r.logprob)
@@ -262,7 +325,8 @@ class CachedDcModel(DcModelRewriteMixin):
             c = Continuation(token, logprob, user_data[0])
             sq = sq.extend(c, internal=True)
             tok = tok[1:]
-            det = det[1:]
+            if type(det) is not bool:
+                det = det[1:]
             user_data = user_data[1:]
             if len(tok) == 0:
                 return sq, tok, det, user_data
@@ -364,11 +428,12 @@ class CachedDcModel(DcModelRewriteMixin):
     
     async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         async def op_score(sq, tok):
+            unexpanded_tok = tok
             # create continuation sequence at cache boundary
             continued_seq, tok, det, _ = self.expand_through_cache(sq, tok, deterministic, [user_data for _ in tok])
-            
+
             if len(tok) == 0:
-                completion = np.array(tokens[0])
+                completion = np.array(unexpanded_tok)
                 token_scores = continued_seq.logprobs[-len(completion):]
             else:
                 # run actual score() call for remaining non-cached part of 'tokens' (tok)
@@ -376,7 +441,7 @@ class CachedDcModel(DcModelRewriteMixin):
                 
                 # extract scores and tokens for new, scored part of 'tokens'
                 token_scores = np.array(result.logprobs[len(sq.input_ids):].tolist() + result.next_logprobs.tolist())
-                completion = np.array(tokens[0])
+                completion = np.array(unexpanded_tok)
                 assert len(token_scores) == len(completion), f"Expected {len(completion)} scores, but got {len(token_scores)}"
 
                 # store in cache
@@ -409,5 +474,85 @@ class CachedDcModel(DcModelRewriteMixin):
                     sticky_user_data_keys=sq.sticky_user_data_keys,
                     internal=internal
             )
-
         return await asyncio.gather(*[op_score(sq, tok) for sq, tok in zip(sqs, tokens)])
+
+    def register_token_stream(self, token_iterator: callable):
+        async def token_consumer(itr):
+            try:
+                ids = None
+                keys = None
+                sq = None
+                waiting_token_keys = []
+
+                async for (s, tokens, scores, edge_types, user_data) in itr():
+                    if type(tokens) is int or len(tokens) == 1:
+                        tokens = ensure_iterable(tokens)
+                        scores = ensure_iterable(scores)
+                        if type(edge_types) is str or edge_types is None:
+                            edge_types = [edge_types]
+                    else:
+                        assert len(tokens) == len(scores) == len(edge_types), f"token_consumer: expected all lists to have the same length, but got {len(tokens)}, {len(scores)}, {len(edge_type)}"
+                        # print("setting entries for", edge_types)
+                    
+                    waiting_token_keys = []
+                    
+                    async with self.cache_lock:
+                        for token, score, edge_type in zip(tokens, scores, edge_types):
+                            assert type(edge_type) is str or edge_type is None, "edge_types is {}".format(edge_types)
+                            
+                            if ids is None:
+                                ids = s.input_ids
+                                keys = await self.get_keys(s, edge_type, **self.model_args)
+                                sq = s
+                            token_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
+                            token_keys += [(self.base_key(ids), str(token))]
+                            # filter out keys with edge_type=None
+                            token_keys = [k for k in token_keys if k[1] is not None]
+
+                            # for tk in token_keys:
+                            #     if tk in self.cache and type(self.cache[tk][0]) is not asyncio.Future:
+                            #         print("token_consumer: token for {} from stream already in cache ({} streams): {}".format(tk, len(self.token_streams), self.cache[tk]))
+
+                            self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data)
+
+                            if self.show_speculative:
+                                c = Continuation(np.array(token), np.array(score), None)
+                                sq = sq.extend(c)
+
+                            # set future for next token (so get_cache can wait for it if needed)
+                            fut_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
+                            waiting_token_keys.append(fut_keys)
+                            # set future for next token (if k is not already set)
+                            fut = asyncio.Future()
+                            unset_keys = [k for k in fut_keys if k not in self.cache]
+                            self.set_cache(unset_keys, (fut, fut))
+
+                    # extend ids
+                    ids = np.append(ids, tokens[0])
+                        # print(waiting_token_keys)
+                
+                # remove last waiting token entry (since it will not be provided by this stream)
+                for future_keys in waiting_token_keys:
+                    for k in future_keys:
+                        fut = self.cache.get(k, (None, None))[0]
+                        if type(fut) is asyncio.Future:
+                            # resolve future as invalid (handled in get_cache)
+                            fut.set_result(None)
+                            del self.cache[k]
+            except Exception as e:
+                print("DcCachedModel: token_consumer failed with:", e)
+                import traceback
+                traceback.print_exc()
+                raise e
+
+        self.token_streams = [s for s in self.token_streams if not s.done()]
+        self.token_streams.append(asyncio.create_task(token_consumer(token_iterator)))
+        
+    async def wait_for_active_streams(self):
+        """
+        Waits until all active cache streams have been processed.
+        """
+        caches = self.token_streams
+        # remove all done cache streams
+        self.token_streams = [f for f in self.token_streams if not f.done()]
+        return await asyncio.gather(*caches)

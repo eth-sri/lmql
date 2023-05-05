@@ -82,6 +82,7 @@ class ModelQueue:
                         **kwargs
                     )
                     for logits, raw, fut in zip(logits, raw, [task.result_fut for task in group]):
+                        if fut.cancelled(): continue
                         fut.set_result((logits, raw))
                     # print("batch of size", len(group), len(batch), self.logits_queue.qsize(), flush=True)
             except Exception as e:
@@ -108,6 +109,19 @@ class ModelQueue:
 
 ModelQueue._instances = {}
 
+class CacheDelegate:
+    def register_token_stream(self, fut: callable):
+        """
+        Registers an async iterator as an active token stream.
+
+        A token stream is an async generator function of (s, token, score, edge_type) tuples, where 
+        - 's' is a DecoderSequence,
+        - 'token' is the token to be appended to 's',
+        - 'score' is the logprob of 'token' given 's',
+        - 'edge_type' is the type of edge that was used to expand 's' to 's + token'.
+        """
+        pass
+
 class DcModel(DcModelRewriteMixin):
     def __init__(self, model, tokenizer, truncation_threshold=-3e38, init_workers=True, **kwargs):
         """
@@ -132,6 +146,14 @@ class DcModel(DcModelRewriteMixin):
         if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier, self.tokenizer.vocab_size)
         else: self.logits_queue = None
 
+        # if set, the cache delegate can be called for speculative model scoring results 
+        # (e.g. when sequences are scored in speculatively).
+        self.cache_delegate: CacheDelegate = None
+
+    def register_token_stream(self, task):
+        if self.cache_delegate is not None:
+            self.cache_delegate.register_token_stream(task)
+
     def log_billable_tokens(self, n: int):
         if hasattr(self.model, "billable_tokens"):
             self.model.billable_tokens += n
@@ -148,17 +170,22 @@ class DcModel(DcModelRewriteMixin):
 
     async def model_logits_async(self, model, input_ids, logits_mask=None, **kwargs):
         loop = asyncio.get_running_loop()
-        result_fut = loop.create_future()
         
         # print(kwargs)
         model_args = {
             "temperature": kwargs.get("temperature", None),
             "eos_token_id": kwargs.get("eos_token_id", None),
         }
-        
-        self.logits_queue.put(DcModelLogitsTask(model, input_ids, logits_mask, model_args, result_fut))
 
-        return await result_fut
+        # with 'noscore' do not compute logprobs of deterministic tokens
+        if logits_mask is not None and masks.mask_num_allowed(logits_mask) == 1 and kwargs.get("noscore", False):
+            logits = np.ones((self.tokenizer.vocab_size), dtype=np.float32) * np.finfo(np.float32).min
+            logits[masks.mask_get_only_allowed(logits_mask)] = 0.0
+            return (logits, logits)
+        else:
+            result_fut = loop.create_future()
+            self.logits_queue.put(DcModelLogitsTask(model, input_ids, logits_mask, model_args, result_fut))
+            return await result_fut
 
     async def autobatch_logits_with_cache(self, model, input_ids, max_batch_size, cache=None, logits_mask=None, **kwargs):
         kwargs = {**self.model_args, **kwargs}
@@ -431,6 +458,9 @@ class DcModel(DcModelRewriteMixin):
     
     def report_stats(self, printer, decoder_step=None):
         self.model.report_stats(printer, decoder_step)
+
+    def save(self):
+        pass
 
 DcModel.batch_size = 1
 

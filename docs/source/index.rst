@@ -75,7 +75,7 @@ Contents
    language/decoders.md
    language/models.md
    language/functions.md
-   
+
 .. toctree::
     :maxdepth: 1
     :caption: 🔗 Python Integration
@@ -84,6 +84,7 @@ Contents
     python/langchain.ipynb
     python/llama_index.ipynb
     python/pandas.ipynb
+    python/output.md
    
 .. toctree::
     :maxdepth: 1

@@ -9,15 +9,7 @@ from lmql.utils import nputil
 import numpy as np
 from lmql.runtime.stats import Stats
 
-def get_vocab(tokenizer):
-    if hasattr(tokenizer, "vocab"):
-        return tokenizer.vocab
-    elif hasattr(tokenizer, "get_vocab"):
-        return tokenizer.get_vocab()
-    elif hasattr(tokenizer, "tokenizer_impl"):
-        return get_vocab(tokenizer.tokenizer_impl)
-    else:
-        assert False, "Could not obtain full vocabulary from unknown tokenizer type: {}".format(type(tokenizer))
+from lmql.runtime.tokenizer import get_vocab
 
 class VocabularyMatcher:
     """
@@ -115,10 +107,6 @@ class VocabularyMatcher:
     def ensure_ready():
         VocabularyMatcher.instance()
 
-    @property
-    def vocab_size(self):
-        return len(self.vocab)
-
     @staticmethod
     def with_cache(keys, provider):
         keys = [k for k in keys if k is not None]
@@ -168,7 +156,7 @@ class VocabularyMatcher:
 
         regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
 
-        mask = np.zeros([self.tokenizer.vocab_size], dtype=np.bool_)
+        mask = np.zeros([self.vocab_size], dtype=np.bool_)
 
         pattern = re.compile(regex, re.UNICODE)
         for id, subtoken in self.vocab.items():
@@ -183,7 +171,7 @@ class VocabularyMatcher:
 
     def _make_mask_from_char_length(self, length):
         if self.token_lengths is None:
-            token_lengths = np.zeros([self.tokenizer.vocab_size], dtype=np.int32)
+            token_lengths = np.zeros([self.vocab_size], dtype=np.int32)
             for id, subtoken in self.vocab.items():
                 token_lengths[id] = len(subtoken)
             self.token_lengths = token_lengths
@@ -191,7 +179,7 @@ class VocabularyMatcher:
         return self.token_lengths == length
 
     def _make_mask_from_tokens(self, tokens, prefix, exact=False):
-        mask = np.zeros([self.tokenizer.vocab_size], dtype=np.bool_)
+        mask = np.zeros([self.vocab_size], dtype=np.bool_)
 
         if "*" in tokens:
             mask[:] = True
@@ -561,7 +549,7 @@ def charlen_tsets():
     assert token_lengths is not None, "VocabularyMatcher.instance().token_lengths is None even though it should be fully initialized."
     # get unique values in token_lengths (numpy)
     length_values = np.unique(token_lengths)
-    return {l: tset(charlen=l) for l in length_values}
+    return {int(l): tset(charlen=l) for l in length_values}
 
 def ntset(*tokens):
     if len(tokens) == 1 and type(tokens[0]) is set:

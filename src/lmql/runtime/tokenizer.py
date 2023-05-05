@@ -42,7 +42,7 @@ def get_js_tokenizer(model_identifier):
             # set typed array type of input_ids to int
             return str(js.detokenize_gpt(to_js([int(i) for i in input_ids])))
 
-        def __call__(self, s: str):
+        def __call__(self, s: str, add_special_tokens=False):
             unpack = False
             if type(s) is not list:
                 s = [s]
@@ -62,14 +62,21 @@ global reverse_special_token_mappings
 reverse_special_token_mappings = {}
 
 class LMQLTokenizer:
+    INVALID_CHARACTER = "\uFFFD"
+
     def __init__(self, tokenizer_impl, model_identifier):
         self.tokenizer_impl = tokenizer_impl
         self.model_identifier = model_identifier
         self.detokenizer_cache = {}
 
+        self._vocab = get_vocab(self.tokenizer_impl)
+        self.vocab_range = max(self._vocab.values()) + 1
+
     @property
     def vocab_size(self):
-        return self.tokenizer_impl.vocab_size
+        # in LMQL vocab_size is the vocab_range (the highest vocabulary ID + 1)
+        # this allows us to use a dense one hot array where no IDs are skipped
+        return self.vocab_range
 
     @property
     def bos_token_id(self):
@@ -107,10 +114,12 @@ class LMQLTokenizer:
             if key in self.detokenizer_cache[n-1].keys():
                 global reverse_special_token_mappings
                 # print("secondary cache hit")
-                if input_ids[-1] >= self.tokenizer_impl.vocab_size:
+                if input_ids[-1] >= self.vocab_size:
                     extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
                 else:
                     extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]], clean_up_tokenization_spaces=False)
+                    if self.INVALID_CHARACTER in extended:
+                        return self.detokenizer_cache[n-1][key]
                 if not n in self.detokenizer_cache.keys():
                     self.detokenizer_cache[n] = {}
                 self.detokenizer_cache[n][str(input_ids)] = extended
@@ -129,7 +138,7 @@ class LMQLTokenizer:
 
         return s
 
-    def __call__(self, s: str):
+    def __call__(self, s: str, add_special_tokens=False):
         input_ids = []
         unpack = False
         if type(s) is not list:
@@ -142,7 +151,8 @@ class LMQLTokenizer:
                 if type(chunk) is int:
                     chunk_input_ids.append(chunk)
                 else:
-                    chunk_input_ids += self.tokenizer_impl(chunk)["input_ids"]
+                    result = self.tokenizer_impl(chunk, add_special_tokens=add_special_tokens)["input_ids"]
+                    chunk_input_ids += result
             input_ids.append(chunk_input_ids)
         
         if unpack:
@@ -157,7 +167,7 @@ class LMQLTokenizer:
         if identifier not in special_token_mappings:
             if len(special_token_mappings) == 0:
                 # offset vocabulary IDs by at least the next decimal power of 10
-                offset = 10 ** (len(str(self.vocab_size)))
+                offset = 10 ** (len(str(self.vocab_range)))
                 special_token_mappings[identifier] = offset
                 reverse_special_token_mappings[offset] = identifier
             else:
@@ -222,6 +232,16 @@ def load_tokenizer(model_identifier):
         with open(cache_path, "wb") as f:
             pickle.dump(t, f)
         return LMQLTokenizer(t, model_identifier)
+
+def get_vocab(tokenizer):
+    if hasattr(tokenizer, "vocab"):
+        return tokenizer.vocab
+    elif hasattr(tokenizer, "get_vocab"):
+        return tokenizer.get_vocab()
+    elif hasattr(tokenizer, "tokenizer_impl"):
+        return get_vocab(tokenizer.tokenizer_impl)
+    else:
+        assert False, "Could not obtain full vocabulary from unknown tokenizer type: {}".format(type(tokenizer))
 
 if __name__ == "__main__":
     import sys

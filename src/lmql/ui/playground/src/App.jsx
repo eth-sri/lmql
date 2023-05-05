@@ -812,11 +812,6 @@ const ModelResultText = styled.div`
     margin-left: 2pt;
   }
 
-  div .variable:hover {
-    position: relative;
-    transform: scale(1.1);
-  }
-
   div .badge {
     padding: 1.0pt 4pt;
     border-radius: 2pt;
@@ -2033,7 +2028,8 @@ function DecoderPanel(props) {
     return {
       "_finfalse": data.user_data && data.user_data.head && data.user_data.head.valid == "False",
       "_isRoot": data.root,
-      "_isDone": data.user_data && data.user_data.head && data.user_data.head.variable == "__done__"
+      "_isDone": data.user_data && data.user_data.head && data.user_data.head.variable == "__done__",
+      "_noUserData": !data.user_data || (data.user_data && data.user_data == "None")
     }
   }
 

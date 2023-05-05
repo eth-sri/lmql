@@ -152,11 +152,9 @@ class PromptInterpreter:
     """
 
     def __init__(self, context=None, force_model=None) -> None:
-        assert force_model is None, "force_model is not supported in P2"
-        
         # model-specific components
-        self.model = None
-        self.model_identifier = None
+        self.model = force_model
+        self.model_identifier = force_model
         self.tokenizer: LMQLTokenizer = None
 
         # decoder configuration
@@ -183,6 +181,7 @@ class PromptInterpreter:
         # caching configuration
         self.caching = True
         self.cache_file = None
+        self.show_speculative = False
         
         # key to use to store program statein decoding tree
         self.user_data_key = "head"
@@ -208,12 +207,13 @@ class PromptInterpreter:
         self.decoder_kwargs["decoder"] = method
 
     def set_model(self, model_name):
-        if model_name == "<dynamic>":
-            assert self.context is not None, "error: model is not explicitly specified and can also not be derived from context. Please provide a 'from' clause or set the model in the context of the query execution."
-            model_name = self.context.model_identifier
+        if self.model is None:
+            if model_name == "<dynamic>":
+                assert self.context is not None, "error: model is not explicitly specified and can also not be derived from context. Please provide a 'from' clause or set the model in the context of the query execution."
+                model_name = self.context.model_identifier
 
-        self.model = model_name
-        self.model_identifier = model_name
+            self.model = model_name
+            self.model_identifier = model_name
 
         client = LMQLModelRegistry.get(self.model)
 
@@ -499,7 +499,7 @@ class PromptInterpreter:
 
     async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace, text):
         if self.output_writer is not None:
-            self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, self.where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
+           await self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, self.where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
 
     async def where_processor(self, seqs, additional_logits_processor_mask, **kwargs):
         zipped_task_inputs = zip(seqs, additional_logits_processor_mask, range(len(seqs)))
@@ -735,6 +735,11 @@ class PromptInterpreter:
         if not "max_len" in decoder_args.keys():
             decoder_args["max_len"] = 2048
         
+        # parse show_speculative argument
+        if "show_speculative" in decoder_args.keys():
+            self.show_speculative = decoder_args.pop("show_speculative")
+            assert self.caching, "warning: show_speculative is only supported when caching is enabled."
+
         # parse cache argument
         if "cache" in decoder_args.keys():
             cache_value = decoder_args.pop("cache")
@@ -751,7 +756,7 @@ class PromptInterpreter:
         # setup dcmodel for use
         self.dcmodel.model_args = decoder_args
         if self.caching:
-            self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids, cache_file=self.cache_file)
+            self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids, cache_file=self.cache_file, show_speculative=self.show_speculative)
         decoder_args["dcmodel"] = self.dcmodel
         dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 
@@ -770,14 +775,14 @@ class PromptInterpreter:
         try:
             import time
 
-            decoder_step = 0
+            self.decoder_step = 0
             average_step_time = None
             start = time.time()
             async for _ in decoder_fct(prompt_ids, **decoder_args):
-                await debug_out(decoder_step)
-                decoder_step += 1
+                await debug_out(self.decoder_step)
+                self.decoder_step += 1
 
-                if step_budget is not None and decoder_step >= step_budget:
+                if step_budget is not None and self.decoder_step >= step_budget:
                     print("warning: step budget exceeded")
                     break
 
@@ -788,9 +793,9 @@ class PromptInterpreter:
                 average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
 
                 if "performance_stats" in decoder_args:
-                    if decoder_step % 10 == 0:
+                    if self.decoder_step % 10 == 0:
                         Stats.print_all()
-                        print("step", decoder_step, "time", average_step_time)
+                        print("step", self.decoder_step, "time", average_step_time)
 
                 start = time.time()
             
@@ -798,7 +803,7 @@ class PromptInterpreter:
                 
         except dc.FinishException as fe:
             # one last call to debug_out to get the final state
-            await debug_out(decoder_step)
+            await debug_out(self.decoder_step)
             # if dc.finish is used, the decoder sets the sequences it considers 
             # finished (return them to prompt interpreter)
             result_sequences = fe.result_sequences
@@ -813,8 +818,6 @@ class PromptInterpreter:
                 # +1 for the eos token
                 billable_tokens += upper + (1 if has_deterministic_tail else 0)
             
-            self.dcmodel.log_billable_tokens(billable_tokens)
-
             results = []
 
             for i,s in enumerate(result_sequences):
@@ -828,17 +831,18 @@ class PromptInterpreter:
                     assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             
-            if hasattr(self.dcmodel, "save"):
-                self.dcmodel.save()
+            # set decoder step +1, for all stats logging that happens in postprocessing
+            self.decoder_step += 1
 
             return results
         finally:
             # make sure token cache is saved if possible
-            if hasattr(self.dcmodel, "save"):
-                self.dcmodel.save()
+            self.dcmodel.save()
+            if hasattr(self.dcmodel, "close"):
+                self.dcmodel.close()
 
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache"]
+        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", "openai_nonstop"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args
@@ -848,7 +852,7 @@ class PromptInterpreter:
                 raise ValueError("Unknown decoder argument: {}".format(k))
 
     def print_stats(self):
-        pass
+        self.dcmodel.report_stats(self.output_writer, self.decoder_step)
 
     def subinterpreter(self, identifier, fct):
         if identifier in self.subinterpreters.keys():
@@ -856,11 +860,12 @@ class PromptInterpreter:
         else:
             subinterpreter = SubInterpreter(fct, self)
             
-            # inherits most interpreter configuration from parent interpreter
+            # inherits interpreter attributes from parent
             subinterpreter.tokenizer = self.tokenizer
             subinterpreter.dcmodel = self.dcmodel
             
             self.subinterpreters[identifier] = subinterpreter
+            
             return subinterpreter
         
     async def apply_subinterpreters(self, s: dc.DecoderSequence, follow_map: FollowMap, calling_state: PromptState, **kwargs):
@@ -886,7 +891,7 @@ class PromptInterpreter:
             if si.root_state is None:
                 state = self.interpreter_state_from_user_data(s)
                 await si.prepare(si.fct, state.variable_offset)
-            
+
             state = si.interpreter_state_from_user_data(s)
             # ids so far in subtinterpreter sequence space
             subinterpreter_prompt = await s.text(offset=si.parent_offset)

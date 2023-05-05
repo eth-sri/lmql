@@ -271,7 +271,6 @@ async def chat_api(**kwargs):
 
                 if current_chunk.strip() == "[DONE]":
                     return
-                
                 try:
                     last_message = json.loads(current_chunk.strip())
                     message = last_message.get("error", {}).get("message", "")
@@ -340,7 +339,7 @@ async def completion_api(**kwargs):
 
                             if len(complete_chunk.strip()) == 0: 
                                 continue
-                            if complete_chunk == "[DONE]": 
+                            if complete_chunk == "[DONE]":
                                 return
                             
                             if n_chunks == 0:

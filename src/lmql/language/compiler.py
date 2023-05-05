@@ -13,15 +13,19 @@ from lmql.language.validator import LMQLValidator, LMQLValidationError
 from lmql.language.fragment_parser import LMQLDecoderConfiguration, LMQLQuery, LanguageFragmentParser, FragmentParserError
 from lmql.runtime.model_registry import model_name_aliases
 import lmql.runtime.lmql_runtime as lmql_runtime
+from lmql.runtime.dclib import get_all_decoders
 
 OPS_NAMESPACE = "lmql.ops"
 
 class FreeVarCollector(ast.NodeVisitor):
-    def __init__(self, free_vars):
+    def __init__(self, free_vars, exclude=None):
         self.free_vars = free_vars
+        self.exclude = exclude or set()
 
     def visit_Name(self, node):
         if type(node.ctx) is ast.Load:
+            if node.id in self.exclude:
+                return
             self.free_vars.add(node.id)
 
 class PromptScope(ast.NodeVisitor):
@@ -41,7 +45,9 @@ class PromptScope(ast.NodeVisitor):
         if query.from_ast is not None:
             FreeVarCollector(self.free_vars).visit(query.from_ast)
         if query.decode is not None:
-            FreeVarCollector(self.free_vars).visit(query.decode)
+            FreeVarCollector(self.free_vars, exclude=get_all_decoders()).visit(query.decode)
+        if query.distribution is not None:
+            FreeVarCollector(self.free_vars).visit(query.distribution.values)
 
         query.scope = self
 
@@ -252,7 +258,7 @@ class WhereClauseTransformation():
                 tops = [self.transform_node(op, snf) for op in ops]
                 tops_list = ",\n  ".join([t.strip() or "None" for t in tops])
                 
-                Op = "lmql.runtime_support.AndOp" if type(expr.op) is ast.And else "lmql.OrOp"
+                Op = f"{OPS_NAMESPACE}.AndOp" if type(expr.op) is ast.And else f"{OPS_NAMESPACE}.OrOp"
                 return snf.add(f"{Op}([\n  {tops_list}\n])")
         elif type(expr) is ast.Name:
             return self.transform_name(expr)
