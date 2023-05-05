@@ -102,7 +102,7 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     if len(args) > 0:
         assert False, "Positional arguments for queries are not supported yet"
     else:
-        assert len(kwargs) == len(query_args), f"Expected {len(query_args)} keyword arguments for query, got {len(kwargs)}"
+        assert len(kwargs) == len(query_args), f"Expected {len(query_args)} keyword arguments for query, got {len(kwargs)}: Expected: {query_args}, got: {kwargs}"
 
         for query_kw in kwargs.keys():
             assert query_kw in query_args, f"Unknown query argument '{query_kw}'"
