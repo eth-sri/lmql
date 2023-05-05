@@ -26,9 +26,17 @@ class FreeVarCollector(ast.NodeVisitor):
         if type(node.ctx) is ast.Load:
             if node.id in self.exclude:
                 return
+            if get_builtin_name(node) is not None:
+                return
             self.free_vars.add(node.id)
 
 class PromptScope(ast.NodeVisitor):
+    def __init__(self):
+        self.distribution_vars = set()
+        self.defined_vars = set()
+        self.free_vars = set()
+        self.written_vars = set()
+
     def scope(self, query: LMQLQuery):
         self.distribution_vars = set([query.distribution.variable_name]) if query.distribution is not None else set()    
         self.defined_vars = set()

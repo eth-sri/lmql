@@ -76,7 +76,8 @@ def load(filepath=None, autoconnect=False, force_model=None, output_writer=None)
     module.query.force_model(force_model)
     return module
 
-async def run_file(filepath, output_writer=None, force_model=None, *args):
+async def run_file(filepath, *args, output_writer=None, force_model=None, **kwargs):
+    import inspect
     module = load(filepath, autoconnect=True, output_writer=output_writer, force_model=force_model)
     
     if module is None: 
@@ -85,25 +86,36 @@ async def run_file(filepath, output_writer=None, force_model=None, *args):
 
     if output_writer is not None:
         module.query.output_writer = output_writer
-    
-    if len(args) == 1 and args[0] == "":
-        kwargs = {}
-    else:
-        kwargs = {}
-        for line in args:
-            line = line.strip()
-            key, value = line.split(":", 1)
-            kwargs[key.strip()] = value.strip()
 
+    compiled_fct_args = module.query.args
+    query_args = []
+
+    calling_frame = inspect.stack()[1]
+    scope = LMQLInputVariableScope(module.query.fct, calling_frame)
+    for arg in compiled_fct_args:
+        if scope.resolve(arg) == None:
+            query_args.append(arg)
+
+    output_variables = module.query.output_variables
+    query_args = list(set(query_args) - set(output_variables))
+
+    if len(args) > 0:
+        assert False, "Positional arguments for queries are not supported yet"
+    else:
+        assert len(kwargs) == len(query_args), f"Expected {len(query_args)} keyword arguments for query, got {len(kwargs)}"
+
+        for query_kw in kwargs.keys():
+            assert query_kw in query_args, f"Unknown query argument '{query_kw}'"
+            
     return await module.query(**kwargs)
 
-async def run(code, output_writer=None):
+async def run(code, *args, output_writer=None, **kwargs):
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(code)
     
     os.chdir(os.path.join(os.path.dirname(__file__), "../../")) 
-    return await run_file(temp_lmql_file, output_writer=output_writer)
+    return await run_file(temp_lmql_file, *args, output_writer=output_writer, **kwargs)
         
 def _query_from_string(s):
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")

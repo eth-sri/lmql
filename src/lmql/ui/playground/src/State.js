@@ -47,6 +47,8 @@ class PersistedState {
       // check for snippet or embed
       let snippetFile = getSnippet()
       if (snippetFile) {
+        let load_as_json = true;
+
         console.log("loading snippet from", snippetFile)
         let matches = queries.filter(c => c.queries.find(q => q.state == "precomputed/" + snippetFile + ".json"))
         if (matches.length === 1) {
@@ -54,10 +56,33 @@ class PersistedState {
           snippetFile = q.state
         }
 
+        // check for github gist
+        if (snippetFile.startsWith("gist:")) {
+          // will be of this form gist:lbeurerkellner/9e203be6f9120dae2515c43517bc1aee/raw/test.lmql
+          try {
+            let parts = snippetFile.split(":")
+            let user = parts[1].split("/")[0]
+            let gist = parts[1].split("/")[1]
+            let file = parts[1].split("/")[3]
+            snippetFile = `https://gist.githubusercontent.com/${user}/${gist}/raw/${file}`
+
+            load_as_json = file.endsWith(".json")
+          } catch (e) {
+            console.error("error parsing github gist URL", e)
+            return;
+          }
+        }
+
         fetch(snippetFile).then(r => r.text()).then(data => {
           // remove ? from url
-          window.history.replaceState({}, document.title, window.location.pathname);
+          if (!snippetFile.includes("gist.github")) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          // actually load data
           if (data) {
+            if (!load_as_json) {
+              data = JSON.stringify({ "lmql-editor-contents": data , "decoder-graph":"{\"nodes\":[],\"edges\":[]}"})
+            }
             displayState.embedFile = snippetFile
             this.load(data)
           }

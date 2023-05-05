@@ -87,7 +87,7 @@ async def best_k(prompt_ids: np.ndarray, k=4, budget=30, kappa=1, beta=0.5, gamm
         scorer = BestKScorer(base_scorer, t, kappa, beta)
         H, h = dc.seperate_topk(h, k, scorer=scorer)
         g = len(H)
-        H = H.extend(await model.topk_continuations(H, k=top_k_continuations))
+        H = H.extend(await model.topk_continuations(H, k=top_k_continuations, **kwargs))
         H = await model.rewrite(H)
         not_done = dc.logical_and(dc.logical_not(dc.eos), dc.lt(max_len))
         H, H_done = H.separate_by(not_done)
@@ -214,7 +214,7 @@ async def beam_var(prompt_ids: np.ndarray, n=4, max_len=None, inject_stop=False,
             done = done_new
 
         h_before_extension = h
-        h_extended = h.extend(await model.topk_continuations(h, k=n))
+        h_extended = h.extend(await model.topk_continuations(h, k=n, **kwargs))
 
         if inject_stop:
             h_injected = await h_before_extension.aelement_wise(stop_phrase_injection, model, **kwargs)
@@ -432,7 +432,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
             if sample:
                 active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
             else:
-                active = active.extend(await model.topk_continuations(active, k=b))
+                active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
             
             active = await model.rewrite(active)
 
@@ -455,7 +455,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
             if sample:
                 active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
             else:
-                active = active.extend(await model.topk_continuations(active, k=b))
+                active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
             
             for s in active.flatten().items():
                 # s.data("eos_score", s.score
@@ -499,7 +499,7 @@ async def bsseq(prompt_ids: np.ndarray, b=2, max_len=384, **kwargs):
         yield s
 
 @dc.decoder
-async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="sample", **kwargs):
+async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="sample", temperature=1.0, **kwargs):
     """
     sample: 
         if True, uses beam_sample variable-local-decoding, otherwise uses beam_search-like decoding
@@ -507,6 +507,7 @@ async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="samp
         sampling temperature to use to obtain multiple variable values
     """
     model = dc.model(**kwargs)
+    kwargs.update({"temperature": temperature})
 
     # keep track of active beams and finished sequences
     variable_done = dc.seqs([dc.seq(prompt_ids)])

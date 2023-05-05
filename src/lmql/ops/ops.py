@@ -755,79 +755,55 @@ class StopAtOp(Node):
     def variable(self):
         return self.predecessors[0]
 
-    async def stopping_phrase_tokenized(self, tokenizer):
-        if tokenizer in self._tokenized_stopping_phrase_cache:
-            return self._tokenized_stopping_phrase_cache[tokenizer]
-        else:
-            result = (await tokenizer(self.stopping_phrase))
-            self._tokenized_stopping_phrase_cache[tokenizer] = result
-            return result
-
     def forward(self, *args, final, **kwargs):
-        if any([a is None for a in args]): return None
-
-        if all([a == "fin" for a in final]):
-            return True
-
-        op1, op1_diff = args[0]
-        op2 = args[1]
-
-        if op1 is None: return
-        if op1_diff is None: op1_diff = ""
-
-        matched_phrase_index = op1.rfind(op2)
-        op2_in_op1 = matched_phrase_index != -1 and matched_phrase_index + len(op2) > len(op1) - len(op1_diff)
-
-        return not op2_in_op1 or op1.endswith(op2)
+        return True
 
     def follow(self, *args, previous_result=None, **kwargs):
-        if any([a is None for a in args]): 
-            return None
-
-        op1, op1_diff = args[0]
-        if op1 is None: return None
-        if op1_diff is None: op1_diff = ""
-
-        op1 = strip_next_token(op1)
-        op2 = args[1]
-
-        matched_phrase_index = op1.rfind(op2)
-        op2_in_op1 = matched_phrase_index != -1 and matched_phrase_index + len(op2) > len(op1) - len(op1_diff)
-
-        if not op2_in_op1: return fmap(("*", True))
-
-        ends_with_stopping_phrase = op1.endswith(op2)
-
-        if op1 != args[0][0] and ends_with_stopping_phrase:
-            # print("StopAtOp.follow()", [op1], [op2], valid)
-            ends_with_stopping_phrase = False
-        if len(op1) == 0:
-            ends_with_stopping_phrase = True
-        
-        return fmap(("*", ends_with_stopping_phrase))
+        return fmap(("*", True))
 
     def final(self, ops_final, operands, result, **kwargs):
-        if result: 
-            if ops_final[0] == "var":
-                return "var"
-            return "fin"
-        else: # not result
-            if ops_final[0] == "var": 
-                r = "var"
-            elif ops_final[0] == "dec": 
-                r = "var"
-            else: 
-                r = "fin"
-            return r
+        return "var"
+
+    def stop(self, *args, final, **kwargs):
+        if any([a is None for a in args]): return None
+
+        if all([a == "fin" for a in final]): return False
+
+        op1, op1_diff = args[0]
+        op2 = args[1]
+
+        if op1 is None: return False
+        if op1_diff is None: op1_diff = ""
+
+
+        matched_phrase_index = op1.rfind(op2)
+        match_only_with_diff = op2 in op1 and matched_phrase_index >= len(op1) - len(op1_diff)
+
+        return match_only_with_diff or op1.endswith(op2)
+
+    def stopping_phrase(self, trace):
+        if type(self.predecessors[1]) is Node:
+            return trace[self.predecessors[1]]
+        return self.predecessors[1]
 
     def postprocess_var(self, var_name):
         return var_name == self.predecessors[0].name
 
     def postprocess(self, operands, value):
-        op2 = operands[1]
-        matched_phrase_index = value.rfind(op2)
+        if value != operands[0][0]:
+            return value
+        value_diff: str = operands[0][1]
+        stopping_phrase = operands[1]
+
+        # find earliest match of stopping phrase in value_diff
+        matched_phrase_index = value.rfind(stopping_phrase)
+        next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+        while next_matched_phrase_index != -1 and next_matched_phrase_index >= len(value) - len(value_diff):
+            matched_phrase_index = next_matched_phrase_index
+            next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+
         if matched_phrase_index != -1:
-            value = value[:matched_phrase_index + len(op2)]
+            value = value[:matched_phrase_index + len(stopping_phrase)]
 
         return postprocessed_rewrite(value), postprocessed_value(value)
     
@@ -854,8 +830,17 @@ class StopAtOp(Node):
 @LMQLOp(["STOPS_BEFORE", "stops_before"])
 class StopBeforeOp(StopAtOp):
     def postprocess(self, operands, value):
-        op2 = operands[1]
-        matched_phrase_index = value.find(op2)
+        value: str = operands[0][0]
+        value_diff: str = operands[0][1]
+        stopping_phrase = operands[1]
+
+        # find earliest match of stopping phrase in value_diff
+        matched_phrase_index = value.rfind(stopping_phrase)
+        next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+        while next_matched_phrase_index != -1 and next_matched_phrase_index >= len(value) - len(value_diff):
+            matched_phrase_index = next_matched_phrase_index
+            next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+
         if matched_phrase_index != -1:
             value = value[:matched_phrase_index]
 
@@ -897,29 +882,168 @@ class OpaqueLambdaOp(Node):
         return fmap(
             ("*", fct(*args))
         )
-    
-def execute_op_stops_at_only(op: Node, result=None):
+def execute_op_stops_at_only(variable: str, op: Node, trace, result=None, sidecondition=None):
     """
     Evaluates a Node and returns the list of defined StopAtOps for the query.
     """
-    if result is None: result = []
+    is_root_call = result is None and sidecondition is None
+    
+    if result is None: 
+        result = []
+    if sidecondition is None: 
+        sidecondition = []
 
-    if type(op) is StopBeforeOp:
-        result.append(op)
+    if isinstance(op, StopAtOp):
+        if op.predecessors[0].name == variable:
+            result.append((op, sidecondition.copy()))
     elif type(op) is AndOp:
+        non_stop_ops = [o for o in op.predecessors if not isinstance(o, StopAtOp)]
         for p in op.predecessors:
-            execute_op_stops_at_only(p, result=result)
+            execute_op_stops_at_only(variable, p, trace=trace, result=result, sidecondition=sidecondition + non_stop_ops)
     elif type(op) is OrOp:
-        subresults = []
         for p in op.predecessors:
-            subresult = []
-            execute_op_stops_at_only(p, result=subresult)
-            subresults.append(subresult)
-        # intersect subresults
-        result += list(set.intersection(*[set(r) for r in subresults]))
-
+            execute_op_stops_at_only(variable, p, trace=trace, result=result, sidecondition=sidecondition)
+    elif type(op) is NotOp:
+        negated_stop_ops = []
+        execute_op_stops_at_only(variable, op.predecessors[0], trace=trace, result=negated_stop_ops)
+        assert len(negated_stop_ops) == 0, "error: nesting stopping operators with 'not' expressions is not supported"
     else:
         # other ops are no-ops from a STOPS_AT perspective (cannot contain additional STOPS_AT ops)
         # TODO: what about not
         return []
+    
+    if is_root_call:
+        # only return stop ops whose sidecondition are all satisfied
+        result = [sp for sp, sc in result if all(trace[p][0] is None or trace[p][0] for p in sc)]
+    
     return result
+
+def execute_postprocess(op: Node, var_name: str, value: str, context=None):
+    """
+    Applies any postprocess() operations of the provided constraints
+    to the specified variable and value.
+
+    Returns a tuple of (postprocessed_value, rewritten_prompt)
+    """
+    if op is None: return value, value
+
+    root_op = op
+    nodes = [op]
+
+    trace = {}
+    expr_value = execute_op(op, trace=trace, context=context, return_final=False)
+    
+    postprocessors = []
+
+    # collect and sort set of postprocessing operations
+    while len(nodes) > 0:
+        op = nodes.pop()
+        nodes += [p for p in op.predecessors if isinstance(p, Node)]
+
+        if op.postprocess_var(var_name):
+            # compute operation inputs
+            inputs = op.execute_predecessors(trace, context)
+            # determine insertion index in postprocessors
+            i = 0
+            while i < len(postprocessors):
+                current_op, current_op_inputs = postprocessors[i]
+                relative_order = op.postprocess_order(current_op, operands=inputs, other_inputs=current_op_inputs)
+                if relative_order == "before":
+                    break
+                elif relative_order == "after":
+                    i += 1
+                else:
+                    assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
+            postprocessors.insert(i, (op, inputs))
+
+    # filter out stopping conditions as postprocessors that were not actually triggered (due to unfulfilled sideconditions)
+    stopping_conditions: List[StopAtOp] = execute_op_stops_at_only(var_name, root_op, trace)
+    postprocessors = [p for p in postprocessors if not isinstance(p[0], StopAtOp) or p[0] in stopping_conditions]
+
+    rewritten_value = None
+    rewritten_prompt = value
+
+    # apply postprocessing operations
+    for pop in postprocessors:
+        pop, inputs = pop # unpack to get op and inputs
+        result = pop.postprocess(inputs, rewritten_prompt)
+
+        if result is not None:
+            if type(result) is tuple:
+                for v in result:
+                    if type(v) is postprocessed_value:
+                        rewritten_value = v.value
+                    elif type(v) is postprocessed_rewrite:
+                        rewritten_prompt = v.rewrite
+                    else:
+                        assert False, "Invalid postprocess() return value: {} for {}".format(v, op)
+            else:
+                rewritten_value = result
+    
+    if rewritten_prompt is None:
+        rewritten_prompt = str(value)
+    if rewritten_value is None:
+        rewritten_value = value
+    
+    return rewritten_value, rewritten_prompt
+
+def execute_op(op: Node, trace=None, context=None, return_final=False, semantics="forward"):
+    # for constant dependencies, just return their value
+    if not is_node(op): 
+        return op
+    
+    # only evaluate each operation once
+    if op in trace.keys(): 
+        return trace[op][0]
+    
+    # compute predecessor values
+    inputs = op.execute_predecessors(trace, context)
+    
+    if op.depends_on_context: 
+        inputs += (context,)
+
+    inputs_final = derive_predecessor_final(op, trace)
+    semantics_fct = op.__getattribute__(semantics)
+    result = semantics_fct(*inputs, final=inputs_final)
+    is_final = derive_final(op, trace, context, result)
+    
+    if trace is not None: 
+        trace[op] = (result, is_final)
+
+    if return_final:
+        return result, is_final
+
+    return result
+
+def digest(expr, context, follow_context, no_follow=False):
+    if expr is None: return True, "fin", {}, {}
+
+    trace = {}
+    follow_trace = {}
+    expr_value, is_final = execute_op(expr, trace=trace, context=context, return_final=True)
+
+    if no_follow:
+        return expr_value, is_final, trace, follow_trace
+
+    for op, value in trace.items():
+        # determine follow map of predecessors
+        if len(op.predecessors) == 0: 
+            # empty argtuple translates to no follow input
+            intm = all_fmap((ArgTuple(), ["fin"])) 
+        else:
+            # use * -> value, for constant value predecessor nodes
+            def follow_map(p):
+                if is_node(p): return follow_trace[p]
+                else: return fmap(("*", (p, ("fin",))))
+            intm = fmap_product(*[follow_map(p) for p in op.predecessors])
+        
+        # apply follow map
+        op_follow_map = follow_apply(intm, op, value, context=follow_context)
+
+        # name = op.__class__.__name__
+        # print(name, value)
+        # print("follow({}) = {}".format(name, op_follow_map))
+
+        follow_trace[op] = op_follow_map
+    
+    return expr_value, is_final, trace, follow_trace
