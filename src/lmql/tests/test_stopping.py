@@ -106,4 +106,28 @@ async def test_double_stop_rewrite_space():
         STOPS_AT(OUTPUT, " ") and STOPS_AT(OUTPUT, "re")
     '''
 
+@lmql.query
+async def test_stop_should_not_postprocess_if_sc_not_satisfied():
+    '''lmql
+    argmax 
+        "A good movie review:[REVIEW] "
+        assert REVIEW.endswith("sad"), "Expected REVIEW to end with sad, but was " + str([REVIEW])
+    from 
+        "openai/text-ada-001" 
+    where
+        len(TOKENS(REVIEW)) > 10 and STOPS_AT(REVIEW, "sad") and STOPS_AT(REVIEW, "Fault")
+    '''
+
+@lmql.query
+async def test_stop_before_should_not_postprocess_if_sc_not_satisfied():
+    '''lmql
+    argmax 
+        "A good movie review:[REVIEW] "
+        assert REVIEW.endswith("sad"), "Expected REVIEW to end with sad, but was " + str([REVIEW])
+    from 
+        "openai/text-ada-001" 
+    where
+        len(TOKENS(REVIEW)) > 10 and STOPS_AT(REVIEW, "sad") and STOPS_BEFORE(REVIEW, "Fault")
+    '''
+
 run_all_tests(globals())

@@ -913,6 +913,9 @@ class StopAtOp(Node):
             matched_phrase_index = next_matched_phrase_index
             next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
 
+        if matched_phrase_index + len(stopping_phrase) <= len(value) - len(value_diff):
+            return None
+
         if matched_phrase_index != -1:
             value = value[:matched_phrase_index + len(stopping_phrase)]
 
@@ -951,6 +954,9 @@ class StopBeforeOp(StopAtOp):
         while next_matched_phrase_index != -1 and next_matched_phrase_index >= len(value) - len(value_diff):
             matched_phrase_index = next_matched_phrase_index
             next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+
+        if matched_phrase_index + len(stopping_phrase) <= len(value) - len(value_diff):
+            return None
 
         if matched_phrase_index != -1:
             value = value[:matched_phrase_index]
