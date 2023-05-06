@@ -643,9 +643,6 @@ class PromptInterpreter:
                 state = await self.advance(state)
             reached_end = state.query_head.result is not None
 
-            if self.context is None:
-                print("PARENT advanced to", [state.prompt])
-
             if reached_end:
                 # make sure to store latest interpreter state in rewritten sequence when query is finished
                 seq.user_data = self.interpreter_state_user_data(state)
