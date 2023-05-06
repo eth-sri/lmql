@@ -1,11 +1,8 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
 name: Browser Build & Web Deploy
 
 on:
   push:
-    branches: [ "main", "updated-web"]
+    branches: [ "main", "next"]
 
 jobs:
   build:
@@ -39,9 +36,35 @@ jobs:
         path: docs/build/html/
     - name: Build web/ and In-Browser LMQL Distribution
       run: cd web && bash deploy.sh
-    
+
+  deploy-main:
+    name: Deploy Main Playground 
+    runs-on: ubuntu-latest
+    needs: [build]
+    if:
+      contains('
+        refs/heads/main
+      ', github.ref)
+    steps:
     - name: Deploy to web branch
       uses: JamesIves/github-pages-deploy-action@v4
       with:
         folder: web-deploy
         branch: web
+
+  deploy-next:
+    name: Deploy Next Playground
+    runs-on: ubuntu-latest
+    needs: [build]
+    if:
+      contains('
+        refs/heads/next
+      ', github.ref)
+    steps:
+    - name: Deploy to web branch
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        folder: web-deploy
+        branch: web-next
+
+
