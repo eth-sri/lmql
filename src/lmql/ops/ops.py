@@ -77,6 +77,8 @@ def DynamicTypeDispatch(name, type_map):
             if self.delegate is not None:
                 return self.delegate
 
+            assert all(a is not None for a in args), "Cannot dispatch to handler with None arguments: {}".format(args)
+
             for signature, op in type_map:
                 # fallback implementation
                 if signature == "*": 
@@ -96,12 +98,18 @@ def DynamicTypeDispatch(name, type_map):
             raise NotImplementedError("error: no matching implemntation of {} for arguments of type {}".format(name, [type(arg) for arg in args]))
 
         def forward(self, *args, **kwargs):
+            if any(a is None for a in args):
+                return None
             return self.get_handler(args).forward(*args, **kwargs)
         
         def follow(self, *args, **kwargs):
+            if any(a is None for a in args):
+                return None
             return self.get_handler(args).follow(*args, **kwargs)
         
         def final(self, *args, **kwargs):
+            if any(a is None for a in kwargs.get("operands")):
+                return None
             return self.get_handler(kwargs.get("operands")).final(*args, **kwargs)
         
         def __str__(self):
@@ -515,18 +523,18 @@ class EqOpInt(Node):
         op2f = operand_final[1]
         op2 = operands[1]
 
-        if op1f == "fin" and op1 < op2 and op2f != "var":
+        if op1f == "fin" and op1 <= op2 and (op2f in ["fin", "inc"]):
             return "fin"
-        if op2f == "fin" and op2 <= op1 and op1f != "var":
+        if op2f == "fin" and op2 <= op1 and (op1f in ["fin", "inc"]):
             return "fin"
 
         # default behavior
         if all([a == "fin" for a in operand_final]):
             return "fin"
+        
         return "var"
 
 EqOp = DynamicTypeDispatch("EqOp", (
-    ((int, int), EqOpInt),
     ((int, int), EqOpInt),
     ("*", EqOpGeneric),
 ))
