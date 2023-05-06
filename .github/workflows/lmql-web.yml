@@ -35,7 +35,11 @@ jobs:
         name: DocumentationHTML
         path: docs/build/html/
     - name: Build web/ and In-Browser LMQL Distribution
-      run: cd web && bash deploy.sh
+      run: cd web && bash deploy.sh    
+    - uses: actions/upload-artifact@master
+      with:
+        name: lmql-web-payload
+        path: web-deploy
 
   deploy-main:
     name: Deploy Main Playground 
@@ -46,6 +50,11 @@ jobs:
         refs/heads/main
       ', github.ref)
     steps:
+    - uses: actions/checkout@master
+    - uses: actions/download-artifact@master
+      with:
+        name: lmql-web-payload
+        path: web-deploy
     - name: Deploy to web branch
       uses: JamesIves/github-pages-deploy-action@v4
       with:
@@ -61,6 +70,11 @@ jobs:
         refs/heads/next
       ', github.ref)
     steps:
+    - uses: actions/checkout@master
+    - uses: actions/download-artifact@master
+      with:
+        name: lmql-web-payload
+        path: web-deploy
     - name: Deploy to web branch
       uses: JamesIves/github-pages-deploy-action@v4
       with:
