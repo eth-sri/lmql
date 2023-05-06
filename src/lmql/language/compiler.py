@@ -1,4 +1,4 @@
-from _ast import AsyncFunctionDef, ClassDef, FunctionDef, Import, ImportFrom
+from _ast import AsyncFunctionDef, Await, Call, ClassDef, FunctionDef, Import, ImportFrom
 import ast
 import sys
 from typing import Any
@@ -180,7 +180,24 @@ class PromptScope(ast.NodeVisitor):
         
         return True
 
-class QueryStringTransformation(ast.NodeTransformer):
+class FunctionCallTransformation(ast.NodeTransformer):
+    """
+    Translates function calls into lmql.call calls (to enable automatic await and unpacking 
+    when calling subqueries).
+    """
+    def visit_Await(self, node: Await) -> Any:
+        super().generic_visit(node)
+
+        if type(node.value) is ast.Await:
+            return node.value
+        return node.value
+
+    def visit_Call(self, node: Call) -> Any:
+        wrapped = Call(ast.parse("lmql.runtime_support.call"), [node.func, *node.args], node.keywords)
+        wrapped = ast.Await(wrapped)
+        return wrapped
+
+class QueryStringTransformation(FunctionCallTransformation):
     """
     Transformes string expressions on statement level to model queries.
     """
@@ -197,7 +214,7 @@ class QueryStringTransformation(ast.NodeTransformer):
         else:
             self.generic_visit(expr)
         return expr
-    
+
     # translate id access to context
     def visit_Name(self, node: ast.Name):
         name = str(node.id)
@@ -229,13 +246,18 @@ class QueryStringTransformation(ast.NodeTransformer):
 
         if len(compiled_qstring) == 0:
             return constant
+        
+        qstring_as_fstring: ast.JoinedStr = ast.parse(f'f"""{compiled_qstring}"""').body[0].value
+        function_call_transformer = FunctionCallTransformation()
+        qstring_as_fstring.values = [function_call_transformer.visit(v) for v in qstring_as_fstring.values]
 
         # result_code = f'yield context.query(f"""{compiled_qstring}""")'
-        result_code = interrupt_call('query', f'f"""{compiled_qstring}"""')
+        result_code = interrupt_call('query', ast.unparse(qstring_as_fstring))
 
         for v in declared_template_vars:
             get_var_call = yield_call('get_var', f'"{v}"')
             result_code += f"\n{v} = " + get_var_call
+        
         return ast.parse(result_code)
 
     # def transform_prompt_stmt(self, stmt):
@@ -601,7 +623,10 @@ class LMQLCompiler:
             lmql_code = preprocess_text(contents)
             buf = StringIO(lmql_code)
             parser = LanguageFragmentParser()
-            q = parser.parse(buf.readline)
+            try:
+                q = parser.parse(buf.readline)
+            except IndentationError as e:
+                raise RuntimeError("parsing error: {}.\nFailed when parsing:\n {}".format(e, lmql_code))
 
             # output file path
             basename = os.path.basename(filepath).split(".lmql")[0]

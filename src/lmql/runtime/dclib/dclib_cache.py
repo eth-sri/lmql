@@ -72,7 +72,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             else:
                 cache = {}
             cache[str(self.initial_prompt_ids)] = self.cache
-            cache["model"] = self.cache["model"]
+            cache["model"] = self.cache.get("model", self.delegate.model_identifier)
             with open(self.cache_file, "wb") as f:
                 pickle.dump(cache, f)
     

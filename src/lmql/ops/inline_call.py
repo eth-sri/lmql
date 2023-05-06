@@ -29,6 +29,16 @@ class InlineCallOp(Node):
             for argname, arg in zip(fct.function_context.argnames, self.args):
                 self.captures[argname] = arg
 
+        # try to resolve remaining arguments from the function context if available
+        for arg in fct.args:
+            if not arg in self.captures.keys() and self.query_fct.function_context is not None:
+                symbol = self.query_fct.function_context.scope.resolve(arg)
+                if symbol is not None:
+                    self.captures[arg] = symbol
+
+        for arg in fct.args:
+            assert arg in self.captures.keys(), "failed to resolve in-context function argument " + str(arg) + " from the local/global scope of the calling query.\n"
+
     def execute_predecessors(self, trace, context):
         return super().execute_predecessors(trace, context) + [context]
 

@@ -43,7 +43,7 @@ class BaseOutputWriter:
                 The current program state (lmql.runtime.program_state). E.g. program_variables.variable_values is a mapping of variable names to their current values.
         """
         pass
-    
+
     def add_compiler_output(self, code): 
         pass
 

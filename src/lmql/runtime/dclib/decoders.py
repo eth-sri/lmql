@@ -564,3 +564,6 @@ async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="samp
 def is_seq_beams_search_done(active_hypotheses, done_hypotheses, num_beams, scorer=None):
     return len(active_hypotheses) == 0 or (len(done_hypotheses) == num_beams and dc.max_score(active_hypotheses, scorer=scorer) < dc.min_score(done_hypotheses, scorer=scorer))
 
+@dc.decoder
+def incontext(*args, **kwargs):
+    raise NotImplementedError("incontext is not a valid decoder function for standalone use")

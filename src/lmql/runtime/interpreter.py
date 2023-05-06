@@ -27,7 +27,8 @@ class _DCLibDebugPrinter: pass
 _DCLibDebugPrinter.printer = None
 
 def set_dclib_debug_printer(printer):
-    _DCLibDebugPrinter.printer = printer
+    if hasattr(printer, "add_decoder_state"):
+        _DCLibDebugPrinter.printer = printer
 
 emoji_mapping = {}
 
@@ -166,6 +167,9 @@ class PromptInterpreter:
     """
 
     def __init__(self, context=None, force_model=None) -> None:
+        if PromptInterpreter.main is None:
+            PromptInterpreter.main = self
+        
         # model-specific components
         self.model = force_model
         self.model_identifier = force_model
@@ -206,6 +210,9 @@ class PromptInterpreter:
         # subinterpreters in case of inline queries
         self.subinterpreters = {}
 
+        # decoder graph if decoder graph logging is enabled
+        self.decoder_graph = None
+
         # context to determine model
         self.context = context
 
@@ -245,6 +252,9 @@ class PromptInterpreter:
         if state.variable is not None:
             return state
         
+        active_decoder_graph = dc.DecoderSequence.graph
+        dc.DecoderSequence.graph = None
+        
         variable = state.variable
         stmt_buffer = state.stmt_buffer
         prompt = state.prompt
@@ -269,6 +279,8 @@ class PromptInterpreter:
             # return context used for last continue_
             return query_head.context
         
+        # disable DecoderSequence.graph for the duration of executing the prompt
+
         try:
             while variable is None and query_head.result is None:
                 if len(stmt_buffer) == 0 and variable is None:
@@ -306,6 +318,11 @@ class PromptInterpreter:
                     assert False, "prompt interpreter encountered unsupported prompt stmt of type {}: {}".format(type(s), s)
         except InterpretationHeadDone:
             pass
+
+        # re-enable DecoderSequence.graph
+        dc.DecoderSequence.graph = active_decoder_graph
+        if self.output_writer is not None:
+            self.output_writer.disable = False
 
         # merge named tuple with new stmt_buffer
 
@@ -780,6 +797,7 @@ class PromptInterpreter:
             if hasattr(_DCLibDebugPrinter.printer, "records_graph"):
                 if _DCLibDebugPrinter.printer.records_graph:
                     dc.set_record_graph()
+                    self.decoder_graph = dc.DecoderSequence.graph
 
         mode = decoder_args["decoder"].lower()
         decoder_fct = dc.get_decoder(mode)
@@ -822,6 +840,8 @@ class PromptInterpreter:
         step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
         
         async def debug_out(decoder_step):
+            if PromptInterpreter.main != self:
+                return
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
                 data = await dc.DecoderSequence.graph.json(diff=True)
                 data = replace_inf_nan_with_str(data)
@@ -1005,6 +1025,8 @@ class UserDataLayer:
         #     self.mappings[s.id] = s.user_data
         #     s.user_data = self.prev_mappings.get(s.id)
         pass
+
+PromptInterpreter.main = None
 
 class SubInterpreter(PromptInterpreter):
     def __init__(self, fct, parent_interpreter: PromptInterpreter, captures: Dict[str, Any]):

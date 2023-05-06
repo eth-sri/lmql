@@ -197,3 +197,15 @@ def compiled_query(output_variables=None, group_by=None):
                                  scope=LMQLInputVariableScope(fct, calling_frame))
     return func_transformer
     
+
+async def call(fct, *args, **kwargs):
+    if type(fct) is LMQLQueryFunction:
+        result = await fct(*args, **kwargs)
+        if len(result) == 1: 
+            return result[0]
+        else: 
+            return result
+    if inspect.iscoroutinefunction(fct):
+        return await fct(*args, **kwargs)
+    else:
+        return fct(*args, **kwargs)

@@ -217,7 +217,7 @@ class LanguageFragmentParser:
         if self.state == "start":
             if tok.type == tokenize.NAME:
                 # for constraints you cannot specify parameters, and we directly switch to the prompt parsing state
-                if tok.string.lower() == "strategy":
+                if tok.string.lower() == "incontext":
                     self.query.decode_str += [tok]
                     self.state = "prompt"
                     return

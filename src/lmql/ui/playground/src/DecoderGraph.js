@@ -177,7 +177,6 @@ function layoutDecoderGraph(cy) {
 
             // console.log("data", node.data())
             depth = parseInt(node.data("seq_id").substr(2))
-            console.log("depth", depth)
 
             if (depth >= mostLikelyDepth) {
                 if (depth > mostLikelyDepth) {
@@ -408,6 +407,7 @@ export function DecoderGraph(props) {
 
     const derivedNodeFeatures = props.derivedNodeFeatures || (() => {})
 
+    const [graphId, setGraphId] = useState(null);
     const [cyData, setCyData] = useState(null);
     const [rawGraphData, setRawGraphData] = useState(null);
     const cyRef = useRef(null)
