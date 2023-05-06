@@ -102,7 +102,7 @@ async def chat_api(**kwargs):
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
 
-    assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
+    assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints: " + str(kwargs["logit_bias"])
         
 
     # transform prompt into chat API format

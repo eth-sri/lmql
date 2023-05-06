@@ -163,69 +163,7 @@ def derive_final(op, trace, context, result):
     
     return op.final(predecessor_final, *context_arg, operands=predecessor_values, result=result)
 
-def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context=None):
-    """
-    Applies any postprocess() operations of the provided constraints
-    to the specified variable and value.
-
-    Returns a tuple of (postprocessed_value, rewritten_prompt)
-    """
-    if op is None: return value, value
-
-    nodes = [op]
-
-    trace = {}
-    postprocessors = []
-
-    # collect and sort set of postprocessing operations
-    while len(nodes) > 0:
-        op = nodes.pop()
-        nodes += [p for p in op.predecessors if isinstance(p, Node)]
-
-        if op.postprocess_var(var_name):
-            # compute operation inputs
-            inputs = op.execute_predecessors(trace, context)
-            # determine insertion index in postprocessors
-            i = 0
-            while i < len(postprocessors):
-                current_op, current_op_inputs = postprocessors[i]
-                relative_order = op.postprocess_order(current_op, operands=inputs, other_inputs=current_op_inputs)
-                if relative_order == "before":
-                    break
-                elif relative_order == "after":
-                    i += 1
-                else:
-                    assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
-            postprocessors.insert(i, (op, inputs))
-    
-    rewritten_value = None
-    rewritten_prompt = value
-
-    # apply postprocessing operations
-    for pop in postprocessors:
-        pop, inputs = pop # unpack to get op and inputs
-        result = pop.postprocess(inputs, rewritten_prompt)
-
-        if result is not None:
-            if type(result) is tuple:
-                for v in result:
-                    if type(v) is postprocessed_value:
-                        rewritten_value = v.value
-                    elif type(v) is postprocessed_rewrite:
-                        rewritten_prompt = v.rewrite
-                    else:
-                        assert False, "Invalid postprocess() return value: {} for {}".format(v, op)
-            else:
-                rewritten_value = result
-    
-    if rewritten_prompt is None:
-        rewritten_prompt = str(value)
-    if rewritten_value is None:
-        rewritten_value = value
-    
-    return rewritten_value, rewritten_prompt
-
-def execute_op(op: Node, trace=None, context=None, return_final=False):
+def execute_op(op: Node, trace=None, context=None, return_final=False, semantics="forward"):
     # for constant dependencies, just return their value
     if not is_node(op): 
         return op
@@ -241,7 +179,8 @@ def execute_op(op: Node, trace=None, context=None, return_final=False):
         inputs += (context,)
 
     inputs_final = derive_predecessor_final(op, trace)
-    result = op.forward(*inputs, final=inputs_final)
+    semantics_fct = op.__getattribute__(semantics)
+    result = semantics_fct(*inputs, final=inputs_final)
     is_final = derive_final(op, trace, context, result)
     
     if trace is not None: 
@@ -284,7 +223,6 @@ def digest(expr, context, follow_context, no_follow=False):
         follow_trace[op] = op_follow_map
     
     return expr_value, is_final, trace, follow_trace
-
 
 NextToken = "<lmql.next>"
 

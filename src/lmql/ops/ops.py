@@ -6,7 +6,8 @@ from lmql.ops.token_set import *
 from lmql.ops.follow_map import *
 from lmql.ops.node import *
 
-from lmql.ops.subquery_op import SubqueryOp
+from lmql.ops.inline_call import InlineCallOp
+from lmql.ops.booleans import *
 
 lmql_operation_registry = {}
 
@@ -305,13 +306,6 @@ class LenOp(Node):
 
     def final(self, x, operands=None, result=None, **kwargs):
         return x[0]
-
-class NotOp(Node):
-    def forward(self, op, **kwargs):
-        return not op
-
-    def follow(self, v, **kwargs):
-        return not v
 
 class Lt(Node):
     def forward(self, *args, **kwargs):
@@ -628,57 +622,6 @@ InOp = DynamicTypeDispatch("InOp", (
     ("*", InOpStrInSet),
 ))
 
-class OrOp(Node):
-    def forward(self, *args, **kwargs):
-        if any([a == True for a in args]):
-            return True
-        elif all([a == False for a in args]):
-            return False
-        else:
-            return None
-
-    def follow(self, *args, **kwargs):
-        return fmap(
-            ("*", self.forward(*args))
-        )
-
-    def final(self, args, operands=None, result=None, **kwargs):
-        if result:
-            if any(a == "fin" and v == True for a,v in zip(args, operands)):
-                return "fin"
-            return "var"
-        else: # not result
-            if any(a == "var" for a in args):
-                return "var"
-            return "fin"
-
-class AndOp(Node):
-    def forward(self, *args, **kwargs):
-        if type(args[0]) is tuple and len(args) == 1:
-            args = args[0]
-
-        if any([a == False for a in args]):
-            return False
-        elif any([a is None for a in args]):
-            return None
-        else:
-            return all([a for a in args])
-
-    def follow(self, *v, **kwargs):
-        return fmap(
-            ("*", self.forward(*v))
-        )
-
-    def final(self, args, operands=None, result=None, **kwargs):
-        if result:
-            if all([a == "fin" for a in args]):
-                return "fin"
-            return "var"
-        else: # not result
-            if any([a == "fin" and v == False for a,v in zip(args, operands)]):
-                return "fin"
-            return "var"
-
 def seq_starts_with(seq1, seq2):
     num_matching = sum([1 if i1 == i2 else 0 for i1,i2 in zip(seq1, seq2)])
     return num_matching == len(seq2)
@@ -802,6 +745,9 @@ class StopAtOp(Node):
             matched_phrase_index = next_matched_phrase_index
             next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
 
+        if matched_phrase_index + len(stopping_phrase) <= len(value) - len(value_diff):
+            return None
+
         if matched_phrase_index != -1:
             value = value[:matched_phrase_index + len(stopping_phrase)]
 
@@ -845,18 +791,19 @@ class StopBeforeOp(StopAtOp):
             value = value[:matched_phrase_index]
 
         return postprocessed_rewrite(value), postprocessed_value(value)
-    
-    @property
-    def stopping_phrase(self):
-        return self.predecessors[1]
 
 class CallOp(Node):
-    def __new__(cls, predecessors):
-        fct, args = predecessors
+    def __new__(cls, predecessors, lcls, glbs):
+        fct, *args = predecessors
         if hasattr(fct, "__lmql_query_function__"):
-            return SubqueryOp([fct, *args])
+            return InlineCallOp(predecessors, lcls, glbs)
         
         return super().__new__(cls)
+
+    def __init__(self, predecessors, lcls, glbs):
+        super().__init__(predecessors)
+        
+        self.fct, *self.args = predecessors
 
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
@@ -882,6 +829,7 @@ class OpaqueLambdaOp(Node):
         return fmap(
             ("*", fct(*args))
         )
+
 def execute_op_stops_at_only(variable: str, op: Node, trace, result=None, sidecondition=None):
     """
     Evaluates a Node and returns the list of defined StopAtOps for the query.
@@ -986,64 +934,3 @@ def execute_postprocess(op: Node, var_name: str, value: str, context=None):
         rewritten_value = value
     
     return rewritten_value, rewritten_prompt
-
-def execute_op(op: Node, trace=None, context=None, return_final=False, semantics="forward"):
-    # for constant dependencies, just return their value
-    if not is_node(op): 
-        return op
-    
-    # only evaluate each operation once
-    if op in trace.keys(): 
-        return trace[op][0]
-    
-    # compute predecessor values
-    inputs = op.execute_predecessors(trace, context)
-    
-    if op.depends_on_context: 
-        inputs += (context,)
-
-    inputs_final = derive_predecessor_final(op, trace)
-    semantics_fct = op.__getattribute__(semantics)
-    result = semantics_fct(*inputs, final=inputs_final)
-    is_final = derive_final(op, trace, context, result)
-    
-    if trace is not None: 
-        trace[op] = (result, is_final)
-
-    if return_final:
-        return result, is_final
-
-    return result
-
-def digest(expr, context, follow_context, no_follow=False):
-    if expr is None: return True, "fin", {}, {}
-
-    trace = {}
-    follow_trace = {}
-    expr_value, is_final = execute_op(expr, trace=trace, context=context, return_final=True)
-
-    if no_follow:
-        return expr_value, is_final, trace, follow_trace
-
-    for op, value in trace.items():
-        # determine follow map of predecessors
-        if len(op.predecessors) == 0: 
-            # empty argtuple translates to no follow input
-            intm = all_fmap((ArgTuple(), ["fin"])) 
-        else:
-            # use * -> value, for constant value predecessor nodes
-            def follow_map(p):
-                if is_node(p): return follow_trace[p]
-                else: return fmap(("*", (p, ("fin",))))
-            intm = fmap_product(*[follow_map(p) for p in op.predecessors])
-        
-        # apply follow map
-        op_follow_map = follow_apply(intm, op, value, context=follow_context)
-
-        # name = op.__class__.__name__
-        # print(name, value)
-        # print("follow({}) = {}".format(name, op_follow_map))
-
-        follow_trace[op] = op_follow_map
-    
-    return expr_value, is_final, trace, follow_trace

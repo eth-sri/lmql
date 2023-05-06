@@ -31,7 +31,7 @@ class LMQLExpr:
             sequence = sequence.split(" ")
         full_text = ""
 
-        program_variables = ProgramState()
+        program_variables = ProgramState("")
         
         digested = []
         results = []

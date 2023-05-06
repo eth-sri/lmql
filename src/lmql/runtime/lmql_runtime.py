@@ -51,6 +51,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     postprocessors: List[Any]
     scope: Any
 
+    name: str = None
+
     output_writer: Optional[Any] = None
     args: Optional[List[str]] = None
     model: Optional[Any] = None

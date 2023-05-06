@@ -153,6 +153,7 @@ def query(fct):
     
     # set the function context of the query based on the function context of the decorated function
     module.query.function_context = FunctionContext(argnames, args_of_query, scope)
+    module.query.name = fct.__name__
     
     return module.query
 

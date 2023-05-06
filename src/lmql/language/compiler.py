@@ -149,6 +149,8 @@ class PromptScope(ast.NodeVisitor):
         return super().visit_Constant(node)
 
     def exclude_identifier(self, name):
+        if name == "input":
+            return False
         if name in self.free_vars:
             return True
         if name in self.written_vars:
@@ -388,7 +390,7 @@ class WhereClauseTransformation():
             tfunc = self.transform_node(expr.func, snf)
             targs = [self.transform_node(a, snf) for a in expr.args]
             targs_list = ", ".join(targs)
-            return f"{OPS_NAMESPACE}.CallOp([{tfunc}, [{targs_list}]])"
+            return f"{OPS_NAMESPACE}.CallOp([{tfunc}, [{targs_list}]], locals(), globals())"
         elif type(expr) is ast.List:
             return self.default_transform_node(expr, snf).strip()
 

@@ -347,9 +347,11 @@ class DecoderSequence:
         ids = ", ".join([str(i) for i in self.input_ids[-10:]])
         return f"<seq token_len={len(self.input_ids)} ids=[... {ids}]>"
 
-    async def text(self, offset:int=None, limit:int=None, pretty=True) -> str:
+    async def text(self, offset:int=None, limit:int=None, pretty=False) -> str:
         offset = offset or 0
         limit = limit or len(self.input_ids)
+        # if offset <= len(self.input_ids): print(f"warning: DecoderSequence.text() offset out of bounds (offset: {offset}, len: {len(self.input_ids)})")
+
         raw_text = await get_tokenizer().decode(self.input_ids[offset:limit])
         if not pretty: 
             return raw_text
@@ -603,6 +605,10 @@ class DeterministicDecoderSequence(DecoderSequence):
                 print("warning: a deterministic token scored below the truncation threshold ({})".format(DecoderSequence.truncation_threshold))
         
         return Continuation(predetermined_token, score, user_data)
+    
+    def __str__(self) -> str:
+        ids = ", ".join([str(i) for i in self.input_ids[-10:]])
+        return f"<detseq token_len={len(self.input_ids)} ids=[... {ids}] next_ids=[{self.next_ids[:10]}]>"
 
 def is_deterministic(s):
     return issubclass(type(s), DeterministicDecoderSequence)
