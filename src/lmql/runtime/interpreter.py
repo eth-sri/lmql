@@ -512,6 +512,9 @@ class PromptInterpreter:
         if return_follow_map:
             return mask, follow_map, self.interpreter_state_user_data(state)
 
+        # truncate mask to remove LMQL specific token IDs
+        logit_mask = self.tokenizer.truncate_to_model_dim(logit_mask)
+
         # no mask, no logits processing
         if logit_mask is None:
             return None, None, self.interpreter_state_user_data(state)

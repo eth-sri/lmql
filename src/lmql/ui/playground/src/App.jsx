@@ -749,14 +749,24 @@ const ModelResultText = styled.div`
 
   &.chat-mode .variable.eos {
     display: inline;
-    margin: 0pt;
-    position: relative;
-    left: calc(50% - 15pt);
-    top: 10pt;
     opacity: 0.5;
+    text-align: center;
+  }
+
+  div .tag-system:after {
+    content: "System";
+    position: absolute;
+    right: 5pt;
+    top: 0pt;
+    font-size: 8pt;
+    text-transform: uppercase;
   }
 
   div .tag-system {
+    display: block;
+    background-color: #ffffff1f !important;
+    margin: 4pt 0pt;
+    position: relative;
   }
 
   div .tag-assistant {
