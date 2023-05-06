@@ -153,6 +153,7 @@ def query(fct):
     
     # set the function context of the query based on the function context of the decorated function
     module.query.function_context = FunctionContext(argnames, args_of_query, scope)
+    module.query.name = fct.__name__
     
     return module.query
 
@@ -163,7 +164,7 @@ async def static_prompt(query_fct, *args, **kwargs):
     res = await query_fct(*args, **kwargs, return_prompt_string=True)
     return res[0]
 
-def main(query_fct):
+def main(query_fct, *args, **kwargs):
     """
     Runs the provided query function in the main thread
     and returns the result.
@@ -171,4 +172,4 @@ def main(query_fct):
     This call is blocking.
     """
     import asyncio
-    return asyncio.run(query_fct())
+    return asyncio.run(query_fct(*args, **kwargs))

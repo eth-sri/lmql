@@ -51,6 +51,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     postprocessors: List[Any]
     scope: Any
 
+    name: str = None
+
     output_writer: Optional[Any] = None
     args: Optional[List[str]] = None
     model: Optional[Any] = None
@@ -59,6 +61,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     is_langchain_use: bool = False
 
     lmql_code: str = None
+
+    __lmql_query_function__ = True
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
         # check for pydantic base class and do kw initialization then
@@ -76,6 +80,9 @@ class LMQLQueryFunction(LMQLChainMixIn):
         self.model = None
         # only set if the query is defined inline of a Python file
         self.function_context = None
+
+    def __hash__(self):
+        return hash(self.fct)
 
     @property
     def input_keys(self) -> List[str]:
@@ -190,3 +197,15 @@ def compiled_query(output_variables=None, group_by=None):
                                  scope=LMQLInputVariableScope(fct, calling_frame))
     return func_transformer
     
+
+async def call(fct, *args, **kwargs):
+    if type(fct) is LMQLQueryFunction:
+        result = await fct(*args, **kwargs)
+        if len(result) == 1: 
+            return result[0]
+        else: 
+            return result
+    if inspect.iscoroutinefunction(fct):
+        return await fct(*args, **kwargs)
+    else:
+        return fct(*args, **kwargs)

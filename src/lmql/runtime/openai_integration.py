@@ -151,8 +151,8 @@ class DclibOpenAiModel(DcModel):
             else:
                 # otherwise we can treat this as a score call
                 return CompletionCall("fixed", masks.mask_get_only_allowed(mask), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
-        elif num_allowed < self.tokenizer.vocab_size:
-            if self.tokenizer.vocab_size - num_allowed > num_allowed:
+        elif num_allowed < self.tokenizer.model_vocab_size:
+            if self.tokenizer.model_vocab_size - num_allowed > num_allowed:
                 # if we have to mask more than half of the tokens, we should just invert the masking
                 invert = True
         else: # num_allowed == mask.shape[-1] (full vocabulary)
@@ -457,7 +457,7 @@ class DclibOpenAiModel(DcModel):
                     next_token_ids.append(np.array([next_token], dtype=np.int64))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
-                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                    full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                     if next_token < len(full_logits):
                         full_logits[next_token] = next_token_score
                     # else: 
@@ -475,10 +475,11 @@ class DclibOpenAiModel(DcModel):
                 prob_tokens = await self.tokenize_list(tokens)
                 token_ids = np.array(prob_tokens, dtype=np.int64).reshape(-1)
 
-                full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
                 full_logits[next_token] = np.finfo(np.float32).min
                 assert kwargs.get("temperature", 1.0) != 0.0 or np.all(full_logits < next_token_score), "next token score is not the highest"
+
 
                 # retroactively apply logits mask to logits
                 mask = completion.logit_mask_or_fixed_id
@@ -554,7 +555,7 @@ class DclibOpenAiModel(DcModel):
                     next_token_ids.append(np.array([next_token], dtype=np.int64))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
-                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                    full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                     full_logits[next_token] = next_token_score
                     logits.append(full_logits)
                     continue
@@ -570,7 +571,7 @@ class DclibOpenAiModel(DcModel):
 
                 assert token_ids[0] == next_token, f"top1 logprob token is not the same as the predicted token {token_ids[0]} (top1) != {next_token} (predicted)"
 
-                full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
 
                 # retroactively apply logits mask to logits

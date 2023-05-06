@@ -1,30 +1,45 @@
-import inspect
 import asyncio
+import inspect
 from collections import namedtuple
-
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple
+from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple, Set
 import numpy as np
-from lmql.runtime.multi_head_interpretation import InterpretationHead, InterpreterCall, InterpretationHeadDone
-from lmql.runtime.program_state import ProgramState
+
+import lmql.ops.ops as ops
 import lmql.runtime.dclib as dc
+from lmql.language.qstrings import (DistributionVariable, TemplateVariable,
+                                    qstring_to_stmts)
+from lmql.ops.follow_map import FollowMap
+from lmql.ops.token_set import VocabularyMatcher, has_tail, tset
+from lmql.ops.follow_map import fmap
+from lmql.runtime.interrupt import interrupt
+from lmql.runtime.model_registry import LMQLModelRegistry
+from lmql.runtime.multi_head_interpretation import (InterpretationHead,
+                                                    InterpretationHeadDone,
+                                                    InterpreterCall)
+from lmql.runtime.program_state import ProgramState
 from lmql.runtime.stats import Stats
 from lmql.runtime.tokenizer import LMQLTokenizer
-from lmql.runtime.interrupt import interrupt
-from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, DistributionVariable
 from lmql.utils.nputil import replace_inf_nan_with_str
 
-from lmql.ops.token_set import VocabularyMatcher, has_tail
-from lmql.runtime.model_registry import LMQLModelRegistry
-
-from lmql.ops.token_set import tset
-import lmql.ops.ops as ops
 
 class _DCLibDebugPrinter: pass
 _DCLibDebugPrinter.printer = None
 
 def set_dclib_debug_printer(printer):
-    _DCLibDebugPrinter.printer = printer
+    if hasattr(printer, "add_decoder_state"):
+        _DCLibDebugPrinter.printer = printer
+
+emoji_mapping = {}
+
+def int_to_emoji(i):
+    global emoji_mapping
+    emojis = ["🛑", "🧠", "🌿", "🏈"]
+    if i in emoji_mapping:
+        return emoji_mapping[i]
+    else:
+        emoji_mapping[i] = emojis[len(emoji_mapping) % len(emojis)]
+        return emoji_mapping[i]
 
 @dataclass
 class RewrittenInputIds:
@@ -32,12 +47,29 @@ class RewrittenInputIds:
     strip_eos: bool = True
     user_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
     value_offset: Optional[int] = None
+    
+    # indicates whether or not this rewrite is a final rewrite (i.e. no further rewrites will be applied if it ends on eos)
+    final: bool = True
 
     rewritten_seq_user_data: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
+
+    @staticmethod
+    def stack(results):
+        return RewrittenInputIds(
+            appended_input_ids=[r.appended_input_ids if r is not None else None for r in results],
+            strip_eos=[r.strip_eos if r is not None else None for r in results],
+            user_data=[r.user_data if r is not None else None for r in results],
+            value_offset=[r.value_offset if r is not None else None for r in results],
+            rewritten_seq_user_data=[r.rewritten_seq_user_data if r is not None else None for r in results],
+            final=[r.final if r is not None else True for r in results]
+        )
 
 class advance: pass # used as symbol
 
 class PromptState(NamedTuple):
+    interpreter: 'PromptInterpreter'
+    subinterpreters: Set['SubInterpreter']
+
     variable : str
     prompt : str
     stmt_buffer : List[Any]
@@ -54,7 +86,7 @@ class PromptState(NamedTuple):
     where: Optional[Any]
 
     def __str__(self):
-        return f"<PromptState '{self.prompt}'>"
+        return f"<PromptState '{self.variable}' '{[self.prompt]}'>"
 
     def updated(self, **updated):
         data_dict = self._asdict()
@@ -62,7 +94,7 @@ class PromptState(NamedTuple):
         return PromptState(**data_dict)
 
 class LMQLContext:
-    def __init__(self, interpreter, state):
+    def __init__(self, interpreter, state, prompt):
         self.interpreter = interpreter
         
         if state:
@@ -70,9 +102,9 @@ class LMQLContext:
             self.state = state
             self.prompt = state.prompt
         else:
-            self.program_state = ProgramState()
+            self.program_state = ProgramState(prompt)
             self.state = None
-            self.prompt = "<prompt not available>"
+            self.prompt = prompt
 
         self.program_state.runtime = interpreter
 
@@ -134,7 +166,10 @@ class PromptInterpreter:
     token masking and scripted interaction during query execution.
     """
 
-    def __init__(self, force_model=None) -> None:
+    def __init__(self, context=None, force_model=None) -> None:
+        if PromptInterpreter.main is None:
+            PromptInterpreter.main = self
+        
         # model-specific components
         self.model = force_model
         self.model_identifier = force_model
@@ -149,7 +184,6 @@ class PromptInterpreter:
         self.extra_kwargs = {}
 
         # query program
-        self.fct = None
         self.root_state = None
 
         # constraints
@@ -162,11 +196,25 @@ class PromptInterpreter:
         # logging and debugger output
         self.output_writer = None
         self.prefers_compact_mask  = False
+        
+        # caching configuration
         self.caching = True
         self.cache_file = None
         self.show_speculative = False
         
+        # key to use to store program statein decoding tree
+        self.user_data_key = "head"
+
         self.eager_followmap_expansion = True
+        
+        # subinterpreters in case of inline queries
+        self.subinterpreters = {}
+
+        # decoder graph if decoder graph logging is enabled
+        self.decoder_graph = None
+
+        # context to determine model
+        self.context = context
 
     def set_where_clause(self, where):
         self.where = where
@@ -182,6 +230,10 @@ class PromptInterpreter:
 
     def set_model(self, model_name):
         if self.model is None:
+            if model_name == "<dynamic>":
+                assert self.context is not None, "error: model is not explicitly specified and can also not be derived from context. Please provide a 'from' clause or set the model in the context of the query execution."
+                model_name = self.context.model_identifier
+
             self.model = model_name
             self.model_identifier = model_name
 
@@ -200,12 +252,12 @@ class PromptInterpreter:
         if state.variable is not None:
             return state
         
+        active_decoder_graph = dc.DecoderSequence.graph
+        dc.DecoderSequence.graph = None
+        
         variable = state.variable
         stmt_buffer = state.stmt_buffer
         prompt = state.prompt
-
-        distribution_variable = None
-        distribution_values = None
 
         query_head = state.query_head
 
@@ -218,7 +270,7 @@ class PromptInterpreter:
             if query_head.current_args is None:
                 query_head = query_head.copy()
                 assert query_head.fresh_copy, "query head must be fresh copy to avoid state sharing side effects"
-                query_head.context = LMQLContext(self, state)
+                query_head.context = LMQLContext(self, state, prompt)
                 await query_head.continue_()
 
             qstring = query_head.current_args[0]
@@ -227,6 +279,8 @@ class PromptInterpreter:
             # return context used for last continue_
             return query_head.context
         
+        # disable DecoderSequence.graph for the duration of executing the prompt
+
         try:
             while variable is None and query_head.result is None:
                 if len(stmt_buffer) == 0 and variable is None:
@@ -256,7 +310,7 @@ class PromptInterpreter:
                     # this will consume the set_distribution call
                 elif s is advance:
                     query_head: InterpretationHead = query_head.copy()
-                    query_head.context = LMQLContext(self, state)
+                    query_head.context = LMQLContext(self, state, prompt)
                     assert query_head.fresh_copy, "query head must be fresh copy to avoid state sharing side effects"
                     await query_head.advance(None)
                     stmt_buffer = stmt_buffer[1:]
@@ -264,6 +318,11 @@ class PromptInterpreter:
                     assert False, "prompt interpreter encountered unsupported prompt stmt of type {}: {}".format(type(s), s)
         except InterpretationHeadDone:
             pass
+
+        # re-enable DecoderSequence.graph
+        dc.DecoderSequence.graph = active_decoder_graph
+        if self.output_writer is not None:
+            self.output_writer.disable = False
 
         # merge named tuple with new stmt_buffer
 
@@ -275,26 +334,28 @@ class PromptInterpreter:
         )
 
     def interpreter_state_user_data(self, state: PromptState):
-        return {"head": state}
+        return {self.user_data_key: state}
 
     def interpreter_state_from_user_data(self, seq, noroot=False):
         if noroot:
-            if seq.data("head") is None:
+            if seq.data(self.user_data_key) is None:
                 return None
-        state_dict = seq.data("head")
+        state_dict = seq.data(self.user_data_key)
         if state_dict is None and not noroot:
             return self.root_state
+        assert state_dict.interpreter is self, "error: interpreter state does not belong to this interpreter, {} vs. {} via {}".format(state_dict.interpreter, self, self.user_data_key)
+        
         return state_dict
 
-    async def where_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
-        mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, **kwargs)
+    async def where_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, return_follow_map=False, **kwargs):
+        mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, return_follow_map=return_follow_map, **kwargs)
 
         # check for tail and prescore
-        if hasattr(self.dcmodel, "prescore_tokens"):
+        if hasattr(self.dcmodel, "prescore_tokens") and (not type(s) is dc.DeterministicDecoderSequence or len(s.next_ids) == 0):
             if has_tail(mask):
                 tail_tokenized = self.tokenizer(mask.tail)["input_ids"]
                 await self.dcmodel.prescore_tokens(s, tail_tokenized, noscore=kwargs.get("noscore", False))
-        
+
         return logit_mask, state
 
         # eager follow map expansion (w/o) model prediction in between
@@ -344,7 +405,7 @@ class PromptInterpreter:
 
         # return logit_masks[0], states[0]
 
-    async def where_step_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, **kwargs):
+    async def where_step_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, return_follow_map=False, **kwargs):
         state = self.interpreter_state_from_user_data(s)
         
         if not needs_masking:
@@ -369,20 +430,33 @@ class PromptInterpreter:
             logit_mask = mask.mask
             stopping_phrases = {"text": [], "tokenized": []}
             follow_trace = None
+            
+            follow_map = fmap(
+                ("eos", (True, "fin")),
+                ("*", (False, "fin"))
+            )
         elif variable is not None:
+            is_before = ":before" in variable
             if ":before" in variable:
                 variable = variable.split(":before",1)[0]
 
             text = await s.text(variable_offset, pretty=False)
             diff_text = text[len(await s.text(variable_offset, limit=-1, pretty=False)):]
 
+            # run applicable inline ops (sub interpreters)
+            subvalid, subfollow, state = await self.subinterpreter_results(s, variable, text, diff_text, state, is_before, **kwargs)
+
             # current context
             program_state: ProgramState = state.program_state.copy()
             program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc")
+            program_state.subinterpreter_results = subvalid
+            program_state.prompt = state.prompt
 
             # follow context
             follow_program_state: ProgramState = state.program_state.copy()
             follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc")
+            follow_program_state.subinterpreter_results = subfollow
+            follow_program_state.prompt = state.prompt
 
             # digest token with where expr
             valid, is_final, trace, follow_trace = ops.digest(self.where,
@@ -392,7 +466,7 @@ class PromptInterpreter:
 
             # obtain where follow map
             follow_map = follow_trace[self.where] if self.where is not None else None
-            # print(id(self), self.variable, [text], "mask", follow_map)
+
             mask = ops.create_mask(follow_map, valid, is_final)
 
             if mask == "*": 
@@ -407,9 +481,13 @@ class PromptInterpreter:
                 del stop_trace[sc]
                 # check if stopping phrase applies in this step
                 if ops.execute_op(sc, stop_trace, context=program_state, semantics="stop"):
-                    # print("apply stop", sc, [text], [diff_text])
+                    # print(int_to_emoji(id(self)), "apply stopping phrase to", variable, sc.stopping_phrase(trace), "at", [await s.text()])
                     mask = tset("eos")
                     logit_mask = mask.mask
+                    follow_map = fmap(
+                        ("eos", (True, "fin")),
+                        ("*", (False, "fin"))
+                    )
                     trace[sc] = (sc.stopping_phrase(trace), "stopped")
             stopping_phrases = {
                 "text": [sc.stopping_phrase(trace) for sc in stopping_conditions if type(sc) is ops.StopBeforeOp],
@@ -430,6 +508,12 @@ class PromptInterpreter:
                         stopping_phrases=stopping_phrases,
                         where=await self.where_graph_with_trace(trace, follow_trace)
         )
+
+        if return_follow_map:
+            return mask, follow_map, self.interpreter_state_user_data(state)
+
+        # truncate mask to remove LMQL specific token IDs
+        logit_mask = self.tokenizer.truncate_to_model_dim(logit_mask)
 
         # no mask, no logits processing
         if logit_mask is None:
@@ -477,16 +561,60 @@ class PromptInterpreter:
         return TokenMask([r[0] for r in results], [r[1] for r in results])
 
     async def rewrite_for_sequence(self, seq: dc.DecoderSequence, needs_rewrite, assert_no_advance=False):
-        if not needs_rewrite:
+        if not needs_rewrite and not seq.is_done():
             return None
+        
+        # assert len([h for h in seq.user_data.keys() if "head" in h]) <= 2, "at max two heads are allowed in a sequence user_data"
 
         # obtain interpreter state from predecessor node
         state = self.interpreter_state_from_user_data(seq.predecessor, noroot=True)
-        
         assert state is not None, "prompt interpreter state must be set in predecessor node"
+
+        # first check for sub-interpreters
+        subinterpreters: Set[SubInterpreter] = state.subinterpreters.copy()
+        sub_results = []
+        subrewrite_applied = False
+
+        assert len(subinterpreters) <= 1
+
+        user_data = seq.data() or {}
+
+        for si in list(subinterpreters):
+            if si.user_data_key not in seq.predecessor.user_data:
+                subinterpreters.remove(si)
+                continue
+
+            result: RewrittenInputIds = await si.rewrite_for_sequence(seq, needs_rewrite, assert_no_advance=assert_no_advance)
+            # print("sub rewrite result", result)
+            user_data = dc.deepmerge(user_data, result.user_data)
+
+            if result.appended_input_ids is not None or result.strip_eos != False:
+                assert not subrewrite_applied, "subinterpreter must not apply rewrite if another subinterpreter already did"
+
+                # apply rewrite
+                sub_results.append(result)
+
+                # remove subinterpreter if it rewrites to an eos token
+                if result.appended_input_ids is not None and result.appended_input_ids[-1] == self.tokenizer.eos_token_id:
+                    subinterpreters.remove(si)
+                subrewrite_applied = True
+
+        if len(sub_results) > 0:
+            # make sure that changes to 'subinterpreters' are reflected in the state of the parent interpreter 
+            # if a subtinterpreter has been removed
+            state = state.updated(subinterpreters=subinterpreters)
+            sub_results[0].user_data = dc.deepmerge(sub_results[0].user_data, self.interpreter_state_user_data(state))
+            sub_results[0].rewritten_seq_user_data = dc.deepmerge(sub_results[0].rewritten_seq_user_data, self.interpreter_state_user_data(state))
+            
+            assert len(sub_results) == 1, "internal limitation: multiple concurrent subinterpreter rewrites are currently not supported. are you using more than one strategy constraint on the same variable?"
+
+            sub_result = sub_results[0]
+            sub_result.final = False
+            return sub_result
 
         if seq.is_done() and state.variable is not None:
             program_state = state.program_state.copy()
+            program_state.prompt = state.prompt
             variable = state.variable
             
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
@@ -496,12 +624,22 @@ class PromptInterpreter:
             variable_value = text
             # set raw variable value
             program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin")
-            
+
             # apply postprocessing, if constraints specify it
             # - variable_value is the postprocessed, converted value (does not have to be a string)
             # - postprocessed_prompt is the string in the prompt that corresponds to the variable value
             variable_value, postprocessed_prompt = ops.execute_postprocess(self.where, variable, variable_value, context=program_state)
-            
+
+            if type(variable_value) is SubInterpreter:
+                si = variable_value
+                result_state = si.interpreter_state_from_user_data(seq)
+                if result_state.query_head.result is not None:
+                    variable_value = result_state.query_head.result
+                    if type(variable_value) is LMQLResult:
+                        postprocessed_prompt = variable_value.prompt
+                    else:
+                        postprocessed_prompt = str(result_state.query_head.result)
+
             # set postprocessed variable value and program value
             program_state.set(variable, postprocessed_prompt, program_value=variable_value, scores=(), diff="", montonicity="fin")
 
@@ -520,10 +658,15 @@ class PromptInterpreter:
             assert not assert_no_advance, f"error: prompt interpreter tried to advance query program even though assert_no_advance was set"
 
             state = state.updated(variable=variable, prompt=prompt, program_state=program_state)
+            
             while state.variable is None and state.query_head.result is None:
                 state = await self.advance(state)
             reached_end = state.query_head.result is not None
-            
+
+            if reached_end:
+                # make sure to store latest interpreter state in rewritten sequence when query is finished
+                seq.user_data = self.interpreter_state_user_data(state)
+
             prompt = state.prompt
 
             # determines part of advanced_head.prompt that was appended by variable or program
@@ -534,6 +677,8 @@ class PromptInterpreter:
             if old_prompt != prompt:
                 n_tokens_to_strip = len(seq.input_ids) - variable_offset
                 value_ids, program_ids = await asyncio.gather(*[self.tokenize(appended_value_prompt), self.tokenize(appended_program_prompt)])
+
+                assert len(seq.input_ids) - n_tokens_to_strip == variable_offset, f"error: variable offset is not correct. expected {len(seq.input_ids) - n_tokens_to_strip} but got {state.variable_offset}"
                 
                 # if query is finished, add eos token to appended IDs (indicates to decoder that this sequence/query has finished decoding)
                 if reached_end:
@@ -547,7 +692,7 @@ class PromptInterpreter:
                 combined_new_ids = seq.input_ids[:-n_tokens_to_strip].tolist() + appended_ids
                 variable_offset = len(combined_new_ids)
 
-                rewritten_state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
+                rewritten_state = state.updated(prompt=prompt, variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(
@@ -566,8 +711,7 @@ class PromptInterpreter:
                     strip_eos=not reached_end, 
                     user_data=self.interpreter_state_user_data(state)
                 )
-        user_data = (seq.data() or {}).copy()
-        user_data["head"] = state
+        user_data[self.user_data_key] = state
         return RewrittenInputIds(appended_input_ids=None, strip_eos=False, user_data=user_data)
 
     async def tokenize(self, *args):
@@ -580,13 +724,7 @@ class PromptInterpreter:
     
     async def rewrite_processor(self, seqs, mask_seq_to_rewrite):
         results = await asyncio.gather(*[self.rewrite_for_sequence(s, needs_rewrite) for s,needs_rewrite in zip(seqs, mask_seq_to_rewrite)])
-        return RewrittenInputIds(
-            appended_input_ids=[r.appended_input_ids if r is not None else None for r in results],
-            strip_eos=[r.strip_eos if r is not None else None for r in results],
-            user_data=[r.user_data if r is not None else None for r in results],
-            value_offset=[r.value_offset if r is not None else None for r in results],
-            rewritten_seq_user_data=[r.rewritten_seq_user_data if r is not None else None for r in results]
-        )
+        return RewrittenInputIds.stack(results)
     
     async def input(self, *args):
         """Uses the output_writer input() implementation if available."""
@@ -596,16 +734,15 @@ class PromptInterpreter:
             return input(*args)
 
     async def run(self, fct, **kwargs):
-        self.fct = fct
-
         # intercept symbol table entry for input
         if "input" in kwargs.keys() and kwargs["input"] == input:
             kwargs["input"] = self.input
 
         # prepare initial program state
-        context = LMQLContext(self, None)
+        context = LMQLContext(self, None, "")
         query_head = InterpretationHead(fct, context, None, kwargs)
-        self.root_state = PromptState(variable=None, prompt="", stmt_buffer=[],
+        self.root_state = PromptState(interpreter=self, subinterpreters={},                          
+            variable=None, prompt="", stmt_buffer=[],
             query_head=query_head, program_state=context.program_state,
             recurring_variable_counter={}, variable_offset=0,
             valid=None, final=None, mask=None, 
@@ -663,6 +800,7 @@ class PromptInterpreter:
             if hasattr(_DCLibDebugPrinter.printer, "records_graph"):
                 if _DCLibDebugPrinter.printer.records_graph:
                     dc.set_record_graph()
+                    self.decoder_graph = dc.DecoderSequence.graph
 
         mode = decoder_args["decoder"].lower()
         decoder_fct = dc.get_decoder(mode)
@@ -705,6 +843,8 @@ class PromptInterpreter:
         step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
         
         async def debug_out(decoder_step):
+            if PromptInterpreter.main != self:
+                return
             if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
                 data = await dc.DecoderSequence.graph.json(diff=True)
                 data = replace_inf_nan_with_str(data)
@@ -767,7 +907,7 @@ class PromptInterpreter:
                     state = await self.advance(state)
                     assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
 
-                    assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
+                    assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             
             # set decoder step +1, for all stats logging that happens in postprocessing
@@ -792,3 +932,141 @@ class PromptInterpreter:
 
     def print_stats(self):
         self.dcmodel.report_stats(self.output_writer, self.decoder_step)
+
+    def subinterpreter(self, identifier, prompt, fct, captures):
+        key = (identifier, prompt)
+
+        if key in self.subinterpreters.keys():
+            return self.subinterpreters[key]
+        else:
+            subinterpreter = SubInterpreter(fct, self, captures)
+            
+            # inherits interpreter attributes from parent
+            subinterpreter.tokenizer = self.tokenizer
+            subinterpreter.dcmodel = self.dcmodel
+            
+            self.subinterpreters[key] = subinterpreter
+            
+            return subinterpreter
+        
+    async def subinterpreter_results(self, s: dc.DecoderSequence, variable, text, diff_text, calling_state, is_before, **kwargs):
+        inline_calls: List[ops.InlineCallOp] = [ic for ic in ops.InlineCallOp.collect(self.where) if ic.variable.name == variable]
+        
+        subfollow = {}
+        subvalid = {}
+        subinterpreters = []
+
+        for ic in inline_calls:
+            si = ic.subinterpreter(self, calling_state.prompt)
+            subinterpreters.append(si)
+            
+            # prepare subinterpreter if this is the first time it is used
+            if si.root_state is None:
+                # print("prepare subinterpreter", int_to_emoji(id(si)), calling_state.variable_offset)
+                await si.prepare(calling_state.variable_offset)
+
+            state = si.interpreter_state_from_user_data(s)
+            # ids so far in subtinterpreter sequence space
+            subinterpreter_prompt = await s.text(offset=si.parent_offset, pretty=False)
+            # check if we need to first add the initial_subprompt_ids
+            if len(si.root_state.prompt) > len(subinterpreter_prompt):
+                remaining_suffix = si.root_state.prompt[len(subinterpreter_prompt):]
+                # mask deterministically to produce si.root_state.prompt
+                mask = ops.tset(remaining_suffix, prefix=True) # gives us first token of si.root_state.prompt + tail with remaining tokens
+
+                s.user_data = dc.deepmerge(s.user_data, si.interpreter_state_user_data(state))
+                s.user_data["set_by"] = "sub-where"
+
+                subvalid[si] = state.valid
+                subfollow[si] = ops.fmap(
+                    (mask, ops.PredeterminedFinal(True, "var")),
+                    ("*", ops.PredeterminedFinal(False, "fin"))
+                )
+            else:
+                if state == si.root_state and len(si.root_state.prompt) == len(subinterpreter_prompt):
+                    si.root_state = si.root_state.updated(variable_offset=len(s.input_ids))
+
+                follow_map, updated_user_data = await si.where_for_sequence(s, True, 0, return_follow_map=True, **kwargs)
+                
+                if updated_user_data is not None:
+                    s.user_data = dc.deepmerge(s.user_data, updated_user_data)
+                    s.user_data["set_by"] = "sub-where"
+                
+                valid = si.interpreter_state_from_user_data(s).valid
+                
+                subvalid[si] = valid
+
+                # make sure final information is also propagated to the parent interpreter
+                fixed_final_value_components = []
+                for m, c in follow_map.components:
+                    v, f = c
+                    if type(f) is tuple:
+                        f = f[0]
+                    fixed_final_value_components.append((m, ops.PredeterminedFinal(v, f)))
+
+                subfollow[si] = ops.fmap(*fixed_final_value_components)
+
+        calling_state = calling_state.updated(subinterpreters=subinterpreters)
+        
+        return subvalid, subfollow, calling_state
+
+class UserDataLayer:
+    def __init__(self, sqs: List[dc.DecoderSequence], mappings):
+        self.sqs: dc.DecoderSequence = sqs
+        self.mappings = mappings
+        self.prev_mappings = {}
+    
+    # enter and exit
+    def __enter__(self):
+        # for s in self.sqs:
+        #     self.prev_mappings[s.id] = s.user_data
+        #     s.user_data = self.mappings.get(s.id)
+        pass
+
+    def __exit__(self, type, value, traceback):
+        # for s in self.sqs:
+        #     self.mappings[s.id] = s.user_data
+        #     s.user_data = self.prev_mappings.get(s.id)
+        pass
+
+PromptInterpreter.main = None
+
+class SubInterpreter(PromptInterpreter):
+    def __init__(self, fct, parent_interpreter: PromptInterpreter, captures: Dict[str, Any]):
+        super().__init__(context=parent_interpreter)
+        self.query_fct = fct
+        self.fct = fct.fct
+        self.captures = captures
+
+        # maps seq_id to this subinterpreters user_data layer
+        self.user_data_mappings = {}
+
+        self.user_data_key = "head[sub-" + str(id(self)) + "]"
+
+        self.parent_offset = None
+        self.initial_subprompt_ids = None
+
+    def user_data_layer(self, *sqs):
+        return UserDataLayer(sqs, self.user_data_mappings)
+
+    async def prepare(self, parent_offset: int):
+        # prepare initial program state
+        context = LMQLContext(self, None, "")
+
+        query_head = InterpretationHead(self.fct, context, args=[], kwargs=self.captures)
+        self.root_state = PromptState(interpreter=self, subinterpreters=set(),
+            variable=None, prompt="", stmt_buffer=[],
+            query_head=query_head, program_state=context.program_state,
+            recurring_variable_counter={}, variable_offset=parent_offset,
+            valid=None, final=None, mask=None, 
+            stopping_phrases=None, where=None)
+        self.root_state = await self.advance(self.root_state)
+
+        self.initial_subprompt_ids = await self.tokenize(self.root_state.prompt)
+        self.n = len(self.initial_subprompt_ids)
+
+        self.parent_offset = parent_offset
+        self.root_state = self.root_state.updated(variable_offset=parent_offset + self.n)
+
+    def run(self, prompt, **kwargs):
+        raise NotImplementedError("A SubInterpreter cannot be run directly. Please use the parent interpreter instead.")

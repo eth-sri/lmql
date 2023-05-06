@@ -73,10 +73,22 @@ class LMQLTokenizer:
         self.vocab_range = max(self._vocab.values()) + 1
 
     @property
-    def vocab_size(self):
-        # in LMQL vocab_size is the vocab_range (the highest vocabulary ID + 1)
-        # this allows us to use a dense one hot array where no IDs are skipped
+    def model_vocab_size(self):
+        """
+        The model vocab size is the size of the vocabulary that a model uses
+        as the dimensionality of its output distribution. This is different from
+        the vocab_size of the tokenizer, which is the size of the vocabulary
+        + some reserved LMQL-specific tokens.
+        """
         return self.vocab_range
+
+    @property
+    def vocab_size(self):
+        """
+        The vocab_size is the vocab_range (the highest vocabulary ID + 1)
+        this allows us to use a dense one hot array where no IDs are skipped.
+        """
+        return self.vocab_range + 100 # 100 reserved tokens for LMQL tags
 
     @property
     def bos_token_id(self):
@@ -107,14 +119,13 @@ class LMQLTokenizer:
         n = len(input_ids)
         if n in self.detokenizer_cache.keys():
             if key in self.detokenizer_cache[n].keys():
-                # print("cache hit")
                 return self.detokenizer_cache[n][key]
         if n-1 in self.detokenizer_cache.keys():
             key = str(input_ids[:-1])
             if key in self.detokenizer_cache[n-1].keys():
                 global reverse_special_token_mappings
                 # print("secondary cache hit")
-                if input_ids[-1] >= self.vocab_size:
+                if input_ids[-1] >= self.model_vocab_size:
                     extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
                 else:
                     extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]], clean_up_tokenization_spaces=False)
@@ -160,20 +171,29 @@ class LMQLTokenizer:
         else:
             return {"input_ids": input_ids}
     
+    def is_special_id(self, id: str):
+        return id >= self.model_vocab_size
+
+    def truncate_to_model_dim(self, mask):
+        if mask is None:
+            return mask
+        return mask[:self.model_vocab_size]
+
     def special_token_id(self, identifier):
         global special_token_mappings
         global reverse_special_token_mappings
         
         if identifier not in special_token_mappings:
             if len(special_token_mappings) == 0:
-                # offset vocabulary IDs by at least the next decimal power of 10
-                offset = 10 ** (len(str(self.vocab_range)))
+                # offset vocabulary IDs by at least 1 to avoid collisions with the tokenizer's vocabulary
+                offset = self.vocab_range + 1
                 special_token_mappings[identifier] = offset
                 reverse_special_token_mappings[offset] = identifier
             else:
                 next_id = max(special_token_mappings.values()) + 1
                 special_token_mappings[identifier] = next_id
                 reverse_special_token_mappings[next_id] = identifier
+                assert next_id < self.vocab_size, "LMQL special tokens exhausted (only 100 allowed by default)"
         return special_token_mappings[identifier]
     
     def chunk_out_by_special_ids(self, input_ids, tokenize=True):
