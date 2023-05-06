@@ -78,7 +78,9 @@ jobs:
     - name: Deploy to web branch
       uses: JamesIves/github-pages-deploy-action@v4
       with:
+        repository-name: lmql-lang/lmql-next
+        token: ${{ secrets.LMQL_LANG_NEXT_PUSH_ACCESS }} 
         folder: web-deploy
-        branch: web-next
+        branch: web
 
 
