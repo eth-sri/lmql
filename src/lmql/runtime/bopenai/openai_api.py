@@ -11,6 +11,7 @@ import time
 import asyncio
 
 from lmql.runtime.tokenizer import load_tokenizer
+from lmql.runtime.stats import Stats
 
 class OpenAIStreamError(Exception): pass
 class OpenAIRateLimitError(OpenAIStreamError): pass
@@ -21,6 +22,8 @@ Capacity.total = 32000 # defines the total capacity available to allocate to dif
 Capacity.reserved = 0
 
 stream_semaphore = None
+
+api_stats = Stats("openai-api")
 
 class CapacitySemaphore:
     def __init__(self, capacity):
@@ -99,7 +102,7 @@ async def chat_api(**kwargs):
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
 
-    assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
+    assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints: " + str(kwargs["logit_bias"])
         
 
     # transform prompt into chat API format
@@ -210,7 +213,7 @@ async def chat_api(**kwargs):
                                 continue
                             if complete_chunk == "[DONE]": 
                                 return
-                            
+
                             n_chunks += 1
                             sum_chunk_times += time.time() - last_chunk_time
                             last_chunk_time = time.time()
@@ -268,7 +271,6 @@ async def chat_api(**kwargs):
 
                 if current_chunk.strip() == "[DONE]":
                     return
-                
                 try:
                     last_message = json.loads(current_chunk.strip())
                     message = last_message.get("error", {}).get("message", "")
@@ -337,9 +339,12 @@ async def completion_api(**kwargs):
 
                             if len(complete_chunk.strip()) == 0: 
                                 continue
-                            if complete_chunk == "[DONE]": 
+                            if complete_chunk == "[DONE]":
                                 return
                             
+                            if n_chunks == 0:
+                                api_stats.times["first-chunk-latency"] = api_stats.times.get("first-chunk-latency", 0) + (time.time() - stream_start)
+
                             n_chunks += 1
                             sum_chunk_times += time.time() - last_chunk_time
                             last_chunk_time = time.time()

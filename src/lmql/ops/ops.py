@@ -4,6 +4,10 @@ from itertools import product
 
 from lmql.ops.token_set import *
 from lmql.ops.follow_map import *
+from lmql.ops.node import *
+
+from lmql.ops.inline_call import InlineCallOp
+from lmql.ops.booleans import *
 
 lmql_operation_registry = {}
 
@@ -18,113 +22,70 @@ def LMQLOp(name):
         return cls
     return class_transformer
 
-class Node:
-    def __init__(self, predecessors):
-        assert type(predecessors) is list, "Predecessors must be a list, not {}".format(type(predecessors))
-        self.predecessors = predecessors
-        self.depends_on_context = False
-    
-    def execute_predecessors(self, trace, context):
-        return [execute_op(p, trace=trace, context=context) for p in self.predecessors]
-
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError(type(self) + " does not implement forward()")
-
-    def follow(self, *args, **kwargs):
-        raise NotImplementedError(type(self) + " does not implement follow()")
-    
-    def final(self, args, **kwargs):
-        if all([a == "fin" for a in args]):
-            return "fin"
-        return "var"
-
-    def __nodelabel__(self):
-        return str(type(self))
-    
-    def postprocess_var(self, var_name):
-        """
-        Returns true if this operations provides postprocessing semantics for complete values for the given variable name.
-        """
-        return False
-
-    def postprocess(self, operands, value):
-        """
-        Returns the postprocessed variant of `value`. Only called if `postprocess_var` returns true for variable name of value.
-        
-        You can return a tuple of postprocessed_rewrite (prompt) and postprocessed_value (variable value), to additionally 
-        provide different postprocessing semantics for the variable value and the rewrite of the prompt.
-        """
-        pass
-
-    def postprocess_order(self, other, **kwargs):
-        """
-        Orders application of postprocessing operations. Returns "before", "after" or 0 if order is not defined.
-        
-        Only invoked for `other` operations, that return true for the same `postprocess_var`.
-        """
-        return 0 # by default, no order is defined (only one postprocessing operation per variable can be applied)
-
 def DynamicTypeDispatch(name, type_map):
-    def get_handler(args):
-        for signature, op in type_map:
-            # fallback implementation
-            if signature == "*": return op
-            
-            # check for matching signature
-            is_match = True
-            if type(signature) is tuple:
-                for arg, t in zip(args, signature):
-                    is_match = is_match and isinstance(arg, t)
-            else:
-                is_match = isinstance(args, signature)
-            if is_match: return op
-        raise NotImplementedError("error: no matching implemntation of {} for arguments of type {}".format(name, [type(arg) for arg in args]))
-    
     class TypeDispatchingNode(Node):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            
+            self.delegate_args = args
+            self.delegate_kwargs = kwargs
+            self.delegate = None
+
+        def get_handler(self, args):
+            if self.delegate is not None:
+                return self.delegate
+
+            assert all(a is not None for a in args), "Cannot dispatch to handler with None arguments: {}".format(args)
+
+            for signature, op in type_map:
+                # fallback implementation
+                if signature == "*": 
+                    self.delegate = op(*self.delegate_args, **self.delegate_kwargs)
+                    return self.delegate
+                
+                # check for matching signature
+                is_match = True
+                if type(signature) is tuple:
+                    for arg, t in zip(args, signature):
+                        is_match = is_match and isinstance(arg, t)
+                else:
+                    is_match = isinstance(args, signature)
+                if is_match: 
+                    self.delegate = op(*self.delegate_args, **self.delegate_kwargs)
+                    return self.delegate
+            raise NotImplementedError("error: no matching implemntation of {} for arguments of type {}".format(name, [type(arg) for arg in args]))
+
         def forward(self, *args, **kwargs):
-            return get_handler(args).forward(self, *args, **kwargs)
+            if any(a is None for a in args):
+                return None
+            return self.get_handler(args).forward(*args, **kwargs)
         
         def follow(self, *args, **kwargs):
-            return get_handler(args).follow(self, *args, **kwargs)
+            if any(a is None for a in args):
+                return None
+            return self.get_handler(args).follow(*args, **kwargs)
         
         def final(self, *args, **kwargs):
-            return get_handler(args).final(self, *args, **kwargs)
+            if any(a is None for a in kwargs.get("operands")):
+                return None
+            return self.get_handler(kwargs.get("operands")).final(*args, **kwargs)
         
         def __str__(self):
+            if self.delegate is not None:
+                return str(self.delegate)
             return f"<{name}>"
         
         def __repr__(self):
+            if self.delegate is not None:
+                return repr(self.delegate)
             return f"<{name}>"
         
         def __nodelabel__(self):
+            if self.delegate is not None:
+                return self.delegate.__nodelabel__()
             return name
 
     return TypeDispatchingNode
-
-NextToken = "<lmql.next>"
-
-def is_next_token(t): 
-    return t == NextToken
-
-def strip_next_token(x):
-    if type(x) is list:
-        return [i for i in x if not is_next_token(i)]
-    elif type(x) is tuple:
-        return tuple(i for i in x if not is_next_token(i))
-    if type(x) is not str:
-        return x
-    if x.endswith(NextToken):
-        x = x[:-len(NextToken)]
-    return x
-
-class postprocessed_value:
-    def __init__(self, value):
-        self.value = value
-class postprocessed_rewrite:
-    def __init__(self, rewrite):
-        self.rewrite = rewrite
-
-
 @LMQLOp("SENTENCES")
 class Sentences(Node):
     def forward(self, v, **kwargs):
@@ -265,28 +226,24 @@ class TokensOp(Node):
         self.depends_on_context = True
 
     def forward(self, x, context, **kwargs):
-        import asyncio
         if x is None: return None
         if x == "": return []
 
-        assert False, "TOKENS() operation is currently not supported"
-
-        tokens = context.runtime.model.sync_tokenize(x)
-        return tokens
+        return tuple(context.runtime.model.sync_tokenize(x))
 
     def follow(self, v, context=None, **kwargs):
         if v is None: return None
         contains_next_token = v != strip_next_token(v)
-        words = self.forward(strip_next_token(v), context)
 
-        # if len(words) > 0 and contains_next_token:
-        #     # allow continuation sub-tokens
-        #     continuation_tokens = tset("[^\u0120].*", regex=True)
-        #     valid_continuations = union(tset("eos"), continuation_tokens)
-        #     components = [((valid_continuations, (words[:-1] + [words[-1] + NextToken])))] + components
-        
+        if not contains_next_token:
+            tokens = tuple(context.runtime.model.sync_tokenize(v))
+            return tokens
+        v = strip_next_token(v)
+        tokens = tuple(context.runtime.model.sync_tokenize(v))
+
         return fmap(
-            ("*", (words + [NextToken]) if contains_next_token else words)
+            ("eos", tokens),
+            ("*", (*tokens, NextToken))
         )
 
     def final(self, x, context, operands=None, result=None, **kwargs):
@@ -332,6 +289,8 @@ class WordsOp(Node):
 class LenOp(Node):
     def forward(self, x, **kwargs):
         if x is None: return None
+        if type(x) is list or type(x) is tuple:
+            return len(x)
         if type(x) is not str: 
             x = str(x)
         return len(x)
@@ -350,18 +309,11 @@ class LenOp(Node):
             len_masks = []
             for l,tmask in charlen_tsets().items():
                 len_masks.append((tmask, len(v) + l))
-            
+
             return fmap(*len_masks)
 
     def final(self, x, operands=None, result=None, **kwargs):
         return x[0]
-
-class NotOp(Node):
-    def forward(self, op, **kwargs):
-        return not op
-
-    def follow(self, v, **kwargs):
-        return not v
 
 class Lt(Node):
     def forward(self, *args, **kwargs):
@@ -395,7 +347,7 @@ class Lt(Node):
 
 def Gt(preds): return Lt(list(reversed(preds)))
 
-class EqOp(Node):
+class EqOpGeneric(Node):
     def __init__(self, predecessors):
         super().__init__(predecessors)
 
@@ -409,26 +361,21 @@ class EqOp(Node):
         if op1 is None or op2 is None:
             return None
         
+        
         if is_next_token(op1):
             if is_next_token(op2): 
                 return fmap(
                     ("*", True)
                 )
             else:
-                return fmap(
-                    (op2, True),
-                    ("*", False)
-                )
+                return InOpStrInSet([]).follow(op1, [op2])
         if is_next_token(op2):
             if is_next_token(op1): 
                 return fmap(
                     ("*", True)
                 )
             else:
-                return fmap(
-                    (op1, True),
-                    ("*", False)
-                )
+                return InOpStrInSet([]).follow(op2, [op1])
 
         if type(op1) is str or type(op1) is str:
             op_shorter = op1 if len(strip_next_token(op1)) < len(strip_next_token(op2)) else op2
@@ -480,6 +427,44 @@ class EqOp(Node):
         
         return super().final(operand_final, operands=operands, result=result, **kwargs)
 
+class EqOpInt(Node):
+    def __init__(self, predecessors):
+        super().__init__(predecessors)
+
+    def forward(self, *args, **kwargs):
+        return all([a == args[0] for a in args])
+
+    def follow(self, *args, **kwargs):
+        op1 = args[0]
+        op2 = args[1]
+        
+        if op1 is None or op2 is None:
+            return None
+        
+        return op1 == op2
+
+    def final(self, operand_final, operands=None, result=None, **kwargs):
+        op1f = operand_final[0]
+        op1 = operands[0]
+        op2f = operand_final[1]
+        op2 = operands[1]
+
+        if op1f == "fin" and op1 <= op2 and (op2f in ["fin", "inc"]):
+            return "fin"
+        if op2f == "fin" and op2 <= op1 and (op1f in ["fin", "inc"]):
+            return "fin"
+
+        # default behavior
+        if all([a == "fin" for a in operand_final]):
+            return "fin"
+        
+        return "var"
+
+EqOp = DynamicTypeDispatch("EqOp", (
+    ((int, int), EqOpInt),
+    ("*", EqOpGeneric),
+))
+
 class SelectOp(Node):
     def forward(self, *args, **kwargs):
         if len(args[0]) <= args[1]:
@@ -512,49 +497,6 @@ class SelectOp(Node):
         if result is not None and (l == "fin" or l == "inc"):
             return "fin"
         else: return "var"
-
-class Var(Node):
-    def __init__(self, name):
-        super().__init__([])
-        self.name = name
-
-        self.depends_on_context = True
-        
-        # indicates whether the downstream node requires text diff information
-        self.diff_aware_read = False
-
-    async def json(self):
-        return self.name
-
-    def forward(self, context, **kwargs):
-        if self.diff_aware_read:
-            return (context.get(self.name, None), context.get_diff(self.name, None))
-        return context.get(self.name, None)
-    
-    def follow(self, context, **kwargs):
-        value = context.get(self.name, None)
-        if value is None: return None
-        
-        # also return the text diff if required
-        if self.diff_aware_read:
-            value = (value, context.get_diff(self.name, None))
-
-        # strip_next_token but also supports tuples
-        def strip_nt(v):
-            if type(v) is tuple: return (strip_next_token(v[0]), v[1])
-            else: return strip_next_token(v)
-
-        return fmap(
-            ("eos", PredeterminedFinal(strip_nt(value), "fin")),
-            ("*", value),
-        )
-
-    def final(self, x, context, operands=None, result=None, **kwargs):
-        return context.final(self.name)
-
-    def __repr__(self) -> str:
-        return f"<Var {self.name}>"
-
 class RawValueOp(Node):
     def __init__(self, args):
         super().__init__([])
@@ -622,7 +564,7 @@ class InOpStrInStr(Node):
             (setminus("*", allowed_subtokens), False)
         )
 
-    def final(self, op_final, result=None, **kwargs):
+    def final(self, op_final, operands=None, result=None, **kwargs):
         if not result:
             return super().final(op_final, result=result, **kwargs)
         if op_final[1] == "inc" and op_final[0] == "fin":
@@ -688,57 +630,6 @@ InOp = DynamicTypeDispatch("InOp", (
     ("*", InOpStrInSet),
 ))
 
-class OrOp(Node):
-    def forward(self, *args, **kwargs):
-        if any([a == True for a in args]):
-            return True
-        elif all([a == False for a in args]):
-            return False
-        else:
-            return None
-
-    def follow(self, *args, **kwargs):
-        return fmap(
-            ("*", self.forward(*args))
-        )
-
-    def final(self, args, operands=None, result=None, **kwargs):
-        if result:
-            if any(a == "fin" and v == True for a,v in zip(args, operands)):
-                return "fin"
-            return "var"
-        else: # not result
-            if any(a == "var" for a in args):
-                return "var"
-            return "fin"
-
-class AndOp(Node):
-    def forward(self, *args, **kwargs):
-        if type(args[0]) is tuple and len(args) == 1:
-            args = args[0]
-
-        if any([a == False for a in args]):
-            return False
-        elif any([a is None for a in args]):
-            return None
-        else:
-            return all([a for a in args])
-
-    def follow(self, *v, **kwargs):
-        return fmap(
-            ("*", self.forward(*v))
-        )
-
-    def final(self, args, operands=None, result=None, **kwargs):
-        if result:
-            if all([a == "fin" for a in args]):
-                return "fin"
-            return "var"
-        else: # not result
-            if any([a == "fin" and v == False for a,v in zip(args, operands)]):
-                return "fin"
-            return "var"
-
 def seq_starts_with(seq1, seq2):
     num_matching = sum([1 if i1 == i2 else 0 for i1,i2 in zip(seq1, seq2)])
     return num_matching == len(seq2)
@@ -798,31 +689,6 @@ class StartsWithOp(Node):
         
         return super().final(ops_final, **kwargs)
 
-    # def final(self, args, operands=None, result=None, pattern: TokenSet=None, **kwargs):
-    #     x_final = args[0]
-
-    #     if result is None:
-    #         return "var"
-    #     elif result == False:
-    #         x = operands[0]
-    #         allowed_phrases = operands[1]
-
-    #         if x_final == "inc":
-    #             # check whether there are suffixes which could be matched
-    #             suffixes = list(matching_phrases_suffixes(x, allowed_phrases))
-    #             suffixes = [s for s in suffixes if pattern is None or pattern.starts_with(s)]
-    #             # print("final() with x_final inc", x, allowed_phrases)
-    #             if len(suffixes) > 0: return "var"
-    #             else: return "fin"
-    #         elif x_final == "fin":
-    #             return "fin"
-    #         else:
-    #             return "var"
-    #     else: # result == True
-    #         if x_final == "inc" or x_final == "fin":
-    #             return "fin"
-    #         return "var"
-
 @LMQLOp(["STOPS_AT", "stops_at"])
 class StopAtOp(Node):
     def __init__(self, *args, **kwargs):
@@ -840,90 +706,65 @@ class StopAtOp(Node):
     def variable(self):
         return self.predecessors[0]
 
-    @property
-    def stopping_phrase(self):
-        return self.predecessors[1]
-
-    async def stopping_phrase_tokenized(self, tokenizer):
-        if tokenizer in self._tokenized_stopping_phrase_cache:
-            return self._tokenized_stopping_phrase_cache[tokenizer]
-        else:
-            result = (await tokenizer(self.stopping_phrase))
-            self._tokenized_stopping_phrase_cache[tokenizer] = result
-            return result
-
     def forward(self, *args, final, **kwargs):
-        if any([a is None for a in args]): return None
-
-        if all([a == "fin" for a in final]):
-            return True
-
-        op1, op1_diff = args[0]
-        op2 = args[1]
-
-        if op1 is None: return
-        if op1_diff is None: op1_diff = ""
-
-        matched_phrase_index = op1.rfind(op2)
-        op2_in_op1 = matched_phrase_index != -1 and matched_phrase_index + len(op2) > len(op1) - len(op1_diff)
-
-        return not op2_in_op1 or op1.endswith(op2)
+        return True
 
     def follow(self, *args, previous_result=None, **kwargs):
-        if any([a is None for a in args]): 
-            return None
-
-        op1, op1_diff = args[0]
-        if op1 is None: return None
-        if op1_diff is None: op1_diff = ""
-
-        op1 = strip_next_token(op1)
-        op2 = args[1]
-
-        matched_phrase_index = op1.rfind(op2)
-        op2_in_op1 = matched_phrase_index != -1 and matched_phrase_index + len(op2) > len(op1) - len(op1_diff)
-
-        if not op2_in_op1: return fmap(("*", True))
-
-        ends_with_stopping_phrase = op1.endswith(op2)
-
-        if op1 != args[0][0] and ends_with_stopping_phrase:
-            # print("StopAtOp.follow()", [op1], [op2], valid)
-            ends_with_stopping_phrase = False
-        if len(op1) == 0:
-            ends_with_stopping_phrase = True
-        
-        return fmap(("*", ends_with_stopping_phrase))
+        return fmap(("*", True))
 
     def final(self, ops_final, operands, result, **kwargs):
-        if result: 
-            if ops_final[0] == "var":
-                return "var"
-            return "fin"
-        else: # not result
-            if ops_final[0] == "var": 
-                r = "var"
-            elif ops_final[0] == "dec": 
-                r = "var"
-            else: 
-                r = "fin"
-            return r
+        return "var"
+
+    def stop(self, *args, final, **kwargs):
+        if any([a is None for a in args]): return None
+
+        if all([a == "fin" for a in final]): return False
+
+        op1, op1_diff = args[0]
+        op2 = args[1]
+
+        if op1 is None: return False
+        if op1_diff is None: op1_diff = ""
+
+
+        matched_phrase_index = op1.rfind(op2)
+        match_only_with_diff = op2 in op1 and matched_phrase_index >= len(op1) - len(op1_diff)
+
+        return match_only_with_diff or op1.endswith(op2)
+
+    def stopping_phrase(self, trace):
+        if type(self.predecessors[1]) is Node:
+            return trace[self.predecessors[1]]
+        return self.predecessors[1]
 
     def postprocess_var(self, var_name):
         return var_name == self.predecessors[0].name
 
     def postprocess(self, operands, value):
-        op2 = operands[1]
-        matched_phrase_index = value.rfind(op2)
+        if value != operands[0][0]:
+            return value
+        value_diff: str = operands[0][1]
+        stopping_phrase = operands[1]
+
+        # find earliest match of stopping phrase in value_diff
+        matched_phrase_index = value.rfind(stopping_phrase)
+        next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+        while next_matched_phrase_index != -1 and next_matched_phrase_index >= len(value) - len(value_diff):
+            matched_phrase_index = next_matched_phrase_index
+            next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+
+        if matched_phrase_index + len(stopping_phrase) <= len(value) - len(value_diff):
+            return None
+
         if matched_phrase_index != -1:
-            value = value[:matched_phrase_index + len(op2)]
+            value = value[:matched_phrase_index + len(stopping_phrase)]
 
         return postprocessed_rewrite(value), postprocessed_value(value)
     
     def postprocess_order(self, other, operands, other_inputs, **kwargs):
         if type(other) is IntOp:
             return "before"
-        if type(other) is StopAtOp:
+        if isinstance(other, StopAtOp):
             value, value_diff = operands[0]
             op2 = operands[1]
             assert value == other_inputs[0][0], "internal error: comparing postprocess_order with two StopAtOps with different values (do they refer to different variables) {}".format((value, other_inputs[0]))
@@ -943,12 +784,48 @@ class StopAtOp(Node):
 @LMQLOp(["STOPS_BEFORE", "stops_before"])
 class StopBeforeOp(StopAtOp):
     def postprocess(self, operands, value):
-        op2 = operands[1]
-        matched_phrase_index = value.find(op2)
+        value: str = operands[0][0]
+        value_diff: str = operands[0][1]
+        stopping_phrase = operands[1]
+
+        # find earliest match of stopping phrase in value_diff
+        matched_phrase_index = value.rfind(stopping_phrase)
+        next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+        while next_matched_phrase_index != -1 and next_matched_phrase_index >= len(value) - len(value_diff):
+            matched_phrase_index = next_matched_phrase_index
+            next_matched_phrase_index = value.rfind(stopping_phrase, 0, matched_phrase_index)
+
+        if matched_phrase_index + len(stopping_phrase) <= len(value) - len(value_diff):
+            return None
+
         if matched_phrase_index != -1:
             value = value[:matched_phrase_index]
 
         return postprocessed_rewrite(value), postprocessed_value(value)
+
+class CallOp(Node):
+    def __new__(cls, predecessors, lcls, glbs):
+        fct, *args = predecessors
+        if hasattr(fct, "__lmql_query_function__"):
+            return InlineCallOp(predecessors, lcls, glbs)
+        
+        return super().__new__(cls)
+
+    def __init__(self, predecessors, lcls, glbs):
+        super().__init__(predecessors)
+        
+        self.fct, *self.args = predecessors
+
+    def forward(self, *args, **kwargs):
+        if any([a is None for a in args]): return None
+        fct, *args = args
+        return fct(*args)
+    
+    def follow(self, *v, **kwargs):
+        if any([a is None for a in v]): return None
+
+        fct, *args = v
+        return fmap(("*", fct(*args)))
 
 @LMQLOp(["ESCAPED", "escaped"])
 class EscapedOp(Node):
@@ -1034,96 +911,43 @@ class OpaqueLambdaOp(Node):
             ("*", fct(*args))
         )
 
-def create_mask(follow_map, valid, final):
-    if follow_map is None:
-        return "*"
-    
-    allowed_tokens = tset()
-    otherwise_result = None
-
-    for pattern, result in follow_map:
-        if pattern == "*":
-            otherwise_result = result
-
-        if result is not None:
-            value, final = result
-        else:
-            value = None
-            final = "var"
-
-        if value == True or value is None:
-            allowed_tokens = union(allowed_tokens,pattern)
-        elif value == False and final == ("var",):
-            allowed_tokens = union(allowed_tokens, pattern)
-        elif value is None and len(follow_map.components) == 1:
-            allowed_tokens = "*"
-        elif result == (False, ('fin',)):
-            if pattern != "*":
-                allowed_tokens = setminus(allowed_tokens, pattern)
-
-    if allowed_tokens == "∅":
-        return tset("eos")
-
-    if len(allowed_tokens) == 0:
-        if otherwise_result is not None:
-            othw_value, othw_final = otherwise_result
-        else:
-            othw_value, othw_final = None, "var"
-        if not othw_value and othw_final == ("fin",):
-            return tset("eos")
-        else:
-            return "*"
-
-    return allowed_tokens
-
-def is_node(op):
-    return issubclass(type(op), Node)
-
-def derive_predecessor_final(op, trace):
-    def get_final(v):
-        # for nodes, get final value from trace
-        if is_node(v): return trace[v][1]
-        # for constants, final value is always "fin"
-        return "fin"
-    return [get_final(p) for p in op.predecessors]
-
-def derive_final(op, trace, context, result):
-    predecessor_final = derive_predecessor_final(op, trace)
-
-    def get_predecessor_result(v):
-        if is_node(v): return trace[v][0]
-        return v
-    
-    predecessor_values = [get_predecessor_result(p) for p in op.predecessors]
-
-    context_arg = ()
-    if op.depends_on_context: 
-        context_arg += (context,)
-    
-    return op.final(predecessor_final, *context_arg, operands=predecessor_values, result=result)
-
-def execute_op_stops_at_only(op: Node, result=None):
+def execute_op_stops_at_only(variable: str, op: Node, trace, result=None, sidecondition=None):
     """
     Evaluates a Node and returns the list of defined StopAtOps for the query.
     """
-    if result is None: result = []
+    is_root_call = result is None and sidecondition is None
+    
+    if result is None: 
+        result = []
+    if sidecondition is None: 
+        sidecondition = []
 
-    if type(op) is StopAtOp:
-        result.append(op)
+    if isinstance(op, StopAtOp):
+        if op.predecessors[0].name == variable:
+            result.append((op, sidecondition.copy()))
     elif type(op) is AndOp:
+        non_stop_ops = [o for o in op.predecessors if not isinstance(o, StopAtOp)]
         for p in op.predecessors:
-            execute_op_stops_at_only(p, result=result)
+            execute_op_stops_at_only(variable, p, trace=trace, result=result, sidecondition=sidecondition + non_stop_ops)
     elif type(op) is OrOp:
-        # TODO: actually STOPS_AT in OR is not really supported yet
         for p in op.predecessors:
-            execute_op_stops_at_only(p, result=result)
+            execute_op_stops_at_only(variable, p, trace=trace, result=result, sidecondition=sidecondition)
+    elif type(op) is NotOp:
+        negated_stop_ops = []
+        execute_op_stops_at_only(variable, op.predecessors[0], trace=trace, result=negated_stop_ops)
+        assert len(negated_stop_ops) == 0, "error: nesting stopping operators with 'not' expressions is not supported"
     else:
         # other ops are no-ops from a STOPS_AT perspective (cannot contain additional STOPS_AT ops)
         # TODO: what about not
         return []
+    
+    if is_root_call:
+        # only return stop ops whose sidecondition are all satisfied
+        result = [sp for sp, sc in result if all(trace[p][0] is None or trace[p][0] for p in sc)]
+    
     return result
 
-def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context=None):
+def execute_postprocess(op: Node, var_name: str, value: str, context=None):
     """
     Applies any postprocess() operations of the provided constraints
     to the specified variable and value.
@@ -1132,9 +956,12 @@ def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context
     """
     if op is None: return value, value
 
+    root_op = op
     nodes = [op]
 
     trace = {}
+    expr_value = execute_op(op, trace=trace, context=context, return_final=False)
+    
     postprocessors = []
 
     # collect and sort set of postprocessing operations
@@ -1163,7 +990,11 @@ def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context
                     else:
                         assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
             postprocessors.insert(i, (op, inputs))
-    
+
+    # filter out stopping conditions as postprocessors that were not actually triggered (due to unfulfilled sideconditions)
+    stopping_conditions: List[StopAtOp] = execute_op_stops_at_only(var_name, root_op, trace)
+    postprocessors = [p for p in postprocessors if not isinstance(p[0], StopAtOp) or p[0] in stopping_conditions]
+
     rewritten_value = None
     rewritten_prompt = value
 
@@ -1173,7 +1004,6 @@ def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context
         result = pop.postprocess(inputs, rewritten_prompt)
 
         if result is not None:
-            
             if type(result) is tuple:
                 for v in result:
                     if type(v) is postprocessed_value:
@@ -1191,63 +1021,3 @@ def execute_postprocess(op: Node, var_name: str, value: str, trace=None, context
         rewritten_value = value
     
     return rewritten_value, rewritten_prompt
-
-def execute_op(op: Node, trace=None, context=None, return_final=False):
-    # for constant dependencies, just return their value
-    if not is_node(op): 
-        return op
-    
-    # only evaluate each operation once
-    if op in trace.keys(): 
-        return trace[op][0]
-    
-    # compute predecessor values
-    inputs = op.execute_predecessors(trace, context)
-    
-    if op.depends_on_context: 
-        inputs += (context,)
-
-    inputs_final = derive_predecessor_final(op, trace)
-    result = op.forward(*inputs, final=inputs_final)
-    is_final = derive_final(op, trace, context, result)
-    
-    if trace is not None: 
-        trace[op] = (result, is_final)
-
-    if return_final:
-        return result, is_final
-
-    return result
-
-def digest(expr, context, follow_context, no_follow=False):
-    if expr is None: return True, "fin", {}, {}
-
-    trace = {}
-    follow_trace = {}
-    expr_value, is_final = execute_op(expr, trace=trace, context=context, return_final=True)
-
-    if no_follow:
-        return expr_value, is_final, trace, follow_trace
-
-    for op, value in trace.items():
-        # determine follow map of predecessors
-        if len(op.predecessors) == 0: 
-            # empty argtuple translates to no follow input
-            intm = all_fmap((ArgTuple(), ["fin"])) 
-        else:
-            # use * -> value, for constant value predecessor nodes
-            def follow_map(p):
-                if is_node(p): return follow_trace[p]
-                else: return fmap(("*", (p, ("fin",))))
-            intm = fmap_product(*[follow_map(p) for p in op.predecessors])
-        
-        # apply follow map
-        op_follow_map = follow_apply(intm, op, value, context=follow_context)
-
-        # name = op.__class__.__name__
-        # print(name, value)
-        # print("follow({}) = {}".format(name, op_follow_map))
-
-        follow_trace[op] = op_follow_map
-    
-    return expr_value, is_final, trace, follow_trace

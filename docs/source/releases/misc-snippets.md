@@ -43,3 +43,38 @@ argmax
 from 
    "openai/text-ada-001"
 ```
+
+```{lmql}
+name::mrkl
+argmax
+   """
+   Answer the following questions as best you can. You have access to the following tools:
+
+   Calculator: Useful for when you need to answer questions about math.
+
+   Use the following format:
+
+   Question: the input question you must answer
+   Thought: you should always think about what to do
+   Action: the action to take, should be one of {Calculator}
+   Action Input: The input to the action (must be valid python)
+   Observation: the result of the action
+   ... (this Thought/Action/Action Input/Observation can repeat N times)
+   Thought: I now know the final answer
+   Final Answer: the final answer to the original input question
+
+   Begin!
+
+   Question: I have two apples and three friends, how many apples can I give each so it is fair?
+   """
+   for i in range(8):
+      "[MODE]: [CONTENT]"
+      if MODE.strip() == "Action":
+         "Action Input: [ACTION_INPUT]"
+         print("run action", CONTENT, "with input", ACTION_INPUT)
+         "Observation: {eval(ACTION_INPUT)}\n"
+from
+   'openai/text-davinci-003'
+where
+   MODE in [" Thought", " Action", " Final Answer"] and STOPS_AT(CONTENT, "\n") and STOPS_AT(ACTION_INPUT, "\n")
+```

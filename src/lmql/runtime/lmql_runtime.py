@@ -51,6 +51,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     postprocessors: List[Any]
     scope: Any
 
+    name: str = None
+
     output_writer: Optional[Any] = None
     args: Optional[List[str]] = None
     model: Optional[Any] = None
@@ -59,6 +61,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
     is_langchain_use: bool = False
 
     lmql_code: str = None
+
+    __lmql_query_function__ = True
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
         # check for pydantic base class and do kw initialization then
@@ -76,6 +80,9 @@ class LMQLQueryFunction(LMQLChainMixIn):
         self.model = None
         # only set if the query is defined inline of a Python file
         self.function_context = None
+
+    def __hash__(self):
+        return hash(self.fct)
 
     @property
     def input_keys(self) -> List[str]:
@@ -100,15 +107,20 @@ class LMQLQueryFunction(LMQLChainMixIn):
             args_of_query = self.function_context.args_of_query
             scope = self.function_context.scope
 
+        # do not consider kwargs that are already set
+        argnames = [a for a in argnames if a not in kwargs.keys()]
+
         assert len(args) == len(argnames), f"@lmql.query {self.fct.__name__} expects {len(argnames)} positional arguments, but got {len(args)}."
         captured_variables = set(args_of_query)
         for name, value in zip(argnames, args):
             if name in args_of_query:
                 kwargs[name] = value
                 captured_variables.remove(name)
-    
+
+        # resolve remaining unset args from scope
         for v in captured_variables:
-            kwargs[v] = scope.resolve(v)
+            if not v in kwargs:
+                kwargs[v] = scope.resolve(v)
         
         if "output_writer" in kwargs:
             self.output_writer = kwargs["output_writer"]
@@ -152,6 +164,7 @@ class LMQLQueryFunction(LMQLChainMixIn):
                 results = await postprocessor.process(results, self.output_writer)
         
         interpreter.print_stats()
+        interpreter.dcmodel.save()
 
         return results
 
@@ -184,3 +197,15 @@ def compiled_query(output_variables=None, group_by=None):
                                  scope=LMQLInputVariableScope(fct, calling_frame))
     return func_transformer
     
+
+async def call(fct, *args, **kwargs):
+    if type(fct) is LMQLQueryFunction:
+        result = await fct(*args, **kwargs)
+        if len(result) == 1: 
+            return result[0]
+        else: 
+            return result
+    if inspect.iscoroutinefunction(fct):
+        return await fct(*args, **kwargs)
+    else:
+        return fct(*args, **kwargs)

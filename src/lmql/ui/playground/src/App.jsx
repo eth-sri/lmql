@@ -170,16 +170,17 @@ const TokenCountDiv = styled.div`
   white-space: pre-line;
   max-height: 10pt;
 
-  :hover .tooltip {
-    visibility: visible;
-    opacity: 1;
-  }
+  /* indicate copy */
+  cursor: pointer;
 `
 
 function TokenCountIndicator() {
   const [stats, setStats] = useState({})
 
   const format_cost = (c, precision) => {
+    if (c == 0) {
+      return "$0.00"
+    }
     c = c.toFixed(precision)
     if (c === (0).toFixed(precision))
       return "<$" + (Math.pow(10, -precision)).toFixed(precision);
@@ -262,7 +263,8 @@ function TokenCountIndicator() {
   let tokenCount = 0;
   let model = ""
   let steps = 1;
-  if (stats.tokens) {
+  let copyString = ""
+  if (stats.tokens || stats._step) {
     tokenCount = stats.tokens
     model = stats.model
     steps = stats._step || 1
@@ -274,20 +276,26 @@ function TokenCountIndicator() {
     const toFirstUpper = k => k.charAt(0).toUpperCase() + k.slice(1)
     text = `Tokens: ${tokenCount}, ${otherKeys.map(k => `${toFirstUpper(k)}: ${stats[k]}`).join(", ")}`
 
+    copyString = `Tokens: ${tokenCount}\n${otherKeys.map(k => `${toFirstUpper(k)}: ${stats[k]}`).join("\n")}`
+
     // time elapsed
     if (stats._start) {
       const end = stats._end || stats._now || Date.now();
       const elapsed = (end - stats._start) / 1000
       text += `\n Time: ${elapsed.toFixed(1)}s, `
+      copyString += `\nTime: ${elapsed.toFixed(1)}s, `
     }
 
     text += `${(tokenCount / steps).toFixed(2)} tok/step`
     if (model.includes("openai")) {
       text += ` Est. Cost ${cost_estimate(model, tokenCount / 1000, 4)}`
+      copyString += `\nEst. Cost ${cost_estimate(model, tokenCount / 1000, 4)}`
     }
   }
 
-  return <TokenCountDiv>
+  return <TokenCountDiv onClick={() => {
+    navigator.clipboard.writeText(copyString)
+  }}>
     {text}
   </TokenCountDiv>
 }
@@ -687,24 +695,6 @@ const ModelResultText = styled.div`
   overflow-y: auto;
   font-size: 10pt;
 
-  &.chat-mode {
-    padding-bottom: 50pt;
-  }
-
-  &.chat-mode .system-message {
-    text-align: center;
-    display: block;
-    font-size: 8pt;
-    background-color: transparent !important;
-    color: #adadad;
-    margin-top: 10pt;
-  }
-
-  .system-message {
-    display: none;
-  }
-
-
   &::-webkit-scrollbar {
     width: 0px;
   }
@@ -735,56 +725,61 @@ const ModelResultText = styled.div`
     opacity: 0.95;
   }
   
+  &.chat-mode {
+    padding-bottom: 50pt;
+  }
+
+  &.chat-mode .system-message {
+    display: block;
+    font-size: 8pt;
+  }
+
+  .system-message {
+    display: none;
+    text-align: center;
+  }
+
   div .tag {
     display: block;
     text-align: center;
     font-size: 8pt;
     color: #5c5c5c;
-    padding: 0;
-    margin: 0;
     display: none;
   }
 
   &.chat-mode .variable.eos {
     display: inline;
-    margin: 0pt;
-    position: relative;
-    left: calc(50% - 15pt);
-    top: 10pt;
     opacity: 0.5;
+    text-align: center;
+  }
+
+  div .tag-system:after {
+    content: "System";
+    position: absolute;
+    right: 5pt;
+    top: 0pt;
+    font-size: 8pt;
+    text-transform: uppercase;
   }
 
   div .tag-system {
     display: block;
-    text-align: center;
-    background-color: #ffffff13;
-    border-radius: 8pt;
-    font-size: 90%;
-    margin-top: 10pt;
-    margin-bottom: 10pt;
-    color: #c0c0c0;
+    background-color: #ffffff1f !important;
+    margin: 4pt 0pt;
+    position: relative;
   }
 
   div .tag-assistant {
-    display: inline-block;
-    border: 1pt solid #5c5c5c;
-    margin-top: 5pt;
-    margin-right: 4%;
-
-    border-radius: 8pt;
-    overflow: hidden;
-    padding: 4pt;
   }
 
   div .tag-user {
     display: block;
-    margin-left: 4%;
-    position: relative;
-    border: 1pt solid #5c5c5c;
-    border-radius: 8pt;
-    padding: 4pt;
-    margin-bottom: 2pt;
-    margin-top: 5pt;
+    margin-top: 20pt;
+    margin-bottom: 5pt;
+    background-color: #ffffff25;
+    margin-left: 15%;
+    border-radius: 5pt;;
+    padding: 5pt;
   }
   
   &>div>span:first-child {
@@ -802,11 +797,6 @@ const ModelResultText = styled.div`
     opacity: 1.0;
     border-radius: 2pt;
     margin-left: 2pt;
-  }
-
-  div .variable:hover {
-    position: relative;
-    transform: scale(1.1);
   }
 
   div .badge {
@@ -1544,7 +1534,7 @@ function InspectorPanelContent(props) {
 
   const valid = ["valid", <ValidText final={resolve(nodeInfo, "final")} valid={resolve(nodeInfo, "valid")} onOpenValidationGraph={props.onOpenValidationGraph}/>]
 
-  const DECODER_KEYS = ["logprob", "seqlogprob", "pool"]
+  const DECODER_KEYS = ["logprob", "seqlogprob", "pool", "prompt"]
   const INTERPRETER_KEYS = ["variable", valid, "mask", "head_index"]
   const PROGRAM_VARIABLES = resolve(nodeInfo, "program_state") ? Object.keys(resolve(nodeInfo, "program_state"))
     .map(key => [key, resolve(nodeInfo, "program_state." + key)]) : []
@@ -2025,7 +2015,8 @@ function DecoderPanel(props) {
     return {
       "_finfalse": data.user_data && data.user_data.head && data.user_data.head.valid == "False",
       "_isRoot": data.root,
-      "_isDone": data.user_data && data.user_data.head && data.user_data.head.variable == "__done__"
+      "_isDone": data.user_data && data.user_data.head && data.user_data.head.variable == "__done__",
+      "_noUserData": !data.user_data || (data.user_data && data.user_data == "None")
     }
   }
 

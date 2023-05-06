@@ -69,12 +69,12 @@ class FollowMap(Iterable):
 
         for p2, component in self.components:
             assert handled != "*", "Cannot intersect further patterns if '*' has already been handled."
-            
+        
             p1 = setminus(p1, handled)
             # p2 = setminus(p2, handled)
-            # print("intersect", p1, "and", p2, end="  ")
+            # print("intersect", p1, "and", p2)
             intersected_pattern = intersect(p1, p2)
-            # print(" gives", intersected_pattern, end=" ")
+            # print(" gives", intersected_pattern)
             intersected_pattern = setminus(intersected_pattern, handled)
             # print("minus", handled, " ", intersected_pattern)
 
@@ -155,6 +155,24 @@ class FollowMap(Iterable):
     def map(self, fct):
         mappings = [(pattern, fct(pattern, value)) for pattern, value in self.components]
         return fmap(*mappings)
+    
+    def flat_map(self, fct, simplify=True):
+        mappings = []
+        
+        for pattern, value in self.components:
+            submap = fct(pattern, value)
+            if submap is None:
+                mappings.append((pattern, value))
+            else:
+                submap = submap.intersect(pattern)
+                for subpattern, subvalue in submap.components:
+                    mappings.append((subpattern, subvalue))
+        result = fmap(*mappings)
+        
+        if simplify: result.simplify()
+
+        return result
+
 
 def zip_fmap(*fmaps):
     """

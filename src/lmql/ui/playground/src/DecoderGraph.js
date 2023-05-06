@@ -173,6 +173,10 @@ function layoutDecoderGraph(cy) {
         roots: rootNodes,
         visit: (node, edge, previous, i, depth) => {
             if (node.hasClass("compound")) return;
+            if (node.data("_noUserData")) return;
+
+            // console.log("data", node.data())
+            depth = parseInt(node.data("seq_id").substr(2))
 
             if (depth >= mostLikelyDepth) {
                 if (depth > mostLikelyDepth) {
@@ -277,6 +281,18 @@ function initDecoderGraphCy(element) {
                     'color': 'white',
                     'border-color': 'green',
                     'border-width': '0px',
+                }
+            },
+            {
+                selector: 'node[_noUserData]',
+                style: {
+                    // light blue
+                    'background-color': 'rgb(249, 209, 248)',
+                    'background-opacity': 0.7,
+                    'color': 'white',
+                    'border-color': 'red',
+                    'border-width': '0px',
+                    'opacity': 0.4
                 }
             },
             {
@@ -391,6 +407,7 @@ export function DecoderGraph(props) {
 
     const derivedNodeFeatures = props.derivedNodeFeatures || (() => {})
 
+    const [graphId, setGraphId] = useState(null);
     const [cyData, setCyData] = useState(null);
     const [rawGraphData, setRawGraphData] = useState(null);
     const cyRef = useRef(null)

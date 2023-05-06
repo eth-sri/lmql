@@ -7,8 +7,10 @@ from typing import Any, Callable, List, Optional, Union
 
 import numpy as np
 
+import lmql.runtime.masks as masks
 import lmql.runtime.bopenai as openai
 import lmql.runtime.dclib as dc
+import lmql.utils.nputil as nputil
 from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.dclib.dclib_seq import (DecoderSequence, deepcopy, deepmerge,
                                           detseq, is_deterministic)
@@ -110,12 +112,11 @@ class DclibOpenAiModel(DcModel):
         self.model_identifier = "openai/" + self.model.model_identifier
 
         self.model.chunk_size = kwargs.get("openai_chunksize", 64)
+        self.model.nostop = kwargs.get("openai_nonstop", False)
         self.num_billed_tokens = {}
         self.num_requests = 0
 
         self.stats = Stats("openai")
-
-        # openai.Completion.set_chaos(0.05) # for unreliably testing
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
 
     def log_billable_tokens(self, n: int):
@@ -140,18 +141,18 @@ class DclibOpenAiModel(DcModel):
             return CompletionCall("*", None, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
 
         invert = False
-        num_allowed = is_allowed(mask).sum(axis=-1)
-        assert num_allowed > 0, "DclibOpenAiModel: encountered logits mask with no allowed tokens"
+        num_allowed = masks.mask_num_allowed(mask)
+        assert num_allowed > 0, "DclibOpenAiModel: encountered logits mask with no allowed tokens: mask: {} mask type:{}".format(mask, type(mask))
 
         if num_allowed == 1:
             # check for <eos> case
-            if is_allowed(mask[self.eos_token_id]):
+            if masks.mask_is_allowed(mask, self.eos_token_id):
                 return CompletionCall("fixed", self.eos_token_id, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
             else:
                 # otherwise we can treat this as a score call
-                return CompletionCall("fixed", mask.argmax(axis=-1), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
-        elif num_allowed < mask.shape[-1]:
-            if mask.shape[-1] - num_allowed > num_allowed:
+                return CompletionCall("fixed", masks.mask_get_only_allowed(mask), s.input_ids, kwargs, stopping_phrases=stopping_phrases)
+        elif num_allowed < self.tokenizer.model_vocab_size:
+            if self.tokenizer.model_vocab_size - num_allowed > num_allowed:
                 # if we have to mask more than half of the tokens, we should just invert the masking
                 invert = True
         else: # num_allowed == mask.shape[-1] (full vocabulary)
@@ -188,10 +189,8 @@ class DclibOpenAiModel(DcModel):
             return np.zeros(len(next_tokens), dtype=np.float32)
         return (await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids)))
     
-    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False):
+    async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
-        
-        completion = [np.array(cont) for cont in tokens]
 
         def make_detseq(s, token_score, completion):
             # compose deterministic flags
@@ -199,7 +198,7 @@ class DclibOpenAiModel(DcModel):
                 deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])])
                 next_deterministic = np.array([deterministic] * len(completion[1:]))
             else:
-                assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored"
+                assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
                 deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])])
                 next_deterministic = np.array(deterministic[1:])
 
@@ -213,13 +212,21 @@ class DclibOpenAiModel(DcModel):
                     user_data=user_data,
                     stop_phrase=np.concatenate([s.stop_phrase, np.array([stop_phrase])]),
                     needs_rewrite=needs_rewrite,
-                    sticky_user_data_keys=s.sticky_user_data_keys)
+                    sticky_user_data_keys=s.sticky_user_data_keys,
+                    internal=internal
+            )
         results = []
 
-        for s,compl,result in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
-            results.append(make_detseq(s, result, compl))
+        async for (s, tokens, scores) in self.score_tokens(sqs, tokens, max_batch_size=max_batch_size, noscore=noscore):
+            results.append(make_detseq(s, scores, tokens))
 
         return results
+    
+    async def score_tokens(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, noscore=False):
+        completion = [np.array(cont) for cont in tokens]
+
+        for s, tokens,scores in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
+            yield (s, tokens, scores)
 
     async def async_complete(self, completion_call: Union[CompletionCall, List[CompletionCall]], **kwargs) -> openai.response_buffer:
         assert type(completion_call) is CompletionCall
@@ -230,6 +237,7 @@ class DclibOpenAiModel(DcModel):
 
         temperature = completion_call.kwargs.get("temperature", 0.0)
         logprobs = completion_call.kwargs.get("logprobs", 5)
+        noscore = completion_call.kwargs.get("noscore", False)
 
         kwargs = {
             "model": self.model.model_identifier,
@@ -248,6 +256,9 @@ class DclibOpenAiModel(DcModel):
             pass
         elif mode == "complete": # complete with mask
             logit_bias = completion_call.api_mask
+            # reduce chunk size, if logit mask seems very sparse
+            if len(logit_bias) > 0 and max(logit_bias.values()) == 100 and len(logit_bias) < 10:
+                kwargs["max_tokens"] = min(kwargs["max_tokens"], 4)
             kwargs.update({"logit_bias": logit_bias})
         elif mode == "fixed": # complete with fixed token
             fixed_next_token = completion_call.logit_mask_or_fixed_id # special return value case for prepare function
@@ -256,21 +267,27 @@ class DclibOpenAiModel(DcModel):
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=0), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
             else:
                 fixed_next_token = nputil.ensure_array(fixed_next_token, dtype=np.int64)
-                logprob = (await self.api_score(np.concatenate([input_ids, fixed_next_token.reshape(1)], axis=0), len(input_ids)))
+                if noscore: logprob = 0.0
+                else: logprob = (await self.api_score(np.concatenate([input_ids, fixed_next_token.reshape(1)], axis=0), len(input_ids)))
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=logprob), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
-        elif len(completion_call.stopping_phrases) > 0:
+        else:
+            assert False, f"Internal openai API dispatcher returned an unknown completion mode {mode}"
+
+        if len(completion_call.stopping_phrases) > 0:
             if len(completion_call.stopping_phrases) > 4:
                 # same but blaming it more on OpenAI
                 print("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
-            kwargs.update({"stop": completion_call.stopping_phrases[:4]})
-        else:
-            assert False, f"Internal openai API dispatcher returned an unknown completion mode {mode}"
+            # skip stopping phrases for more speculative execution
+            if not self.model.nostop:
+                kwargs.update({"stop": completion_call.stopping_phrases[:4]})
 
         # TODO: we are now overestimate the number of tokens billed to the user since we are not account for stopping phrases for the sake of streaming
         self.count_billed_tokens(input_ids.size + kwargs.get("max_tokens") * batch_size, self.model_identifier)
         
         if self.model_args.get("chatty_openai", False):
-            print("Completion with", kwargs)
+            args = kwargs.copy()
+            args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
+            print(f"openai complete: {args}")
 
         return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     
@@ -279,66 +296,8 @@ class DclibOpenAiModel(DcModel):
             return [[t[0]] for t in await self.model.tokenize(tokens)]
         return tokens
     
-    async def _complete(self, completion_call: Union[CompletionCall, List[CompletionCall]], **kwargs):
-        if type(completion_call) is list:
-            input_ids = np.stack([c.input_ids for c in completion_call], axis=0)
-            assert input_ids.ndim == 2, f"_complete expects input_ids to be a 1D tensor per completion call, when multiple completion calls are passed, got {input_ids.ndim}D tensor."
-            # all other call parameters are assumed to be the same
-            batch_size = len(completion_call)
-            completion_call = completion_call[0]
-        else:
-            batch_size = 1
-            input_ids = completion_call.input_ids
-            assert input_ids.ndim == 1, f"_complete expects input_ids to be a 1D tensor when only one completion_call is passed, got {input_ids.ndim}D tensor."
-
-        temperature = completion_call.kwargs.get("temperature", 0.0)
-        logprobs = completion_call.kwargs.get("logprobs", 5)
-
-        kwargs = {
-            "model": self.model.model_identifier,
-            "prompt": input_ids.tolist()[0], # no more batching at this point
-            "max_tokens": self.model.chunk_size,
-            "temperature": temperature,
-            "logprobs": logprobs,
-            "user": "lmql",
-            "stream": True,
-        }
-
-        mode = completion_call.mode
-        
-        if mode == "*": # complete without mask
-            pass
-        elif mode == "complete": # complete with mask
-            logit_bias = completion_call.api_mask
-            kwargs.update({"logit_bias": logit_bias})
-        elif mode == "fixed": # complete with fixed token
-            fixed_next_token = completion_call.logit_mask_or_fixed_id # special return value case for prepare function
-            # TODO revisit this, what kind of probability do we want here (masked or unmasked/scored)
-            if fixed_next_token == self.eos_token_id:
-                return OpenAIModelOutputBuffer.fixed_output(fixed_next_token, 0)
-            else:
-                if not nputil.is_array(fixed_next_token): 
-                    fixed_next_token = np.array(fixed_next_token)
-                logprob = (await self.api_score(np.concatenate([input_ids, fixed_next_token.reshape(1)], axis=0), len(input_ids))).result
-                return OpenAIModelOutputBuffer.fixed_output(fixed_next_token, logprob)
-        elif len(completion_call.stopping_phrases) > 0:
-            if len(completion_call.stopping_phrases) > 4:
-                # same but blaming it more on OpenAI
-                print("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
-            kwargs.update({"stop": completion_call.stopping_phrases[:4]})
-        else:
-            assert False, f"Internal openai API dispatcher returned an unknown completion mode {mode}"
-
-        # TODO: we are now overestimate the number of tokens billed to the user since we are not account for stopping phrases for the sake of streaming
-        self.count_billed_tokens(input_ids.size + kwargs.get("max_tokens") * batch_size, self.model_identifier)
-        
-        if self.model_args.get("chatty_openai", False):
-            print("Completion with", kwargs)
-        
-        async def complete_op():
-            return openai_complete_create(**kwargs)
-        return await CompleteTask(complete_op, None, continuation_type=completion_call.continuation_type, 
-            logit_mask_or_fixed_id=completion_call.logit_mask_or_fixed_id).run(retries=3)
+    async def openai_cache_delegate(self, kwargs, tokens, scores):
+        print(tokens, scores, self.cache_delegate)
 
     def count_billed_tokens(self, n, model):
         if model not in self.num_billed_tokens.keys():
@@ -386,12 +345,73 @@ class DclibOpenAiModel(DcModel):
                     None,
                 )
 
-            return await self.async_complete(completion_call)
+            completion_result = await self.async_complete(completion_call)
+            # eagerly expand and cache full completion if a cache_delegate is available
+            if self.cache_delegate is not None:
+                await self.expand_and_cache(s, completion_result, "top-1", logprobs=kwargs.get("logprobs", 1))
+            
+            assert not await completion_result.buffer.empty(), "Completion result is empty on arrival"
+            return completion_result
 
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
 
+    async def expand_and_cache(self, s: DecoderSequence, completion_result: CompletionResult, edge_type, logprobs=1):
+        async def token_stream():
+            nonlocal edge_type, s, completion_result
+            response_buffer = completion_result.buffer
+            
+            try:
+                tokens = []
+                scores = []
+
+                while True:
+                    try:
+                        if await response_buffer.empty():
+                            break
+
+                        res = await response_buffer.get(0)
+                        tokens = nputil.ensure_iterable(res["logprobs"]["tokens"])
+                        scores = res["logprobs"]["token_logprobs"]
+
+                        topprobs = res["logprobs"]["top_logprobs"]
+                        if topprobs is not None and logprobs > 1:
+                            topk_tokens = list(topprobs.items())
+                            topk_tokens = [(tok[0], score) for (tok_str, score), tok in zip(topk_tokens, await self.tokenize_list([s for s,_ in topk_tokens]))]
+                            topk_tokens += [(tokens[0], scores)]
+                            topk_tokens = list(dict.fromkeys(topk_tokens))
+                            topk_tokens = sorted(topk_tokens, key=lambda x: x[1], reverse=True)
+                            topk_tokens = topk_tokens[:logprobs]
+                            
+                            tokens = [tok for tok, _ in topk_tokens]
+                            scores = [score for _, score in topk_tokens]
+                            edge_type = ["top-{}".format(i+1) for i in range(len(topk_tokens))]
+                        
+                        # future continuation
+                        response_buffer = response_buffer[1:]
+                        continuation = CompletionResult(response_buffer, completion_result.continuation_type, completion_result.logit_mask_or_fixed_id)
+
+                        if continuation.continuation_type is None:
+                            edge_type = None
+
+                        user_data = {
+                            "openai-continuations": {
+                                continuation.continuation_type: continuation
+                            }
+                        }
+                        yield (s, tokens, scores, edge_type, user_data)
+                    except IndexError:
+                        break
+                # print("fully expanded speculativate continuation:", [await self.detokenize(tokens)], flush=True)
+                # if len(tokens) > 1:
+                #     await self.cache(s, tokens, scores, edge_type)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print("error in expand_and_cache worker:", e, flush=True)
+        self.register_token_stream(token_stream)
+
     async def argmax(self, sequences, **kwargs):
-        return await self.sample(sequences, num_samples=1, temperature=0)
+        return await self.sample(sequences, num_samples=1, temperature=0, **kwargs)
 
     def report_stats(self, printer, decoder_step=None):
         if printer is None:
@@ -415,7 +435,7 @@ class DclibOpenAiModel(DcModel):
         kwargs = {**self.model_args, **kwargs}
 
         async def op_sample(seqs):
-            completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=5, **kwargs)
+            completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=1, **kwargs)
             
             next_token_ids = []
             next_token_scores = []
@@ -437,7 +457,7 @@ class DclibOpenAiModel(DcModel):
                     next_token_ids.append(np.array([next_token], dtype=np.int64))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
-                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                    full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                     if next_token < len(full_logits):
                         full_logits[next_token] = next_token_score
                     # else: 
@@ -455,10 +475,11 @@ class DclibOpenAiModel(DcModel):
                 prob_tokens = await self.tokenize_list(tokens)
                 token_ids = np.array(prob_tokens, dtype=np.int64).reshape(-1)
 
-                full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
                 full_logits[next_token] = np.finfo(np.float32).min
                 assert kwargs.get("temperature", 1.0) != 0.0 or np.all(full_logits < next_token_score), "next token score is not the highest"
+
 
                 # retroactively apply logits mask to logits
                 mask = completion.logit_mask_or_fixed_id
@@ -496,9 +517,8 @@ class DclibOpenAiModel(DcModel):
                 }
                 return [continuation_as_user_data] + [default_user_data.copy()] * (num_successors - 1)
 
-            s = [s.make_successors(next_token_ids[i], next_token_scores[i], logits=logits[i], 
+            return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=logits[i], 
                 user_data=successor_user_data(continuation_buffers[i], len(next_token_ids[i]))) for i,s in enumerate(seqs)]
-            return s
         with self.stats.timer("sample"):
             return await sequences.aelement_wise(op_sample)
 
@@ -535,7 +555,7 @@ class DclibOpenAiModel(DcModel):
                     next_token_ids.append(np.array([next_token], dtype=np.int64))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
-                    full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                    full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                     full_logits[next_token] = next_token_score
                     logits.append(full_logits)
                     continue
@@ -551,7 +571,7 @@ class DclibOpenAiModel(DcModel):
 
                 assert token_ids[0] == next_token, f"top1 logprob token is not the same as the predicted token {token_ids[0]} (top1) != {next_token} (predicted)"
 
-                full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
+                full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
 
                 # retroactively apply logits mask to logits
@@ -806,6 +826,7 @@ class OptimisticChunkBasedOpenAIModel:
     def __init__(self, model_identifier, tokenizer):
         self.model_identifier = model_identifier.split("openai/",1)[1]
         self.chunk_size = 32
+        self.nostop = False
         self.tokenizer = tokenizer
 
         self.input_ids = []
@@ -848,39 +869,6 @@ class OptimisticChunkBasedOpenAIModel:
         complete_op = lambda: openai_complete_create(**kwargs)
         return CompleteTask(complete_op, None, continuation_type=None).run(retries=3)
         
-
-    async def advance(self):
-        sequence_indices_to_extend_on = []
-        prompts_to_extend = []
-        for i, buffer in enumerate(self.buffer):
-            if await buffer.at_end():
-                sequence_indices_to_extend_on.append(i)
-                prompts_to_extend.append(self.input_ids[i])
-
-        if len(prompts_to_extend) > 0:
-            res = self._complete(np.stack(prompts_to_extend, axis=0))
-            response_buffer = OpenAIModelOutputBuffer(res, len(prompts_to_extend), self.tokenizer)
-            for i, seq_idx in enumerate(sequence_indices_to_extend_on):
-                self.buffer[seq_idx] = response_buffer.buffer(i)
-
-        # advance all self.input_ids by one token from buffer
-        next_tokens = []
-        for i, buffer in enumerate(self.buffer):
-            assert not await buffer.at_end(), f"openai model did not complete decoder head {i} further."
-            token, logprob = await buffer.pop()
-            next_tokens.append(token)
-            self.next_token_scores[i].append(logprob)
-
-        next_tokens = np.array(next_tokens, dtype=np.int64)
-        self.input_ids = np.concatenate([self.input_ids, next_tokens.unsqueeze(1)], axis=1)
-
-    def make_api_logits_mask(self, logits, invert):
-        if invert:
-            masked = (logits >= 0)
-        else:
-            masked = (logits < 0)
-        mask_value = 100 if invert else -100
-        return {int(idx): mask_value for idx in np.nonzero(masked)[0]}
     
     async def tokenize(self, text):
         return self.tokenizer(text)["input_ids"]

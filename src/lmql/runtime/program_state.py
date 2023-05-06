@@ -1,5 +1,5 @@
 class ProgramState:
-    def __init__(self, runtime=None):
+    def __init__(self, prompt, runtime=None):
         self.variable_values = {}
         # postprocessed, converted variable values if not just str (e.g. objects, int)
         self.variable_program_values = {}
@@ -8,6 +8,8 @@ class ProgramState:
         self.variable_monotonicity = {}
 
         self.runtime = runtime
+        self.subinterpreter_results = {}
+        self.prompt = prompt
 
     async def json(self):
         def json_value(k):
@@ -42,7 +44,7 @@ class ProgramState:
         return self.variable_monotonicity.get(name, "var")
 
     def copy(self):
-        s = ProgramState()
+        s = ProgramState(self.prompt)
         s.variable_values = self.variable_values.copy()
         s.variable_program_values = self.variable_program_values.copy()
         s.variable_monotonicity = self.variable_monotonicity.copy()

@@ -191,6 +191,8 @@ export function ValidationGraph(props) {
                       n.data.color = "rgb(38, 87, 38)"
                   } else if (value == true) {
                       n.data.color = "rgb(58, 88, 58)"
+                  } else if (final == "stopped") {
+                      n.data.color = "rgb(134, 79, 142)"
                   } else {
                       n.data.color = "rgb(64, 61, 61)"
                   }

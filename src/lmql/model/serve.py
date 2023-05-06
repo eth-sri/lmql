@@ -173,6 +173,7 @@ class ModelProcessor:
 
     def run(self):
         dtype = self.state.dtype
+        load_in_8bit = dtype == "8bit"
         if dtype == "float16":
             dtype = torch.float16
         else:
@@ -184,7 +185,7 @@ class ModelProcessor:
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, torch_dtype=dtype, resume_download=True)
         else:
             print("Loading {} (Multi-GPU)".format(self.model_identifier))
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, torch_dtype=dtype, resume_download=True, device_map="auto")
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, torch_dtype=dtype, resume_download=True, load_in_8bit=load_in_8bit, device_map="auto")
         self.model.eval()
         
         print("Ready!".format(self.model_identifier))
@@ -451,7 +452,7 @@ if __name__ == "__main__":
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--cuda", action="store_true", default=False)
     parser.add_argument("--cache", type=str, default=None)
-    parser.add_argument("--dtype", type=str, default="none")
+    parser.add_argument("--dtype", type=str, default="none", help="What format to load the model weights. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes)")
     parser.add_argument("--wait_until_ready", action="store_true", default=False, help="Whether the server should start only after the model and tokenizer have been loaded.")
     parser.add_argument("--num-tokenizer-processes", type=int, default=2, dest="num_tokenizer_processes")
     
