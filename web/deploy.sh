@@ -49,6 +49,7 @@ pushd browser-build
 bash browser-build.sh
 popd
 cp -r browser-build/dist/wheels ../web-deploy/playground/
+rm ../web-deploy/playground/wheels/.gitignore # remove gitignore to deploy .whl files to Pages
 cp -r browser-build/dist/lmql.web.min.js ../web-deploy/playground/
 
 # check for --push
