@@ -1,7 +1,7 @@
 import { BrowserProcessConnection } from './browser_process';
 import { RemoteProcessConnection as RemoteRemoteProcessConnection} from './remote_process';
 
-const NEXT_MODE = window.location.host.includes("next")
+const NEXT_MODE = window.location.host.includes("next") || window.location.hash.includes("is-next");
 
 const BrowserProfile = {
     DEMO_MODE: true,
