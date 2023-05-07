@@ -352,7 +352,7 @@ const PreviewQueries = {
 }
 
 if (configuration.NEXT_MODE) {
-  let url = "https://gist.githubusercontent.com/lbeurerkellner/ac14e0d324edf547d1c7af468ca084fc/raw/next-queries.js";
+  let url = "https://raw.githubusercontent.com/lmql-lang/awesome-lmql/main/next/showcase-playground.js";
   url += "?nocache=" + Math.random();
   fetch(url).then((r) => r.text()).then((r) => {
     // eslint-disable-next-line no-eval
