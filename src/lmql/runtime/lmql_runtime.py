@@ -152,8 +152,16 @@ class LMQLQueryFunction(LMQLChainMixIn):
             else:
                 query_kwargs[a] = self.scope.resolve(a)
         
-        # execute main prompt
-        results = await interpreter.run(self.fct, **query_kwargs)
+        
+        # keep track of the main interpreter (only produces debug output for this one)
+        try:
+            if PromptInterpreter.main is None:
+                PromptInterpreter.main = interpreter
+            # execute the program
+            results = await interpreter.run(self.fct, **query_kwargs)
+        finally:
+            if PromptInterpreter.main == interpreter:
+                PromptInterpreter.main = None
 
         # applies distribution postprocessor if required
         results = await (ConditionalDistributionPostprocessor(interpreter).process(results))
