@@ -1141,7 +1141,7 @@ function ModelResultContent(props) {
       }
 
       if (segment.variable == "__prompt__") {
-        if (segment.content == "\\n" || segment.content.trim() == "") {
+        if (segment.content.trim() == "") {
           continue;
         }
         result.push({
