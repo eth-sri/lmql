@@ -24,6 +24,7 @@ from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
+import lmql.types as types
 
 model_registry = LMQLModelRegistry
 

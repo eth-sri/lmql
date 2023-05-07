@@ -18,6 +18,7 @@ import lmql.runtime.lmql_runtime as lmql_runtime
 from lmql.runtime.dclib import get_all_decoders
 
 OPS_NAMESPACE = "lmql.ops"
+LIB_NAMESPACE = "lmql.lib"
 
 class FreeVarCollector(ast.NodeVisitor):
     def __init__(self, free_vars, exclude_criteria=None):
@@ -192,11 +193,26 @@ class FunctionCallTransformation(ast.NodeTransformer):
             return node.value
         return node.value
 
-    def visit_Call(self, node: Call) -> Any:
-        wrapped = Call(ast.parse("lmql.runtime_support.call"), [node.func, *node.args], node.keywords)
-        wrapped = ast.Await(wrapped)
-        return wrapped
+    def is_excluded_from_call_transformation(self, node):
+        if not type(node) is ast.Name: return False
+        if ast.unparse(node).startswith("lmql.runtime_support.call"): return True
+        return node.id in ["print", "eval"]
 
+    def visit_Call(self, node: Call) -> Any:
+        f = self.visit(node.func)
+        args = [self.visit(a) for a in node.args]
+        keywords = [self.visit(k) for k in node.keywords]
+
+        if self.is_excluded_from_call_transformation(node.func):
+            node.func = f
+            node.args = args
+            node.keywords = keywords
+            return node
+
+        wrapped = Call(ast.parse("lmql.runtime_support.call"), [f, *args], keywords)
+        wrapped = ast.Await(wrapped)
+
+        return wrapped
 class QueryStringTransformation(FunctionCallTransformation):
     """
     Transformes string expressions on statement level to model queries.
@@ -390,10 +406,11 @@ class WhereClauseTransformation():
                     ops_list = ", ".join(ops).strip()
                     return snf.add(f"{impl}([{ops_list}])")
             
-            # if is_type_constraint(expr):
-            #     type_name = expr.comparators[0].id
-            #     var_name = expr.left.args[0].id
-            #     return snf.add(f"{OPS_NAMESPACE}.TypeConstraint([{type_name}, {OPS_NAMESPACE}.Var('{var_name}')])")
+            if is_type_constraint(expr):
+                type_name = expr.comparators[0].id
+                var_name = expr.left.args[0].id
+                return snf.add(f"{OPS_NAMESPACE}.CallOp([{LIB_NAMESPACE}.type_constraints.is_type, [{OPS_NAMESPACE}.Var('{var_name}'), {type_name}]], locals(), globals())")
+                # return snf.add(f"{LIB_NAMESPACE}.is_type([{type_name}, {OPS_NAMESPACE}.Var('{var_name}')])")
             
             assert False, "operator {} is not supported.".format(astunparse.unparse(expr))
         elif type(expr) is ast.Constant:
@@ -528,7 +545,7 @@ class PythonFunctionWriter:
         self.file = open(self.filename, "w")
 
         self.indent = "  "
-        self.write("import lmql\n")
+        self.write("import lmql\nimport lmql.lib\n")
         self.write(self.prologue)
         
         if decorators is not None:
@@ -672,6 +689,9 @@ class LMQLCompiler:
                     writer.add(yield_call("set_distribution", "\"" + q.distribution.variable_name + "\"", astunparse.unparse(q.distribution.values).strip()))
                 
                 writer.add(f"yield ('result', (" + yield_call("get_return_value", ()) + "))")
+
+            if q.decode.has_dump_compiled_code_flag:
+                print(writer.in_memory_contents)
 
             return LMQLModule(output_file, lmql_code=lmql_code, output_variables=[v for v in scope.defined_vars])
         except FragmentParserError as e:
