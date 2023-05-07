@@ -1002,6 +1002,11 @@ class PromptInterpreter:
                 
                 subvalid[si] = valid
 
+                # nothing to process if follow_map is None
+                if follow_map is None:
+                    subfollow[si] = None
+                    continue
+
                 # make sure final information is also propagated to the parent interpreter
                 fixed_final_value_components = []
                 for m, c in follow_map.components:
