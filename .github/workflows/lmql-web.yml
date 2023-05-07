@@ -80,7 +80,7 @@ jobs:
       uses: JamesIves/github-pages-deploy-action@v4
       with:
         repository-name: lmql-lang/lmql-next
-        token: ${{ secrets.LMQL_LANG_NEXT_PUSH_ACCESS }} 
+        ssh-key: ${{ secrets.LMQL_LANG_NEXT_PUSH_KEY }} 
         folder: web-deploy
         branch: web
 
