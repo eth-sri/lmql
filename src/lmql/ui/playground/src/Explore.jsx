@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import {queries} from "./queries";
 import { displayState, persistedState, trackingState } from "./State";
+import {configuration} from "./Configuration"
 
 export const PromptPopup = styled.div`
   position: absolute;
@@ -289,8 +290,8 @@ const TypingContainer = styled.span`
 `
 
 
-function TypedText() {
-  const text = "Welcome To LMQL";
+function TypedText(props) {
+  const text = props.text;
   const speed = 50;
   let [index, setIndex] = useState(window.textWasTyped ? text.length : 0);
   let [isTyping, setIsTyping] = useState(!window.textWasTyped);
@@ -345,6 +346,25 @@ const CiteBox = styled.code`
 
 let didLoadAnchor = false;
 
+const PreviewQueries = {
+  queries: [],
+  listeners: []
+}
+
+if (configuration.NEXT_MODE) {
+  let url = "https://gist.githubusercontent.com/lbeurerkellner/ac14e0d324edf547d1c7af468ca084fc/raw/next-queries.js";
+  url += "?nocache=" + Math.random();
+  fetch(url).then((r) => r.text()).then((r) => {
+    let queries = eval(r).queries;
+    PreviewQueries.queries = queries;
+    PreviewQueries.listeners.forEach((l) => l());
+    console.log("Loaded list of Preview release queries.", queries)
+  }).catch((e) => {
+    console.error(e)
+    console.error("Error loading list of Preview release queries.")
+  });
+}
+
 export function Explore() {
     const [visible, setVisible] = useState(ExploreState.visible);
 
@@ -362,7 +382,9 @@ export function Explore() {
       } else {
         persistedState.setItem("lmql-editor-contents", q.code)
       }
-  }
+    }
+
+    let [exploreQueries, setExploreQueries] = useState(queries);
 
     useEffect(() => {
         // register listeners
@@ -390,7 +412,28 @@ export function Explore() {
         }
     }, []);
 
+    useEffect(() => {
+      if (configuration.NEXT_MODE) {
+        const listener = () => {
+          setExploreQueries(PreviewQueries.queries);
+        }
+        PreviewQueries.listeners.push(listener);
+        return () => {
+          PreviewQueries.listeners = PreviewQueries.listeners.filter((l) => l !== listener);
+        }
+      }
+    }, [])
+
+
     if (!visible) return null;
+
+    let description = <>
+    LMQL is a query language for large language models. This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below, demonstrating <i>constrained model use</i>, <i>control-flow guided generation</i>, and tool-augmented LLMs.
+    </>
+
+    if (configuration.NEXT_MODE) {
+      description = <>This is the preview channel of LMQL. It contains the latest features, but may be unstable. If you are looking for the stable version, please visit <a href="https://lmql.ai/playground">the stable Playground IDE</a>.</>
+    }
 
     return <PromptPopup>
         <div className="click-handler" onClick={() => ExploreState.setVisibility(false)}/>
@@ -399,13 +442,11 @@ export function Explore() {
             <img src="/lmql.svg" alt="LMQL Logo"/>  
             <TypedText text="Welcome To LMQL" speed={20}/>
           </h1>
-          <Description>
-            LMQL is a query language for large language models. This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below, demonstrating <i>constrained model use</i>, <i>control-flow guided generation</i>, and tool-augmented LLMs.
-          </Description>
+          <Description>{description}</Description>
           <span className="close" onClick={() => ExploreState.setVisibility(false)}>
             &times;
           </span>
-          {queries.map(c => 
+          {exploreQueries.map(c => 
             <>
             <h2 key={c.category}>{c.category}</h2>
             <div key={c.category + "-div"}>
@@ -418,11 +459,13 @@ export function Explore() {
             </div>
             </>
           )}
+          {!configuration.NEXT_MODE && <>
           <h2 key="read-paper">Read the Paper</h2>
           <CiteBox key="cite">
           Beurer-Kellner, Luca, Marc Fischer, and Martin Vechev. "Prompting Is Programming: A Query Language For Large Language Models." 
           <a target="_blank" rel="noreferrer" href="https://arxiv.org/pdf/2212.06094">arXiv preprint arXiv:2212.06094</a> (2022).
           </CiteBox>
+          </>}
         </ExploreDialog>
     </PromptPopup>
 }
