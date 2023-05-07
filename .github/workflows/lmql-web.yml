@@ -75,7 +75,7 @@ jobs:
       with:
         name: lmql-web-payload
         path: web-deploy
-    - run: cp web-deploy/playground/* web-deploy/
+    - run: cp -r web-deploy/playground/* web-deploy/
     - name: Deploy to web branch
       uses: JamesIves/github-pages-deploy-action@v4
       with:
