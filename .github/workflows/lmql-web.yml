@@ -75,6 +75,7 @@ jobs:
       with:
         name: lmql-web-payload
         path: web-deploy
+    - run: cp web-deploy/index-next.html web-deploy/index.html
     - name: Deploy to web branch
       uses: JamesIves/github-pages-deploy-action@v4
       with:
