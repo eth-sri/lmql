@@ -355,6 +355,7 @@ if (configuration.NEXT_MODE) {
   let url = "https://gist.githubusercontent.com/lbeurerkellner/ac14e0d324edf547d1c7af468ca084fc/raw/next-queries.js";
   url += "?nocache=" + Math.random();
   fetch(url).then((r) => r.text()).then((r) => {
+    // eslint-disable-next-line no-eval
     let queries = eval(r).queries;
     PreviewQueries.queries = queries;
     PreviewQueries.listeners.forEach((l) => l());

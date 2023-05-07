@@ -407,7 +407,6 @@ export function DecoderGraph(props) {
 
     const derivedNodeFeatures = props.derivedNodeFeatures || (() => {})
 
-    const [graphId, setGraphId] = useState(null);
     const [cyData, setCyData] = useState(null);
     const [rawGraphData, setRawGraphData] = useState(null);
     const cyRef = useRef(null)
