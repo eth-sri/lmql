@@ -17,6 +17,14 @@ class LMQLDecoderConfiguration:
     method: ast.AST
     decoding_args: List[ast.keyword]
 
+    @property
+    def has_dump_compiled_code_flag(self):
+        for kwa in self.decoding_args:
+            if kwa.arg == "dump_compiled_code":
+                if type(kwa.value) is ast.Constant and kwa.value.value == True:
+                    return True
+        return False
+
 @dataclass
 class LMQLDistributionClause:
     variable_name: str
@@ -216,11 +224,6 @@ class LanguageFragmentParser:
     def digest(self, tok):
         if self.state == "start":
             if tok.type == tokenize.NAME:
-                # for constraints you cannot specify parameters, and we directly switch to the prompt parsing state
-                if tok.string.lower() == "incontext":
-                    self.query.decode_str += [tok]
-                    self.state = "prompt"
-                    return
                 # when we encounter the first decoder keyword, we switch to the query parsing state
                 if tok.string.lower() in get_all_decoders():
                     self.query.decode_str += [tok]

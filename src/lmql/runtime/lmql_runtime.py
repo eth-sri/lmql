@@ -140,10 +140,10 @@ class LMQLQueryFunction(LMQLChainMixIn):
         kwargs = self.make_kwargs(*args, **kwargs)
 
         interpreter = PromptInterpreter(force_model=self.model)
-        
-        if self.output_writer is not None:
-            kwargs["output_writer"] = self.output_writer
-        interpreter.set_extra_args(**kwargs)
+        interpreter.set_extra_args(
+            output_writer = self.output_writer,
+            **kwargs
+        )
 
         query_kwargs = {}
         for a in self.args:

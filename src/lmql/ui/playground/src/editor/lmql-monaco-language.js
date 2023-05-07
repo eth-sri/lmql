@@ -55,6 +55,7 @@ export function registerLmqlLanguage(monaco) {
             "beam",
             "ARGMAX",
             "argmax",
+            "incontext",
             "SAMPLE",
             "BEST_K",
             "best_k",
@@ -244,7 +245,10 @@ export function registerLmqlLanguage(monaco) {
             whitespace: [
                 [/\s+/, 'white'],
                 [/(^#.*$)/, 'comment'],
-                [/'''/, 'string', '@endDocString'],
+                // use ''' but not '''lmql
+                [/'''[^(lmql)]+/, 'string', '@endDocString'],
+                [/'''lmql/, 'comment'],
+                [/'''$/, 'comment'],
                 [/"""/, 'string', '@endDblDocString']
             ],
             endDocString: [
@@ -252,6 +256,11 @@ export function registerLmqlLanguage(monaco) {
                 [/\\'/, 'string'],
                 [/'''/, 'string', '@popall'],
                 [/'/, 'string']
+            ],
+            endLmqlDocString: [
+                // everything like top-level
+                // [/[^(''')]+/, 'root'],
+                [/'''/, 'comment', '@popall'],
             ],
             endDblDocString: [
                 [/[^"]+/, 'string'],

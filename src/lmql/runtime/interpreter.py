@@ -177,9 +177,9 @@ class PromptInterpreter:
 
         # decoder configuration
         self.decoder = None
-        self.decoder_kwargs = {}
+        self.decoder_kwargs = None
         self.decoder_step = 0
-        
+
         # extra interpreter flags passed via @lmql.query/@lmql.compiled_query
         self.extra_kwargs = {}
 
@@ -222,9 +222,13 @@ class PromptInterpreter:
     def set_extra_args(self, **kwargs):
         if "output_writer" in kwargs:
             self.output_writer = kwargs["output_writer"]
+        # store remaining flags
         self.extra_kwargs.update(kwargs)
 
     def set_decoder(self, method, **kwargs):
+        # remove compiler-level flags
+        if "dump_compiled_code" in kwargs:
+            kwargs.pop("dump_compiled_code")
         self.decoder_kwargs = kwargs
         self.decoder_kwargs["decoder"] = method
 
@@ -963,11 +967,11 @@ class PromptInterpreter:
             # prepare subinterpreter if this is the first time it is used
             if si.root_state is None:
                 # print("prepare subinterpreter", int_to_emoji(id(si)), calling_state.variable_offset)
-                await si.prepare(calling_state.variable_offset)
+                await si.prepare(calling_state.variable_offset, calling_state.prompt)
 
             state = si.interpreter_state_from_user_data(s)
             # ids so far in subtinterpreter sequence space
-            subinterpreter_prompt = await s.text(offset=si.parent_offset, pretty=False)
+            subinterpreter_prompt = calling_state.prompt + text
             # check if we need to first add the initial_subprompt_ids
             if len(si.root_state.prompt) > len(subinterpreter_prompt):
                 remaining_suffix = si.root_state.prompt[len(subinterpreter_prompt):]
@@ -984,7 +988,9 @@ class PromptInterpreter:
                 )
             else:
                 if state == si.root_state and len(si.root_state.prompt) == len(subinterpreter_prompt):
+                    # set actual variable offset and store state back into current sequence
                     si.root_state = si.root_state.updated(variable_offset=len(s.input_ids))
+                    s.user_data = dc.deepmerge(s.user_data, si.interpreter_state_user_data(si.root_state))
 
                 follow_map, updated_user_data = await si.where_for_sequence(s, True, 0, return_follow_map=True, **kwargs)
                 
@@ -1043,19 +1049,18 @@ class SubInterpreter(PromptInterpreter):
 
         self.user_data_key = "head[sub-" + str(id(self)) + "]"
 
-        self.parent_offset = None
         self.initial_subprompt_ids = None
 
     def user_data_layer(self, *sqs):
         return UserDataLayer(sqs, self.user_data_mappings)
 
-    async def prepare(self, parent_offset: int):
+    async def prepare(self, parent_offset: int, prompt: str):
         # prepare initial program state
         context = LMQLContext(self, None, "")
 
         query_head = InterpretationHead(self.fct, context, args=[], kwargs=self.captures)
         self.root_state = PromptState(interpreter=self, subinterpreters=set(),
-            variable=None, prompt="", stmt_buffer=[],
+            variable=None, prompt=prompt, stmt_buffer=[],
             query_head=query_head, program_state=context.program_state,
             recurring_variable_counter={}, variable_offset=parent_offset,
             valid=None, final=None, mask=None, 
@@ -1065,8 +1070,7 @@ class SubInterpreter(PromptInterpreter):
         self.initial_subprompt_ids = await self.tokenize(self.root_state.prompt)
         self.n = len(self.initial_subprompt_ids)
 
-        self.parent_offset = parent_offset
-        self.root_state = self.root_state.updated(variable_offset=parent_offset + self.n)
+        self.root_state = self.root_state.updated(variable_offset=self.n)
 
     def run(self, prompt, **kwargs):
         raise NotImplementedError("A SubInterpreter cannot be run directly. Please use the parent interpreter instead.")
