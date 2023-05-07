@@ -11,6 +11,7 @@ npm install
 node generate.js
 # copy index.html
 cp index.html ../web-deploy/
+cp index-next.html ../web-deploy/
 cp static/images/lmql.svg ../web-deploy/lmql.svg
 # copy static content
 cp -r static ../web-deploy/
