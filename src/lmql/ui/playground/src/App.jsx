@@ -140,6 +140,17 @@ const Title = styled.h1`
     margin-left: 5pt;
     top: 2pt;
   }
+
+  span.badge {
+    background-color: #383666;
+    font-size: 8pt;
+    padding: 2pt;
+    border-radius: 2pt;
+    color: white;
+    margin-left: 5pt;
+    position: relative;
+    top: -1pt;
+  }
 `;
 
 const Sidebar = styled.div.attrs(props => ({ className: "sidebar" }))`
@@ -2552,8 +2563,13 @@ class App extends React.Component {
           <Title>
             <img src="/lmql.svg" alt="LMQL Logo"/>  
             LMQL Playground
+            {configuration.NEXT_MODE && <span className="badge">PREVIEW</span>}
           </Title>
-          {configuration.DEMO_MODE && <FancyButton className="in-toolbar" onClick={() => ExploreState.setVisibility(true)}><ExploreIc/> Explore LMQL</FancyButton>}
+          {configuration.DEMO_MODE && <FancyButton className="in-toolbar" onClick={() => ExploreState.setVisibility(true)}>
+            <ExploreIc/> 
+            {!configuration.NEXT_MODE && <>Explore LMQL</>}
+            {configuration.NEXT_MODE && <>Explore New Features</>}
+          </FancyButton>}
           {window.location.hostname.includes("lmql.ai") && <a href={"https://docs.lmql.ai/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
           Install LMQL Locally </a>}
           <Spacer />

@@ -1,10 +1,13 @@
 import { BrowserProcessConnection } from './browser_process';
 import { RemoteProcessConnection as RemoteRemoteProcessConnection} from './remote_process';
 
+const NEXT_MODE = window.location.host.includes("next")
+
 const BrowserProfile = {
     DEMO_MODE: true,
     BROWSER_MODE: true,
     DEV_MODE: true,
+    NEXT_MODE: NEXT_MODE,
     ProcessConnection: BrowserProcessConnection
 }
 
@@ -12,6 +15,7 @@ const RemoteProfile = {
     DEMO_MODE: true,
     BROWSER_MODE: false,
     DEV_MODE: true,
+    NEXT_MODE: NEXT_MODE,
     ProcessConnection: RemoteRemoteProcessConnection
 }
 
