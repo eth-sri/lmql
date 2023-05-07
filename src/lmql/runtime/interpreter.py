@@ -167,9 +167,6 @@ class PromptInterpreter:
     """
 
     def __init__(self, context=None, force_model=None) -> None:
-        if PromptInterpreter.main is None:
-            PromptInterpreter.main = self
-        
         # model-specific components
         self.model = force_model
         self.model_identifier = force_model
