@@ -987,10 +987,10 @@ class PromptInterpreter:
                     ("*", ops.PredeterminedFinal(False, "fin"))
                 )
             else:
-                if state == si.root_state and len(si.root_state.prompt) == len(subinterpreter_prompt):
+                if len(si.root_state.prompt) == len(subinterpreter_prompt):
                     # set actual variable offset and store state back into current sequence
-                    si.root_state = si.root_state.updated(variable_offset=len(s.input_ids))
-                    s.user_data = dc.deepmerge(s.user_data, si.interpreter_state_user_data(si.root_state))
+                    updated_offset_state = state.updated(variable_offset=len(s.input_ids))
+                    s.user_data = dc.deepmerge(s.user_data, si.interpreter_state_user_data(updated_offset_state))
 
                 follow_map, updated_user_data = await si.where_for_sequence(s, True, 0, return_follow_map=True, **kwargs)
                 
