@@ -58,7 +58,7 @@ def endpoint(query, *args, output_writer_cls=HttpEventStreamOutputWriter, **kwar
         elif request.method == "GET":
             payload = request.query
 
-        kwargs = {**payload, **kwargs}
+        query_kwargs = {**payload, **(kwargs.copy())}
 
-        return await serve(request, q, *args, output_writer_cls=output_writer_cls, **kwargs)
+        return await serve(request, q, *args, output_writer_cls=output_writer_cls, **query_kwargs)
     return handler

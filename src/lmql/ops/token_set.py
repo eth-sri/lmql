@@ -8,7 +8,7 @@ from itertools import product
 from lmql.utils import nputil
 import numpy as np
 from lmql.runtime.stats import Stats
-
+from lmql.runtime.caching import cachefile, cache_file_exists
 from lmql.runtime.tokenizer import get_vocab
 
 class VocabularyMatcher:
@@ -40,23 +40,20 @@ class VocabularyMatcher:
 
         # first try to load pickled matcher from cache (faster)
         import pickle
-        import pathlib
 
-        cache_dir = pathlib.Path.home() / ".cache" / "lmql"
-        cache_dir.mkdir(parents=True, exist_ok=True)
         cache_identifier = tokenizer.model_identifier.replace("/", "-")
-        cache_path = cache_dir / f"token-mask-cache-{cache_identifier}.pkl"
-        matcher_path = cache_dir / f"matcher-{cache_identifier}.pkl"
+        cache_path = f"token-mask-cache-{cache_identifier}.pkl"
+        matcher_path = f"matcher-{cache_identifier}.pkl"
 
         try:
-            with open(matcher_path, "rb") as f:
+            with cachefile(matcher_path, "rb") as f:
                 VocabularyMatcher._instance = pickle.load(f)
                 VocabularyMatcher._instance.stats = Stats("VocabularyMatcher")
         except:
             VocabularyMatcher._instance = VocabularyMatcher(tokenizer, tokenizer.model_identifier)
 
-        if cache_path.exists():
-            with open(cache_path, "rb") as f:
+        if cache_file_exists(cache_path):
+            with cachefile(cache_path, "rb") as f:
                 try:
                     import time
                     s = time.time()
@@ -71,17 +68,12 @@ class VocabularyMatcher:
     def save(self):
         # save cache to disk
         import pickle
-        import pathlib
 
-        # assert False
-
-        cache_dir = pathlib.Path.home() / ".cache" / "lmql"
-        cache_dir.mkdir(parents=True, exist_ok=True)
         cache_identifier = self.model_identifier.replace("/", "-")
-        cache_path = cache_dir / f"token-mask-cache-{cache_identifier}.pkl"
-        matcher_path = cache_dir / f"matcher-{cache_identifier}.pkl"
+        cache_path = f"token-mask-cache-{cache_identifier}.pkl"
+        matcher_path = f"matcher-{cache_identifier}.pkl"
 
-        with open(matcher_path, "wb") as f:
+        with cachefile(matcher_path, "wb") as f:
             stats = self.stats
             self.stats = None
             pickle.dump(self, f)
@@ -94,7 +86,7 @@ class VocabularyMatcher:
                 return True
             return False
 
-        with open(cache_path, "wb") as f:
+        with cachefile(cache_path, "wb") as f:
             pickle.dump({k: v for k, v in VocabularyMatcher.cache.items() if is_cached(k)}, f)
 
     @staticmethod
