@@ -11,6 +11,9 @@ CACHE_DIR = pathlib.Path.home() / ".cache" / "lmql"
 def prepare_cache_access():
     if not CACHE_DIR.exists():
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+        with open(os.path.join(CACHE_DIR, "cache-version"), "w") as f:
+            f.write(str(CACHE_VERSION))
         return
 
     cache_is_valid = False
