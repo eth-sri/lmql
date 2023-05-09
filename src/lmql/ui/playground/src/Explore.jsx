@@ -351,21 +351,6 @@ const PreviewQueries = {
   listeners: []
 }
 
-if (configuration.NEXT_MODE) {
-  let url = "https://raw.githubusercontent.com/lmql-lang/awesome-lmql/main/next/showcase-playground.js";
-  url += "?nocache=" + Math.random();
-  fetch(url).then((r) => r.text()).then((r) => {
-    // eslint-disable-next-line no-eval
-    let queries = eval(r).queries;
-    PreviewQueries.queries = queries;
-    PreviewQueries.listeners.forEach((l) => l());
-    console.log("Loaded list of Preview release queries.", queries)
-  }).catch((e) => {
-    console.error(e)
-    console.error("Error loading list of Preview release queries.")
-  });
-}
-
 export function Explore() {
     const [visible, setVisible] = useState(ExploreState.visible);
 
@@ -385,7 +370,24 @@ export function Explore() {
       }
     }
 
-    let [exploreQueries, setExploreQueries] = useState(queries);
+    let [exploreQueries, setExploreQueries] = useState(configuration.NEXT_MODE ? PreviewQueries.queries : queries);
+
+    useEffect(() => {
+      if (configuration.NEXT_MODE) {
+        let url = "https://raw.githubusercontent.com/lmql-lang/awesome-lmql/main/next/showcase-playground.js";
+        url += "?nocache=" + Math.random();
+        fetch(url).then((r) => r.text()).then((r) => {
+          // eslint-disable-next-line no-eval
+          let queries = eval(r).queries;
+          PreviewQueries.queries = queries;
+          PreviewQueries.listeners.forEach((l) => l());
+          console.log("Loaded list of Preview release queries.", queries)
+        }).catch((e) => {
+          console.error(e)
+          console.error("Error loading list of Preview release queries.")
+        });
+      }
+    }, [])
 
     useEffect(() => {
         // register listeners
