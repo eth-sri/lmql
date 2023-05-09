@@ -776,7 +776,7 @@ class PromptInterpreter:
             return results
         finally:
             # make sure token cache is saved if possible
-            self.dcmodel.save()
+            self.dcmodel.save(prompt_ids)
             if hasattr(self.dcmodel, "close"):
                 self.dcmodel.close()
 

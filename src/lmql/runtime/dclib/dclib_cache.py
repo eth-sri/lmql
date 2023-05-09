@@ -13,6 +13,44 @@ from .dclib_rewrite import DcModelRewriteMixin
 import lmql.runtime.masks as masks
 from lmql.utils.nputil import ensure_iterable
 
+class CacheFile:
+    def __init__(self, filename, initial_ids, model):
+        self.filename = filename
+        self.initial_ids = initial_ids
+        self.model = model
+    
+    def load(self):
+        if self.filename is not None and os.path.exists(self.filename):
+            with open(self.filename, "rb") as f:
+                cache = pickle.load(f)
+                if cache.get("model") != self.model:
+                    print("warning: cache file is from a different model. Its contents will be overwritten. {} != {}".format(cache["model"], self.model))
+                else:
+                    if not str(self.initial_ids) in cache.keys():
+                        print(str(self.initial_ids))
+                        print("cache miss for", self.filename, cache.keys())
+                    return cache.get(str(self.initial_ids), {})
+        return {}
+    
+    def save(self, cache):
+        if os.path.exists(self.filename):
+            with open(self.filename, "rb") as f:
+                existing_cache = pickle.load(f)
+                if existing_cache.get("model") != self.model:
+                    print("warning: cache file is from a different model. Its contents will be overwritten. {} != {}".format(cache.get("model"), self.model))
+                    existing_cache = {}
+        else:
+            existing_cache = {}
+        if "model" in existing_cache.keys() and existing_cache["model"] != self.model:
+            print("warning: cache file is from a different model. Its contents will be overwritten. {} != {}".format(existing_cache.get("model"), self.model))
+            existing_cache = {}
+        existing_cache["model"] = self.model
+        existing_cache[str(self.initial_ids)] = cache
+        
+        with open(self.filename, "wb") as f:
+            pickle.dump(existing_cache, f)
+
+
 class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     delegate: DcModel
     
@@ -36,7 +74,6 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         
         mc.input_id_key_offset = len(initial_prompt_ids) if initial_prompt_ids else 0
         mc.initial_prompt_ids = initial_prompt_ids
-        mc.cache["initial_prompt_ids"] = str(initial_prompt_ids) if initial_prompt_ids is not None else None
         mc.cache["model"] = delegate.model_identifier
     
         mc.calls = 0
@@ -45,13 +82,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         mc.cache_file = cache_file
 
         try:
-            if cache_file is not None and os.path.exists(cache_file):
-                with open(cache_file, "rb") as f:
-                    cache = pickle.load(f)
-                    if cache.get("model") != delegate.model_identifier:
-                        print("warning: cache file is from a different model. Its contents will be overwritten.")
-                    else:
-                        mc.cache = cache.get(str(initial_prompt_ids), {})
+            mc.cache = CacheFile(cache_file, initial_prompt_ids, delegate.model_identifier).load()
+            print("did load cache from file", cache_file, mc.cache.keys())
         except Exception as e:
             print("error: failed to load token cache from file", e)
             pass
@@ -64,17 +96,14 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             ts.cancel()
         self.token_streams = []
 
-    def save(self):
+    def save(self, initial_ids):
         if self.cache_file is not None:
-            if os.path.exists(self.cache_file):
-                with open(self.cache_file, "rb") as f:
-                    cache = pickle.load(f)
-            else:
-                cache = {}
-            cache[str(self.initial_prompt_ids)] = self.cache
-            cache["model"] = self.cache["model"]
-            with open(self.cache_file, "wb") as f:
-                pickle.dump(cache, f)
+            cf = CacheFile(self.cache_file, initial_ids, self.delegate.model_identifier)
+            try:
+                cf.save(self.cache)
+            except Exception as e:
+                print("error: failed to save token cache to file", e, flush=True)
+                pass
     
     def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
