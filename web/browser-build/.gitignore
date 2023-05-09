@@ -5,3 +5,4 @@ temp
 build
 browsertorch
 shim/openai-shim/openai-shim.tar.gz
+wheels/*.tar.gz
