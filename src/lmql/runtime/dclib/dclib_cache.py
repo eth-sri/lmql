@@ -71,6 +71,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         mc.mask_cache = {}
         mc.show_speculative = show_speculative
+        mc.initial_ids = initial_prompt_ids
         
         mc.input_id_key_offset = len(initial_prompt_ids) if initial_prompt_ids else 0
         mc.initial_prompt_ids = initial_prompt_ids
@@ -83,7 +84,6 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         try:
             mc.cache = CacheFile(cache_file, initial_prompt_ids, delegate.model_identifier).load()
-            print("did load cache from file", cache_file, mc.cache.keys())
         except Exception as e:
             print("error: failed to load token cache from file", e)
             pass
@@ -96,9 +96,9 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             ts.cancel()
         self.token_streams = []
 
-    def save(self, initial_ids):
+    def save(self):
         if self.cache_file is not None:
-            cf = CacheFile(self.cache_file, initial_ids, self.delegate.model_identifier)
+            cf = CacheFile(self.cache_file, self.initial_ids, self.delegate.model_identifier)
             try:
                 cf.save(self.cache)
             except Exception as e:

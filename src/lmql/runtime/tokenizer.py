@@ -1,4 +1,5 @@
 import asyncio
+from lmql.runtime.caching import cache_file_exists, cachefile
 
 def get_js_tokenizer(model_identifier):
     import js
@@ -218,18 +219,16 @@ def load_tokenizer(model_identifier):
     import pickle
     import pathlib
 
-    cache_dir = pathlib.Path.home() / ".cache" / "lmql"
-    cache_dir.mkdir(parents=True, exist_ok=True)
     cache_identifier = model_identifier.replace("/", "-")
-    cache_path = cache_dir / f"tokenizer-{cache_identifier}.pkl"
+    cache_path = f"tokenizer-{cache_identifier}.pkl"
 
-    if cache_path.exists():
-        with open(cache_path, "rb") as f:
+    if cache_file_exists(cache_path):
+        with cachefile(cache_path, "rb") as f:
             return LMQLTokenizer(pickle.load(f), model_identifier)
     else:
         from transformers import AutoTokenizer
         t = AutoTokenizer.from_pretrained(model_identifier)
-        with open(cache_path, "wb") as f:
+        with cachefile(cache_path, "wb") as f:
             pickle.dump(t, f)
         return LMQLTokenizer(t, model_identifier)
 
