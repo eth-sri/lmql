@@ -54,7 +54,7 @@ async function pyodide_main() {
     const micropip = pyodide.runPython("import micropip; micropip");
     await micropip.install(["requests", "pyyaml", "filelock", "regex", "importlib_metadata", "sacremoses", "typing_extensions", "ssl"])
     postStatus("init", "standard libraries")
-    await pyodide.loadPackage(["wheels/astunparse-1.6.3-py2.py3-none-any.whl", "six", "packaging", "numpy", "tqdm", "termcolor", "wheels/pydot-1.4.2-py2.py3-none-any.whl", "wheels/gpt3_tokenizer-0.1.3-py2.py3-none-any.whl"])
+    await pyodide.loadPackage(["wheels/astunparse-1.6.3-py2.py3-none-any.whl", "six", "packaging", "numpy", "tqdm", "termcolor", "wheels/gpt3_tokenizer-0.1.3-py2.py3-none-any.whl"])
     postStatus("init", "LMQL distribution")
     
     await pyodide.runPythonAsync(`
