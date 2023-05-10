@@ -239,7 +239,7 @@ def load_tokenizer(model_identifier):
             with cachefile(cache_path, "wb") as f:
                 pickle.dump(t, f)
     except Exception as e:
-        print("info: trying to use python-based tokenizer as 'transformers' is not available") 
+        # print("info: trying to use python-based tokenizer as 'transformers' is not available")
         # fallback to non-transformers tokenizer
         t = load_tokenizer_notransformers(model_identifier)
 
