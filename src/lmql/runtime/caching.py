@@ -24,6 +24,10 @@ def prepare_cache_access():
             cache_is_valid = int(cache_version) == CACHE_VERSION
     except:
         cache_is_valid = False
+    
+    if "CLEAR_CACHE" in os.environ.keys():
+        cache_is_valid = False
+    
     if not cache_is_valid:
         print("LMQL cache directory ({}) format is outdated, clearing cache (existing: v{}, runtime: v{})...".format(CACHE_DIR, cache_version, CACHE_VERSION))
         for f in os.listdir(CACHE_DIR):

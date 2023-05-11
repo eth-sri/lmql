@@ -46,13 +46,14 @@ class VocabularyMatcher:
         matcher_path = f"matcher-{cache_identifier}.pkl"
 
         try:
+            assert False
             with cachefile(matcher_path, "rb") as f:
                 VocabularyMatcher._instance = pickle.load(f)
                 VocabularyMatcher._instance.stats = Stats("VocabularyMatcher")
         except:
             VocabularyMatcher._instance = VocabularyMatcher(tokenizer, tokenizer.model_identifier)
 
-        if cache_file_exists(cache_path):
+        if cache_file_exists(cache_path) and False:
             with cachefile(cache_path, "rb") as f:
                 try:
                     import time
