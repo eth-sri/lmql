@@ -9,7 +9,12 @@ CACHE_VERSION = 1
 CACHE_DIR = pathlib.Path.home() / ".cache" / "lmql"
 
 def prepare_cache_access():
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if not CACHE_DIR.exists():
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+        with open(os.path.join(CACHE_DIR, "cache-version"), "w") as f:
+            f.write(str(CACHE_VERSION))
+        return
 
     cache_is_valid = False
     cache_version = "<none>"
@@ -19,6 +24,10 @@ def prepare_cache_access():
             cache_is_valid = int(cache_version) == CACHE_VERSION
     except:
         cache_is_valid = False
+    
+    if "CLEAR_CACHE" in os.environ.keys():
+        cache_is_valid = False
+    
     if not cache_is_valid:
         print("LMQL cache directory ({}) format is outdated, clearing cache (existing: v{}, runtime: v{})...".format(CACHE_DIR, cache_version, CACHE_VERSION))
         for f in os.listdir(CACHE_DIR):
