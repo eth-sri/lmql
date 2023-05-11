@@ -1,7 +1,12 @@
 var openPlaygroundElement = null;
 
-function getPlaygroundUrl() {
+function getPlaygroundUrl(next) {
     const host = window.location.host;
+    
+    if (next) {
+        return "https://next.lmql.ai/playground";
+    }
+    
     if (host === "docs.lmql.ai") {
         return "https://lmql.ai/playground";
     } else if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
@@ -34,8 +39,7 @@ function closePlaygroundSnippet() {
 function openPlaygroundSnippet(link, snippet) {
     closePlaygroundSnippet();
 
-    const playground = getPlaygroundUrl();
-    console.log("playground url: " + playground);
+    const playground = getPlaygroundUrl(snippet.includes("next-"));
 
     // this is a that was clicked, replace parent div with iframe (temporarily)
     const container = link.parentElement;

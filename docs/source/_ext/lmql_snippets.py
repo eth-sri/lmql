@@ -27,8 +27,9 @@ class LmqlLexer(PythonLexer):
         "WHERE",
         "where",
         "DISTRIBUTION",
-        "distribution")
-    )
+        "distribution",
+        "class"
+    ))
 
     def get_tokens_unprocessed(self, text):
         for index, token, value in PythonLexer.get_tokens_unprocessed(self, text):

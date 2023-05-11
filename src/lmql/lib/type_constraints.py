@@ -4,7 +4,7 @@ import json
 @lmql.query
 async def single_shot_as_type(s, ty):
     '''lmql
-    argmax(openai_chunksize=1024)
+    argmax(openai_chunksize=256)
         schema_description = lmql.types.schema_description(ty)
         "Provided a data schema of the following schema: {schema_description}\n"
         "Translate the following into a JSON payload: {s}\n"
