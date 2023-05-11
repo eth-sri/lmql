@@ -46,7 +46,6 @@ class VocabularyMatcher:
         matcher_path = f"matcher-{cache_identifier}.pkl"
 
         try:
-            assert False
             with cachefile(matcher_path, "rb") as f:
                 VocabularyMatcher._instance = pickle.load(f)
                 VocabularyMatcher._instance.stats = Stats("VocabularyMatcher")
