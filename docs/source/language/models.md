@@ -98,7 +98,13 @@ Unfortunately, the OpenAI API Completions and Chat API are severely limited in t
 
 LMQL also support locally-hosted models via [🤗 Transformers](https://huggingface.co/transformers). This includes all models that are available via the [🤗 Transformers Model Hub](https://huggingface.co/models) and conform to the AutoModelForCausalLM API. Examples include `gpt2` or `facebook/opt-30B`.
 
-The API limitations mentioned above do not apply to locally-hosted models, as the LMQL runtime can leverage the full power of the 🤗 Transformers API and access the full token distribution, enforcing token masks of arbitrary size.
+Before you start using LMQL with 🤗 Transformers models, make sure you have installed the `lmql` package with the optional `hf` flag:
+
+```bash
+pip install lmql[hf]
+```
+
+This will install the `transformers` package and its dependencies, which is required to load 🤗  Transformers models.
 
 ### Running LMQL with 🤗 Transformers
 
