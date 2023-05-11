@@ -164,8 +164,8 @@ function openPlaygroundSnippet(link, snippet) {
 
 <p>Today, we are releasing LMQL v0.0.6.3. This update contains several bug fixes and improvements. The most notable changes are:</p>
 <ul>
-<li><p><strong>Lighter Runtime</strong> As part of our continued efforts, we made LMQL much lighter (no more mandatory <code class="docutils literal notranslate"><span class="pre">transformers</span></code> dependency). By default LMQL now no longer requires <code class="docutils literal notranslate"><span class="pre">transformers</span></code> or PyTorch. However, if you rely on local models, you can still install LMQL via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql[hf]</span></code> to Transformers integration.</p></li>
-<li><p><strong>Token Constraints</strong> A new function <code class="docutils literal notranslate"><span class="pre">TOKENS(...)</span></code> was added to the LMQL constraint language, allowing you to specify lower and upper bounds or the exact number of tokens to generate for given variable.</p>
+<li><p><strong>Lighter Runtime</strong> As part of our continued efforts, we made LMQL much lighter (no more mandatory <code class="docutils literal notranslate"><span class="pre">transformers</span></code> dependency). By default LMQL now no longer requires <code class="docutils literal notranslate"><span class="pre">transformers</span></code> or PyTorch. If you rely on local models, just install LMQL via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql[hf]</span></code> to get full Transformers integration.</p></li>
+<li><p><strong>Token Constraints</strong> A new function <code class="docutils literal notranslate"><span class="pre">TOKENS(...)</span></code> was added to the LMQL constraint language, allowing you to specify lower and upper bounds or the exact number of tokens to generate for a given variable.</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-3-md-token_constraints')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> 
     <span class="s2">"A 10 token response[WHO]"</span> 
 <span class="kn">from</span> 
@@ -176,7 +176,7 @@ function openPlaygroundSnippet(link, snippet) {
 <p></p>
 </li>
 <li><p><strong>Conditional Stopping</strong> <code class="docutils literal notranslate"><span class="pre">STOPS_AT</span></code> can now be combined with additional side conditions. This allows you to specify stopping phrases that are only enforced, once other conditions are met.</p>
-<p>For example below, we stop when the generated text hits a newline character, but only if the overall variable output is already at least 10 tokens long.</p>
+<p>For example, below, we stop when the generated text hits a newline character, but only if the overall variable output is already at least 10 tokens long.</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-3-md-conditional_stopping ')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> 
     <span class="s2">"Hello[WHO]"</span> 
 <span class="kn">from</span> 
@@ -440,7 +440,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Thu, May 11, 6:09 PM (UTC)<br/>
+        Last updated on Thu, May 11, 6:17 PM (UTC)<br/>
       </div>
     </div>
   </div>
