@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "express-http-proxy": "^1.6.3",
-    "gpt3-tokenizer": "^1.1.4",
     "request": "^2.88.2"
   },
   "scripts": {

@@ -1,31 +1,11 @@
 import io
-
-import pydot
 import os
+from dataclasses import dataclass
 
 from lmql.ops.ops import Node
 
-def show(pydot_graph):
-    # png_str = pydot_graph.create_png(prog=['dot','-Gsize=70,70!'])
-
-    # # treat the DOT output as an image file
-    # sio = io.BytesIO()
-    # sio.write(png_str)
-    # sio.seek(0)
-    # img = mpimg.imread(sio)
-
-    # # plot the image
-    # imgplot = plt.imshow(img, aspect='equal')
-    # plt.show()
-
-    pydot_graph.write_png("out.png", prog=['dot','-Gsize=70,70!'])
-    pydot_graph.write_dot('test.dot')
-    # os.system("open out.png")
-
 class GraphWriter:
     def __init__(self, name=None, type=None, extra_data_provider=None):
-        self.graph = pydot.Dot(name if name is not None else "graphwriter_graph", graph_type='graph')
-        
         if type is not None: self.graph.set_type(type)
         
         self.node_names = {}
@@ -100,7 +80,12 @@ class GraphWriter:
             self.name_counter += 1
             self.node_names[obj] = name
 
-        n = pydot.Node(name, label=label, shape="box", **kwargs, cyto_data=cyto_data)
+        n = {
+            "name": name, 
+            "label": label, 
+            **kwargs, 
+            "cyto_data": cyto_data
+        }
         self.graph.add_node(n)
 
         return name
@@ -109,10 +94,10 @@ class GraphWriter:
         n1 = self.node(src)
         n2 = self.node(dst)
 
-        self.graph.add_edge(pydot.Edge(n1, n2))
-
-    def show(self):
-        show(self.graph)
+        self.graph.add_edge({
+            "src": n1,
+            "dst": n2
+        })
 
 class CytoscapeNode:
     def __init__(self, node, graph):
@@ -140,9 +125,16 @@ class CytoscapeGraph:
         else: return json.dumps(d)
 
     def add_node(self, node_data, label=None):
-        node = node_data.obj_dict["name"]
-        if label is None and "label" in node_data.obj_dict["attributes"]:
-            label = node_data.obj_dict["attributes"]["label"]
+        # {
+        #     "name": name, 
+        #     "label": label, 
+        #     **kwargs, 
+        #     "cyto_data": cyto_data
+        # }
+
+        node = node_data["name"]
+        if label is None and "label" in node_data.keys():
+            label = node_data["label"]
         if label is None and node in self.nodes.keys():
             label = self.nodes[node]["data"]["label"]
 
@@ -154,14 +146,14 @@ class CytoscapeGraph:
             }
         }
 
-        if "cyto_data" in node_data.obj_dict["attributes"]:
-            self.nodes[node]["data"].update(node_data.obj_dict["attributes"]["cyto_data"])
+        if "cyto_data" in node_data.keys():
+            self.nodes[node]["data"].update(node_data["cyto_data"])
 
     def get_node(self, node):
         return [CytoscapeNode(node, self)] if node in self.nodes else []
 
     def add_edge(self, edge):
-        src, dst = edge.obj_dict["points"]
+        src, dst = edge["src"], edge["dst"]
         if type(src) is CytoscapeNode: src = src.node
         if type(dst) is CytoscapeNode: dst = dst.node
 
