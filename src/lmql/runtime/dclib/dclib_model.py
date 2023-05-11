@@ -103,7 +103,7 @@ class ModelQueue:
                 elif type(logit_masks[i]) is int:
                     logit_masks[i] = masks.to_dense(nputil.ensure_array(logit_masks).reshape(1), self.vocab_size)
                 else:
-                    assert len(logit_masks[i]) == self.vocab_size
+                    assert len(logit_masks[i]) == self.vocab_size, f"Logit mask has wrong size: {len(logit_masks[i])} != {self.vocab_size}"
             lm = np.stack([m if m is not None else np.zeros((self.vocab_size), dtype=np.bool) for m in logit_masks])
             return lm
 
@@ -143,7 +143,7 @@ class DcModel(DcModelRewriteMixin):
 
         self.stats = Stats("dcmodel")
 
-        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier, self.tokenizer.vocab_size)
+        if init_workers: self.logits_queue = ModelQueue.get(self.model_identifier, self.tokenizer.model_vocab_size)
         else: self.logits_queue = None
 
         # if set, the cache delegate can be called for speculative model scoring results 
