@@ -162,7 +162,8 @@ def load_tiktoken_tokenizer(model_identifier):
     return TiktokenTokenizer(model_identifier)
 
 def load_tokenizer_notransformers(model_identifier):
-    print("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
+    if not "SLOW_TOKENIZER_OK" in os.environ.keys():
+        print("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
     return PythonBackedTokenizer(model_identifier)
 
 def load_tokenizer(model_identifier):
@@ -203,7 +204,6 @@ def load_tokenizer(model_identifier):
             with cachefile(cache_path, "wb") as f:
                 pickle.dump(t, f)
     except Exception as e:
-        print("info: trying to use python-based tokenizer as 'transformers' is not available")
         # fallback to non-transformers tokenizer
         t = load_tokenizer_notransformers(model_identifier)
 

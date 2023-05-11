@@ -77,6 +77,7 @@ async function pyodide_main() {
             # set USE_TORCH to true
             os.environ["USE_TORCH"] = "1"
             os.environ["LMQL_BROWSER"] = "1"
+            os.environ["SLOW_TOKENIZER_OK"] = "1"
             import lmql
             print("LMQL", lmql.__version__, "on Pyodide Python", sys.version)
             # open and print lmql package folder BUILD

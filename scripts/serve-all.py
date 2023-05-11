@@ -19,11 +19,11 @@ processes = []
 
 summary = ""
 
-summary += termcolor.colored("Website on http://localhost:8080/\n\n", "green")
+summary += "Website on " + termcolor.colored("http://localhost:8080/\n\n", "green")
 serve_web = subprocess.Popen(["python", "-m", "http.server", "8080"], cwd="web", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 processes.append(serve_web)
 
-summary += termcolor.colored("Browser Playground on http://localhost:8081/playground/\n\n", "green") 
+summary += "Browser Playground on " + termcolor.colored("http://localhost:8081/playground/\n\n", "green") 
 serve_web_deploy = subprocess.Popen(["python", "-m", "http.server", "8081"], cwd="web-deploy", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 processes.append(serve_web_deploy)
 
@@ -32,14 +32,17 @@ processes.append(serve_web_deploy)
 autobuild_sphinx_p = subprocess.Popen(["onchange", "**/*.py", "**/*.md", "**/*.rst", "**/*.css", "**/*.js", "**/*.ipynb", "-e", "build", "--", "make", "html"], cwd="docs")
 processes.append(autobuild_sphinx_p)
 # serve docs/build/html on http://localhost:8081/
-summary += termcolor.colored("Docs on http://localhost:8081/\n\n", "green") 
-serve_docs = subprocess.Popen(["python", "-m", "http.server", "8081"], cwd="docs/build/html", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+summary += "Docs on " + termcolor.colored("http://localhost:8082/\n\n", "green") 
+# if docs are empty, build with make html
+if not os.path.exists("docs/build/html/index.html"):
+    subprocess.run(["make", "html"], cwd="docs")
+serve_docs = subprocess.Popen(["python", "-m", "http.server", "8082"], cwd="docs/build/html", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 processes.append(serve_docs)
 
 # autobuild blog
 # onchange ../../docs/build/html/blog/*.html -- node generate.js
-summary += termcolor.colored("Blog on http://localhost:8080/blog\n\n", "green")
-autobuild_blog_p = subprocess.Popen(["onchange", "../../docs/build/html/blog/*.html", "--", "node", "generate.js"], cwd="web-deploy/blog")
+summary += "Blog on " + termcolor.colored("http://localhost:8080/blog\n\n", "green")
+autobuild_blog_p = subprocess.Popen(["onchange", "../../docs/build/html/blog/*.html", "--", "node", "generate.js"], cwd="web/blog")
 processes.append(autobuild_blog_p)
 
 # autobuild web/
@@ -51,7 +54,7 @@ while True:
     try:
         print(summary)
         # listen for keyboard input
-        command = input("Enter command (q to quit, bb to build browser playground): ")
+        command = input("Enter command (q to quit, bb to build browser playground, docs-clean to clean build docs, web-clean to clean build web-deploy): ")
         if command == "q":
             raise KeyboardInterrupt
         elif command == "bb": # browser build
@@ -59,6 +62,14 @@ while True:
             # run bash deploy.sh in web/
             subprocess.run(["bash", "deploy.sh"], cwd="web")
             print(termcolor.colored("Done!", "green"))
+        elif command == "docs-clean":
+            # docs/ make clean
+            subprocess.run(["make", "clean", "html"], cwd="docs")
+        elif command == "web-clean":
+            # rm -rf web-deploy/*
+            subprocess.run(["rm", "-rf", "web-deploy/*"])
+            # rm web/browser-build/temp
+            subprocess.run(["rm", "-rf", "web/browser-build/temp"])
         else:
             print(termcolor.colored("Unknown command!", "red"))
     except KeyboardInterrupt:

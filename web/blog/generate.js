@@ -20,6 +20,9 @@ articles = articles.map((article) => {
         content: contents,
     }
 })
+
+console.log("Articles: " + articles.map(a => a.filename).join("\n"))
+
 // extract lines with "release: " as timestring
 articles = articles.map((article) => {
     // get first <p></p> block
