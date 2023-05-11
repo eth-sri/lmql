@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax \n    \"A 10 token response[WHO]\" \nfrom \n    \"openai/text-ada-001\" \nwhere \n    len(TOKENS(WHO)) == 10", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

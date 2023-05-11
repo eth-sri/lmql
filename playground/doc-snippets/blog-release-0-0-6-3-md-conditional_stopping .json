@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax \n    \"Hello[WHO]\" \nfrom \n    \"openai/text-ada-001\" \nwhere \n    len(TOKENS(WHO)) > 10 and STOPS_AT(WHO, \"\\n\")", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

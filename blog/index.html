@@ -139,6 +139,68 @@ function openPlaygroundSnippet(link, snippet) {
   </div>
 
 
+<section class="section blog startpage" id="release-0.0.6.3">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column">
+          <h5 class="title is-2 has-text-left" style="margin-bottom: 2pt;">
+            <a href="blog/release-0.0.6.3.html" class="anchor">
+                LMQL v0.0.6.3
+            </a>
+          </h5>
+          <div class="content has-text-justified">
+          <div class="authors">
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
+        </span>
+            </div>
+          </div>
+            <div class="date">
+                Thu, May 11, 2023
+            </div>
+            <section id="lmql-v0-0-6-3">
+
+<p>Today, we are releasing LMQL v0.0.6.3. This update contains several bug fixes and improvements. The most notable changes are:</p>
+<ul>
+<li><p><strong>Lighter Runtime</strong> As part of our continued efforts, we made LMQL much lighter (no more mandatory <code class="docutils literal notranslate"><span class="pre">transformers</span></code> dependency).</p></li>
+<li><p><strong>Token Constraints</strong> A new function <code class="docutils literal notranslate"><span class="pre">TOKENS(...)</span></code> was added to the LMQL constraint language, allowing you to specify lower and upper bounds or the exact number of tokens to generate for given variable.</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-3-md-token_constraints')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> 
+    <span class="s2">"A 10 token response[WHO]"</span> 
+<span class="kn">from</span> 
+    <span class="s2">"openai/text-ada-001"</span> 
+<span class="kp">where</span> 
+    <span class="nb">len</span><span class="p">(</span><span class="n">TOKENS</span><span class="p">(</span><span class="n">WHO</span><span class="p">))</span> <span class="o">==</span> <span class="mi">10</span>
+</pre></div>
+<p></p>
+</li>
+<li><p><strong>Conditional Stopping</strong> <code class="docutils literal notranslate"><span class="pre">STOPS_AT</span></code> can now be combined with additional side conditions. This allows you to specify stopping phrases that are only enforced, once other conditions are met.</p>
+<p>For example below, we stop when the generated text hits a newline character, but only if the overall variable output is already at least 10 tokens long.</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-3-md-conditional_stopping ')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> 
+    <span class="s2">"Hello[WHO]"</span> 
+<span class="kn">from</span> 
+    <span class="s2">"openai/text-ada-001"</span> 
+<span class="kp">where</span> 
+    <span class="nb">len</span><span class="p">(</span><span class="n">TOKENS</span><span class="p">(</span><span class="n">WHO</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">10</span> <span class="ow">and</span> <span class="n">STOPS_AT</span><span class="p">(</span><span class="n">WHO</span><span class="p">,</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+<p></p>
+</li>
+<li><p><strong>lmql.run</strong>: Improved input validation for <code class="docutils literal notranslate"><span class="pre">lmql.run</span></code> as contributed by <a href="https://twitter.com/lfegray" target="_blank">@lfegray</a>. More specifically, <code class="docutils literal notranslate"><span class="pre">lmql.run</span></code> wil now provide more helpful error messages when client logic does not specify input values for all required query parameters.</p></li>
+<li><p><strong>Automatic Cache Invalidation</strong>: LMQL’s tokenizer cache at <code class="docutils literal notranslate"><span class="pre">~/.cache/lmql</span></code> is now invalidated automatically when upgrading to a new version. This should prevent issues with outdated cache files.</p></li>
+</ul>
+<blockquote>
+<div><p>Note: Version 0.0.6.2 was skipped and yanked from pypi.org, as an invalid release was pushed accidentally.</p>
+</div></blockquote>
+</section>
+
+
+
+          </div>
+        </div>
+    </div>
+  </section>
+    
 <section class="section blog startpage" id="release-0.0.6.1">
     <div class="container is-max-desktop">
       <!-- Abstract. -->
@@ -378,7 +440,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Thu, May 11, 5:38 PM (UTC)<br/>
+        Last updated on Thu, May 11, 6:00 PM (UTC)<br/>
       </div>
     </div>
   </div>
