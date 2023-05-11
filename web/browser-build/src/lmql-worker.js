@@ -54,13 +54,16 @@ async function pyodide_main() {
     const micropip = pyodide.runPython("import micropip; micropip");
     await micropip.install(["requests", "pyyaml", "filelock", "regex", "importlib_metadata", "sacremoses", "typing_extensions", "ssl"])
     postStatus("init", "standard libraries")
-    await pyodide.loadPackage(["wheels/astunparse-1.6.3-py2.py3-none-any.whl", "six", "packaging", "numpy", "tqdm", "termcolor", "wheels/gpt3_tokenizer-0.1.3-py2.py3-none-any.whl"])
+    await pyodide.loadPackage(["wheels/astunparse-1.6.3-py2.py3-none-any.whl", "six", "packaging", "numpy", "tqdm", "termcolor"])
     postStatus("init", "LMQL distribution")
     
     await pyodide.runPythonAsync(`
         from pyodide.http import pyfetch
 
         response = await pyfetch("wheels/openai-shim.tar.gz")
+        await response.unpack_archive() # by default, unpacks to the current dir
+
+        response = await pyfetch("wheels/gpt3-tokenizer.zip")
         await response.unpack_archive() # by default, unpacks to the current dir
         
         response = await pyfetch("wheels/lmql.tar.gz")
