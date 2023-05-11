@@ -5,9 +5,9 @@ metadata:authors: team
 
 Today, we are releasing LMQL v0.0.6.3. This update contains several bug fixes and improvements. The most notable changes are:
 
-* **Lighter Runtime** As part of our continued efforts, we made LMQL much lighter (no more mandatory `transformers` dependency). By default LMQL now no longer requires `transformers` or PyTorch. However, if you rely on local models, you can still install LMQL via `pip install lmql[hf]` to Transformers integration.
+* **Lighter Runtime** As part of our continued efforts, we made LMQL much lighter (no more mandatory `transformers` dependency). By default LMQL now no longer requires `transformers` or PyTorch. If you rely on local models, just install LMQL via `pip install lmql[hf]` to get full Transformers integration.
 
-* **Token Constraints** A new function `TOKENS(...)` was added to the LMQL constraint language, allowing you to specify lower and upper bounds or the exact number of tokens to generate for given variable.
+* **Token Constraints** A new function `TOKENS(...)` was added to the LMQL constraint language, allowing you to specify lower and upper bounds or the exact number of tokens to generate for a given variable.
     
     ```{lmql}
     name::token_constraints
@@ -21,7 +21,7 @@ Today, we are releasing LMQL v0.0.6.3. This update contains several bug fixes an
 
 * **Conditional Stopping** `STOPS_AT` can now be combined with additional side conditions. This allows you to specify stopping phrases that are only enforced, once other conditions are met. 
 
-    For example below, we stop when the generated text hits a newline character, but only if the overall variable output is already at least 10 tokens long.
+    For example, below, we stop when the generated text hits a newline character, but only if the overall variable output is already at least 10 tokens long.
 
     ```{lmql}
     name::conditional_stopping 
