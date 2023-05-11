@@ -47,8 +47,12 @@
   <script>
     var openPlaygroundElement = null;
 
-function getPlaygroundUrl() {
+function getPlaygroundUrl(next) {
     const host = window.location.host;
+    console.log("next is", next)
+    if (next) {
+      return "https://next.lmql.ai/playground"
+    }
     if (host.includes("lmql.ai")) {
         return "https://lmql.ai/playground";
     } else if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
@@ -81,7 +85,7 @@ function closePlaygroundSnippet() {
 function openPlaygroundSnippet(link, snippet) {
     closePlaygroundSnippet();
 
-    const playground = getPlaygroundUrl();
+    const playground = getPlaygroundUrl(snippet.includes("next-"));
     console.log("playground url: " + playground);
 
     // this is a that was clicked, replace parent div with iframe (temporarily)
@@ -219,7 +223,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Thu, May 11, 6:17 PM (UTC)<br/>
+        Last updated on Thu, May 11, 7:09 PM (UTC)<br/>
       </div>
     </div>
   </div>
