@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "gpt3_tokenizer"
+version = "0.1.3"
+description = "Encoder/Decoder and tokens counter for GPT3"
+authors = ["Alison Ferrenha"]
+readme = "README.rst"
+license = "MIT"
+keywords = ["openai", "gpt", "gpt-3", "gpt3", "gpt4", "gpt-4", "tokenizer"]
+homepage = "https://github.com/alisonjf/gpt3-tokenizer"
+repository = "https://github.com/alisonjf/gpt3-tokenizer"
+classifiers = [
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 2',
+    'Programming Language :: Python :: 2.7',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    "Operating System :: OS Independent",
+]
+
+include = [
+    "LICENSE",
+]
+
+packages = [
+    { include = "gpt3_tokenizer" },
+]
+
+[tool.poetry.dependencies]
+python = ">=2.7"
+future = "^0.18.3"
+six = "^1.16.0"
+regex  = [
+    { version = "2021.11.10", python = "<3" },
+    { version = "*", python = ">=3" }
+]
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
+[tool.distutils.bdist_wheel]
+universal = true
