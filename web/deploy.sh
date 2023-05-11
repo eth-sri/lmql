@@ -11,6 +11,7 @@ npm install
 node generate.js
 # copy index.html
 cp index.html ../web-deploy/
+cp index-next.html ../web-deploy/
 cp static/images/lmql.svg ../web-deploy/lmql.svg
 # copy static content
 cp -r static ../web-deploy/
@@ -49,6 +50,7 @@ pushd browser-build
 bash browser-build.sh
 popd
 cp -r browser-build/dist/wheels ../web-deploy/playground/
+rm ../web-deploy/playground/wheels/.gitignore # remove gitignore to deploy .whl files to Pages
 cp -r browser-build/dist/lmql.web.min.js ../web-deploy/playground/
 
 # check for --push

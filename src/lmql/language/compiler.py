@@ -134,10 +134,6 @@ class PromptScope(ast.NodeVisitor):
             except:
                 raise RuntimeError("Failed to parse fstring expression: ", v)
 
-            
-            # if v not in self.defined_vars and v not in self.free_vars and v not in self.written_vars:
-            #     self.free_vars.add(v)
-
         # put double curly braces back in
         qstring = qstring.replace("__curly_open__", "{{").replace("__curly_close__", "}}")
                 
@@ -150,7 +146,8 @@ class PromptScope(ast.NodeVisitor):
         return super().visit_Constant(node)
 
     def exclude_identifier(self, name):
-        if name == "input":
+        # make sure "input" can be intercepted
+        if name in ["input"]:
             return False
         if name in self.free_vars:
             return True
