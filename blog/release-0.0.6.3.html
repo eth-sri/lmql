@@ -164,7 +164,7 @@ function openPlaygroundSnippet(link, snippet) {
 
 <p>Today, we are releasing LMQL v0.0.6.3. This update contains several bug fixes and improvements. The most notable changes are:</p>
 <ul>
-<li><p><strong>Lighter Runtime</strong> As part of our continued efforts, we made LMQL much lighter (no more mandatory <code class="docutils literal notranslate"><span class="pre">transformers</span></code> dependency).</p></li>
+<li><p><strong>Lighter Runtime</strong> As part of our continued efforts, we made LMQL much lighter (no more mandatory <code class="docutils literal notranslate"><span class="pre">transformers</span></code> dependency). By default LMQL now no longer requires <code class="docutils literal notranslate"><span class="pre">transformers</span></code> or PyTorch. However, if you rely on local models, you can still install LMQL via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql[hf]</span></code> to Transformers integration.</p></li>
 <li><p><strong>Token Constraints</strong> A new function <code class="docutils literal notranslate"><span class="pre">TOKENS(...)</span></code> was added to the LMQL constraint language, allowing you to specify lower and upper bounds or the exact number of tokens to generate for given variable.</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-3-md-token_constraints')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> 
     <span class="s2">"A 10 token response[WHO]"</span> 
@@ -211,7 +211,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Thu, May 11, 6:00 PM (UTC)<br/>
+        Last updated on Thu, May 11, 6:09 PM (UTC)<br/>
       </div>
     </div>
   </div>
