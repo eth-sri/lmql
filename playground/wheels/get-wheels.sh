@@ -6,6 +6,7 @@ if [ ! -f "comma-fix.zip" ]; then
     # get GH https://github.com/lbeurerkellner/gpt3-tokenizer/archive/refs/heads/comma-fix.zip
     wget https://github.com/lbeurerkellner/gpt3-tokenizer/archive/refs/heads/comma-fix.zip
 fi
+rm -rf gpt3-tokenizer-comma-fix
 # unzip comma-fix.zip
 unzip comma-fix.zip
 # make new archive with gpt3-tokenizer-comma-fix/* files
