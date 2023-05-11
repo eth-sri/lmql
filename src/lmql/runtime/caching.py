@@ -5,7 +5,7 @@ LMQL runtime components.
 import os
 import pathlib
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 CACHE_DIR = pathlib.Path.home() / ".cache" / "lmql"
 
 def prepare_cache_access():
