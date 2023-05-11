@@ -5,7 +5,7 @@ metadata:authors: team
 
 Today, we are releasing LMQL v0.0.6.3. This update contains several bug fixes and improvements. The most notable changes are:
 
-* **Lighter Runtime** As part of our continued efforts, we made LMQL much lighter (no more mandatory `transformers` dependency).
+* **Lighter Runtime** As part of our continued efforts, we made LMQL much lighter (no more mandatory `transformers` dependency). By default LMQL now no longer requires `transformers` or PyTorch. However, if you rely on local models, you can still install LMQL via `pip install lmql[hf]` to Transformers integration.
 
 * **Token Constraints** A new function `TOKENS(...)` was added to the LMQL constraint language, allowing you to specify lower and upper bounds or the exact number of tokens to generate for given variable.
     
