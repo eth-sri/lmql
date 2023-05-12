@@ -827,7 +827,7 @@ button.next:after {
 
 .topnav img {
     position: absolute;
-    top: 12.5pt;
+    top: 18pt;
     left: 20pt;
     height: 16pt;
 }
@@ -1061,7 +1061,7 @@ p.uni-branding {
 }
 
 section.blog {
-    font-size: 14pt;
+    font-size: 12pt;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
     position: relative;
 }
@@ -1165,4 +1165,128 @@ section.blog pre {
 .highlight.lmql>button:hover {
     text-decoration: underline;
     cursor: pointer;
+}
+
+.headerlink {
+    /* display: none; */
+    margin-left: 5pt;
+}
+
+.highlight-model-output::before {
+    content: "Model Output";
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    position: absolute;
+    top: 4pt;
+    font-size: 9pt;
+    text-transform: uppercase;
+    left: 0pt;
+    z-index: 2;
+    width: 100%;
+    text-align: center;
+    color: grey;
+}
+
+.highlight-model-output {
+    position: relative;
+    top: -5pt;
+    z-index: -1;
+    font-size: 0.9em;
+    font-family: monospace;
+}
+
+html[data-theme="dark"] .highlight-model-output::before {
+    color: rgb(143, 143, 143);
+}
+
+html[data-theme="dark"] .highlight-model-output {
+    background: transparent;
+}
+
+.highlight-model-output .highlight, html[data-theme="dark"] .highlight-model-output .highlight {
+    display: block;
+    white-space: break-spaces !important;
+}
+
+
+.highlight-model-output .highlight {
+    background-color: #f7f6f6 !important;
+    position: relative;
+    /* top: -12pt; */
+    border: none;
+    white-space: break-spaces !important;
+    padding: 10pt;
+    padding-top: 20pt;
+    border-radius: 4pt;
+}
+
+html[data-theme="dark"] .highlight-model-output .highlight {
+    background-color: rgb(30, 30, 30) !important;
+    border-color: rgb(68, 68, 68) !important;
+}
+
+.variable {
+    display: inline; 
+    padding: 0.5pt;
+    border-radius: 2pt;
+}
+
+.variable .variable-name {
+    font-weight: 700;
+    color: #333;
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 0.2em;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.9);
+    display: inline;
+    margin: 0;
+    margin-right: 0.0em;
+    margin-left: 0;
+    font-size: 0.7em;
+    padding: 0.12em;
+    position: relative;
+    top: -0.15em;
+    left: 0.1em;
+
+    transform-origin: 0 50%;
+    overflow: hidden;
+}
+
+.variable .variable-name.visible {
+    opacity: 1.0;
+}
+
+.val1 {
+    background-color: rgba(255, 166, 0, 0.5) !important;
+    cursor: default;
+}
+
+.val1:hover, .val1.hover, .val1-hover .val1 {
+    background-color: rgba(255, 166, 0, 1.0) !important;
+}
+.val2 {
+    background-color: rgba(206, 128, 184, 1.0) !important;
+    cursor: default;
+}
+
+.val2:hover, .val2.hover, .val2-hover .val2 {
+    background-color: rgba(206, 128, 184, 1.0) !important;
+}
+.val3 {
+    background-color: rgb(130, 140, 249) !important;
+    cursor: default;
+}
+
+.val3:hover, .val3.hover, .val3-hover .val3 {
+    background-color: rgba(107, 119, 255, 1.0) !important;
+}
+
+section.blog h2, section.blog h3 {
+    margin-top: 20pt;
+}
+
+@media screen and (max-width: 270pt) {
+    .hide-on-small {
+        display: none !important;
+        background-color: green;
+    }
 }

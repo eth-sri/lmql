@@ -2,25 +2,52 @@
 // node generate.js --experimental-modules
 
 import fs from 'fs';
+import jsdom from 'jsdom';
 // marked
 import * as marked from 'marked';
 
 const index_html = fs.readFileSync("index.template.html")
 
 // read all markdown files in articles/
-let articles = fs.readdirSync("articles/")
+let articles = fs.readdirSync("../../docs/build/html/blog/")
 
-articles = articles.map((article) => ({
-    filename: article,
-    content: fs.readFileSync("articles/" + article).toString(),
-}))
+articles = articles.map((article) => {
+    let contents = fs.readFileSync("../../docs/build/html/blog/" + article).toString();
+    contents = jsdom.JSDOM.fragment(contents).querySelector("article").innerHTML
+    
+    return {
+        filename: article,
+        content: contents,
+    }
+})
+
+console.log("Articles: " + articles.map(a => a.filename).join("\n"))
+
 // extract lines with "release: " as timestring
-articles = articles.map((article) => ({
-    filename: article.filename.replace(".md", ""),
-    content: article.content.split("\n").filter((line) => !line.startsWith("metadata:")).join("\n"),
-    release: article.content.split("metadata:release: ")[1].split("\n")[0],
-    authors: article.content.split("metadata:authors: ")[1].split("\n")[0].split(",").map((author) => author.trim()),
-}))
+articles = articles.map((article) => {
+    // get first <p></p> block
+    let metadata_block = article.content.split("<p>")[1].split("</p>")[0]
+    let content = article.content.split("</p>").slice(1).join("</p>")
+
+    let data = {
+        filename: article.filename.replace(".html", ""),
+        content: content,
+        release: "",
+        authors: "",
+    }
+
+    for (let line of metadata_block.split("\n")) {
+        if (line.startsWith("metadata:release: ")) {
+            data.release = line.substring("metadata:release: ".length)
+        } else if (line.startsWith("metadata:authors: ")) {
+            data.authors = line.substring("metadata:authors: ".length).split(",")
+        } else {
+            console.warn("Unknown metadata line: " + line)
+        }
+    }
+
+    return data
+})
 // parse release as date
 articles = articles.map((article) => ({
     ...article,
@@ -35,6 +62,10 @@ function template(title, anchor, authors, date, content, startpage) {
         "luca": {
             "name": "Luca Beurer-Kellner",
             "link": "https://www.sri.inf.ethz.ch/people/luca",
+        },
+        "team": {
+            "name": "LMQL Team",
+            "link": "mailto:hello@lmql.ai",
         },
         "marc": {
             "name": "Marc Fischer",
@@ -87,17 +118,16 @@ function template(title, anchor, authors, date, content, startpage) {
 
 function getTitle(article) {
     let title = null;
-    const lines = article.content.split("\n")
-    let lines_without_title = []
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith("#") && !title) {
-            title = lines[i].substring(1).trim()
-        } else {
-            lines_without_title.push(lines[i])
-        }
-    }
-    title = title || article.filename
-    
+    let lines_without_title = article
+
+    let firstH1 = jsdom.JSDOM.fragment(article.content).querySelector("h1")
+    let outerHtml = firstH1.outerHTML
+    lines_without_title = article.content.replace(outerHtml, "").split("\n")
+
+    // remove .headerlink from title
+    firstH1.querySelector(".headerlink").remove()
+    title = firstH1.innerHTML
+
     return [title, lines_without_title.join("\n")]
 }
 
@@ -139,7 +169,13 @@ function render_page(page) {
 
     let description = "Regular updates on the LMQL project."
     if (article != null) {
-        description = article.content.split("\n").filter((line) => !line.startsWith("#") && line.trim() != "").slice(0, 3).join(" ")
+        let dom = jsdom.JSDOM.fragment(article.content)
+        let firstParagraph = dom.querySelector("p")
+        if (firstParagraph != null) {
+            description = firstParagraph.textContent
+        } else {
+            description = ""
+        }
     }
 
     // replace all <%TITLE%> with title

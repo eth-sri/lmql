@@ -1,5 +1,5 @@
 // import { editor as MonacoEditor } from "monaco-editor";
-import tokenizer from "./lmql_js_tokenizer"
+// import tokenizer from "./lmql_js_tokenizer"
 import {get_openai_secret} from "./openai_secret"
 import * as lmql_openai_integration from "./lmql_openai_integration"
 import * as lmql_http_integration from "./lmql_http_integration"
@@ -54,13 +54,16 @@ async function pyodide_main() {
     const micropip = pyodide.runPython("import micropip; micropip");
     await micropip.install(["requests", "pyyaml", "filelock", "regex", "importlib_metadata", "sacremoses", "typing_extensions", "ssl"])
     postStatus("init", "standard libraries")
-    await pyodide.loadPackage(["wheels/astunparse-1.6.3-py2.py3-none-any.whl", "six", "packaging", "numpy", "tqdm", "termcolor", "wheels/pydot-1.4.2-py2.py3-none-any.whl"])
+    await pyodide.loadPackage(["wheels/astunparse-1.6.3-py2.py3-none-any.whl", "six", "packaging", "numpy", "tqdm", "termcolor"])
     postStatus("init", "LMQL distribution")
     
     await pyodide.runPythonAsync(`
         from pyodide.http import pyfetch
 
         response = await pyfetch("wheels/openai-shim.tar.gz")
+        await response.unpack_archive() # by default, unpacks to the current dir
+
+        response = await pyfetch("wheels/gpt3-tokenizer.zip")
         await response.unpack_archive() # by default, unpacks to the current dir
         
         response = await pyfetch("wheels/lmql.tar.gz")
@@ -74,6 +77,7 @@ async function pyodide_main() {
             # set USE_TORCH to true
             os.environ["USE_TORCH"] = "1"
             os.environ["LMQL_BROWSER"] = "1"
+            os.environ["SLOW_TOKENIZER_OK"] = "1"
             import lmql
             print("LMQL", lmql.__version__, "on Pyodide Python", sys.version)
             # open and print lmql package folder BUILD

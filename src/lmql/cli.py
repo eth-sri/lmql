@@ -32,9 +32,8 @@ def cmd_run():
     args = parser.parse_args(sys.argv[2:])
 
     absolute_path = os.path.abspath(args.lmql_file)
-    from lmql.runtime.output_writer import PrintingDebuggerOutputWriter
 
-    writer = PrintingDebuggerOutputWriter()
+    writer = lmql.printing
     writer.clear = not args.no_clear
     writer.print_output = not args.no_realtime
 
@@ -185,8 +184,14 @@ def hello():
     """
         asyncio.run(lmql.run(code_openai, output_writer=lmql.printing))
 
+def basic_samples():
+    from lmql.tests.test_sample_queries import main
+    import asyncio
+    asyncio.run(main())
+
 hidden_commands = {
-    "hello": hello
+    "hello": hello,
+    "test": basic_samples
 }
 
 def main():

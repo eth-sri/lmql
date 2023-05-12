@@ -11,6 +11,7 @@ npm install
 node generate.js
 # copy index.html
 cp index.html ../web-deploy/
+cp index-next.html ../web-deploy/
 cp static/images/lmql.svg ../web-deploy/lmql.svg
 # copy static content
 cp -r static ../web-deploy/
@@ -35,8 +36,12 @@ popd
 cp -r ../src/lmql/ui/playground/build/* ../web-deploy/playground/
 
 # copy documentation snippets
+echo "📦  Copying documentation snippets..."
 pushd ../docs
-cp -r build/html/doc-snippets/* ../web-deploy/playground/doc-snippets/
+# check if any doc-snippets exist at all (check for *)
+if [ -n "$(ls -A build/html/doc-snippets/*)" ]; then
+    cp -r build/html/doc-snippets/* ../web-deploy/playground/doc-snippets/
+fi
 popd
 
 echo "📦  Packaging LMQL for In-Browser use..."
@@ -45,6 +50,7 @@ pushd browser-build
 bash browser-build.sh
 popd
 cp -r browser-build/dist/wheels ../web-deploy/playground/
+rm ../web-deploy/playground/wheels/.gitignore # remove gitignore to deploy .whl files to Pages
 cp -r browser-build/dist/lmql.web.min.js ../web-deploy/playground/
 
 # check for --push

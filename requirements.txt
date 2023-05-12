@@ -1,7 +1,6 @@
 astunparse==1.6.3
 openai
 termcolor
-pydot
-transformers==4.25.1
-pandas
+transformers>=4.28.1
 accelerate
+tiktoken

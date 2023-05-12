@@ -7,7 +7,6 @@ dependencies:
     - astunparse
     - openai
     - termcolor
-    - pydot
     - transformers==4.28.1
     - pandas
     - accelerate

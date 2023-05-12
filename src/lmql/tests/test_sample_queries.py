@@ -9,6 +9,8 @@ import time
 import io
 import termcolor
 
+from lmql.runtime.stats import Stats
+
 # load queries by executing ../ui/playground/src/queries.js via node and getting the object of module.exports
 
 def load_queries():
@@ -36,6 +38,8 @@ async def main():
     queries = load_queries()
     stderr = sys.stderr
     
+    api_stats = Stats("openai-api")
+
     for category in queries:
         print(f"{category['category']}")
         
@@ -50,13 +54,19 @@ async def main():
                 rpad = 0
 
             print(f" - {query['name']}{'.' * rpad}", end=" ", flush=True)
+
+            api_stats.times["first-chunk-latency"] = 0
+            
             # run query
             try:
                 s = time.time()
                 error_buffer = io.StringIO()
                 sys.stderr = error_buffer
                 await lmql.run(query["code"], output_writer=lmql.headless)
-                print(termcolor.colored("[OK]", "green"), f"({time.time() - s:.2f}s)")
+                runtime = time.time() - s
+                # time minus api latency
+                latency = api_stats.times.get("first-chunk-latency", 0)
+                print(termcolor.colored("[OK]", "green"), f"({runtime:.2f}s, w/o latency: {(runtime - latency):.2f}s)")
             except Exception as e:
                 print(error_buffer.getvalue())
                 print(e)

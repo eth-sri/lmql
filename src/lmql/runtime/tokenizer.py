@@ -1,60 +1,8 @@
-import asyncio
+import os
+from lmql.runtime.caching import cache_file_exists, cachefile
 
-def get_js_tokenizer(model_identifier):
-    import js
-    from pyodide.ffi import to_js
-
-    assert "gpt" in model_identifier, "JS tokenizer only supports GPT models."
-
-    class JSBridgedTokenizer:
-        """ Custom tokenizer to be used only in a browser environment. This tokenizer only supports GPT tokenization. """
-        def __init__(self):
-            self.bos_token_id = 50256
-            self.eos_token_id = 50256
-            self._vocab = None
-
-        @property
-        def vocab_size(self):
-            return len(self.vocab)
-
-        @property
-        def vocab(self):
-            if self._vocab is None:
-                self._vocab = js.get_vocab().to_py()
-            return self._vocab
-
-        def convert_tokens_to_string(self, tokens):
-            return js.convert_tokens_to_string_gpt(to_js(tokens))
-
-        def tokenize(self, s):
-            unpack = False
-            if type(s) is not list:
-                s = [s]
-                unpack = True
-            tokens = [js.tokenize_gpt_toks(se).to_py() for se in s]
-            
-            if unpack:
-                return tokens[0]
-            else:
-                return tokens
-         
-        def decode(self, input_ids, clean_up_tokenization_spaces=None):
-            # set typed array type of input_ids to int
-            return str(js.detokenize_gpt(to_js([int(i) for i in input_ids])))
-
-        def __call__(self, s: str):
-            unpack = False
-            if type(s) is not list:
-                s = [s]
-                unpack = True
-            input_ids = [[int(v) for v in js.tokenize_gpt(se)] for se in s]
-            
-            if unpack:
-                return {"input_ids": input_ids[0]}
-            else:
-                return {"input_ids": input_ids}
-    
-    return JSBridgedTokenizer()
+from lmql.runtime.tokenizers.pure_python_tokenizer import PythonBackedTokenizer
+from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 
 global special_token_mappings
 special_token_mappings = {}
@@ -62,14 +10,24 @@ global reverse_special_token_mappings
 reverse_special_token_mappings = {}
 
 class LMQLTokenizer:
+    INVALID_CHARACTER = "\uFFFD"
+
     def __init__(self, tokenizer_impl, model_identifier):
         self.tokenizer_impl = tokenizer_impl
         self.model_identifier = model_identifier
         self.detokenizer_cache = {}
 
+        self._vocab = get_vocab(self.tokenizer_impl)
+        self.vocab_range = max(max(self._vocab.values()) + 1, self.tokenizer_impl.vocab_size)
+
+        if "FORCE_TIKTOKEN" in os.environ:
+            assert type(self.tokenizer_impl) is TiktokenTokenizer
+
     @property
     def vocab_size(self):
-        return self.tokenizer_impl.vocab_size
+        # in LMQL vocab_size is the vocab_range (the highest vocabulary ID + 1)
+        # this allows us to use a dense one hot array where no IDs are skipped
+        return self.vocab_range
 
     @property
     def bos_token_id(self):
@@ -107,10 +65,12 @@ class LMQLTokenizer:
             if key in self.detokenizer_cache[n-1].keys():
                 global reverse_special_token_mappings
                 # print("secondary cache hit")
-                if input_ids[-1] >= self.tokenizer_impl.vocab_size:
+                if input_ids[-1] >= self.vocab_size:
                     extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
                 else:
                     extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]], clean_up_tokenization_spaces=False)
+                    if self.INVALID_CHARACTER in extended:
+                        return self.detokenizer_cache[n-1][key]
                 if not n in self.detokenizer_cache.keys():
                     self.detokenizer_cache[n] = {}
                 self.detokenizer_cache[n][str(input_ids)] = extended
@@ -129,7 +89,7 @@ class LMQLTokenizer:
 
         return s
 
-    def __call__(self, s: str):
+    def __call__(self, s: str, add_special_tokens=False):
         input_ids = []
         unpack = False
         if type(s) is not list:
@@ -142,7 +102,8 @@ class LMQLTokenizer:
                 if type(chunk) is int:
                     chunk_input_ids.append(chunk)
                 else:
-                    chunk_input_ids += self.tokenizer_impl(chunk)["input_ids"]
+                    result = self.tokenizer_impl(chunk, add_special_tokens=add_special_tokens)["input_ids"]
+                    chunk_input_ids += result
             input_ids.append(chunk_input_ids)
         
         if unpack:
@@ -157,7 +118,7 @@ class LMQLTokenizer:
         if identifier not in special_token_mappings:
             if len(special_token_mappings) == 0:
                 # offset vocabulary IDs by at least the next decimal power of 10
-                offset = 10 ** (len(str(self.vocab_size)))
+                offset = 10 ** (len(str(self.vocab_range)))
                 special_token_mappings[identifier] = offset
                 reverse_special_token_mappings[offset] = identifier
             else:
@@ -194,34 +155,69 @@ class LMQLTokenizer:
         segments.append(s[offset:])
         return segments
 
+def load_tiktoken_tokenizer(model_identifier):
+    if not TiktokenTokenizer.is_available():
+        raise Exception("TiktokenTokenizer not available")
+
+    return TiktokenTokenizer(model_identifier)
+
+def load_tokenizer_notransformers(model_identifier):
+    if not "SLOW_TOKENIZER_OK" in os.environ.keys():
+        print("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
+    return PythonBackedTokenizer(model_identifier)
+
 def load_tokenizer(model_identifier):
     import os
-
-    # check environment of USE_JS_TOKENIZER
-    if "LMQL_BROWSER" in os.environ:
-        return LMQLTokenizer(get_js_tokenizer(model_identifier), model_identifier)
-
-    from transformers import AutoTokenizer
-    import torch
 
     # first try to load pickled tokenizer from cache (faster)
     import pickle
     import pathlib
 
-    cache_dir = pathlib.Path.home() / ".cache" / "lmql"
-    cache_dir.mkdir(parents=True, exist_ok=True)
     cache_identifier = model_identifier.replace("/", "-")
-    cache_path = cache_dir / f"tokenizer-{cache_identifier}.pkl"
+    cache_path = f"tokenizer-{cache_identifier}.pkl"
 
-    if cache_path.exists():
-        with open(cache_path, "rb") as f:
-            return LMQLTokenizer(pickle.load(f), model_identifier)
-    else:
-        from transformers import AutoTokenizer
-        t = AutoTokenizer.from_pretrained(model_identifier)
-        with open(cache_path, "wb") as f:
-            pickle.dump(t, f)
+    # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
+    try:
+        if cache_file_exists(cache_path):
+            with cachefile(cache_path, "rb") as f:
+                return LMQLTokenizer(pickle.load(f), model_identifier)
+        else:
+            t = load_tiktoken_tokenizer(model_identifier)
+
+            with cachefile(cache_path, "wb") as f:
+                pickle.dump(t, f)
+        
         return LMQLTokenizer(t, model_identifier)
+    except Exception as e:
+        pass
+
+    try:
+        import torch
+        from transformers import AutoTokenizer
+
+        if cache_file_exists(cache_path):
+            with cachefile(cache_path, "rb") as f:
+                return LMQLTokenizer(pickle.load(f), model_identifier)
+        else:
+            t = AutoTokenizer.from_pretrained(model_identifier)
+
+            with cachefile(cache_path, "wb") as f:
+                pickle.dump(t, f)
+    except Exception as e:
+        # fallback to non-transformers tokenizer
+        t = load_tokenizer_notransformers(model_identifier)
+
+    return LMQLTokenizer(t, model_identifier)
+
+def get_vocab(tokenizer):
+    if hasattr(tokenizer, "vocab"):
+        return tokenizer.vocab
+    elif hasattr(tokenizer, "get_vocab"):
+        return tokenizer.get_vocab()
+    elif hasattr(tokenizer, "tokenizer_impl"):
+        return get_vocab(tokenizer.tokenizer_impl)
+    else:
+        assert False, "Could not obtain full vocabulary from unknown tokenizer type: {}".format(type(tokenizer))
 
 if __name__ == "__main__":
     import sys
