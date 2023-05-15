@@ -116,7 +116,7 @@ class VocabularyMatcher:
     def mask_cache_name(self, tokens=None, regex=None, minus=None, prefix=None, exact=None, charlen=None, name=None):
         keys = ["named:" + name] if name is not None else []
         if regex is not None:
-            return keys + ["regex:"]
+            return keys + ["regex:" + regex]
         elif charlen is not None:
             return keys + ["charlen:" + str(charlen)]
         else:

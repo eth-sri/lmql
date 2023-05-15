@@ -22,10 +22,13 @@ class TiktokenTokenizer:
             self.vocab[token_name] = i
 
     @staticmethod
-    def is_available():
+    def is_available(model_identifier):
         try:
             import tiktoken
+            tiktoken.encoding_for_model(model_identifier)
         except ImportError:
+            return False
+        except KeyError:
             return False
         return True
 

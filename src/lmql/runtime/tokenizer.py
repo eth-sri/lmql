@@ -155,12 +155,6 @@ class LMQLTokenizer:
         segments.append(s[offset:])
         return segments
 
-def load_tiktoken_tokenizer(model_identifier):
-    if not TiktokenTokenizer.is_available():
-        raise Exception("TiktokenTokenizer not available")
-
-    return TiktokenTokenizer(model_identifier)
-
 def load_tokenizer_notransformers(model_identifier):
     if not "SLOW_TOKENIZER_OK" in os.environ.keys():
         print("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
@@ -182,8 +176,8 @@ def load_tokenizer(model_identifier, type="auto"):
         tiktoken_available = False
         # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
         try:
-            import tiktoken
-            tiktoken_available = True
+            if TiktokenTokenizer.is_available(model_identifier):
+                tiktoken_available = True
         except:
             tiktoken_available = False
         
@@ -192,7 +186,7 @@ def load_tokenizer(model_identifier, type="auto"):
                 with cachefile(cache_path, "rb") as f:
                     return LMQLTokenizer(pickle.load(f), model_identifier)
             else:
-                t = load_tiktoken_tokenizer(model_identifier)
+                t = TiktokenTokenizer(model_identifier)
 
                 with cachefile(cache_path, "wb") as f:
                     pickle.dump(t, f)

@@ -407,7 +407,7 @@ class PromptInterpreter:
                 logit_mask = None
             else:
                 logit_mask = mask.mask
-            
+
             # check stopping conditions
             stopping_conditions: List[ops.StopAtOp] = ops.execute_op_stops_at_only(state.variable, self.where, trace)
             for sc in stopping_conditions:
