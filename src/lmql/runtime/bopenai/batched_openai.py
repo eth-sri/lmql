@@ -354,6 +354,8 @@ class ResponseStreamSliceIterator:
         self.consumed_tokens = []
         self.n = 0
 
+        self.waiting_tasks = []
+
     async def recover(self):
         recovery_kwargs = self.slice.kwargs.copy()
         # reconstruct the prompt by tokenizing the consumed tokens
@@ -396,16 +398,27 @@ class ResponseStreamSliceIterator:
         self.slice = new_slice
         # otherwise the chunking aligns with the old stream, so we return the next chunk
         return await self.__anext__()
+    
+    def __del__(self):
+        """Make sure to clean up any pending tasks."""
+        for t in self.waiting_tasks:
+            loop = asyncio.get_event_loop()
+            if not t.done() and not loop.is_closed():
+                t.cancel()
 
     async def get_next(self):
         if self.slice.done.is_set(): 
             if self.n == 0:
                 return RecoveryAttempt(self.slice.kwargs, TimeoutError(), self.slice.maximum_retries)
             raise StopAsyncIteration
-        check_done_task = asyncio.create_task(self.slice.done.wait())
+        check_done_task = asyncio.create_task(self.slice.done.wait(), name="check_done_task")
+        self.waiting_tasks.append(check_done_task)
+        
         get_next_item_task = asyncio.create_task(self.slice.data_queue.get())
         done, pending = await asyncio.wait([get_next_item_task, check_done_task], 
             return_when=asyncio.FIRST_COMPLETED, timeout=5.0)
+    
+        self.waiting_tasks.remove(check_done_task)
 
         if check_done_task in done:
             # this indicates the end of this response stream

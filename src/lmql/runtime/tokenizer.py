@@ -164,9 +164,11 @@ def load_tiktoken_tokenizer(model_identifier):
 def load_tokenizer_notransformers(model_identifier):
     if not "SLOW_TOKENIZER_OK" in os.environ.keys():
         print("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
+    assert PythonBackedTokenizer.is_available(), "PythonBackedTokenizer not available. Please make sure the 'gpt3_tokenizer' package is installed."
+    
     return PythonBackedTokenizer(model_identifier)
 
-def load_tokenizer(model_identifier):
+def load_tokenizer(model_identifier, type="auto"):
     import os
 
     # first try to load pickled tokenizer from cache (faster)
@@ -176,20 +178,26 @@ def load_tokenizer(model_identifier):
     cache_identifier = model_identifier.replace("/", "-")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
-    # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
-    try:
-        if cache_file_exists(cache_path):
-            with cachefile(cache_path, "rb") as f:
-                return LMQLTokenizer(pickle.load(f), model_identifier)
-        else:
-            t = load_tiktoken_tokenizer(model_identifier)
-
-            with cachefile(cache_path, "wb") as f:
-                pickle.dump(t, f)
+    if type != "hf":
+        tiktoken_available = False
+        # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
+        try:
+            import tiktoken
+            tiktoken_available = True
+        except:
+            tiktoken_available = False
         
-        return LMQLTokenizer(t, model_identifier)
-    except Exception as e:
-        pass
+        if tiktoken_available:
+            if cache_file_exists(cache_path):
+                with cachefile(cache_path, "rb") as f:
+                    return LMQLTokenizer(pickle.load(f), model_identifier)
+            else:
+                t = load_tiktoken_tokenizer(model_identifier)
+
+                with cachefile(cache_path, "wb") as f:
+                    pickle.dump(t, f)
+            
+            return LMQLTokenizer(t, model_identifier)
 
     try:
         import torch
@@ -221,6 +229,7 @@ def get_vocab(tokenizer):
 
 if __name__ == "__main__":
     import sys
+    import torch
 
     model_identifier = sys.argv[1]
     t = load_tokenizer(model_identifier)

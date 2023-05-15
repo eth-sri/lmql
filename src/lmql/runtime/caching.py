@@ -36,6 +36,8 @@ def prepare_cache_access():
             f.write(str(CACHE_VERSION))
 
 def cache_file_exists(path):
+    if "NO_CACHE" in os.environ.keys():
+        return False
     prepare_cache_access()
     return os.path.exists(path)
 
@@ -57,4 +59,6 @@ class CacheDirFile:
             f.write(str(CACHE_VERSION))
 
 def cachefile(path, mode):
+    if not cache_file_exists(path) and "r" in mode:
+        raise FileNotFoundError("Cache file {} does not exist".format(path))
     return CacheDirFile(path, mode)

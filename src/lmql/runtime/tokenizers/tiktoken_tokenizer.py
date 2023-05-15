@@ -12,9 +12,8 @@ class TiktokenTokenizer:
 
         self.model_identifier = model_identifier
         self.enc = tiktoken.encoding_for_model(model_identifier)
-        self.vocab = {unicode(v): i for i,v in enumerate(self.enc.token_byte_values())}
-        # breakpoint()
 
+        self.vocab = {self.enc.decode([i]): i for i in range(self.enc.max_token_value)}
         self.stats = Stats("tiktoken")
 
         for i in range(self.enc.n_vocab, self.enc.max_token_value):
