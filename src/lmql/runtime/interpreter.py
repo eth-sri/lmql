@@ -786,9 +786,6 @@ class PromptInterpreter:
             # make sure token cache is saved if possible
             self.dcmodel.save()
 
-            if hasattr(self.dcmodel, "calls"):
-                print("dcmodel calls", self.dcmodel.calls - self.dcmodel.hits)
-
             if hasattr(self.dcmodel, "close"):
                 self.dcmodel.close()
 
