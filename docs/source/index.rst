@@ -91,6 +91,7 @@ Contents
     :caption: 💬 Contribute
     
     dev-setup
+    docker-setup
     Discord <https://discord.gg/7eJP4fcyNT>
     GitHub Issues <https://github.com/eth-sri/lmql/issues>
     E-Mail <mailto:hello@lmql.ai>
