@@ -47,6 +47,8 @@ def persist_cache():
             pickle.dump(cache, f)
 
 async def apply(q, *args):
+    global cache
+
     # handle non-LMQL queries
     if type(q) is not LMQLQueryFunction:
         if inspect.iscoroutinefunction(q):
@@ -67,19 +69,24 @@ async def apply(q, *args):
         print("warning: cannot hash LMQL query arguments {}. Change the argument types to be hashable.".format(args))
         key = str(q.lmql_code) + str(args)
     
-    if key in cache.keys():
+    if cache is not None and key in cache.keys():
         stats["cached"] += 1
         return cache[key]
     else:
-        result = await q(*args)
-        if len(result) == 1:
-            result = result[0]
-        if type(result) is LMQLResult:
-            if "RESULT" in result.variables.keys():
-                result = result.variables["RESULT"].strip()
+        try:
+            result = await q(*args)
+            if len(result) == 1:
+                result = result[0]
+            if type(result) is LMQLResult:
+                if "RESULT" in result.variables.keys():
+                    result = result.variables["RESULT"].strip()
 
-        cache[key] = result
-        persist_cache()
+            if cache is not None:
+                cache[key] = result
+                persist_cache()
+        except Exception as e:
+            print("Failed for args: {}".format(args), flush=True)
+            raise e
 
         return result
 

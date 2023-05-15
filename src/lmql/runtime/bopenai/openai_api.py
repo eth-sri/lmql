@@ -200,14 +200,17 @@ async def chat_api(**kwargs):
                         is_done = current_chunk.strip().endswith("[DONE]")
                         
                         while "data: " in current_chunk:
-                            chunks = current_chunk.split("data: ")
+                            chunks = current_chunk.split("\ndata: ")
                             while len(chunks[0]) == 0:
                                 chunks = chunks[1:]
                             if len(chunks) == 1:
                                 # last chunk may be incomplete
                                 break
                             complete_chunk = chunks[0].strip()
-                            current_chunk = "data: ".join(chunks[1:])
+                            current_chunk = "\ndata: ".join(chunks[1:])
+
+                            if complete_chunk.startswith("data: "):
+                                complete_chunk = complete_chunk[len("data: "):]
 
                             if len(complete_chunk.strip()) == 0: 
                                 continue
@@ -218,7 +221,10 @@ async def chat_api(**kwargs):
                             sum_chunk_times += time.time() - last_chunk_time
                             last_chunk_time = time.time()
                             
-                            data = json.loads(complete_chunk)
+                            try:
+                                data = json.loads(complete_chunk)
+                            except json.decoder.JSONDecodeError:
+                                print("Failed to decode JSON:", [complete_chunk])
 
                             if "error" in data.keys():
                                 message = data["error"]["message"]
@@ -328,14 +334,17 @@ async def completion_api(**kwargs):
                         is_done = current_chunk.strip().endswith("[DONE]")
                         
                         while "data: " in current_chunk:
-                            chunks = current_chunk.split("data: ")
+                            chunks = current_chunk.split("\ndata: ")
                             while len(chunks[0]) == 0:
                                 chunks = chunks[1:]
                             if len(chunks) == 1:
                                 # last chunk may be incomplete
                                 break
                             complete_chunk = chunks[0].strip()
-                            current_chunk = "data: ".join(chunks[1:])
+                            current_chunk = "\ndata: ".join(chunks[1:])
+                            
+                            if complete_chunk.startswith("data: "):
+                                complete_chunk = complete_chunk[len("data: "):]
 
                             if len(complete_chunk.strip()) == 0: 
                                 continue
@@ -349,7 +358,10 @@ async def completion_api(**kwargs):
                             sum_chunk_times += time.time() - last_chunk_time
                             last_chunk_time = time.time()
                             
-                            data = json.loads(complete_chunk)
+                            try:
+                                data = json.loads(complete_chunk)
+                            except json.decoder.JSONDecodeError:
+                                print("Failed to decode JSON:", [complete_chunk])
 
                             if "error" in data.keys():
                                 message = data["error"]["message"]

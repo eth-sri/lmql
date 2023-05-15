@@ -131,7 +131,9 @@ class PromptScope(ast.NodeVisitor):
                 parsed = ast.parse(v).body[0].value
                 self.visit(parsed)
             except:
-                raise RuntimeError("Failed to parse fstring expression: ", v)
+                print("info: failed to parse fstring expression: ", v)
+                # raise RuntimeError("Failed to parse fstring expression: ", v)
+                return super().visit_Constant(node)
 
         # put double curly braces back in
         qstring = qstring.replace("__curly_open__", "{{").replace("__curly_close__", "}}")

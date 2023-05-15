@@ -405,8 +405,7 @@ class ResponseStreamSliceIterator:
         check_done_task = asyncio.create_task(self.slice.done.wait())
         get_next_item_task = asyncio.create_task(self.slice.data_queue.get())
         done, pending = await asyncio.wait([get_next_item_task, check_done_task], 
-            return_when=asyncio.FIRST_COMPLETED, timeout=2.0)
-        
+            return_when=asyncio.FIRST_COMPLETED, timeout=5.0)
 
         if check_done_task in done:
             # this indicates the end of this response stream
@@ -418,11 +417,13 @@ class ResponseStreamSliceIterator:
             assert get_next_item_task in done, f"expected get_next_item_task to be done, but only {done} is done."
             # cancel self.done waiting task
             for t in pending: t.cancel()
+            check_done_task.cancel()
             # return with new data chunk
             self.n += 1
             return get_next_item_task.result()
         else:
             for t in pending: t.cancel()
+            check_done_task.cancel()
             # if after timeout this response has been fully consumed, we are done
             if self.slice.done.is_set() and self.n > 0:
                 raise StopAsyncIteration

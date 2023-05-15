@@ -81,6 +81,14 @@ class LMQLContext:
 
     # LMQL runtime API
 
+    @property
+    def num_calls(self):
+        dcmodel = self.interpreter.dcmodel
+        if hasattr(dcmodel, 'calls'):
+            return dcmodel.calls - dcmodel.hits
+        else:
+            return 0
+
     async def get_var(self, name):
         return self.program_state.get_program_value(name)
 
@@ -777,6 +785,10 @@ class PromptInterpreter:
         finally:
             # make sure token cache is saved if possible
             self.dcmodel.save()
+
+            if hasattr(self.dcmodel, "calls"):
+                print("dcmodel calls", self.dcmodel.calls - self.dcmodel.hits)
+
             if hasattr(self.dcmodel, "close"):
                 self.dcmodel.close()
 

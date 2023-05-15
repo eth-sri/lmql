@@ -176,7 +176,7 @@ async def beam_search(prompt_ids: np.ndarray, n=4, max_len=None, **kwargs):
 dc.decoder(beam_search, "beam")
 
 @dc.decoder
-async def beam_var(prompt_ids: np.ndarray, n=4, max_len=None, inject_stop=False, prune=None, **kwargs):
+async def beam_var(prompt_ids: np.ndarray, n=4, max_len=None, inject_stop=False, prune=None, return_first=False, **kwargs):
     s = Stats("beam_var")
 
     n = kwargs.get("num_beams", n)
@@ -254,11 +254,16 @@ async def beam_var(prompt_ids: np.ndarray, n=4, max_len=None, inject_stop=False,
 
             done = dc.topk(done, n, scorer=scorer, name="done_" + str(num_steps))
 
+        if len(done) > 0 and return_first:
+            break
+
         yield (h, done)
     
     done.name("final result")
     yield done
-    dc.finish(done)
+
+    # sort done by score
+    dc.finish(dc.array_sorted(done.flatten(), key=lambda s: -s.logprobs.sum()))
 
 
 def post_vilar_allocation(h, k, scorer=None, num_steps=0):
@@ -413,6 +418,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
     active = seqs.reshape(lambda s: s.id)
     variable_done = dc.seqs()
     active_variable.set(None)
+    sample = method == "sample"
 
     def is_active_variable(s):
         v = s.data("head.variable")
@@ -466,7 +472,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
             active, variable_done = (active + variable_done).separate_by(is_active_variable)
             active = dc.topk(active, b)
 
-            top_variable_done, _ = dc.seperate_topk(variable_done, b, scorer=nw_score)
+            top_variable_done, _ = dc.seperate_topk(variable_done, b, scorer=regular_scorer)
 
             active.name(str(active_variable.get()) + "[" + str(i) + "]_")
             i += 1
@@ -499,7 +505,7 @@ async def bsseq(prompt_ids: np.ndarray, b=2, max_len=384, **kwargs):
         yield s
 
 @dc.decoder
-async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="sample", temperature=1.0, **kwargs):
+async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="sample", temperature=1.0, return_first=False, **kwargs):
     """
     sample: 
         if True, uses beam_sample variable-local-decoding, otherwise uses beam_search-like decoding
@@ -553,13 +559,15 @@ async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="samp
         variable_done.name("candidates_" + active_variable.get())
 
         yield variable_done
+
+        if len(done) > 0 and return_first: break
         # variable_done = non_det
 
     done = dc.topk(done, len(done))
     done.name("final result")
     yield done
     
-    dc.finish(done)
+    dc.finish(dc.array_sorted(done.flatten(), key=lambda s: -s.logprobs.sum()))
 
 def is_seq_beams_search_done(active_hypotheses, done_hypotheses, num_beams, scorer=None):
     return len(active_hypotheses) == 0 or (len(done_hypotheses) == num_beams and dc.max_score(active_hypotheses, scorer=scorer) < dc.min_score(done_hypotheses, scorer=scorer))

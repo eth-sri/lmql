@@ -26,9 +26,6 @@ class CacheFile:
                 if cache.get("model") != self.model:
                     print("warning: cache file is from a different model. Its contents will be overwritten. {} != {}".format(cache["model"], self.model))
                 else:
-                    if not str(self.initial_ids) in cache.keys():
-                        print(str(self.initial_ids))
-                        print("cache miss for", self.filename, cache.keys())
                     return cache.get(str(self.initial_ids), {})
         return {}
     
@@ -375,6 +372,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         if len(tok) == 0: return
         # do actual scoring with delegate model
+        self.calls += 1
         sq, tokens, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
         self.save_cached(sq.input_ids, tokens, scores, user_data)
         
@@ -465,6 +463,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 completion = np.array(unexpanded_tok)
                 token_scores = continued_seq.logprobs[-len(completion):]
             else:
+                self.calls += 1
                 # run actual score() call for remaining non-cached part of 'tokens' (tok)
                 result: DeterministicDecoderSequence = (await self.delegate.score([continued_seq], [tok], max_batch_size, det, stop_phrase, needs_rewrite=needs_rewrite, user_data=user_data, noscore=noscore, internal=True))[0]
                 
