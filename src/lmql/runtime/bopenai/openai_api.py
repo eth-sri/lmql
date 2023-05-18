@@ -409,6 +409,9 @@ async def completion_api(**kwargs):
                     raise OpenAIStreamError("Token stream ended unexpectedly.", current_chunk)
 
 async def main():
+    import sys
+    # Not sure if this should work, but prompt needs tokenizing I think
+    """
     kwargs = {
         "model": "text-davinci-003",
         "prompt": "Say this is a test",
