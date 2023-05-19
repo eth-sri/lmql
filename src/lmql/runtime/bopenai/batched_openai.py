@@ -361,7 +361,7 @@ class ResponseStreamSliceIterator:
         # reconstruct the prompt by tokenizing the consumed tokens
         if len(self.consumed_tokens) > 0:
             prompt = self.consumed_tokens
-            recovery_kwargs["prompt"] = [t[0] for t in prompt]
+            recovery_kwargs["prompt"] = "".join([t for t in prompt])
         
         # issue new completion call
         new_slice = await self.slice.stream.scheduler.complete(**recovery_kwargs)

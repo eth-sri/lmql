@@ -102,7 +102,7 @@ class CompletionCall:
 
 class DclibOpenAiModel(DcModel):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, truncation_threshold=-120, init_workers=False, **kwargs)
+        super().__init__(*args, truncation_threshold=-12000, init_workers=False, **kwargs)
 
         # if available, store reference to output writer for eager stats reporting
         self.output_writer = None
@@ -235,6 +235,10 @@ class DclibOpenAiModel(DcModel):
         input_ids = completion_call.input_ids.reshape(-1)
         assert input_ids.ndim == 1, f"_complete expects input_ids to be a 1D tensor when only one completion_call is passed, got {input_ids.ndim}D tensor."
 
+        # do not include bos token in prompt for request
+        if input_ids[0] == self.tokenizer.bos_token_id:
+            input_ids = input_ids[1:]
+
         temperature = completion_call.kwargs.get("temperature", 0.0)
         logprobs = completion_call.kwargs.get("logprobs", 5)
         noscore = completion_call.kwargs.get("noscore", False)
@@ -288,6 +292,9 @@ class DclibOpenAiModel(DcModel):
             args = kwargs.copy()
             args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
             print(f"openai complete: {args}")
+        
+        if self.model_args.get("api"):
+            kwargs["endpoint"] = self.model_args.get("api")
 
         return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     

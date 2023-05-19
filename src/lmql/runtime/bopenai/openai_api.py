@@ -98,6 +98,9 @@ def tagged_segments(s):
 
 def get_endpoint_and_headers(**kwargs):
     model = kwargs["model"]
+    
+    print(kwargs)
+
     if os.environ.get("OPENAI_API_TYPE", 'openai') == 'azure':
         model_env_name = model.upper().replace(".", "_")
         endpoint = os.environ[f"AZURE_OPENAI_{model_env_name}_ENDPOINT"]
@@ -314,6 +317,10 @@ async def completion_api(**kwargs):
 
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
+
+    endpoint = kwargs.pop("endpoint", "https://api.openai.com/v1/")
+    if not endpoint.startswith("http"):
+        endpoint = "http://" + endpoint
 
     async with CapacitySemaphore(num_prompts * max_tokens):
         
