@@ -95,8 +95,31 @@ def tagged_segments(s):
     segments.append({"tag": current_tag, "text": s[offset:]})
     return segments
 
+
+def get_endpoint_and_headers(**kwargs):
+    model = kwargs["model"]
+    if os.environ.get("OPENAI_API_TYPE", 'openai') == 'azure':
+        model_env_name = model.upper().replace(".", "_")
+        endpoint = os.environ[f"AZURE_OPENAI_{model_env_name}_ENDPOINT"]
+        key = os.environ[f"AZURE_OPENAI_{model_env_name}_KEY"]
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": key,
+        }
+        return endpoint, headers
+    else:
+        from lmql.runtime.openai_secret import openai_secret, openai_org
+        if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
+            endpoint = "https://api.openai.com/v1/chat/completions"
+        else:
+            endpoint = "https://api.openai.com/v1/completions"
+        return endpoint, {
+            "Authorization": f"Bearer {openai_secret}",
+            "Content-Type": "application/json",
+        }
+
+
 async def chat_api(**kwargs):
-    from lmql.runtime.openai_secret import openai_secret, openai_org
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
@@ -165,13 +188,11 @@ async def chat_api(**kwargs):
         stream_start = time.time()
         
         async with aiohttp.ClientSession() as session:
+            endpoint, headers = get_endpoint_and_headers(**kwargs)
             async with session.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openai_secret}",
-                    "Content-Type": "application/json",
-                },
-                json={**kwargs},
+                    endpoint,
+                    headers=headers,
+                    json={**kwargs},
             ) as resp:
                 last_chunk_time = time.time()
                 sum_chunk_times = 0
@@ -289,7 +310,6 @@ async def chat_api(**kwargs):
                     raise OpenAIStreamError("Token stream ended unexpectedly.", current_chunk)
     
 async def completion_api(**kwargs):
-    from lmql.runtime.openai_secret import openai_secret, openai_org
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
@@ -301,13 +321,11 @@ async def completion_api(**kwargs):
         stream_start = time.time()
         
         async with aiohttp.ClientSession() as session:
+            endpoint, headers = get_endpoint_and_headers(**kwargs)
             async with session.post(
-                "https://api.openai.com/v1/completions",
-                headers={
-                    "Authorization": f"Bearer {openai_secret}",
-                    "Content-Type": "application/json",
-                },
-                json={**kwargs},
+                    endpoint,
+                    headers=headers,
+                    json={**kwargs},
             ) as resp:
                 last_chunk_time = time.time()
                 sum_chunk_times = 0
@@ -391,6 +409,9 @@ async def completion_api(**kwargs):
                     raise OpenAIStreamError("Token stream ended unexpectedly.", current_chunk)
 
 async def main():
+    import sys
+    # Not sure if this should work, but prompt needs tokenizing I think
+    """
     kwargs = {
         "model": "text-davinci-003",
         "prompt": "Say this is a test",
@@ -400,8 +421,36 @@ async def main():
     }
 
     async for chunk in complete(**kwargs):
-        print(chunk)
+                print(chunk)"""
+
+    """
+     Tested working with these environment variables:
+        Azure config for GPT-3.5-Turbo:
+            OPENAI_API_TYPE = azure
+            AZURE_OPENAI_GPT-3_5-TURBO_ENDPOINT = https://{service}.openai.azure.com/openai/deployments/{gpt3.5-turbo-deployment}/chat/completions?api-version=2023-03-15-preview
+            AZURE_OPENAI_GPT-3_5-TURBO_KEY = XXXXXXXXX
+        Regular OpenAI credentials for GPT-3.5-Turbo:
+            OPENAI_API_TYPE = openai
+            OPENAI_API_KEY = XXXXXXXXX
+    """
+
+    kwargs = {
+        "model": "gpt-3.5-turbo",
+        "prompt": [
+            tokenize("<lmql:system/> You are a helpful assistant.<lmql:user/>Hi, tell me all you know about GPT-2.")],
+        "max_tokens": 512,
+        "temperature": 0.,
+        "stream": True,
+        "echo": False,
+        "logprobs": None,
+    }
+
+    async for chunk in chat_api(**kwargs):
+        if len(chunk["choices"]) > 0:
+            sys.stdout.write(chunk["choices"][0]["text"])
+
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())
