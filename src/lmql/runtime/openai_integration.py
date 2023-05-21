@@ -924,7 +924,7 @@ class HFModelStatsAdapter:
     def cost_estimate(self, model):
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
-def openai_model(model_identifier, endpoint=None):
+def openai_model(model_identifier, endpoint=None, mock=False):
     # make sure openai org and secret are available
     import lmql.runtime.openai_secret
     
@@ -940,7 +940,10 @@ def openai_model(model_identifier, endpoint=None):
 
         def get_tokenizer(self):
             if self._tokenizer is None:
-                self._tokenizer = load_tokenizer("gpt2")
+                if not mock:
+                    self._tokenizer = load_tokenizer("gpt2")
+                else:
+                    self._tokenizer = load_tokenizer(self.model_identifier)
             self.served_model = self
             return self._tokenizer
 

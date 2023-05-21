@@ -40,12 +40,15 @@ def autoregister(model_name):
 
         if LMQLModelRegistry is not None:
             backend: str = LMQLModelRegistry.backend_configuration
-            if backend.startswith("mocked-oai://"):
+            if backend != "legacy":
                 from lmql.runtime.openai_integration import openai_model
                 
+                if backend is None:
+                    backend = "localhost:8080"
+                
                 # use provided inference server as mocked OpenAI API
-                endpoint = backend[len("mocked-oai://"):]
-                Model = openai_model(model_name, endpoint=endpoint)
+                endpoint = backend
+                Model = openai_model(model_name, endpoint=endpoint, mock=True)
                 register_model(model_name, Model)
                 register_model("*", Model)
                 return

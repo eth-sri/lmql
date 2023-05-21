@@ -13,7 +13,7 @@ def cmd_serve_model():
     """emoji:🏄 Serve a 🤗 Transformers model via the LMQL inference API"""
     os.chdir(project_root)
     if "--legacy" in sys.argv:
-        os.system("python -m lmql.model.serve " + " ".join(sys.argv[2:]))
+        os.system("python -m lmql.model.serve_legacy " + " ".join(sys.argv[2:]))
     else:
         os.system("python -m lmql.model.serve_oai " + " ".join(sys.argv[2:]))
 

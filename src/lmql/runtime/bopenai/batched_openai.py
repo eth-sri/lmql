@@ -408,9 +408,12 @@ class ResponseStreamSliceIterator:
     def __del__(self):
         """Make sure to clean up any pending tasks."""
         for t in self.waiting_tasks:
-            loop = asyncio.get_event_loop()
-            if not t.done() and not loop.is_closed():
-                t.cancel()
+            try:
+                loop = asyncio.get_event_loop()
+                if not t.done() and not loop.is_closed():
+                    t.cancel()
+            except RuntimeError:
+                pass
 
     async def get_next(self):
         if self.slice.done.is_set(): 
