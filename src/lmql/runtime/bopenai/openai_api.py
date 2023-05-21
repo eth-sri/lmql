@@ -99,7 +99,15 @@ def tagged_segments(s):
 def get_endpoint_and_headers(**kwargs):
     model = kwargs["model"]
     
-    print(kwargs)
+    endpoint = kwargs.pop("endpoint", None)
+
+    # if a custom endpoint is specified, use it
+    if endpoint is not None:
+        if not endpoint.endswith("http"):
+            endpoint = f"http://{endpoint}"
+        return endpoint + "/completions", {
+            "Content-Type": "application/json"
+        }
 
     if os.environ.get("OPENAI_API_TYPE", 'openai') == 'azure':
         model_env_name = model.upper().replace(".", "_")
@@ -310,17 +318,13 @@ async def chat_api(**kwargs):
                         raise OpenAIStreamError(last_message["error"]["message"] + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
                         # raise OpenAIStreamError(last_message["error"]["message"])
                 except json.decoder.JSONDecodeError:
-                    raise OpenAIStreamError("Token stream ended unexpectedly.", current_chunk)
+                    raise OpenAIStreamError("Error in API response:", current_chunk)
     
 async def completion_api(**kwargs):
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
-
-    endpoint = kwargs.pop("endpoint", "https://api.openai.com/v1/")
-    if not endpoint.startswith("http"):
-        endpoint = "http://" + endpoint
 
     async with CapacitySemaphore(num_prompts * max_tokens):
         
@@ -413,7 +417,7 @@ async def completion_api(**kwargs):
                         raise OpenAIStreamError(last_message["error"]["message"] + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
                         # raise OpenAIStreamError(last_message["error"]["message"])
                 except json.decoder.JSONDecodeError:
-                    raise OpenAIStreamError("Token stream ended unexpectedly.", current_chunk)
+                    raise OpenAIStreamError("Error in API response:", current_chunk)
 
 async def main():
     import sys

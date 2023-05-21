@@ -8,16 +8,11 @@ from typing import Any, Dict, Optional
 
 from lmql.ops.ops import *
 from lmql.runtime.langchain import LMQLChainMixIn
-from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import silent
 from lmql.runtime.interpreter import PromptInterpreter
 from lmql.runtime.postprocessing.conditional_prob import \
     ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
-
-
-def register_model(identifier, ModelClass):
-    LMQLModelRegistry.registry[identifier] = ModelClass
 
 class LMQLInputVariableScope:
     def __init__(self, f, calling_frame):

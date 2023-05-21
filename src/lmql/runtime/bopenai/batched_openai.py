@@ -90,6 +90,9 @@ def make_request_args(tasks):
     futures = [t["future"] for t in tasks]
     request_ids = [t["request_id"] for t in tasks]
 
+    endpoints = [t.get("endpoint", None) for t in tasks if t.get("endpoint") is not None]
+    endpoint = endpoints[0] if len(endpoints) > 0 else None
+
     # construct request arguments
     request_args = tasks[0].copy()
     del request_args["future"]
@@ -98,6 +101,9 @@ def make_request_args(tasks):
     request_args["futures"] = futures
     request_args["request_id"] = request_ids
     request_args["stream"] = True
+    
+    if endpoint is not None: 
+        request_args["endpoint"] = endpoint
 
     return request_args
 
@@ -675,7 +681,7 @@ class AsyncOpenAIAPI:
                             raise e
                         self.stats.errors += 1
                         retries -= 1            
-                        print("Failed to call complete endpoint", type(e), e, flush=True)
+                        print("OpenAI:", str(e), '"' + str(type(e)) + '"', flush=True)
                         await asyncio.sleep(0.5)
                         if retries <= 0 or self.is_definitive_error(e):
                             raise e
@@ -723,7 +729,6 @@ class AsyncOpenAIAPI:
             if logit_bias_logging:
                 print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.", file=sys.stderr)
             kwargs["logit_bias"] = {t:b for t,b in biases}
-
 
         assert kwargs.get("echo", False), f"bopenai requires echo=True for to enable proper error recovery. Please handle proper prompt removal in client code."
 

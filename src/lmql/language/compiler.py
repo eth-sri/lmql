@@ -632,9 +632,8 @@ class LMQLCompiler:
             with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
                 
+                writer.add(yield_call("set_decoder", astunparse.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))                
                 writer.add(yield_call("set_model", model_name))
-                # writer.add(f"context.set_decoder({})")
-                writer.add(yield_call("set_decoder", astunparse.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))
                 writer.add("# where")
                 writer.add(q.where)
                 writer.add(yield_call("set_where_clause", q.where_expr))

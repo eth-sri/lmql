@@ -451,6 +451,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--cuda", action="store_true", default=False)
+    parser.add_argument("--legacy", action="store_true", default=False)
     parser.add_argument("--cache", type=str, default=None)
     parser.add_argument("--dtype", type=str, default="none", help="What format to load the model weights. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes)")
     parser.add_argument("--wait_until_ready", action="store_true", default=False, help="Whether the server should start only after the model and tokenizer have been loaded.")

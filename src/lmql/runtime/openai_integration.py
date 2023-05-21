@@ -101,7 +101,7 @@ class CompletionCall:
         return f"{parameter_values_key_segment}-{mask_key_segment}"
 
 class DclibOpenAiModel(DcModel):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, endpoint=None, **kwargs):
         super().__init__(*args, truncation_threshold=-12000, init_workers=False, **kwargs)
 
         # if available, store reference to output writer for eager stats reporting
@@ -115,6 +115,7 @@ class DclibOpenAiModel(DcModel):
         self.model.nostop = kwargs.get("openai_nonstop", False)
         self.num_billed_tokens = {}
         self.num_requests = 0
+        self.endpoint = endpoint
 
         self.stats = Stats("openai")
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
@@ -162,6 +163,9 @@ class DclibOpenAiModel(DcModel):
         return CompletionCall("complete", mask, s.input_ids, kwargs, invert=invert, stopping_phrases=stopping_phrases)
 
     async def api_score(self, input_ids, offset):
+        if input_ids[0] == self.tokenizer.bos_token_id:
+            input_ids = input_ids[1:]
+        
         kwargs = {
             "model": self.model.model_identifier,
             "prompt": input_ids.tolist(),
@@ -169,12 +173,16 @@ class DclibOpenAiModel(DcModel):
             "temperature": 0,
             "logprobs": 1,
             "user": "lmql",
-            "echo": True
+            "echo": True,
+            **({"endpoint": self.endpoint} if self.endpoint is not None else {})
         }
 
-        logprobs = []
+        logprobs = [None]
         async for data in await openai.Completion.create(**kwargs):
             logprobs += data["logprobs"]["token_logprobs"]
+        
+        print(len(input_ids), len(logprobs))
+
         return np.array(logprobs[offset:], dtype=np.float32)
 
     async def queue_api_score(self, kwargs):
@@ -251,7 +259,8 @@ class DclibOpenAiModel(DcModel):
             "logprobs": logprobs,
             "user": "lmql",
             "stream": True,
-            "echo": True
+            "echo": True,
+            **({"endpoint": self.endpoint} if self.endpoint is not None else {})
         }
 
         mode = completion_call.mode
@@ -293,9 +302,6 @@ class DclibOpenAiModel(DcModel):
             args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
             print(f"openai complete: {args}")
         
-        if self.model_args.get("api"):
-            kwargs["endpoint"] = self.model_args.get("api")
-
         return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     
     async def tokenize_list(self, tokens: List[str]):
@@ -575,7 +581,7 @@ class DclibOpenAiModel(DcModel):
                 tokens = [p[0] for p in probs]
                 token_ids = np.array([self.model.get_tokenizer()(t)["input_ids"][0] for t in tokens], dtype=np.int64)
 
-                assert token_ids[0] == next_token, f"top1 logprob token is not the same as the predicted token {token_ids[0]} (top1) != {next_token} (predicted)"
+                assert token_ids[0] == next_token, f"top1 logprob token is not the same as the predicted token {token_ids[0]} '{await self.detokenize([token_ids[0]])}' != {next_token} '{await self.detokenize([next_token])}'"
 
                 full_logits = np.ones(self.model.get_tokenizer().vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
@@ -861,6 +867,8 @@ class OptimisticChunkBasedOpenAIModel:
         if self.logits_mask[-1] is not None:
             kwargs["logit_bias"] = self.logits_mask[-1]
 
+        
+
         kwargs = {
             "model": self.model_identifier,
             "prompt": input_ids.tolist(),
@@ -916,7 +924,7 @@ class HFModelStatsAdapter:
     def cost_estimate(self, model):
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
-def openai_model(model_identifier):
+def openai_model(model_identifier, endpoint=None):
     # make sure openai org and secret are available
     import lmql.runtime.openai_secret
     
@@ -942,7 +950,7 @@ def openai_model(model_identifier):
 
             dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
 
-            return DclibOpenAiModel(self, self.get_tokenizer(), **self.decoder_args)
+            return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, **self.decoder_args)
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]

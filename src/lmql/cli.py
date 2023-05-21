@@ -12,7 +12,10 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def cmd_serve_model():
     """emoji:🏄 Serve a 🤗 Transformers model via the LMQL inference API"""
     os.chdir(project_root)
-    os.system("python -m lmql.model.serve " + " ".join(sys.argv[2:]))
+    if "--legacy" in sys.argv:
+        os.system("python -m lmql.model.serve " + " ".join(sys.argv[2:]))
+    else:
+        os.system("python -m lmql.model.serve_oai " + " ".join(sys.argv[2:]))
 
 def cmd_run():
     """
