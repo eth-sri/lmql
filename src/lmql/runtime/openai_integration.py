@@ -300,7 +300,7 @@ class DclibOpenAiModel(DcModel):
         if self.model_args.get("chatty_openai", False):
             args = kwargs.copy()
             args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
-            print(f"openai complete: {args}")
+            print(f"openai complete: {args}", flush=True)
         
         return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[input_ids.size:], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     
@@ -935,7 +935,7 @@ def openai_model(model_identifier, endpoint=None, mock=False):
             self._tokenizer = None
 
             self.decoder_args = {
-                "openai_chunksize": 64
+                "openai_chunksize": 64 if not mock else 16,
             }
 
         def get_tokenizer(self):

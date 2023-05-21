@@ -10,7 +10,7 @@ import concurrent
 from aiohttp import web
 from aiohttp_sse import sse_response
 from queue import Queue
-from threading import Event
+from threading import Event, Thread
 from typing import Optional, Tuple
 
 from typing import List
@@ -163,7 +163,7 @@ def log_echo(all_input_ids, all_scores, tokenizer, output_queue):
             t_before = t
             output_queue.put(result_object)
     
-async def run(input_ids, model, tokenizer, response, vocab_range, temperature=0.0, echo=False, num_logprobs=1, device=None, **kwargs):
+async def run(pool, input_ids, model, tokenizer, response, vocab_range, temperature=0.0, echo=False, num_logprobs=1, device=None, **kwargs):
     start = time.time()
     logger = None
     
@@ -258,11 +258,11 @@ async def run(input_ids, model, tokenizer, response, vocab_range, temperature=0.
             traceback.print_exc()
         output_queue.put(None)
     
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        logger_task = asyncio.create_task(logging())
-        await asyncio.get_event_loop().run_in_executor(pool, _generate_task)
-        output_queue.put(None)
-        await logger_task
+    logger_task = asyncio.create_task(logging())
+    
+    await asyncio.get_event_loop().run_in_executor(pool, _generate_task)
+    output_queue.put(None)
+    await logger_task
 
     # print(termcolor.colored(tokenizer.decode(input_ids, skip_special_tokens=True), "green"))
     # print("took", time.time() - start, "seconds")
@@ -275,6 +275,8 @@ class APIHandler:
         self.device = None
 
         self.args = args
+
+        self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
     def load(self, model_name):
         # prepare device
@@ -307,9 +309,9 @@ class APIHandler:
         body = await request.json()
         model_name = body["model"]
 
-        if model_name != args.model:
+        if model_name != self.args.model:
             res = web.Response(status=400)
-            res.text = "This API serves the model " + args.model + ", but you requested " + model_name
+            res.text = "This API serves the model " + self.args.model + ", but you requested " + model_name
             return res
 
         input_ids = []
@@ -344,7 +346,7 @@ class APIHandler:
 
         await response.prepare(request)
 
-        await run(input_ids, self.model, self.tokenizer, response, vocab_range=self.vocab_range, temperature=temperature, 
+        await run(self.pool, input_ids, self.model, self.tokenizer, response, vocab_range=self.vocab_range, temperature=temperature, 
                     echo=echo, max_new_tokens=max_tokens, logit_bias=logit_bias, num_logprobs=num_logprobs, device=self.device)
 
         try:
@@ -356,7 +358,7 @@ class APIHandler:
 
         return response
 
-if __name__ == "__main__":
+async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("model", type=str)
     parser.add_argument("--port", type=int, default=8080)
@@ -375,4 +377,10 @@ if __name__ == "__main__":
 
     def p(*print_args):
         print("[Serving mocked OpenAI API at http://" + args.host + ":" + str(args.port) + "/completions]")
-    web.run_app(app, port=args.port, host=args.host, print=p)
+    
+    task = await web._run_app(app, port=args.port, host=args.host, print=p)
+
+    api.pool
+
+if __name__ == "__main__":
+    asyncio.run(main())
