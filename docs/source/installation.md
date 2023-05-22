@@ -8,7 +8,7 @@ To install the latest version of LMQL locally, run the following command with Py
 pip install lmql
 ```
 
-**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. [https://pytorch.org/get-started/locally/]()).
+**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. [https://pytorch.org/get-started/locally/]()). To install GPU dependencies via pip, install LMQL via `pip install lmql[hf]`.
 
 ## Running LMQL Programs
 
@@ -36,7 +36,7 @@ For more details, please see the [Python Integration](./python/python.ipynb) cha
 
 ## Self-Hosted Models
 
-Note that when using local [🤗 Transformers](https://huggingface.co/transformers) models in the Playground IDE or via `lmql run`, you have to first launch an instance of the LMQL Inference API for the corresponding model via the command `lmql serve-model`. For more details, please see [Models](./language/models.md) chapter.
+Note that when using local [🤗 Transformers](https://huggingface.co/transformers) models in the Playground IDE or via `lmql run`, you have to first launch an instance of the LMQL Inference API for the corresponding model via the command `lmql serve-model`. For more details, please see [🤗 Models](./language/hf.md) chapter.
 
 ## Configuring OpenAI API Credentials
 

@@ -1,4 +1,4 @@
-# OpenAI
+# OpenAI API Models
 
 In general, LMQL supports all models available via the OpenAI Completions or OpenAI Chat API, e.g., GPT-3.5 variants, ChatGPT, and GPT-4.
 
@@ -88,14 +88,3 @@ Unfortunately, the OpenAI API Completions and Chat API are severely limited in t
 * The **OpenAI Completions API only provides the top-5 logprobs per predicted token**. This means that decoding algorithms that explore e.g. the top-n probabilities to make decisions like beam search, are limited to a branching factor of 5.
 
 * The **OpenAI Chat API does not provide any way to mask tokens or obtain the token distribution (ChatGPT, GPT-4)**. Simple constraints can still be enforced, as the LMQL runtime optimizes them to fit the OpenAI API. However, more complex constraints may not be enforceable. In these cases, LMQL will print a error message to the console. As a workaround users may then adjust their constraints to fit these API limitations or resort to post-processing and backtracking. Scripted prompting, intermediate instructions and simple constraints are still supported with Chat API models, nonetheless.
-## 🤗 Transformers Models
-
-LMQL also support locally-hosted models via [🤗 Transformers](https://huggingface.co/transformers). This includes all models that are available via the [🤗 Transformers Model Hub](https://huggingface.co/models) and conform to the AutoModelForCausalLM API. Examples include `gpt2` or `facebook/opt-30B`.
-
-Before you start using LMQL with 🤗 Transformers models, make sure you have installed the `lmql` package with the optional `hf` flag:
-
-```bash
-pip install lmql[hf]
-```
-
-This will install the `transformers` package and its dependencies, which is required to load 🤗  Transformers models.

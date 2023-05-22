@@ -6,7 +6,6 @@ Due to the modular design of LMQL, it is easy to add support for new models and 
 
 ```{toctree}
 :maxdepth: 1
-:caption: Contents
 
 openai.md
 hf.md
