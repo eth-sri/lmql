@@ -113,6 +113,14 @@ class LMQLContext:
 
     # LMQL runtime API
 
+    @property
+    def num_calls(self):
+        dcmodel = self.interpreter.dcmodel
+        if hasattr(dcmodel, 'calls'):
+            return dcmodel.calls - dcmodel.hits
+        else:
+            return 0
+
     async def get_var(self, name):
         return self.program_state.get_program_value(name)
 
@@ -229,7 +237,27 @@ class PromptInterpreter:
         self.decoder_kwargs = kwargs
         self.decoder_kwargs["decoder"] = method
 
+        if "backend" in kwargs:
+            LMQLModelRegistry.backend_configuration = kwargs["backend"]
+
     def set_model(self, model_name):
+        if type(model_name) is not str:
+            # derive model endpoint from model object
+            if hasattr(model_name, "port"):
+                endpoint = "localhost:" + str(model_name.port)
+                if self.decoder_kwargs.get("backend") is not None:
+                    if self.decoder_kwargs["backend"] != endpoint:
+                        print("warning: The provided query specifies a backend at " + self.decoder_kwargs["backend"] + " but the passed model is served at " + 
+                              endpoint + ".", "Using the model's backend instead.")
+                self.decoder_kwargs["backend"] = endpoint
+                LMQLModelRegistry.backend_configuration = endpoint
+            
+            # read the model name from the model object
+            if hasattr(model_name, "model"):
+                model_name = model_name.model
+            else:
+                assert False, "LMQL query specifies an invalid model name"
+
         if self.model is None:
             if model_name == "<dynamic>":
                 assert self.context is not None, "error: model is not explicitly specified and can also not be derived from context. Please provide a 'from' clause or set the model in the context of the query execution."
@@ -474,7 +502,7 @@ class PromptInterpreter:
                 logit_mask = None
             else:
                 logit_mask = mask.mask
-            
+
             # check stopping conditions
             stopping_conditions: List[ops.StopAtOp] = ops.execute_op_stops_at_only(state.variable, self.where, trace)
             for sc in stopping_conditions:
@@ -918,11 +946,14 @@ class PromptInterpreter:
         finally:
             # make sure token cache is saved if possible
             self.dcmodel.save()
+
             if hasattr(self.dcmodel, "close"):
                 self.dcmodel.close()
 
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", "openai_nonstop"]
+        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", 
+                         "backend", "chunk_timeout", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", 
+                         "show_speculative", "openai_nonstop"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args

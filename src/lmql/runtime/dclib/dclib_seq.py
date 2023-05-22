@@ -377,8 +377,17 @@ class DecoderSequence:
 
     def make_successors(self, next_tokens, next_token_scores, logits, user_data=None):
         # remove very low scoring tokens (likely they were masked and therefore score low)
-        next_tokens = np.stack([t for t, s in zip(next_tokens, next_token_scores) if s > DecoderSequence.truncation_threshold], axis=0)
-        next_token_scores = np.stack([s for s in next_token_scores if s > DecoderSequence.truncation_threshold], axis=0)
+        next_tokens = nputil.ensure_iterable(next_tokens)
+        next_token_scores = nputil.ensure_iterable(next_token_scores)
+        
+        tokens = [t for t, s in zip(next_tokens, next_token_scores) if s > DecoderSequence.truncation_threshold]
+        scores = [s for s in next_token_scores if s > DecoderSequence.truncation_threshold]
+        if len(tokens) == 0:
+            print("WARNING: all continuation token fall below truncation threshold. This is likely due to a too small truncation factor. Try increasing it. Continuing with the top 1 token.")
+            tokens = [t for t, s in zip(next_tokens, next_token_scores)][:1]
+            scores = [s for s in next_token_scores][:1]
+        next_tokens = np.stack(tokens, axis=0)
+        next_token_scores = np.stack(scores, axis=0)
 
         return Continuation(next_tokens, next_token_scores, user_data)
 # global counter for all sequences created in this process for identification purposes

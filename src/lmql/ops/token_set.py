@@ -42,6 +42,7 @@ class VocabularyMatcher:
         import pickle
 
         cache_identifier = tokenizer.model_identifier.replace("/", "-")
+        cache_identifier += "-" + type(tokenizer.tokenizer_impl).__name__.replace("[^a-z0-9]", "")
         cache_path = f"token-mask-cache-{cache_identifier}.pkl"
         matcher_path = f"matcher-{cache_identifier}.pkl"
 
@@ -69,7 +70,8 @@ class VocabularyMatcher:
         # save cache to disk
         import pickle
 
-        cache_identifier = self.model_identifier.replace("/", "-")
+        cache_identifier = self.tokenizer.model_identifier.replace("/", "-")
+        cache_identifier += "-" + type(self.tokenizer.tokenizer_impl).__name__.replace("[^a-z0-9]", "")
         cache_path = f"token-mask-cache-{cache_identifier}.pkl"
         matcher_path = f"matcher-{cache_identifier}.pkl"
 
@@ -114,7 +116,7 @@ class VocabularyMatcher:
     def mask_cache_name(self, tokens=None, regex=None, minus=None, prefix=None, exact=None, charlen=None, name=None):
         keys = ["named:" + name] if name is not None else []
         if regex is not None:
-            return keys + ["regex:"]
+            return keys + ["regex:" + regex]
         elif charlen is not None:
             return keys + ["charlen:" + str(charlen)]
         else:
@@ -541,7 +543,10 @@ def charlen_tsets():
     assert token_lengths is not None, "VocabularyMatcher.instance().token_lengths is None even though it should be fully initialized."
     # get unique values in token_lengths (numpy)
     length_values = np.unique(token_lengths)
-    return {int(l): tset(charlen=l) for l in length_values}
+    tsets = {int(l): tset(charlen=l) for l in length_values}
+    # only eos should have charlen 0
+    tsets[0] = tset("eos") 
+    return tsets
 
 def ntset(*tokens):
     if len(tokens) == 1 and type(tokens[0]) is set:

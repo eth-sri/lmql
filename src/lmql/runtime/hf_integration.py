@@ -53,6 +53,9 @@ def transformers_model(endpoint, model_identifier):
         def get_tokenizer(self):
             return self.tokenizer
 
+        def sync_tokenize(self, text):
+            return self.get_tokenizer()(text)["input_ids"]
+
         async def tokenize(self, text):
             async def task(text):
                 input_ids = self.get_tokenizer()(text)["input_ids"]

@@ -8,6 +8,14 @@ class PythonBackedTokenizer:
         self.eos_token_id = 50256
         self._vocab = None
 
+    @staticmethod
+    def is_available():
+        try:
+            import gpt3_tokenizer
+            return True
+        except:
+            return False
+
     @property
     def vocab_size(self):
         return len(self.vocab)

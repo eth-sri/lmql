@@ -132,7 +132,9 @@ class PromptScope(ast.NodeVisitor):
                 parsed = ast.parse(v).body[0].value
                 self.visit(parsed)
             except:
-                raise RuntimeError("Failed to parse fstring expression: ", v)
+                print("info: failed to parse fstring expression: ", v)
+                # raise RuntimeError("Failed to parse fstring expression: ", v)
+                return super().visit_Constant(node)
 
         # put double curly braces back in
         qstring = qstring.replace("__curly_open__", "{{").replace("__curly_close__", "}}")
@@ -672,9 +674,8 @@ class LMQLCompiler:
             with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
                 
+                writer.add(yield_call("set_decoder", astunparse.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))                
                 writer.add(yield_call("set_model", model_name))
-                # writer.add(f"context.set_decoder({})")
-                writer.add(yield_call("set_decoder", astunparse.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))
                 writer.add("# where")
                 writer.add(q.where)
                 writer.add(yield_call("set_where_clause", q.where_expr))

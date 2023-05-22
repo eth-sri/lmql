@@ -90,6 +90,12 @@ def make_request_args(tasks):
     futures = [t["future"] for t in tasks]
     request_ids = [t["request_id"] for t in tasks]
 
+    endpoints = [t.get("endpoint", None) for t in tasks if t.get("endpoint") is not None]
+    endpoint = endpoints[0] if len(endpoints) > 0 else None
+
+    timeouts = [t.get("timeout", None) for t in tasks if t.get("timeout") is not None]
+    timeout = max(timeouts) if len(timeouts) > 0 else None
+
     # construct request arguments
     request_args = tasks[0].copy()
     del request_args["future"]
@@ -98,6 +104,10 @@ def make_request_args(tasks):
     request_args["futures"] = futures
     request_args["request_id"] = request_ids
     request_args["stream"] = True
+    request_args["timeout"] = timeout
+    
+    if endpoint is not None: 
+        request_args["endpoint"] = endpoint
 
     return request_args
 
@@ -354,12 +364,14 @@ class ResponseStreamSliceIterator:
         self.consumed_tokens = []
         self.n = 0
 
+        self.waiting_tasks = []
+
     async def recover(self):
         recovery_kwargs = self.slice.kwargs.copy()
         # reconstruct the prompt by tokenizing the consumed tokens
         if len(self.consumed_tokens) > 0:
             prompt = self.consumed_tokens
-            recovery_kwargs["prompt"] = [t[0] for t in prompt]
+            recovery_kwargs["prompt"] = "".join([t for t in prompt])
         
         # issue new completion call
         new_slice = await self.slice.stream.scheduler.complete(**recovery_kwargs)
@@ -396,17 +408,30 @@ class ResponseStreamSliceIterator:
         self.slice = new_slice
         # otherwise the chunking aligns with the old stream, so we return the next chunk
         return await self.__anext__()
+    
+    def __del__(self):
+        """Make sure to clean up any pending tasks."""
+        for t in self.waiting_tasks:
+            try:
+                loop = asyncio.get_event_loop()
+                if not t.done() and not loop.is_closed():
+                    t.cancel()
+            except RuntimeError:
+                pass
 
     async def get_next(self):
         if self.slice.done.is_set(): 
             if self.n == 0:
                 return RecoveryAttempt(self.slice.kwargs, TimeoutError(), self.slice.maximum_retries)
             raise StopAsyncIteration
-        check_done_task = asyncio.create_task(self.slice.done.wait())
+        check_done_task = asyncio.create_task(self.slice.done.wait(), name="check_done_task")
+        self.waiting_tasks.append(check_done_task)
+        
         get_next_item_task = asyncio.create_task(self.slice.data_queue.get())
         done, pending = await asyncio.wait([get_next_item_task, check_done_task], 
-            return_when=asyncio.FIRST_COMPLETED, timeout=2.0)
-        
+            return_when=asyncio.FIRST_COMPLETED, timeout=5.0)
+    
+        self.waiting_tasks.remove(check_done_task)
 
         if check_done_task in done:
             # this indicates the end of this response stream
@@ -418,11 +443,13 @@ class ResponseStreamSliceIterator:
             assert get_next_item_task in done, f"expected get_next_item_task to be done, but only {done} is done."
             # cancel self.done waiting task
             for t in pending: t.cancel()
+            check_done_task.cancel()
             # return with new data chunk
             self.n += 1
             return get_next_item_task.result()
         else:
             for t in pending: t.cancel()
+            check_done_task.cancel()
             # if after timeout this response has been fully consumed, we are done
             if self.slice.done.is_set() and self.n > 0:
                 raise StopAsyncIteration
@@ -661,7 +688,7 @@ class AsyncOpenAIAPI:
                             raise e
                         self.stats.errors += 1
                         retries -= 1            
-                        print("Failed to call complete endpoint", type(e), e, flush=True)
+                        print("OpenAI:", str(e), '"' + str(type(e)) + '"', flush=True)
                         await asyncio.sleep(0.5)
                         if retries <= 0 or self.is_definitive_error(e):
                             raise e
@@ -709,7 +736,6 @@ class AsyncOpenAIAPI:
             if logit_bias_logging:
                 print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.", file=sys.stderr)
             kwargs["logit_bias"] = {t:b for t,b in biases}
-
 
         assert kwargs.get("echo", False), f"bopenai requires echo=True for to enable proper error recovery. Please handle proper prompt removal in client code."
 

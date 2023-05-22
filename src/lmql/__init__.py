@@ -9,7 +9,7 @@ A query language for language models.
 __version__ = version_info.version
 __author__ = 'Luca Beurer-Kellner, Marc Fischer and Mark Mueller'
 __email__ = "luca.beurer-kellner@inf.ethz.ch"
-__license__ = "MIT"
+__license__ = "Apache 2.0"
 
 import os
 import tempfile
@@ -25,45 +25,22 @@ from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
 import lmql.types as types
+from lmql.model.serve_oai import inprocess
 
 model_registry = LMQLModelRegistry
 
 def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
-    from lmql.runtime.hf_integration import transformers_model
-
-    Model = transformers_model(server, model_name)
-    lmql_runtime.register_model(model_name, Model)
-    lmql_runtime.register_model("*", Model)
-
-def _autoconnect_model(model_name):
-    if model_name.startswith("openai/"):
-        from lmql.runtime.openai_integration import openai_model
-
-        # hard-code openai/ namespace to be openai-API-based
-        Model = openai_model(model_name[7:])
-        lmql_runtime.register_model(model_name, Model)
-        lmql_runtime.register_model("*", Model)
-    else:
-        if "LMQL_BROWSER" in os.environ:
-            assert False, "Cannot use HuggingFace Transformers models in browser. Please use openai/ models or install lmql on your local machine."
-
-        from lmql.runtime.hf_integration import transformers_model
-
-        default_server = "http://localhost:8080"
-        Model = transformers_model(default_server, model_name)
-        lmql_runtime.register_model(model_name, Model)
-        lmql_runtime.register_model("*", Model)
-
-def make_pinned_model(model_name):
-    _autoconnect_model(model_name)
-    return model_registry.get(model_name)
+    print("warning: connect() is deprecated. Use set_backend() instead.")
 
 def autoconnect():
-    model_registry.autoconnect = _autoconnect_model
+    model_registry.autoconnect = True
+
+def set_backend(backend):
+    model_registry.backend_configuration = backend
 
 def load(filepath=None, autoconnect=False, force_model=None, output_writer=None):
     if autoconnect: 
-        model_registry.autoconnect = _autoconnect_model
+        model_registry.autoconnect = True
     # compile query and obtain the where clause computational graph
     compiler = LMQLCompiler()
     module = compiler.compile(filepath)

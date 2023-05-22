@@ -159,6 +159,13 @@ def min_score(ar, scorer: Optional[topk_scorer]=None):
 
     return ar.reduce(op_max_score, np.finfo(np.float32).max)
 
+def array_sorted(ar, key, name=None):
+    def op_sorted(seqs):
+        if len(seqs) == 0: 
+            return None
+        return list(sorted(seqs, key=key))
+    return ar.element_wise(op_sorted, name=name)
+
 def topk(ar, k, scorer: Optional[topk_scorer]=None, name=None):
     if scorer is None:
         scorer = alpha_length_normalized()

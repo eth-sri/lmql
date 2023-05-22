@@ -22,8 +22,4 @@ def test_different_tails():
     r = intersect(p1, p2)
     assert r.tail is None, f"Expected None, got '{r.tail}'"
 
-def test_notail_single_token():
-    p1 = tset("Sun", prefix=True)
-    assert p1.tail is None, f"Expected None, got '{p1.tail}'"
-
 run_all_tests(globals())

@@ -78,7 +78,6 @@ async def lmql(code, *args, web=False):
             continue
 
         if type(r) is not lmql.LMQLResult:
-            print(r)
             continue
         
         for v in [v for v in r.variables if v.startswith("P(")]:

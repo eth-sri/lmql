@@ -1,10 +1,11 @@
 import os
 
 if "LMQL_BROWSER" in os.environ:
+    # use mocked aiohttp for browser (redirects to JS for network requests)
     import lmql.runtime.maiohttp as aiohttp
 else:
+    # use real aiohttp for python
     import aiohttp
-
 
 import json
 import time
@@ -95,8 +96,42 @@ def tagged_segments(s):
     segments.append({"tag": current_tag, "text": s[offset:]})
     return segments
 
+
+def get_endpoint_and_headers(**kwargs):
+    model = kwargs["model"]
+    
+    endpoint = kwargs.pop("endpoint", None)
+
+    # if a custom endpoint is specified, use it
+    if endpoint is not None:
+        if not endpoint.endswith("http"):
+            endpoint = f"http://{endpoint}"
+        return endpoint + "/completions", {
+            "Content-Type": "application/json"
+        }
+
+    if os.environ.get("OPENAI_API_TYPE", 'openai') == 'azure':
+        model_env_name = model.upper().replace(".", "_")
+        endpoint = os.environ[f"AZURE_OPENAI_{model_env_name}_ENDPOINT"]
+        key = os.environ[f"AZURE_OPENAI_{model_env_name}_KEY"]
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": key,
+        }
+        return endpoint, headers
+    else:
+        from lmql.runtime.openai_secret import openai_secret, openai_org
+        if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
+            endpoint = "https://api.openai.com/v1/chat/completions"
+        else:
+            endpoint = "https://api.openai.com/v1/completions"
+        return endpoint, {
+            "Authorization": f"Bearer {openai_secret}",
+            "Content-Type": "application/json",
+        }
+
+
 async def chat_api(**kwargs):
-    from lmql.runtime.openai_secret import openai_secret, openai_org
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
@@ -108,6 +143,8 @@ async def chat_api(**kwargs):
     # transform prompt into chat API format
     prompt_ids = kwargs["prompt"]
     kwargs["prompt"] = [detokenize(p) for p in kwargs["prompt"]]
+
+    timeout = kwargs.pop("timeout", 1.5)
     
     echo = kwargs.pop("echo")
     
@@ -165,13 +202,11 @@ async def chat_api(**kwargs):
         stream_start = time.time()
         
         async with aiohttp.ClientSession() as session:
+            endpoint, headers = get_endpoint_and_headers(**kwargs)
             async with session.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {openai_secret}",
-                    "Content-Type": "application/json",
-                },
-                json={**kwargs},
+                    endpoint,
+                    headers=headers,
+                    json={**kwargs},
             ) as resp:
                 last_chunk_time = time.time()
                 sum_chunk_times = 0
@@ -186,7 +221,7 @@ async def chat_api(**kwargs):
                         # print("Average chunk time:", sum_chunk_times / n_chunks, "Current chunk time:", current_chunk_time)
                         # print("available capacity", Capacity.total - Capacity.reserved, "reserved capacity", Capacity.reserved, "total capacity", Capacity.total, flush=True)
 
-                        if current_chunk_time > 1.5:
+                        if current_chunk_time > timeout:
                             print("Token stream took too long to produce next chunk, re-issuing completion request. Average chunk time:", sum_chunk_times / max(1,n_chunks), "Current chunk time:", current_chunk_time, flush=True)
                             resp.close()
                             raise OpenAIStreamError("Token stream took too long to produce next chunk.")
@@ -200,14 +235,17 @@ async def chat_api(**kwargs):
                         is_done = current_chunk.strip().endswith("[DONE]")
                         
                         while "data: " in current_chunk:
-                            chunks = current_chunk.split("data: ")
+                            chunks = current_chunk.split("\ndata: ")
                             while len(chunks[0]) == 0:
                                 chunks = chunks[1:]
                             if len(chunks) == 1:
                                 # last chunk may be incomplete
                                 break
                             complete_chunk = chunks[0].strip()
-                            current_chunk = "data: ".join(chunks[1:])
+                            current_chunk = "\ndata: ".join(chunks[1:])
+
+                            if complete_chunk.startswith("data: "):
+                                complete_chunk = complete_chunk[len("data: "):]
 
                             if len(complete_chunk.strip()) == 0: 
                                 continue
@@ -218,7 +256,10 @@ async def chat_api(**kwargs):
                             sum_chunk_times += time.time() - last_chunk_time
                             last_chunk_time = time.time()
                             
-                            data = json.loads(complete_chunk)
+                            try:
+                                data = json.loads(complete_chunk)
+                            except json.decoder.JSONDecodeError:
+                                print("Failed to decode JSON:", [complete_chunk])
 
                             if "error" in data.keys():
                                 message = data["error"]["message"]
@@ -280,14 +321,15 @@ async def chat_api(**kwargs):
                         raise OpenAIStreamError(last_message["error"]["message"] + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
                         # raise OpenAIStreamError(last_message["error"]["message"])
                 except json.decoder.JSONDecodeError:
-                    raise OpenAIStreamError("Token stream ended unexpectedly.", current_chunk)
+                    raise OpenAIStreamError("Error in API response:", current_chunk)
     
 async def completion_api(**kwargs):
-    from lmql.runtime.openai_secret import openai_secret, openai_org
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
+
+    timeout = kwargs.pop("timeout", 1.5)
 
     async with CapacitySemaphore(num_prompts * max_tokens):
         
@@ -295,13 +337,11 @@ async def completion_api(**kwargs):
         stream_start = time.time()
         
         async with aiohttp.ClientSession() as session:
+            endpoint, headers = get_endpoint_and_headers(**kwargs)
             async with session.post(
-                "https://api.openai.com/v1/completions",
-                headers={
-                    "Authorization": f"Bearer {openai_secret}",
-                    "Content-Type": "application/json",
-                },
-                json={**kwargs},
+                    endpoint,
+                    headers=headers,
+                    json={**kwargs},
             ) as resp:
                 last_chunk_time = time.time()
                 sum_chunk_times = 0
@@ -316,7 +356,7 @@ async def completion_api(**kwargs):
                         # print("Average chunk time:", sum_chunk_times / n_chunks, "Current chunk time:", current_chunk_time)
                         # print("available capacity", Capacity.total - Capacity.reserved, "reserved capacity", Capacity.reserved, "total capacity", Capacity.total, flush=True)
 
-                        if current_chunk_time > 1.5:
+                        if current_chunk_time > timeout:
                             print("Token stream took too long to produce next chunk, re-issuing completion request. Average chunk time:", sum_chunk_times / max(1,n_chunks), "Current chunk time:", current_chunk_time, flush=True)
                             resp.close()
                             raise OpenAIStreamError("Token stream took too long to produce next chunk.")
@@ -328,14 +368,17 @@ async def completion_api(**kwargs):
                         is_done = current_chunk.strip().endswith("[DONE]")
                         
                         while "data: " in current_chunk:
-                            chunks = current_chunk.split("data: ")
+                            chunks = current_chunk.split("\ndata: ")
                             while len(chunks[0]) == 0:
                                 chunks = chunks[1:]
                             if len(chunks) == 1:
                                 # last chunk may be incomplete
                                 break
                             complete_chunk = chunks[0].strip()
-                            current_chunk = "data: ".join(chunks[1:])
+                            current_chunk = "\ndata: ".join(chunks[1:])
+                            
+                            if complete_chunk.startswith("data: "):
+                                complete_chunk = complete_chunk[len("data: "):]
 
                             if len(complete_chunk.strip()) == 0: 
                                 continue
@@ -349,7 +392,10 @@ async def completion_api(**kwargs):
                             sum_chunk_times += time.time() - last_chunk_time
                             last_chunk_time = time.time()
                             
-                            data = json.loads(complete_chunk)
+                            try:
+                                data = json.loads(complete_chunk)
+                            except json.decoder.JSONDecodeError:
+                                print("Failed to decode JSON:", [complete_chunk])
 
                             if "error" in data.keys():
                                 message = data["error"]["message"]
@@ -376,9 +422,12 @@ async def completion_api(**kwargs):
                         raise OpenAIStreamError(last_message["error"]["message"] + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
                         # raise OpenAIStreamError(last_message["error"]["message"])
                 except json.decoder.JSONDecodeError:
-                    raise OpenAIStreamError("Token stream ended unexpectedly.", current_chunk)
+                    raise OpenAIStreamError("Error in API response:", current_chunk)
 
 async def main():
+    import sys
+    # Not sure if this should work, but prompt needs tokenizing I think
+    """
     kwargs = {
         "model": "text-davinci-003",
         "prompt": "Say this is a test",
@@ -388,8 +437,36 @@ async def main():
     }
 
     async for chunk in complete(**kwargs):
-        print(chunk)
+                print(chunk)"""
+
+    """
+     Tested working with these environment variables:
+        Azure config for GPT-3.5-Turbo:
+            OPENAI_API_TYPE = azure
+            AZURE_OPENAI_GPT-3_5-TURBO_ENDPOINT = https://{service}.openai.azure.com/openai/deployments/{gpt3.5-turbo-deployment}/chat/completions?api-version=2023-03-15-preview
+            AZURE_OPENAI_GPT-3_5-TURBO_KEY = XXXXXXXXX
+        Regular OpenAI credentials for GPT-3.5-Turbo:
+            OPENAI_API_TYPE = openai
+            OPENAI_API_KEY = XXXXXXXXX
+    """
+
+    kwargs = {
+        "model": "gpt-3.5-turbo",
+        "prompt": [
+            tokenize("<lmql:system/> You are a helpful assistant.<lmql:user/>Hi, tell me all you know about GPT-2.")],
+        "max_tokens": 512,
+        "temperature": 0.,
+        "stream": True,
+        "echo": False,
+        "logprobs": None,
+    }
+
+    async for chunk in chat_api(**kwargs):
+        if len(chunk["choices"]) > 0:
+            sys.stdout.write(chunk["choices"][0]["text"])
+
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())
