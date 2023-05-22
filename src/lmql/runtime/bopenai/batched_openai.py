@@ -93,6 +93,9 @@ def make_request_args(tasks):
     endpoints = [t.get("endpoint", None) for t in tasks if t.get("endpoint") is not None]
     endpoint = endpoints[0] if len(endpoints) > 0 else None
 
+    timeouts = [t.get("timeout", None) for t in tasks if t.get("timeout") is not None]
+    timeout = max(timeouts) if len(timeouts) > 0 else None
+
     # construct request arguments
     request_args = tasks[0].copy()
     del request_args["future"]
@@ -101,6 +104,7 @@ def make_request_args(tasks):
     request_args["futures"] = futures
     request_args["request_id"] = request_ids
     request_args["stream"] = True
+    request_args["timeout"] = timeout
     
     if endpoint is not None: 
         request_args["endpoint"] = endpoint

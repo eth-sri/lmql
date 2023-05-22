@@ -1,10 +1,11 @@
 import os
 
 if "LMQL_BROWSER" in os.environ:
+    # use mocked aiohttp for browser (redirects to JS for network requests)
     import lmql.runtime.maiohttp as aiohttp
 else:
+    # use real aiohttp for python
     import aiohttp
-
 
 import json
 import time
@@ -137,11 +138,12 @@ async def chat_api(**kwargs):
     max_tokens = kwargs.get("max_tokens", 0)
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
-        
-
+    
     # transform prompt into chat API format
     prompt_ids = kwargs["prompt"]
     kwargs["prompt"] = [detokenize(p) for p in kwargs["prompt"]]
+
+    timeout = kwargs.pop("timeout", 1.5)
     
     echo = kwargs.pop("echo")
     
@@ -218,7 +220,7 @@ async def chat_api(**kwargs):
                         # print("Average chunk time:", sum_chunk_times / n_chunks, "Current chunk time:", current_chunk_time)
                         # print("available capacity", Capacity.total - Capacity.reserved, "reserved capacity", Capacity.reserved, "total capacity", Capacity.total, flush=True)
 
-                        if current_chunk_time > 1.5:
+                        if current_chunk_time > timeout:
                             print("Token stream took too long to produce next chunk, re-issuing completion request. Average chunk time:", sum_chunk_times / max(1,n_chunks), "Current chunk time:", current_chunk_time, flush=True)
                             resp.close()
                             raise OpenAIStreamError("Token stream took too long to produce next chunk.")
@@ -326,6 +328,8 @@ async def completion_api(**kwargs):
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
 
+    timeout = kwargs.pop("timeout", 1.5)
+
     async with CapacitySemaphore(num_prompts * max_tokens):
         
         current_chunk = ""
@@ -351,7 +355,7 @@ async def completion_api(**kwargs):
                         # print("Average chunk time:", sum_chunk_times / n_chunks, "Current chunk time:", current_chunk_time)
                         # print("available capacity", Capacity.total - Capacity.reserved, "reserved capacity", Capacity.reserved, "total capacity", Capacity.total, flush=True)
 
-                        if current_chunk_time > 1.5:
+                        if current_chunk_time > timeout:
                             print("Token stream took too long to produce next chunk, re-issuing completion request. Average chunk time:", sum_chunk_times / max(1,n_chunks), "Current chunk time:", current_chunk_time, flush=True)
                             resp.close()
                             raise OpenAIStreamError("Token stream took too long to produce next chunk.")

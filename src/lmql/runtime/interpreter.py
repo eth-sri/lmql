@@ -192,6 +192,23 @@ class PromptInterpreter:
             LMQLModelRegistry.backend_configuration = kwargs["backend"]
 
     def set_model(self, model_name):
+        if type(model_name) is not str:
+            # derive model endpoint from model object
+            if hasattr(model_name, "port"):
+                endpoint = "localhost:" + str(model_name.port)
+                if self.decoder_kwargs.get("backend") is not None:
+                    if self.decoder_kwargs["backend"] != endpoint:
+                        print("warning: The provided query specifies a backend at " + self.decoder_kwargs["backend"] + " but the passed model is served at " + 
+                              endpoint + ".", "Using the model's backend instead.")
+                self.decoder_kwargs["backend"] = endpoint
+                LMQLModelRegistry.backend_configuration = endpoint
+            
+            # read the model name from the model object
+            if hasattr(model_name, "model"):
+                model_name = model_name.model
+            else:
+                assert False, "LMQL query specifies an invalid model name"
+
         if self.model is None:
             self.model = model_name
             self.model_identifier = model_name
@@ -794,7 +811,8 @@ class PromptInterpreter:
 
     def validate_args(self, decoder_args, decoder_fct):
         INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", 
-                         "backend", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", "openai_nonstop"]
+                         "backend", "chunk_timeout", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", 
+                         "show_speculative", "openai_nonstop"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args

@@ -103,6 +103,8 @@ class CompletionCall:
 class DclibOpenAiModel(DcModel):
     def __init__(self, *args, endpoint=None, **kwargs):
         super().__init__(*args, truncation_threshold=-12000, init_workers=False, **kwargs)
+        
+        mock = kwargs.get("mock", False)
 
         # if available, store reference to output writer for eager stats reporting
         self.output_writer = None
@@ -111,11 +113,13 @@ class DclibOpenAiModel(DcModel):
         
         self.model_identifier = "openai/" + self.model.model_identifier
 
-        self.model.chunk_size = kwargs.get("openai_chunksize", 64)
+        self.model.chunk_size = kwargs.get("openai_chunksize", 64 if not mock else 8)
         self.model.nostop = kwargs.get("openai_nonstop", False)
         self.num_billed_tokens = {}
         self.num_requests = 0
+        
         self.endpoint = endpoint
+        self.timeout = kwargs.get("chunk_timeout", 1.5 if not mock else 4.5)
 
         self.stats = Stats("openai")
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
@@ -174,7 +178,8 @@ class DclibOpenAiModel(DcModel):
             "logprobs": 1,
             "user": "lmql",
             "echo": True,
-            **({"endpoint": self.endpoint} if self.endpoint is not None else {})
+            **({"endpoint": self.endpoint} if self.endpoint is not None else {}),
+            **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
         logprobs = [None]
@@ -260,7 +265,8 @@ class DclibOpenAiModel(DcModel):
             "user": "lmql",
             "stream": True,
             "echo": True,
-            **({"endpoint": self.endpoint} if self.endpoint is not None else {})
+            **({"endpoint": self.endpoint} if self.endpoint is not None else {}),
+            **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
         mode = completion_call.mode
@@ -934,9 +940,7 @@ def openai_model(model_identifier, endpoint=None, mock=False):
             self.served_model = None
             self._tokenizer = None
 
-            self.decoder_args = {
-                "openai_chunksize": 64 if not mock else 16,
-            }
+            self.decoder_args = {}
 
         def get_tokenizer(self):
             if self._tokenizer is None:
@@ -953,7 +957,7 @@ def openai_model(model_identifier, endpoint=None, mock=False):
 
             dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
 
-            return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, **self.decoder_args)
+            return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **self.decoder_args)
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]

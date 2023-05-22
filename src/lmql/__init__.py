@@ -24,15 +24,12 @@ from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
+from lmql.model.serve_oai import inprocess
 
 model_registry = LMQLModelRegistry
 
 def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
-    from lmql.runtime.hf_integration import transformers_model
-
-    Model = transformers_model(server, model_name)
-    lmql_runtime.register_model(model_name, Model)
-    lmql_runtime.register_model("*", Model)
+    print("warning: connect() is deprecated. Use set_backend() instead.")
 
 def autoconnect():
     model_registry.autoconnect = True
@@ -143,7 +140,7 @@ async def static_prompt(query_fct, *args, **kwargs):
     res = await query_fct(*args, **kwargs, return_prompt_string=True)
     return res[0]
 
-def main(query_fct):
+def main(query_fct, **kwargs):
     """
     Runs the provided query function in the main thread
     and returns the result.
@@ -151,4 +148,4 @@ def main(query_fct):
     This call is blocking.
     """
     import asyncio
-    return asyncio.run(query_fct())
+    return asyncio.run(query_fct(**kwargs))

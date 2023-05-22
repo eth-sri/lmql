@@ -1,4 +1,5 @@
 import os
+from lmql.model.serve_oai import inprocess
 
 model_name_aliases = {
     "chatgpt": "openai/gpt-3.5-turbo",
@@ -16,6 +17,10 @@ class LMQLModelRegistry:
             # use auto connector to obtain model connection
             if LMQLModelRegistry.autoconnect and model not in LMQLModelRegistry.registry:
                 autoregister(model)
+
+            # strip off local
+            if model.startswith("local:"):
+                model = model[6:]
 
             client = LMQLModelRegistry.registry[model]()
             LMQLModelRegistry.clients[model] = client
@@ -40,27 +45,33 @@ def autoregister(model_name):
 
         if LMQLModelRegistry is not None:
             backend: str = LMQLModelRegistry.backend_configuration
-            if backend != "legacy":
-                from lmql.runtime.openai_integration import openai_model
+            if backend == "legacy":
+                from lmql.runtime.hf_integration import transformers_model
+
+                default_server = "http://localhost:8080"
+                Model = transformers_model(default_server, model_name)
                 
+                if model_name.startswith("local:"):
+                    model_name = model_name[6:]
+                
+                register_model(model_name, Model)
+            else:
+                from lmql.runtime.openai_integration import openai_model
+
+                # determine endpoint URL
                 if backend is None:
                     backend = "localhost:8080"
-                
+
+                # determine model name and if we run in-process
+                if model_name.startswith("local:"):
+                    model_name = model_name[6:]
+                    inprocess(model_name, use_existing_configuration=True)
+
                 # use provided inference server as mocked OpenAI API
                 endpoint = backend
                 Model = openai_model(model_name, endpoint=endpoint, mock=True)
                 register_model(model_name, Model)
-                register_model("*", Model)
                 return
-            else:
-                assert False, "Unknown backend configuration string '" + backend + "'"
-
-        from lmql.runtime.hf_integration import transformers_model
-
-        default_server = "http://localhost:8080"
-        Model = transformers_model(default_server, model_name)
-        register_model(model_name, Model)
-        register_model("*", Model)
 
 def register_model(identifier, ModelClass):
     LMQLModelRegistry.registry[identifier] = ModelClass
