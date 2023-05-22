@@ -24,7 +24,11 @@ from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
-from lmql.model.serve_oai import inprocess
+
+if "LMQL_BROWSER" in os.environ:
+    def inprocess(*args, **kwargs): raise NotImplementedError("inprocess() is not supported in the browser")
+else:
+    from lmql.model.serve_oai import inprocess
 
 model_registry = LMQLModelRegistry
 

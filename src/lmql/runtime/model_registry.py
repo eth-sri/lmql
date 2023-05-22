@@ -1,5 +1,4 @@
 import os
-from lmql.model.serve_oai import inprocess
 
 model_name_aliases = {
     "chatgpt": "openai/gpt-3.5-turbo",
@@ -64,6 +63,8 @@ def autoregister(model_name):
 
                 # determine model name and if we run in-process
                 if model_name.startswith("local:"):
+                    from lmql.model.serve_oai import inprocess
+                    
                     model_name = model_name[6:]
                     inprocess(model_name, use_existing_configuration=True)
 
