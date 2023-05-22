@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "argmax(openai_chunksize=128)\n    \"The quick brown fox jumps over the[COMPLETION]\"\nfrom\n    \"openai/text-ada-001\"\nwhere\n    STOPS_AT(COMPLETION, \".\")", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
