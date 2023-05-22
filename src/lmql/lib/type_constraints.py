@@ -1,6 +1,13 @@
 import lmql
 import json
 
+global _oneshot
+_oneshot = True
+
+def oneshot(state):
+    global _oneshot
+    _oneshot = state
+
 @lmql.query
 async def single_shot_as_type(s, ty):
     '''lmql
@@ -18,11 +25,15 @@ async def single_shot_as_type(s, ty):
 async def is_type(ty):
     '''lmql
     incontext
-        # first run a simple one-shot query to get an initial result
-        simple_json_result = single_shot_as_type(context.prompt, ty)
-        try:
-            already_parsed = json.loads(simple_json_result)
-        except:
+        if _oneshot and "openai/" in context.interpreter.model_identifier:
+            # "oneshot type prediction is only needed with openai/ models"
+            # first run a simple one-shot query to get an initial result
+            simple_json_result = single_shot_as_type(context.prompt, ty)
+            try:
+                already_parsed = json.loads(simple_json_result)
+            except:
+                already_parsed = {}
+        else:
             already_parsed = {}
         
         # then do scripted parsing as a fallback (does not query the model if already_parsed already contains all the keys we need)
@@ -98,5 +109,7 @@ async def is_type(ty):
         json_payload = json.loads(payload)
         return lmql.types.dict_to_type_instance(json_payload, ty)
     where
-        STOPS_BEFORE(STRING_VALUE, '"') and STOPS_AT(INT_VALUE, ",") and ESCAPED(STRING_VALUE) and STOPS_AT(COMMA_OR_BRACKET, "]") and STOPS_AT(COMMA_OR_BRACKET, ",") and ERASE(COMMA_OR_BRACKET)
+        STOPS_BEFORE(STRING_VALUE, '"') and STOPS_AT(INT_VALUE, ",") and 
+        ESCAPED(STRING_VALUE) and STOPS_AT(COMMA_OR_BRACKET, "]") and 
+        STOPS_AT(COMMA_OR_BRACKET, ",") and ERASE(COMMA_OR_BRACKET)
     '''
