@@ -328,7 +328,7 @@ class DecoderSequence:
         
         stop_phrases = self.data("head").stopping_phrases["tokenized"] if self.data("head") is not None else []
 
-        if stop_phrases is None:
+        if stop_phrases is None or len(stop_phrases) == 0:
             return new_stop_phrase
 
         ids = np.concatenate([self.input_ids, continuation.token.reshape(1)]),

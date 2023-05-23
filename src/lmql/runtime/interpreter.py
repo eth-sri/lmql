@@ -84,6 +84,7 @@ class PromptState(NamedTuple):
     mask : Optional[Any]
     stopping_phrases: Optional[Any]
     where: Optional[Any]
+    tail: Optional[str]
 
     def __str__(self):
         return f"<PromptState '{self.variable}' '{[self.prompt]}'>"
@@ -538,6 +539,9 @@ class PromptInterpreter:
                         where=await self.where_graph_with_trace(trace, follow_trace)
         )
 
+        if has_tail(mask):
+            state = state.updated(tail = mask.tail)
+
         if return_follow_map:
             return mask, follow_map, self.interpreter_state_user_data(state)
 
@@ -592,12 +596,26 @@ class PromptInterpreter:
     async def rewrite_for_sequence(self, seq: dc.DecoderSequence, needs_rewrite, assert_no_advance=False):
         if not needs_rewrite and not seq.is_done():
             return None
-        
+    
         # assert len([h for h in seq.user_data.keys() if "head" in h]) <= 2, "at max two heads are allowed in a sequence user_data"
 
         # obtain interpreter state from predecessor node
         state = self.interpreter_state_from_user_data(seq.predecessor, noroot=True)
         assert state is not None, "prompt interpreter state must be set in predecessor node"
+
+        if state.tail is not None:
+            rewritten_state = state.updated(tail=None)
+            prompt_ids = seq.input_ids.tolist()
+            tail_ids = await self.tokenize(state.tail)
+            updated_ids = prompt_ids + tail_ids[1:]
+
+            return RewrittenInputIds(
+                appended_input_ids=updated_ids,
+                strip_eos=False,
+                value_offset=state.variable_offset + len(tail_ids) - 1,
+                user_data=self.interpreter_state_user_data(state),
+                rewritten_seq_user_data=self.interpreter_state_user_data(rewritten_state)
+            )
 
         # first check for sub-interpreters
         subinterpreters: Set[SubInterpreter] = state.subinterpreters.copy()
@@ -729,7 +747,10 @@ class PromptInterpreter:
                     strip_eos=-n_tokens_to_strip,
                     value_offset=value_offset,
                     user_data=self.interpreter_state_user_data(state),
-                    rewritten_seq_user_data=self.interpreter_state_user_data(rewritten_state)
+                    rewritten_seq_user_data={
+                        "backlink": seq.id,
+                        **self.interpreter_state_user_data(rewritten_state)
+                    }
                 )
             else:
                 # do nothing rewrite
@@ -775,7 +796,8 @@ class PromptInterpreter:
             query_head=query_head, program_state=context.program_state,
             recurring_variable_counter={}, variable_offset=0,
             valid=None, final=None, mask=None, 
-            stopping_phrases=None, where=None)
+            stopping_phrases=None, where=None,
+            tail=None)
         self.root_state = await self.advance(self.root_state)
 
         # prepare dcmodel
@@ -1097,7 +1119,8 @@ class SubInterpreter(PromptInterpreter):
             query_head=query_head, program_state=context.program_state,
             recurring_variable_counter={}, variable_offset=parent_offset,
             valid=None, final=None, mask=None, 
-            stopping_phrases=None, where=None)
+            stopping_phrases=None, where=None,
+            tail=None)
         self.root_state = await self.advance(self.root_state)
 
         self.initial_subprompt_ids = await self.tokenize(self.root_state.prompt)

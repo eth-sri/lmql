@@ -159,7 +159,7 @@ class DcModelRewriteMixin:
             deterministic = [True if i + 1 > num_value_tokens else False for i in range(len(appended_ids))]
             continuation = (await self.score([continued_seq], [appended_ids], deterministic=deterministic, stop_phrase=False, needs_rewrite=False, user_data=user_data, noscore=noscore))[0]
             
-            continuation.stop_phrase = s.stop_phrase[:len(continuation.input_ids)]
+            # continuation.stop_phrase = s.stop_phrase[:len(continuation.input_ids) - 1] 
             continuation.needs_rewrite = False
             
             steps = 0
