@@ -932,8 +932,7 @@ class HFModelStatsAdapter:
 
 def openai_model(model_identifier, endpoint=None, mock=False):
     # make sure openai org and secret are available
-    import lmql.runtime.openai_secret
-    
+    if not mock: from lmql.runtime.openai_secret import openai_secret, openai_org
     class OpenAIModel:
         def __init__(self) -> None:
             self.model_identifier = model_identifier
