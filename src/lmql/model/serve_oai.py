@@ -12,7 +12,6 @@ import argparse
 import psutil
 import concurrent
 from aiohttp import web
-from aiohttp_sse import sse_response
 from queue import Queue
 from threading import Event, Thread
 from typing import Optional, Tuple
