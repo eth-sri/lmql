@@ -693,7 +693,7 @@ function OutputPanelContent(props) {
   }, props.style)
 
   return <>
-    <OutputText style={props.style} readOnly={true} value={output}></OutputText>
+    <OutputText style={props.style} className={props.className} readOnly={true} value={output}></OutputText>
   </>
 }
 
@@ -1311,6 +1311,12 @@ const OutputText = styled.textarea`
   font-family: monospace;
   background-color: #222;
   padding: 0;
+
+  &.simple {
+    flex: 0.3;
+    border-top: 1px solid #444;
+    padding-top: 10pt;
+  }
 `
 const CompiledCodeEditorContainer = styled.div`
   flex: 1;
@@ -1807,7 +1813,6 @@ function SidePanel(props) {
           }
         </>}
       </h2>
-      <OutputPanelContent style={{ display: sidepanel === 'output' ? 'block' : 'none' }} clearTrigger={clearTrigger} />
       <CompiledCodePanelContent style={{ display: sidepanel === 'code' ? 'block' : 'none' }} />
       <ModelResultContent style={{ display: sidepanel === 'model' ? 'flex' : 'none' }}
         selectedNodes={props.selectedNodes}
@@ -1817,6 +1822,7 @@ function SidePanel(props) {
         onTrackLatest={() => setTrackMostLikly(true)}
         processStatus={props.processStatus}
       />
+      <OutputPanelContent className={!props.simpleMode && sidepanel != 'output' ? "simple" : ""} style={{ display: (!props.simpleMode || sidepanel === 'output') ? 'block' : 'none' }} clearTrigger={clearTrigger} />
       {/* <StatisticsPanelContent style={{display: sidepanel === 'stats' ? 'flex' : 'none'}}/> */}
 
       <Sidebar>

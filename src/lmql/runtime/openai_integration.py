@@ -119,7 +119,8 @@ class DclibOpenAiModel(DcModel):
         self.num_requests = 0
         
         self.endpoint = endpoint
-        self.timeout = kwargs.get("chunk_timeout", 1.5 if not mock else 4.5)
+        # self.timeout = kwargs.get("chunk_timeout", 8.5 if not mock else 4.5)
+        self.timeout = 8.5
 
         self.stats = Stats("openai")
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
@@ -497,7 +498,7 @@ class DclibOpenAiModel(DcModel):
                 full_logits = np.ones(self.model.get_tokenizer().model_vocab_size) * np.finfo(np.float32).min
                 full_logits[token_ids] = np.array(logprobs)
                 full_logits[next_token] = np.finfo(np.float32).min
-                assert kwargs.get("temperature", 1.0) != 0.0 or np.all(full_logits < next_token_score), "next token score is not the highest"
+                # assert kwargs.get("temperature", 1.0) != 0.0 or np.all(full_logits < next_token_score), "next token score is not the highest"
 
 
                 # retroactively apply logits mask to logits

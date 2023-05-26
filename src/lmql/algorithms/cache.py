@@ -4,6 +4,7 @@ import inspect
 
 from lmql.runtime.lmql_runtime import LMQLQueryFunction
 from lmql import LMQLResult
+import lmql
 
 # cache query results by query code and arguments
 global cache_file
@@ -46,8 +47,15 @@ def persist_cache():
         with open(cache_file, "wb") as f:
             pickle.dump(cache, f)
 
-async def apply(q, *args):
+async def apply(q, *args, parameter=None):
     global cache
+
+    if type(q) is str:
+        lmql_code = q
+        q = lmql.query(q)
+    else:
+        lmql_code = q.lmql_code
+
 
     # handle non-LMQL queries
     if type(q) is not LMQLQueryFunction:
@@ -63,18 +71,24 @@ async def apply(q, *args):
         # convert dict to list
         key_args = [tuple(sorted(list(a.items()))) if type(a) is dict else a for a in args]
         key_args = [tuple(a) if type(a) is list else a for a in key_args]
-        key = (q.lmql_code, *key_args).__hash__()
-        key = (q.lmql_code, *key_args)
+        key = (lmql_code, *key_args).__hash__()
+        key = (lmql_code, *key_args)
     except:
         print("warning: cannot hash LMQL query arguments {}. Change the argument types to be hashable.".format(args))
-        key = str(q.lmql_code) + str(args)
+        key = str(lmql_code) + str(args)
     
     if cache is not None and key in cache.keys():
         stats["cached"] += 1
         return cache[key]
     else:
+        kwargs = {}
         try:
-            result = await q(*args)
+            if parameter is not None:
+                assert len(args) == 1
+                kwargs = {parameter: args[0]}
+                args = []
+            # get positional arguments
+            result = await q(*args, **kwargs)
             if len(result) == 1:
                 result = result[0]
             if type(result) is LMQLResult:
@@ -85,7 +99,7 @@ async def apply(q, *args):
                 cache[key] = result
                 persist_cache()
         except Exception as e:
-            print("Failed for args: {}".format(args), flush=True)
+            print("Failed for args: {} {}".format(args, kwargs), flush=True)
             raise e
 
         return result

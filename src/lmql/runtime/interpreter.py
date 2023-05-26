@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple, Set
 import numpy as np
 
+import re
 import lmql.ops.ops as ops
 import lmql.runtime.dclib as dc
 from lmql.language.qstrings import (DistributionVariable, TemplateVariable,
@@ -319,6 +320,7 @@ class PromptInterpreter:
                 s = stmt_buffer[0]
 
                 if type(s) is str:
+                    s = self.process_query_string(s)
                     prompt += s
                     stmt_buffer = stmt_buffer[1:]
                     # keep latest prompt in transient state
@@ -362,6 +364,12 @@ class PromptInterpreter:
             stmt_buffer=stmt_buffer,
             query_head=query_head
         )
+
+    def process_query_string(self, s: str):
+        if not ("turbo" in self.model_identifier or "gpt-4" in self.model_identifier):
+            # replace all r"<lmql:(.*?)\/>" tags with ((\1))
+            s = re.sub(r"<lmql:(.*?)\/>", "", s)
+        return s
 
     def interpreter_state_user_data(self, state: PromptState):
         return {self.user_data_key: state}

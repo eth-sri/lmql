@@ -147,7 +147,6 @@ class LMQLQueryFunction(LMQLChainMixIn):
             else:
                 query_kwargs[a] = self.scope.resolve(a)
         
-        
         # keep track of the main interpreter (only produces debug output for this one)
         try:
             if PromptInterpreter.main is None:
