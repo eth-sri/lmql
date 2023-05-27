@@ -25,7 +25,7 @@ def cmd_run():
 
     parser = argparse.ArgumentParser(description="Runs a LMQL program.")
     parser.add_argument("lmql_file", type=str, help="path to the LMQL file to run")
-    parser.add_argument("--no-clear", action="store_true", dest="no_clear", help="don't clear inbetween printing results")
+    parser.add_argument("--no-clear", action="store_true", dest="no_clear", help="don't clear in between printing results")
     parser.add_argument("--no-realtime", action="store_true", dest="no_realtime", help="don't print text as it's being generated")
     parser.add_argument("--time", action="store_true", dest="time", help="Time the query.")
 

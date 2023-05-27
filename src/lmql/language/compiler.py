@@ -181,7 +181,7 @@ class PromptScope(ast.NodeVisitor):
 
 class QueryStringTransformation(ast.NodeTransformer):
     """
-    Transformes string expressions on statement level to model queries.
+    Transforms string expressions on statement level to model queries.
     """
     
     def __init__(self, query):

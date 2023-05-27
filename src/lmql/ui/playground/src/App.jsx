@@ -1442,10 +1442,10 @@ function resolve(o, path) {
   }
 
   try {
-    let segements = path.split(".");
+    let segments = path.split(".");
     let value = o;
-    for (let i = 0; i < segements.length; i++) {
-      value = value[segements[i]];
+    for (let i = 0; i < segments.length; i++) {
+      value = value[segments[i]];
     }
     return value;
   } catch (e) {

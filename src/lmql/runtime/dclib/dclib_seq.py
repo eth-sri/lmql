@@ -287,7 +287,7 @@ class DecoderSequence:
 
     def extend_user_data(self, continuation=None, user_data=None):
         assert continuation is None or user_data is None, f"continuation and user_data are mutually exclusive arguments"
-        # prepares the user_data dictionary to use with sucessor sequences
+        # prepares the user_data dictionary to use with successor sequences
         if continuation is None and user_data is None:
             user_data = {}
         elif continuation is not None:

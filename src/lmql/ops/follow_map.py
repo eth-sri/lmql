@@ -91,8 +91,8 @@ class FollowMap(Iterable):
         return fm
 
     def add_all(self, other_map):
-        for patter, component in other_map.components:
-            self.components.append((patter, component))
+        for pattern, component in other_map.components:
+            self.components.append((pattern, component))
 
     def __iter__(self):
         return ((p,c) for p,c in self.components)

@@ -327,7 +327,7 @@ class PromptInterpreter:
         # while mask_can_be_expanded_further() and self.eager_followmap_expansion:
         #     # extend the sequence with the next token
         #     s = s.extend(dc.Continuation(mask.mask.argmax(), np.array([0]), None), internal=True)
-        #     # do not futher expand sequences at <eos>
+        #     # do not further expand sequences at <eos>
         #     if s.is_done(): break
 
         #     # rewrite to get next-token user data and set it on the sequence
@@ -775,7 +775,7 @@ class PromptInterpreter:
                     state = await self.advance(state)
                     assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
 
-                    assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
+                    assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underlying query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.str(), decoder_args["decoder"])
                     results.append(state.query_head.result)
             
             # set decoder step +1, for all stats logging that happens in postprocessing

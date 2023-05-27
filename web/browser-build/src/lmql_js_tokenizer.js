@@ -11,7 +11,7 @@ function tokenize_gpt(line) {
     if (line == "<|endoftext|>") {
         return [50256];
     }
-    // assert that no other occurences of eos
+    // assert that no other occurrences of eos
     if (line.includes("<|endoftext|>")) {
         throw "Invalid input: " + line;
     }

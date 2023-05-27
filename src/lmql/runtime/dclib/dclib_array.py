@@ -333,7 +333,7 @@ class DataArray:
 
     def separate_by(self, *criteria):
         """
-        Separate this bundle intot two bundles (a,b), one containing sequences that satisfy 
+        Separate this bundle into two bundles (a,b), one containing sequences that satisfy 
         the provided criteria (a), and one containing sequences that do not (b).
         """
         def is_a(seq): return all(c(seq) for c in criteria)

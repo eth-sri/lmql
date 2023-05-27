@@ -629,7 +629,7 @@ class AsyncOpenAIAPI:
         while True:
             self.futures = set([f for f in self.futures if not f.done()])
             while Capacity.reserved >= Capacity.total * 0.8:
-                # print("wait before queing more requests", flush=True)
+                # print("wait before queueing more requests", flush=True)
                 await asyncio.sleep(0.1)
                 # print(Capacity.reserved, Capacity.total, flush=True)
             # print(Capacity.reserved, Capacity.total, flush=True)

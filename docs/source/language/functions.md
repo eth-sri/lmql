@@ -27,7 +27,7 @@ Here, similar to a python [f-string](https://peps.python.org/pep-0498), we use t
 
 ## Calculator
 Building on the previous example, we can now create a more complex calculator that can handle more complex expressions.
-Here we define a function `calc` that leverages the build-in `re` library for Regular Expressions to strip the input of any non-numeric characters, before calling `eval`. Subsequently we can use `calc` to augment the reasoning capabilities of the large language model with a simple calculator.
+Here we define a function `calc` that leverages the built-in `re` library for Regular Expressions to strip the input of any non-numeric characters, before calling `eval`. Subsequently we can use `calc` to augment the reasoning capabilities of the large language model with a simple calculator.
 
 Further, there we also call a function `gsm8k_samples` defined in a file `demo` within the LMQL library that returns a few-shot sample of the `gsm8k` dataset with examples of how to use the calculator.
 
@@ -72,7 +72,7 @@ So the answer] is [RESULT $70,000.]
 ```
 
 ## Beyond Calculators
-Function use is not limited to calculators. In the example bellow we show how text retrieval, using Pythons `async`/`await` [syntax](https://docs.python.org/3/library/asyncio.html), can be used to augment the reasoning capabilities of the large language model. 
+Function use is not limited to calculators. In the example below we show how text retrieval, using Pythons `async`/`await` [syntax](https://docs.python.org/3/library/asyncio.html), can be used to augment the reasoning capabilities of the large language model. 
 
 ```{lmql}
 name::wikipedia

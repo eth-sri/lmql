@@ -28,7 +28,7 @@ def get_decorated_function_code(fct):
 
         tree = ast.parse(source)
         docstring_element = tree.body[0].body[0].value
-        # get range of source that corresonds to the docstring
+        # get range of source that corresponds to the docstring
         start = docstring_element.lineno
         end = docstring_element.end_lineno
         startcol = docstring_element.col_offset

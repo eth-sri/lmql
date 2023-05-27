@@ -5,7 +5,7 @@ metadata:authors: team
 
 Today we are announcing **LMQL Next**, our preview release channel for LMQL, allowing us to ship the latest features to the community and get feedback, while also maintaining a stable release channel for more stable use on `main`. 
 
-LMQL Next is continously deployed and can be used starting today, via <a href="https://next.lmql.ai">https://next.lmql.ai</a> or locally by installing LMQL directly from the corresponding branch: `pip install git+https://github.com/eth-sri/lmql@next`. We encourage everyone to try Next, and share feedback with us via [GitHub](https://github.com/eth-sri/lmql) or our [Discord community](https://discord.gg/7eJP4fcyNT).
+LMQL Next is continuously deployed and can be used starting today, via <a href="https://next.lmql.ai">https://next.lmql.ai</a> or locally by installing LMQL directly from the corresponding branch: `pip install git+https://github.com/eth-sri/lmql@next`. We encourage everyone to try Next, and share feedback with us via [GitHub](https://github.com/eth-sri/lmql) or our [Discord community](https://discord.gg/7eJP4fcyNT).
 
 As part of **LMQL Next**, as we launch it today, we are excited to share **two major upcoming features** with the community, that will soon also land on `main`.
 

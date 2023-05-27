@@ -158,7 +158,7 @@ function Query(q, showcase_info, id, i) {
                     continue
                 }
                 if ((lines[lines.length - 1].length > max_column_width || (lines.length == 1 && lines[lines.length - 1].length + s.offset > max_column_width)) && c === " ") {
-                    // preprend unicode line broken char
+                    // prepend unicode line broken char
                     lines.push(s.indent + " ➥")
                 }
                 lines[lines.length - 1] += c
@@ -171,7 +171,7 @@ function Query(q, showcase_info, id, i) {
         return s.content;
     }).join("")
 
-    // highligh anchors
+    // highlight anchors
     if (showcase_info.anchors) {
         Object.keys(showcase_info.anchors).forEach(k => {
             let label = showcase_info.anchors[k]

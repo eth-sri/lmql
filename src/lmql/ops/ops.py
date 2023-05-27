@@ -95,7 +95,7 @@ def DynamicTypeDispatch(name, type_map):
                 if is_match: 
                     self.delegate = op(*self.delegate_args, **self.delegate_kwargs)
                     return self.delegate
-            raise NotImplementedError("error: no matching implemntation of {} for arguments of type {}".format(name, [type(arg) for arg in args]))
+            raise NotImplementedError("error: no matching implementation of {} for arguments of type {}".format(name, [type(arg) for arg in args]))
 
         def forward(self, *args, **kwargs):
             if any(a is None for a in args):

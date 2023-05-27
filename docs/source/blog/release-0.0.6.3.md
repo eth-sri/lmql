@@ -33,7 +33,7 @@ Today, we are releasing LMQL v0.0.6.3. This update contains several bug fixes an
         len(TOKENS(WHO)) > 10 and STOPS_AT(WHO, "\n")
     ```
 
-* **lmql.run**: Improved input validation for `lmql.run` as contributed by <a href="https://twitter.com/lfegray" target="_blank">@lfegray</a>. More specifically, `lmql.run` wil now provide more helpful error messages when client logic does not specify input values for all required query parameters.
+* **lmql.run**: Improved input validation for `lmql.run` as contributed by <a href="https://twitter.com/lfegray" target="_blank">@lfegray</a>. More specifically, `lmql.run` will now provide more helpful error messages when client logic does not specify input values for all required query parameters.
 
 * **Automatic Cache Invalidation**: LMQL's tokenizer cache at `~/.cache/lmql` is now invalidated automatically when upgrading to a new version. This should prevent issues with outdated cache files.
 
