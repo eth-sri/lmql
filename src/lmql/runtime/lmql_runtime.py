@@ -131,7 +131,14 @@ class LMQLQueryFunction(LMQLChainMixIn):
         
         if self.output_writer is not None:
             kwargs["output_writer"] = self.output_writer
+
+        if "self" in kwargs:
+            kwargs["_self" ] = kwargs.pop("self")
+            
         interpreter.set_extra_args(**kwargs)
+
+        if "_self" in kwargs:
+            kwargs["self" ] = kwargs.pop("_self")
 
         query_kwargs = {}
         for a in self.args:
@@ -141,6 +148,9 @@ class LMQLQueryFunction(LMQLChainMixIn):
                 query_kwargs[a] = self.scope.resolve(a)
         
         # execute main prompt
+        if "self" in query_kwargs:
+            query_kwargs["_self" ] = query_kwargs.pop("self")
+
         results = await interpreter.run(self.fct, **query_kwargs)
 
         # applies distribution postprocessor if required
@@ -184,4 +194,3 @@ def compiled_query(output_variables=None, group_by=None):
                                  postprocessors=postprocessors, 
                                  scope=LMQLInputVariableScope(fct, calling_frame))
     return func_transformer
-    

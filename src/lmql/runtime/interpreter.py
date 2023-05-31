@@ -626,6 +626,9 @@ class PromptInterpreter:
     async def run(self, fct, **kwargs):
         self.fct = fct
 
+        if "_self" in kwargs:
+            kwargs["self" ] = kwargs.pop("_self")
+
         # intercept symbol table entry for input
         if "input" in kwargs.keys() and kwargs["input"] == input:
             kwargs["input"] = self.input
