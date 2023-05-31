@@ -3,6 +3,17 @@ export function reconstructTaggedModelResult(nodes) {
     return []
   }
 
+  function unescapeBytes(s) {
+    if (s.length == 1) {
+      if (s[0].startsWith("bytes:")) {
+        return [s[0].substring(6)]
+      } else {
+        return [s]
+      }
+    }
+    return s
+  }
+
   let results = []
 
   for (let node of nodes) {
@@ -20,7 +31,7 @@ export function reconstructTaggedModelResult(nodes) {
       }
       if (n.incomers().length > 0) {
         text.push({
-          text: n.data("text"),
+          text: unescapeBytes(n.data("text")),
           variable: n.data("deterministic") ? "__prompt__" : n.data("user_data.head.variable"),
           pool: n.data("pool"),
         })

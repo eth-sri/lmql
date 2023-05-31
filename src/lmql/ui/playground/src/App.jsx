@@ -918,16 +918,16 @@ class Truncated extends React.Component {
     super(props)
     
     this.state = {
-      typingOffset: 0,
+      typingOffset: 1024,
       expandedText: ""
     }
     this.stepper = null
   }
 
   componentDidMount() {
-    this.stepper = setInterval(() => {
+    /* this.stepper = setInterval(() => {
       this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 16 }))
-    }, 5)
+    }, 5) */
   }
 
   componentWillUnmount() {
@@ -981,6 +981,26 @@ class Truncated extends React.Component {
     // make sure to render model output control characters
     content = content.replace(/\\n/g, "\n")
     content = content.replace(/\\t/g, "\t")
+
+    /* convert text to char code */
+    console.log("content", content)
+    let bytes = []
+    for (let i = 0; i < content.length; i++) {
+      /* check for \xXX and parse charcode from hex */
+      if (content[i] == "\\") {
+        if (content[i + 1] == "x") {
+          let hex = content.substring(i + 2, i + 4)
+          let charCode = parseInt(hex, 16)
+          bytes.push(charCode)
+          i += 3
+          continue;
+        }
+      }
+      bytes = bytes.concat(Array.from(new TextEncoder("utf-8").encode(content[i])))
+    }
+    console.log("bytes", bytes, bytes.length)
+    content = new TextDecoder("utf-8").decode(new Uint8Array(bytes))
+    console.log("content", content)
 
     let EXPLICIT_CHARS = {
       "\n": "⏎",

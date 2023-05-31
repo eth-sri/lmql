@@ -197,9 +197,22 @@ class DecoderSequence:
 
     async def detokenized(self, name):
         async def seqtext_provider():
-            return str([await get_tokenizer().decode(self.input_ids[1:])][0])
+            t = str([await get_tokenizer().decode(self.input_ids)][0])
+            t = str(t.encode("utf-8"))[2:-1]
+            return t
         async def text_provider():
-            return str([await get_tokenizer().decode(self.input_ids[-1:])])[2:-2]
+            t = str([await get_tokenizer().decode(self.input_ids[-1:])])[2:-2]
+            INVALID_CHARACTER = "\uFFFD"
+            if INVALID_CHARACTER in t:
+                # use token id
+                if type(self.input_ids[-1]) is int:
+                    t = "token:" + str(self.input_ids[-1])
+                elif type(self.input_ids[-1]) is bytes or type(self.input_ids[-1]) is np.bytes_:
+                    t = str(self.input_ids[-1])[2:-1]
+                else:
+                    t = str(self.input_ids[-1])
+                    t = str(t.encode("utf-8"))[2:-1]
+            return t
         providers = {
             "seqtext": seqtext_provider,
             "text": text_provider
@@ -331,7 +344,7 @@ class DecoderSequence:
         if stop_phrases is None:
             return new_stop_phrase
 
-        ids = np.concatenate([self.input_ids, continuation.token.reshape(1)]),
+        ids = np.concatenate([self.input_ids, continuation.token.reshape(1)])
         for stop in stop_phrases:
             len_stop = len(stop)
             if ids[-len_stop:] == stop:
@@ -371,7 +384,7 @@ class DecoderSequence:
         return f"<seq token_len={len(self.input_ids)} ids=[... {ids}]>"
 
     def is_done(self):
-        return self.input_ids[-1] == get_tokenizer().eos_token_id
+        return self.input_ids[-1] == get_tokenizer().eos_token_id or self.input_ids[-1] == str(get_tokenizer().eos_token_id).encode() or self.input_ids[-1] == b"<|endoftext|>"
 
     def make_successors(self, next_tokens, next_token_scores, logits, user_data=None):
         # remove very low scoring tokens (likely they were masked and therefore score low)
@@ -451,7 +464,7 @@ class DeterministicDecoderSequence(DecoderSequence):
         self.needs_rewrite = needs_rewrite
         self.internal = internal
 
-        if next_logprobs is not None: assert len(next_logprobs) == len(next_ids), "Length of deterministic continuation did not match length of provided logprobs"
+        if next_logprobs is not None: assert len(next_logprobs) == len(next_ids), "Length of deterministic continuation did not match length of provided logprobs. Provided logprobs: {}, Provided IDs: {}".format(len(next_logprobs), next_ids)
         if next_deterministic is not None: assert len(next_deterministic) == len(next_ids), "Length of determinism status did not match length of provided logrprobs"
 
         self.align_user_data()

@@ -318,8 +318,6 @@ class response_buffer:
         while self.num_tokens <= i and self.iterator is not None:
             try:
                 chunk = await anext(self.iterator)
-                chunk["logprobs"]["tokens"] = await self.tokenizer(chunk["logprobs"]["tokens"])
-                # self.tokenizer(data["logprobs"]["tokens"])
                 self._append(chunk)
             except StopAsyncIteration:
                 break

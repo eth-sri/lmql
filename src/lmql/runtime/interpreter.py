@@ -520,7 +520,6 @@ class PromptInterpreter:
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
             text_diff = text[len(await seq.text(state.variable_offset, limit=-2, pretty=False)):]
             
-            assert seq.input_ids[-1] == self.tokenizer.eos_token_id, "last token must be eos token"
             variable_value = text
             # set raw variable value
             program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin")
@@ -576,6 +575,21 @@ class PromptInterpreter:
                 variable_offset = len(combined_new_ids)
 
                 rewritten_state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
+
+                if type(combined_new_ids[0]) is bytes:
+                    new_text = []
+                    for t in combined_new_ids:
+                        if type(t) is bytes:
+                            new_text += [t]
+                        else:
+                            s = self.tokenizer.decode_bytes([t])
+                            assert len(s) == 1, "tokenizer must return exactly one bytes sequence for a single token 't'"
+                            new_text += s
+                    combined_new_ids = np.array(new_text, dtype=np.bytes_)
+                    
+                    allinone = bytes()
+                    for t in combined_new_ids:
+                        allinone += t
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(
@@ -666,7 +680,7 @@ class PromptInterpreter:
         prompt_ids = await self.tokenize(self.root_state.prompt)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
-        n = len(prompt_ids)
+        n = 1
         
         # make sure that the initial prompt is not considered part of a variable
         self.root_state = self.root_state.updated(variable_offset=n)
@@ -745,7 +759,7 @@ class PromptInterpreter:
             self.decoder_step = 0
             average_step_time = None
             start = time.time()
-            async for _ in decoder_fct(prompt_ids, **decoder_args):
+            async for _ in decoder_fct([self.root_state.prompt.encode("utf-8")], **decoder_args):
                 await debug_out(self.decoder_step)
                 self.decoder_step += 1
 

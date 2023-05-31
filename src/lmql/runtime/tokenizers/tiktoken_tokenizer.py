@@ -53,6 +53,9 @@ class TiktokenTokenizer:
     def tokenize(self, text):
         return [self.enc.decode([i]) for i in self.enc.encode(text)]
 
+    def decode_tokens_bytes(self, ids):
+        return self.enc.decode_tokens_bytes(ids)
+
     def decode(self, ids, clean_up_tokenization_spaces=True):
         return self.enc.decode(ids)
 

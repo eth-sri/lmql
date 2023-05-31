@@ -123,7 +123,7 @@ class CacheDelegate:
         pass
 
 class DcModel(DcModelRewriteMixin):
-    def __init__(self, model, tokenizer, truncation_threshold=-3e38, init_workers=True, **kwargs):
+    def __init__(self, model, tokenizer, truncation_threshold=-3e38, init_workers=True, textmode=False, **kwargs):
         """
         Parameters:
         
@@ -139,7 +139,11 @@ class DcModel(DcModelRewriteMixin):
 
         self.bos_token_id = tokenizer.bos_token_id
         self.eos_token_id = tokenizer.eos_token_id
+        self.eos = self.tokenizer.decode_bytes([self.eos_token_id])[0]
+        
         self.truncation_threshold = truncation_threshold
+
+        self.textmode = textmode
 
         self.stats = Stats("dcmodel")
 
@@ -482,5 +486,7 @@ def tokenizer(name, tokenize, detokenize, bos_token_id, eos_token_id):
         async def __call__(self, text):
             return await tokenize(text)
         async def decode(self, tokens):
+            return await detokenize(tokens)
+        async def decode_bytes(self, tokens):
             return await detokenize(tokens)
     return AsyncTokenizer(eos_token_id=eos_token_id, bos_token_id=bos_token_id)
