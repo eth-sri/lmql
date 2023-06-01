@@ -576,20 +576,22 @@ class PromptInterpreter:
 
                 rewritten_state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
 
+
                 if type(combined_new_ids[0]) is bytes:
-                    new_text = []
-                    for t in combined_new_ids:
-                        if type(t) is bytes:
-                            new_text += [t]
+                    res = []
+                    i = 0
+                    while i < len(combined_new_ids):
+                        if type(combined_new_ids[i]) is bytes:
+                            res += [combined_new_ids[i]]
+                            i += 1
                         else:
-                            s = self.tokenizer.decode_bytes([t])
-                            assert len(s) == 1, "tokenizer must return exactly one bytes sequence for a single token 't'"
-                            new_text += s
-                    combined_new_ids = np.array(new_text, dtype=np.bytes_)
-                    
-                    allinone = bytes()
-                    for t in combined_new_ids:
-                        allinone += t
+                            j = i+1
+                            while j < len(combined_new_ids) and type(combined_new_ids[j]) is not bytes:
+                                j += 1
+                            r = self.tokenizer.decode_bytes(combined_new_ids[i:j])
+                            res += r
+                            i = j
+                    combined_new_ids = np.array(res, dtype=np.bytes_)
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(

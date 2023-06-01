@@ -95,7 +95,7 @@ class DclibOpenAiModel(DcModel):
     def __init__(self, *args, endpoint=None, **kwargs):
         super().__init__(*args, truncation_threshold=-12000, init_workers=False, **kwargs)
         
-        mock = kwargs.get("mock", False)
+        self.mock = kwargs.get("mock", False)
 
         # if available, store reference to output writer for eager stats reporting
         self.output_writer = None
@@ -104,13 +104,13 @@ class DclibOpenAiModel(DcModel):
         
         self.model_identifier = "openai/" + self.model.model_identifier
 
-        self.model.chunk_size = kwargs.get("openai_chunksize", 64 if not mock else 8)
+        self.model.chunk_size = kwargs.get("openai_chunksize", 64 if not self.mock else 8)
         self.model.nostop = kwargs.get("openai_nonstop", False)
         self.num_billed_tokens = {}
         self.num_requests = 0
         
         self.endpoint = endpoint
-        self.timeout = kwargs.get("chunk_timeout", 1.5 if not mock else 4.5)
+        self.timeout = kwargs.get("chunk_timeout", 1.5 if not self.mock else 4.5)
 
         self.stats = Stats("openai")
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
@@ -164,7 +164,7 @@ class DclibOpenAiModel(DcModel):
         if input_ids[0] == self.tokenizer.bos_token_id:
             input_ids = input_ids[1:]
 
-        prompt_str = b"".join(input_ids).decode("utf-8")
+        prompt_str = self.tokenizer.encode_bytes(input_ids)
 
         # rstripped_eos = False
         # if prompt_str.endswith("<|endoftext|>"):
@@ -211,7 +211,7 @@ class DclibOpenAiModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens, noscore=False):
         if noscore: return np.zeros(len(next_tokens), dtype=np.float32)
         
-        prompt_str = b"".join(s.input_ids).decode("utf-8")
+        prompt_str = self.tokenizer.encode_bytes(s.input_ids)
         tokenized_input_ids = await self.tokenize(prompt_str)
         print(tokenized_input_ids, [prompt_str], next_tokens, flush=True)
 
@@ -261,7 +261,7 @@ class DclibOpenAiModel(DcModel):
 
         batch_size = 1
         input_ids = completion_call.input_ids.reshape(-1)
-        prompt_str = b"".join(input_ids).decode("utf-8")
+        prompt_str = self.tokenizer.encode_bytes(input_ids)
         tokenized_input_ids = await self.tokenize(prompt_str)
 
         # do not include bos token in prompt for request
@@ -297,7 +297,7 @@ class DclibOpenAiModel(DcModel):
             kwargs.update({"logit_bias": logit_bias})
         elif mode == "fixed": # complete with fixed token
             fixed_next_token = completion_call.logit_mask_or_fixed_id # special return value case for prepare function
-            
+
             if fixed_next_token == self.eos:
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=0), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
             else:

@@ -71,21 +71,6 @@ def tokenize(text):
     raw = [str(t)[2:-1] for t in raw]
     return [t if not "\\x" in t else "bytes:" + t for t in raw]
 
-def detokenize(input_ids):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = load_tokenizer("gpt2")
-        
-    while len(input_ids) > 0 and input_ids[0] == tokenizer.bos_token_id:
-        input_ids = input_ids[1:]
-    while len(input_ids) > 0 and input_ids[-1] == tokenizer.eos_token_id:
-        input_ids = input_ids[:-1]
-        
-    if len(input_ids) == 0:
-        return ""
-        
-    return tokenizer.decode(input_ids)
-
 def tagged_segments(s):
     import re
     segments = []
