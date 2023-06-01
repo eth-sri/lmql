@@ -11,7 +11,7 @@ import lmql.runtime.dclib as dc
 from lmql.runtime.stats import Stats
 from lmql.runtime.tokenizer import LMQLTokenizer
 from lmql.runtime.interrupt import interrupt
-from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, DistributionVariable
+from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, DistributionVariable, unescape_qstring
 from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
@@ -263,7 +263,7 @@ class PromptInterpreter:
                 s = stmt_buffer[0]
 
                 if type(s) is str:
-                    prompt += s
+                    prompt += unescape_qstring(s)
                     stmt_buffer = stmt_buffer[1:]
                     # keep latest prompt in transient state
                     state = state.updated(prompt=prompt)

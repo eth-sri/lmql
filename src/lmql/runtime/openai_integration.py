@@ -186,8 +186,6 @@ class DclibOpenAiModel(DcModel):
         async for data in await openai.Completion.create(**kwargs):
             logprobs += data["logprobs"]["token_logprobs"]
         
-        print(len(input_ids), len(logprobs))
-
         return np.array(logprobs[offset:], dtype=np.float32)
 
     async def queue_api_score(self, kwargs):

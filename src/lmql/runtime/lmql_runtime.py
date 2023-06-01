@@ -162,6 +162,9 @@ def context_call(fct_name, *args, **kwargs):
 def interrupt_call(fct_name, *args, **kwargs):
     return ("interrupt:" + fct_name, args, kwargs)
 
+def f_escape(s):
+    return str(s).replace("[", "[[").replace("]", "]]")
+
 def tag(t):
     return f"<lmql:{t}/>"
 

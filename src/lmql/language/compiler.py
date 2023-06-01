@@ -123,6 +123,9 @@ class PromptScope(ast.NodeVisitor):
         # capture set of format vars (exclude {{ and }})
         # replace {{ and }} with escape sequence \u007b and \u007d 
         qstring = qstring.replace("{{", "__curly_open__").replace("}}", "__curly_close__")
+        # same for [[ and ]]
+        qstring = qstring.replace("[[", "__square_open__").replace("]]", "__square_close__")
+
         used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}\{]+\}", qstring)]
         for v in used_fstring_expr:
             if v.startswith(":"):
@@ -137,11 +140,15 @@ class PromptScope(ast.NodeVisitor):
 
         # put double curly braces back in
         qstring = qstring.replace("__curly_open__", "{{").replace("__curly_close__", "}}")
-                
+        qstring = qstring.replace("__square_open__", "[[").replace("__square_close__", "]]")
+        
         template_tags = [v[1:-1] for v in re.findall("\{:[A-z0-9]+\}", qstring)]
         for tt in template_tags:
             qstring = qstring.replace(f"{{{tt}}}", f"{{lmql.tag('{tt[1:]}')}}")
         
+        # replace other {} with lmql.escape
+        qstring = re.sub("\{[^\}]+\}", lambda m: f"{{lmql.lmql_runtime.f_escape({m.group(0)[1:-1]})}}", qstring)
+
         node.value = qstring
 
         return super().visit_Constant(node)
