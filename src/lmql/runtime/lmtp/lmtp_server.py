@@ -270,13 +270,32 @@ class LMTPWebSocketTransport:
     """
     def __init__(self, ws):
         self.ws = ws
+        self.queue = asyncio.Queue()
+        self._dumper = asyncio.create_task(self.dumper())
+
+    async def dumper(self):
+        while True:
+            try:
+                batch = [await self.queue.get()]
+                while len(batch) < 4:
+                    try:
+                        batch.append(await asyncio.wait_for(self.queue.get(), timeout=0.1))
+                    except asyncio.TimeoutError:
+                        break
+                if len(batch) > 0:
+                    await self.ws.send_str("TOKEN" + " " + json.dumps(batch))
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print("LMTPWebSocketTransport.dumper error", e, flush=True)
 
     async def send(self, type, payload):
-        await self.ws.send_str(type + " " + json.dumps(payload))
+        await self.queue.put(payload)
 
     @staticmethod
     async def listen(ws):
-        session = TokenSession(LMTPWebSocketTransport(ws))
+        transport = LMTPWebSocketTransport(ws)
+        session = TokenSession(transport)
 
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.TEXT:
@@ -291,6 +310,7 @@ class LMTPWebSocketTransport:
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 break
 
+        transport._dumper.cancel()
         session.close()
         await ws.close()
 

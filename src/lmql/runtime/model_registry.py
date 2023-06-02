@@ -49,37 +49,38 @@ def autoregister(model_name):
                 assert False, "Your distribution of LMQL does not support HuggingFace Transformers models.\
                     Please use openai/ models or install lmql with 'transformers' support (pip install lmql[hf])."
 
-        if LMQLModelRegistry is not None:
-            backend: str = LMQLModelRegistry.backend_configuration
-            if backend == "legacy":
-                from lmql.runtime.hf_integration import transformers_model
+        backend: str = LMQLModelRegistry.backend_configuration
+        if backend == "legacy":
+            from lmql.runtime.hf_integration import transformers_model
 
-                default_server = "http://localhost:8080"
-                Model = transformers_model(default_server, model_name)
+            default_server = "http://localhost:8080"
+            Model = transformers_model(default_server, model_name)
+            
+            if model_name.startswith("local:"):
+                model_name = model_name[6:]
+            
+            register_model(model_name, Model)
+        else:
+            from lmql.runtime.lmtp.lmtp_dcmodel import lmtp_model
+
+            # determine endpoint URL
+            if backend is None:
+                backend = "localhost:8080"
+
+            # # determine model name and if we run in-process
+            # if model_name.startswith("local:"):
+            #     from lmql.model.serve_oai import inprocess
                 
-                if model_name.startswith("local:"):
-                    model_name = model_name[6:]
-                
-                register_model(model_name, Model)
-            else:
-                from lmql.runtime.openai_integration import openai_model
+            #     model_name = model_name[6:]
+            #     inprocess(model_name, use_existing_configuration=True)
 
-                # determine endpoint URL
-                if backend is None:
-                    backend = "localhost:8080"
+            # # use provided inference server as mocked OpenAI API
+            # endpoint = backend
 
-                # determine model name and if we run in-process
-                if model_name.startswith("local:"):
-                    from lmql.model.serve_oai import inprocess
-                    
-                    model_name = model_name[6:]
-                    inprocess(model_name, use_existing_configuration=True)
 
-                # use provided inference server as mocked OpenAI API
-                endpoint = backend
-                Model = openai_model(model_name, endpoint=endpoint, mock=True)
-                register_model(model_name, Model)
-                return
+            Model = lmtp_model(model_name, endpoint=backend)
+            register_model(model_name, Model)
+            return
 
 def register_model(identifier, ModelClass):
     LMQLModelRegistry.registry[identifier] = ModelClass

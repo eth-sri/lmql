@@ -12,6 +12,7 @@ from .dclib_model import DcModel, CacheDelegate
 from .dclib_rewrite import DcModelRewriteMixin
 import lmql.runtime.masks as masks
 from lmql.utils.nputil import ensure_iterable
+from concurrent.futures import ThreadPoolExecutor
 
 class CacheFile:
     def __init__(self, filename, initial_ids, model):
@@ -541,7 +542,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             #     if tk in self.cache and type(self.cache[tk][0]) is not asyncio.Future:
                             #         print("token_consumer: token for {} from stream already in cache ({} streams): {}".format(tk, len(self.token_streams), self.cache[tk]))
 
-                            self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data)
+                            self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data, verbose=False)
 
                             if self.show_speculative:
                                 c = Continuation(np.array(token), np.array(score), None)
@@ -574,7 +575,9 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 raise e
 
         self.token_streams = [s for s in self.token_streams if not s.done()]
-        self.token_streams.append(asyncio.create_task(token_consumer(token_iterator)))
+
+        task = asyncio.create_task(token_consumer(token_iterator))
+        self.token_streams.append(task)
         
     async def wait_for_active_streams(self):
         """

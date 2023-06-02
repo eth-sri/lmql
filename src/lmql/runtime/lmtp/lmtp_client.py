@@ -55,11 +55,12 @@ class LMTPWebSocketClient:
     def handle(self, msg):
         cmd, args = msg.data.split(" ",1)
         if cmd == "TOKEN":
-            args = json.loads(args)
-            stream_id = args["stream_id"]
-
-            consumers = self.iterators.get(stream_id, [])
-            for q in consumers: q.put_nowait(args)
+            data = json.loads(args)
+            
+            for d in data:
+                stream_id = d["stream_id"]
+                consumers = self.iterators.get(stream_id, [])
+                for q in consumers: q.put_nowait(d)
         else:
             print("Unknown command: {}".format(cmd), flush=True)
 
@@ -121,29 +122,6 @@ class LMTPInProcessClient:
                 break
             yield item
 
-    def connect(self):
-        async def msg_handler():
-            async for msg in self.ws:
-                if msg.type == aiohttp.WSMsgType.TEXT:
-                    try:
-                        self.handle(msg)
-                    except Exception as e:
-                        print("failed to handle msg", e, flush=True)
-                elif msg.type == aiohttp.WSMsgType.ERROR:
-                    break
-        self.handler = asyncio.create_task(msg_handler())
-
-    def handle(self, msg):
-        cmd, args = msg.data.split(" ",1)
-        if cmd == "TOKEN":
-            args = json.loads(args)
-            stream_id = args["stream_id"]
-
-            consumers = self.iterators.get(stream_id, [])
-            for q in consumers: q.put_nowait(args)
-        else:
-            print("Unknown command: {}".format(cmd), flush=True)
-
 async def main():
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect('http://localhost:8080') as ws:
@@ -189,4 +167,5 @@ async def main_inprocess():
 
 # time.sleep(1.5)
 # print("Starting LMTP client", flush=True)
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
