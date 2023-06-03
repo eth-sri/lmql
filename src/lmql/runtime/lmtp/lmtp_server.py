@@ -224,11 +224,13 @@ class TokenSession:
     A LMTP token session, which is a single user generating tokens with a fixed model, 
     using several token streams in parallel and varying sampling configurations.
     """
-    def __init__(self, transport):
+    def __init__(self, transport, longrunning=False):
         self.transport = transport
         self.token_queue = Queue()
         self.queue_processor = asyncio.create_task(self.queue_loop())
         self.used_models = set()
+
+        self.longrunning = longrunning
 
     async def handle(self, cmd, kwargs):
         try:
@@ -268,7 +270,10 @@ class TokenSession:
                 continue
             scheduler = Scheduler.instance(m, user=self)
             scheduler.unregister(self)
-            Scheduler.gc(0)
+            if self.longrunning:
+                scheduler.gc()
+            else:
+                Scheduler.gc(0)
 
 class LMTPWebSocketTransport:
     """
@@ -301,7 +306,7 @@ class LMTPWebSocketTransport:
     @staticmethod
     async def listen(ws):
         transport = LMTPWebSocketTransport(ws)
-        session = TokenSession(transport)
+        session = TokenSession(transport, longrunning=True)
 
         async for msg in ws:
             if msg.type == aiohttp.WSMsgType.TEXT:

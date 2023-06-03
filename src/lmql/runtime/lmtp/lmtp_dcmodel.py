@@ -1,6 +1,8 @@
 from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.tokenizer import load_tokenizer
-from .lmtp_client import LMTPWebSocketClient, LMTPInProcessClient
+from .lmtp_client import LMTPWebSocketClient
+from .lmtp_multiprocessing import LMTPMultiProcessingClient
+from .lmtp_threading import LMTPThreadedClient
 from .lmtp_server import Scheduler
 import lmql.runtime.dclib as dc
 import asyncio
@@ -38,7 +40,7 @@ class LMTPModel(DcModel):
         self.tokens = 0
 
     async def inprocess_client_loop(self):
-        self.client = LMTPInProcessClient(self.model.model_identifier)
+        self.client = LMTPMultiProcessingClient(self.model.model_identifier)
 
         self.connected_signal.set()
         await self.close_signal.wait()
@@ -54,20 +56,28 @@ class LMTPModel(DcModel):
                 self.connected_signal.set()
                 await self.close_signal.wait()
 
-    def make_cache_entry(self, s, payload):
+    def make_cache_entry(self, s, payload, sampling_mode):
         scores = {}
         for t, score in payload["top_logprobs"].items():
             scores[int(t)] = score
-        scores[int(payload["token"])] = payload["logprob"]
+        
+        if sampling_mode == "top-1":
+            scores[int(payload["token"])] = payload["logprob"]
 
         top_entries = list(sorted(scores.items(), key=lambda x: x[1], reverse=True))
         tokens = [t for t, _ in top_entries]
         scores = [s for _, s in top_entries]
         edge_type = ["top-{}".format(i+1) for i in range(len(top_entries))]
         
+        # for non argmax sampling modes, add the sampled token
+        if sampling_mode != "top-1":
+            tokens = [payload["token"]] + tokens
+            scores = [payload["logprob"]] + scores
+            edge_type = [sampling_mode] + edge_type
+
         return (s, tokens, scores, edge_type, {})
 
-    async def stream_and_return_first(self, s, iterator):
+    async def stream_and_return_first(self, s, iterator, sampling_mode):
         buffer = []
         for i in range(4):
             try:
@@ -82,13 +92,13 @@ class LMTPModel(DcModel):
             self.tokens += 1
             
             for item in buffer:
-                yield self.make_cache_entry(s, item)
+                yield self.make_cache_entry(s, item, sampling_mode)
 
             while True:
                 try:
                     self.tokens += 1
                     item = await anext(iterator)
-                    yield self.make_cache_entry(s, item)
+                    yield self.make_cache_entry(s, item, sampling_mode)
                 except StopAsyncIteration:
                     is_done = True
                     break
@@ -159,6 +169,8 @@ class LMTPModel(DcModel):
     async def sample(self, sequences: dc.DataArray, temperature, **kwargs):
         await self.ensure_connected()
         
+        sampling_mode = "top-1" if temperature == 0.0 else "sample-{}".format(temperature)
+
         assert kwargs.get("num_samples", 1) == 1, "LMTPModel does not support num_samples != 1"
 
         async def op_sample(seqs):
@@ -171,7 +183,7 @@ class LMTPModel(DcModel):
                 return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=None) for i,s in enumerate(seqs)]
             
             self.model.num_queries += len(seqs)
-            tokens = await asyncio.gather(*[self.stream_and_return_first(s, await self.generate(s, temperature=temperature, **kwargs)) for s in seqs])
+            tokens = await asyncio.gather(*[self.stream_and_return_first(s, await self.generate(s, temperature=temperature, **kwargs), sampling_mode) for s in seqs])
 
             next_token_ids = np.array([t['token'] for t in tokens], dtype=np.int64)
             next_token_scores = np.array([t['logprob'] for t in tokens], dtype=np.float32)

@@ -155,9 +155,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 else:
                     keys.append((self.base_key(s), edge_type, "-".join([str(i) for i in np.where(mask >= 0)[0]])))
         else:
-            if edge_type != "sample":
-                # standard key is sequence id + edge type
-                keys.append((self.base_key(s), edge_type))
+            # standard key is sequence id + edge type
+            keys.append((self.base_key(s), edge_type))
 
         return keys
     
@@ -250,7 +249,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             self.calls += len(seqs)
 
             # check cache for all
-            cache_entries = [await self.get_cache(s, 'sample', **kwargs) for s in seqs]
+            temperature = kwargs.get('temperature', 1.0)
+            sampling_mode = "top-1" if temperature == 0.0 else "sample-{}".format(temperature)
+            
+            cache_entries = [await self.get_cache(s, sampling_mode, **kwargs) for s in seqs]
             cached_tokens = [e[1] for e in cache_entries]
             cache_keys = [e[0] for e in cache_entries]
             
