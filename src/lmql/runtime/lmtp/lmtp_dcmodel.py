@@ -1,6 +1,7 @@
 from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.tokenizer import load_tokenizer
-from .lmtp_client import LMTPWebSocketClient
+from .lmtp_client import LMTPWebSocketClient, LMTPInProcessClient
+from .lmtp_server import Scheduler
 import lmql.runtime.dclib as dc
 import asyncio
 import numpy as np
@@ -11,31 +12,46 @@ import lmql.runtime.masks as masks
 from typing import List, Union
 
 class LMTPModel(DcModel):
-    def __init__(self, model, tokenizer, endpoint, truncation_threshold=-3e+38, init_workers=True, **kwargs):
+    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, **kwargs):
         super().__init__(model, tokenizer, truncation_threshold, init_workers, **kwargs)
 
-        self.close_signal = asyncio.Event()
-        
         self.model.chunk_size = kwargs.get("chunksize", 16)
 
+        # LMTP client object (can be inprocess or websocket)
         self.client = None
-        self._client_loop = asyncio.create_task(self.client_loop())
-        self._connected_signal = asyncio.Event()
+        # asyncio task for client loop
+        self._client_loop = None
+        # set once self.client is set up
+        self.connected_signal = asyncio.Event()
+        # set to termiante self._client_loop
+        self.close_signal = asyncio.Event()
         
+        # endpoint in case of remote model
         self.endpoint = endpoint
-        if not self.endpoint.startswith("http"):
+        if endpoint is not None and not self.endpoint.startswith("http"):
             self.endpoint = "http://" + self.endpoint
 
+        self.inprocess = inprocess
+
+        # model statistics
         self.requests = 0
         self.tokens = 0
 
-    async def client_loop(self):
+    async def inprocess_client_loop(self):
+        self.client = LMTPInProcessClient(self.model.model_identifier)
+
+        self.connected_signal.set()
+        await self.close_signal.wait()
+        await self.client.close()
+        self.client = None
+
+    async def ws_client_loop(self):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(self.endpoint) as ws:
                 self.client = LMTPWebSocketClient(self.model.model_identifier, ws)
                 self.client.connect()
                 
-                self._connected_signal.set()
+                self.connected_signal.set()
                 await self.close_signal.wait()
 
     def make_cache_entry(self, s, payload):
@@ -85,11 +101,14 @@ class LMTPModel(DcModel):
 
     async def ensure_connected(self):
         if self.client is None:
-            self._client_loop = asyncio.create_task(self.client_loop())
-        await self._connected_signal.wait()
+            if not self.inprocess:
+                self._client_loop = asyncio.create_task(self.ws_client_loop())
+            else:
+                self._client_loop = asyncio.create_task(self.inprocess_client_loop())
+        await self.connected_signal.wait()
 
     # on deinit
-    async def close(self):
+    def close(self):
         self.close_signal.set()
 
     def __del__(self):
@@ -125,7 +144,7 @@ class LMTPModel(DcModel):
                 return self.singleton_result(only_allowed_id, 0.0)
             
             assert nputil.is_array(mask), "logit_mask_or_fixed_id must be a LongTensor not a " + str(type(mask))
-            invert = num_allowed < self.tokenizer.vocab_size
+            invert = num_allowed < self.tokenizer.vocab_size - num_allowed
 
             if invert: masked = (mask >= 0)
             else: masked = (mask < 0)
@@ -220,7 +239,7 @@ class LMTPModel(DcModel):
         for s, tokens,scores in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
             yield (s, tokens, scores)
 
-def lmtp_model(model_identifier, endpoint=None):
+def lmtp_model(model_identifier, inprocess=False, endpoint=None):
     class LMTPModelCls:
         def __init__(self) -> None:
             self.model_identifier = model_identifier
@@ -243,7 +262,7 @@ def lmtp_model(model_identifier, endpoint=None):
 
             dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
 
-            return LMTPModel(self, self.get_tokenizer(), endpoint=endpoint, **self.decoder_args)
+            return LMTPModel(self, self.get_tokenizer(), inprocess=inprocess, endpoint=endpoint, **self.decoder_args)
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]
@@ -258,4 +277,3 @@ def lmtp_model(model_identifier, endpoint=None):
             pass
 
     return LMTPModelCls
-        

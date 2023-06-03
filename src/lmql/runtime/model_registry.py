@@ -67,18 +67,15 @@ def autoregister(model_name):
             if backend is None:
                 backend = "localhost:8080"
 
-            # # determine model name and if we run in-process
-            # if model_name.startswith("local:"):
-            #     from lmql.model.serve_oai import inprocess
+            # determine model name and if we run in-process
+            if model_name.startswith("local:"):
+                from lmql.runtime.lmtp.lmtp_inprocess import inprocess
                 
-            #     model_name = model_name[6:]
-            #     inprocess(model_name, use_existing_configuration=True)
-
-            # # use provided inference server as mocked OpenAI API
-            # endpoint = backend
-
-
-            Model = lmtp_model(model_name, endpoint=backend)
+                model_name = model_name[6:]
+                Model = inprocess(model_name, use_existing_configuration=True)
+            else:
+                Model = lmtp_model(model_name, endpoint=backend)
+            
             register_model(model_name, Model)
             return
 

@@ -7,6 +7,7 @@ from queue import Queue, Empty as QueueEmpty
 import threading
 import time
 import torch
+import atexit
 
 from transformers import AutoModelForCausalLM
 
@@ -19,7 +20,7 @@ class GenerateCall:
     result_queue: Queue
 
     def put(self, token):
-        self.result_queue.put_nowait(token)
+        self.result_queue.put(token)
 
     def generation_mode(self):
         # string that describes the generation mode for this call (same string = can run in batch)
@@ -61,8 +62,8 @@ class GenerateBatch:
                     bias_tensors = [torch.zeros(vocab_size) for _ in logit_biases]
                     for i, bias in enumerate(logit_biases):
                         if len(bias) > 0:
-                            indices = torch.tensor(list(bias.keys()))
-                            values = torch.tensor(list(bias.values()))
+                            indices = torch.tensor(list(bias.keys()), dtype=torch.long)
+                            values = torch.tensor(list(bias.values()), dtype=torch.float32)
                             bias_tensors[i][indices] = values
                     bias_tensors = torch.stack(bias_tensors).to(scores.device)
                 
@@ -128,7 +129,7 @@ class Scheduler:
         self.queue = Queue()
         self.kill_event = threading.Event()
         
-        self.worker_thread = threading.Thread(target=self.worker)
+        self.worker_thread = threading.Thread(target=self.worker, daemon=True)
         self.worker_thread.start()
 
         self.users = set()
@@ -156,6 +157,7 @@ class Scheduler:
     def worker(self):
         print("[Loading ", self.model_identifier, "]", flush=True, sep="")
         model = AutoModelForCausalLM.from_pretrained(self.model_identifier, device_map="auto")
+        print("Ready", flush=True)
 
         while True:
             if self.kill_event.is_set():
@@ -210,10 +212,10 @@ class Scheduler:
                 s = Scheduler._instances[k]
                 Scheduler._instances[k].dealloc()
         
-        total = len(Scheduler._instances)
+        # total = len(Scheduler._instances)
         
-        if total >= n:
-            print("[Warning] {} models loaded, even though the configured limit is {}. Not needed {}".format(total, n, len(not_needed)), flush=True)
+        # if total >= n:
+        #     print("[Warning] {} models loaded, even though the configured limit is {}. Not needed {}".format(total, n, len(not_needed)), flush=True)
 
 Scheduler._instances = {}
 
@@ -224,7 +226,7 @@ class TokenSession:
     """
     def __init__(self, transport):
         self.transport = transport
-        self.token_queue = asyncio.Queue()
+        self.token_queue = Queue()
         self.queue_processor = asyncio.create_task(self.queue_loop())
         self.used_models = set()
 
@@ -250,8 +252,8 @@ class TokenSession:
                 try:
                     token = self.token_queue.get_nowait()
                     await self.transport.send("TOKEN", token)
-                except asyncio.QueueEmpty:
-                    await asyncio.sleep(0.1)
+                except QueueEmpty:
+                    await asyncio.sleep(0.01)
         except asyncio.CancelledError:
             self.close()
         except Exception as e:
@@ -262,8 +264,11 @@ class TokenSession:
         self.queue_processor.cancel()
         
         for m in self.used_models:
+            if not m in Scheduler._instances:
+                continue
             scheduler = Scheduler.instance(m, user=self)
             scheduler.unregister(self)
+            Scheduler.gc(0)
 
 class LMTPWebSocketTransport:
     """
@@ -327,7 +332,6 @@ async def stream(request):
 def main():
     app = web.Application()
     app.add_routes([web.get('/', stream)])
-    
     web.run_app(app, host='localhost', port=8080)
 
 if __name__ == "__main__":

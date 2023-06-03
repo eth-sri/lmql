@@ -94,6 +94,9 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             ts.cancel()
         self.token_streams = []
 
+        if hasattr(self.delegate, "close"):
+            self.delegate.close()
+
     def save(self):
         if self.cache_file is not None:
             cf = CacheFile(self.cache_file, self.initial_ids, self.delegate.model_identifier)
@@ -557,9 +560,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             fut = asyncio.Future()
                             unset_keys = [k for k in fut_keys if k not in self.cache]
                             self.set_cache(unset_keys, (fut, fut))
-
+                        
                         # extend ids
                         ids = np.append(ids, tokens[0])
+
                 # remove last waiting token entry (since it will not be provided by this stream)
                 for future_keys in waiting_token_keys:
                     for k in future_keys:

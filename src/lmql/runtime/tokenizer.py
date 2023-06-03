@@ -194,6 +194,9 @@ def load_tokenizer(model_identifier, type="auto"):
             return LMQLTokenizer(t, model_identifier)
 
     try:
+        import os
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
         import torch
         from transformers import AutoTokenizer
 
