@@ -514,19 +514,19 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 waiting_token_keys = []
 
                 async for (s, tokens, scores, edge_types, user_data) in itr():
-                    if type(tokens) is int or len(tokens) == 1:
-                        tokens = ensure_iterable(tokens)
-                        scores = ensure_iterable(scores)
-                        if type(edge_types) is str or edge_types is None:
-                            edge_types = [edge_types]
-                    else:
-                        assert len(tokens) == len(scores) == len(edge_types), f"token_consumer: expected all lists to have the same length, but got {len(tokens)}, {len(scores)}, {len(edge_type)}"
-                        # print("setting entries for", edge_types)
-                    
-                    waiting_token_keys = []
-                    
                     async with self.cache_lock:
-                        for token, score, edge_type in zip(tokens, scores, edge_types):
+                        if type(tokens) is int or len(tokens) == 1:
+                            tokens = ensure_iterable(tokens)
+                            scores = ensure_iterable(scores)
+                            if type(edge_types) is str or edge_types is None:
+                                edge_types = [edge_types]
+                        else:
+                            assert len(tokens) == len(scores) == len(edge_types), f"token_consumer: expected all lists to have the same length, but got {len(tokens)}, {len(scores)}, {len(edge_type)}"
+                            # print("setting entries for", edge_types)
+                        
+                        waiting_token_keys = []
+                        
+                        for token, score, edge_type in reversed(list(zip(tokens, scores, edge_types))):
                             assert type(edge_type) is str or edge_type is None, "edge_types is {}".format(edge_types)
                             
                             if ids is None:
@@ -546,20 +546,20 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
                             if self.show_speculative:
                                 c = Continuation(np.array(token), np.array(score), None)
-                                sq = sq.extend(c)
+                                cs = sq.extend(c)
+                                if edge_type == "top-1":
+                                    sq = cs
 
                             # set future for next token (so get_cache can wait for it if needed)
-                            fut_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
+                            fut_keys = [(self.base_key(np.append(ids, token)), edge_type, *k[2:]) for k in keys]
                             waiting_token_keys.append(fut_keys)
                             # set future for next token (if k is not already set)
                             fut = asyncio.Future()
                             unset_keys = [k for k in fut_keys if k not in self.cache]
                             self.set_cache(unset_keys, (fut, fut))
 
-                    # extend ids
-                    ids = np.append(ids, tokens[0])
-                        # print(waiting_token_keys)
-                
+                        # extend ids
+                        ids = np.append(ids, tokens[0])
                 # remove last waiting token entry (since it will not be provided by this stream)
                 for future_keys in waiting_token_keys:
                     for k in future_keys:
@@ -576,8 +576,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         self.token_streams = [s for s in self.token_streams if not s.done()]
 
-        task = asyncio.create_task(token_consumer(token_iterator))
-        self.token_streams.append(task)
+        task = token_consumer(token_iterator)
+        self.token_streams.append(asyncio.ensure_future(task))
         
     async def wait_for_active_streams(self):
         """

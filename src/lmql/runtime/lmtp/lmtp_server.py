@@ -45,7 +45,7 @@ class GenerateBatch:
         
         temperature = calls[0].kwargs.get("temperature", 0.0)
         max_tokens = max(c.kwargs.get("max_tokens", 32) for c in calls)
-        logit_biases = [c.kwargs.get("logit_bias", {}) for c in calls]
+        logit_biases = [c.logit_bias or {} for c in calls]
         return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls)
 
     def logits_processor(self):
@@ -66,8 +66,7 @@ class GenerateBatch:
                             bias_tensors[i][indices] = values
                     bias_tensors = torch.stack(bias_tensors).to(scores.device)
                 
-                scores += bias_tensors
-                return scores
+                return scores + bias_tensors
 
         return BatchLogitsProcessor()
 
@@ -84,7 +83,7 @@ class GenerateBatch:
         }
 
 class TokenStreamer:
-    def __init__(self, batch: GenerateBatch, eos_token_id, top_logprobs=5):
+    def __init__(self, batch: GenerateBatch, eos_token_id, top_logprobs=1):
         self.batch = batch
         self.top_logprobs = top_logprobs
         self.eos_token_id = eos_token_id
@@ -156,7 +155,7 @@ class Scheduler:
 
     def worker(self):
         print("[Loading ", self.model_identifier, "]", flush=True, sep="")
-        model = AutoModelForCausalLM.from_pretrained(self.model_identifier)
+        model = AutoModelForCausalLM.from_pretrained(self.model_identifier, device_map="auto")
 
         while True:
             if self.kill_event.is_set():
@@ -168,7 +167,9 @@ class Scheduler:
                 try:
                     b = GenerateBatch.from_calls(batch)
                     streamer = TokenStreamer(b, model.config.eos_token_id)
-                    result = model.generate(**b.generate_args(), stopping_criteria=[streamer], eos_token_id=eos_token, pad_token_id=eos_token)
+                    kwargs = b.generate_args()
+                    kwargs["input_ids"] = kwargs["input_ids"].to(model.device)
+                    result = model.generate(**kwargs, stopping_criteria=[streamer], eos_token_id=eos_token, pad_token_id=eos_token)
                     streamer.log_token(result.sequences, result.scores, last=True)
                 except Exception as e:
                     print("[Error during generate()]", e, flush=True)
@@ -277,11 +278,11 @@ class LMTPWebSocketTransport:
         while True:
             try:
                 batch = [await self.queue.get()]
-                while len(batch) < 4:
-                    try:
-                        batch.append(await asyncio.wait_for(self.queue.get(), timeout=0.1))
-                    except asyncio.TimeoutError:
-                        break
+                # while len(batch) < 1:
+                #     try:
+                #         batch.append(await asyncio.wait_for(self.queue.get(), timeout=0.1))
+                #     except asyncio.TimeoutError:
+                #         break
                 if len(batch) > 0:
                     await self.ws.send_str("TOKEN" + " " + json.dumps(batch))
             except asyncio.CancelledError:

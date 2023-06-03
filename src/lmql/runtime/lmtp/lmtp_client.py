@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import json
 import sys
+import time
 
 from .lmtp_server import TokenSession
 
@@ -22,6 +23,8 @@ class LMTPWebSocketClient:
             "prompt": prompt,
             "stream_id": self.stream_id
         }
+        if payload.get("logit_bias", None) is None:
+            payload.pop("logit_bias", None)
         await self.ws.send_str("GENERATE {}".format(json.dumps(payload)))
 
         async for token in self.stream_iterator(self.stream_id):
