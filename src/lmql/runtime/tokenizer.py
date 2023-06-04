@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from lmql.runtime.caching import cache_file_exists, cachefile
 
 from lmql.runtime.tokenizers.pure_python_tokenizer import PythonBackedTokenizer
@@ -52,29 +53,35 @@ class LMQLTokenizer:
             else:
                 tokens += self.tokenizer_impl.tokenize(s)
         return tokens
-        
+    
+    def decode_bytes(self, input_ids):
+        # use overriding
+        if hasattr(self.tokenizer_impl, "decode_tokens_bytes"):
+            return self.tokenizer_impl.decode_tokens_bytes(input_ids)
+        text = self.decode(input_ids)
+        offsets = self.tokenizer_impl(text, return_offsets_mapping=True)["offset_mapping"]
+        results = []
+        last_offset = -1
+        for start, end in offsets:
+            start = max(start, last_offset)
+            text_as_bytes = text[:end].encode("utf-8")
+            leading_text = text[:start].encode("utf-8")
+            byte_text = text_as_bytes[len(leading_text):]
+            if len(results) > 0 and results[-1] == byte_text:
+                results[-1] = b""
+            results.append(byte_text)
+            last_offset = end
+        return results
+        # return [t.encode("utf-8") for t in self.tokenizer_impl.convert_ids_to_tokens(input_ids)]
+
+    def encode_bytes(self, token_bytes):
+        # return self.tokenizer_impl.convert_tokens_to_string([t.decode("utf-8") for t in token_bytes])
+        # return self.convert_tokens_to_string([t.decode("utf-8") for t in token_bytes])
+        return b"".join(token_bytes).decode("utf-8")
+
     def decode(self, input_ids):
-        key = str(input_ids)
-        n = len(input_ids)
-        if n in self.detokenizer_cache.keys():
-            if key in self.detokenizer_cache[n].keys():
-                # print("cache hit")
-                return self.detokenizer_cache[n][key]
-        if n-1 in self.detokenizer_cache.keys():
-            key = str(input_ids[:-1])
-            if key in self.detokenizer_cache[n-1].keys():
-                global reverse_special_token_mappings
-                # print("secondary cache hit")
-                if input_ids[-1] >= self.vocab_size:
-                    extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
-                else:
-                    extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]], clean_up_tokenization_spaces=False)
-                    if self.INVALID_CHARACTER in extended:
-                        return self.detokenizer_cache[n-1][key]
-                if not n in self.detokenizer_cache.keys():
-                    self.detokenizer_cache[n] = {}
-                self.detokenizer_cache[n][str(input_ids)] = extended
-                return extended
+        if len(input_ids) > 0 and type(input_ids[0]) is np.bytes_:
+            return b''.join(input_ids).decode("utf-8", errors="replace")
 
         s = ""
         for chunk in self.chunk_out_by_special_ids(input_ids):
@@ -82,10 +89,6 @@ class LMQLTokenizer:
                 s += chunk
             else:
                 s += self.tokenizer_impl.decode(chunk, clean_up_tokenization_spaces=False)
-
-        if not n in self.detokenizer_cache.keys():
-            self.detokenizer_cache[n] = {}
-        self.detokenizer_cache[n][key] = s
 
         return s
 

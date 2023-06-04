@@ -66,22 +66,10 @@ def tokenize(text):
     global tokenizer
     if tokenizer is None:
         tokenizer = load_tokenizer("gpt2")
-    return tokenizer(text)["input_ids"]
-
-def detokenize(input_ids):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = load_tokenizer("gpt2")
-        
-    while len(input_ids) > 0 and input_ids[0] == tokenizer.bos_token_id:
-        input_ids = input_ids[1:]
-    while len(input_ids) > 0 and input_ids[-1] == tokenizer.eos_token_id:
-        input_ids = input_ids[:-1]
-        
-    if len(input_ids) == 0:
-        return ""
-        
-    return tokenizer.decode(input_ids)
+    ids = tokenizer(text)["input_ids"]
+    raw = tokenizer.decode_bytes(ids)
+    raw = [str(t)[2:-1] for t in raw]
+    return [t if not "\\x" in t else "bytes:" + t for t in raw]
 
 def tagged_segments(s):
     import re
@@ -138,30 +126,27 @@ async def chat_api(**kwargs):
     max_tokens = kwargs.get("max_tokens", 0)
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
-    
-    # transform prompt into chat API format
-    prompt_ids = kwargs["prompt"]
-    kwargs["prompt"] = [detokenize(p) for p in kwargs["prompt"]]
+    prompt_tokens = tokenize(kwargs["prompt"][0])
 
     timeout = kwargs.pop("timeout", 1.5)
     
     echo = kwargs.pop("echo")
-    
+
     if echo:
         data = {
             "choices": [
                 {
-                    "text": p,
-                    "index": i,
+                    "text": kwargs["prompt"][0],
+                    "index": 0,
                     "finish_reason": None,
                     "logprobs": {
                         "text_offset": [0 for t in prompt_tokens],
                         "token_logprobs": [0.0 for t in prompt_tokens],
-                        "tokens": [[t] for t in prompt_tokens],
+                        "tokens": prompt_tokens,
                         "top_logprobs": [{t: 0.0} for t in prompt_tokens]
                     }
                 }
-             for i,(p,prompt_tokens) in enumerate(zip(kwargs["prompt"], prompt_ids)) ]
+            ]
         }
         yield data
     
@@ -288,7 +273,6 @@ async def chat_api(**kwargs):
                                 text = delta["content"]
                                 tokens = tokenize((" " if received_text == "" else "") + text)
                                 received_text += text
-                                # print([text], [received_text])
                                 
                                 choices.append({
                                     "text": text,
@@ -297,7 +281,7 @@ async def chat_api(**kwargs):
                                     "logprobs": {
                                         "text_offset": [0 for _ in range(len(tokens))],
                                         "token_logprobs": [0.0 for _ in range(len(tokens))],
-                                        "tokens": [[t] for t in tokens],
+                                        "tokens": tokens,
                                         "top_logprobs": [{t: 0.0} for t in tokens]
                                     }
                                 })

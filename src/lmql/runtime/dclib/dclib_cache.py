@@ -109,7 +109,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
             return self.base_key(ids.input_ids)
-        return str(ids[self.input_id_key_offset:])
+        return str(ids)
 
     async def get_mask(self, s: DecoderSequence, **kwargs):
         if s.id in self.mask_cache:
@@ -382,9 +382,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         sq, tokens, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
         self.save_cached(sq.input_ids, tokens, scores, user_data)
         
-    def save_cached(self, ids: List[int], tokens, scores, user_data):
+    def save_cached(self, ids: List[bytes], tokens, scores, user_data):
         # add cache entries along pre-scored trajectory
         for tok, score in zip(tokens, scores):
+            print(ids, tok, score)
             value = (np.array(tok).reshape(1), np.array(score).reshape(1))
             self.set_cache([(self.base_key(ids, user_data), str(int(tok)))], value)
             ids = np.append(ids, tok)
@@ -534,10 +535,12 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                         for token, score, edge_type in reversed(list(zip(tokens, scores, edge_types))):
                             assert type(edge_type) is str or edge_type is None, "edge_types is {}".format(edge_types)
                             
+
                             if ids is None:
                                 ids = s.input_ids
                                 keys = await self.get_keys(s, edge_type, **self.model_args)
                                 sq = s
+                            
                             token_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
                             token_keys += [(self.base_key(ids), str(token))]
                             # filter out keys with edge_type=None
