@@ -35,7 +35,9 @@ class LMTPThreadingTransport:
 
 class LMTPThreadedClient:
     """
-    Allows use of a LMTP TokenSession from within the same process (model runs in the same process too).
+    Allows use of a LMTP TokenSession where the server is running in a separate thread.
+
+    Note: Currently this implementation has threading issues with LMQL and should not be used.
     """
 
     def __init__(self, model_identifier):

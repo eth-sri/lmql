@@ -18,6 +18,7 @@ class ConditionalDistributionPostprocessor:
         dcmodel.log_queries(sum(len(ids) + 1 for ids in value_ids))
 
         value_scores = []
+
         scoring_results = await dcmodel.score([prompt_seq] * len(value_ids), value_ids)
         for s, value in zip(scoring_results, value_ids):
             s = s.expand()

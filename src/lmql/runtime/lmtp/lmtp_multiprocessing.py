@@ -90,6 +90,21 @@ class LMTPMultiProcessingClient:
         async for token in self.stream_iterator(self.stream_id):
             yield token
 
+    async def score(self, prompt, scored_prompt, **kwargs):
+        self.stream_id += 1
+        payload = {
+            **kwargs,
+            "model": self.model_identifier,
+            "prompt": prompt,
+            "scored": scored_prompt,
+            "stream_id": self.stream_id
+        }
+
+        self.connection.send(("SCORE", payload))
+
+        async for token in self.stream_iterator(self.stream_id):
+            yield token
+
     async def stream_iterator(self, stream_id):
         q = asyncio.Queue()
         self.iterators.setdefault(stream_id, []).append(q)

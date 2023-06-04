@@ -514,6 +514,10 @@ export function DecoderGraph(props) {
                 })
 
                 function strLabel(label) {
+                    // unpack arrays
+                    if (Array.isArray(label)) {
+                        return label.map(strLabel).join(", ")
+                    }
                     if (label.startsWith("bytes:")) {
                         label = label.substring(6)
                         return label

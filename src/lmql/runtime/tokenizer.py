@@ -45,43 +45,62 @@ class LMQLTokenizer:
     def convert_tokens_to_string(self, tokens):
         return self.tokenizer_impl.convert_tokens_to_string(tokens)
 
-    def tokenize(self, s):
+    def tokenize(self, s, asbytes=False):
         tokens = []
         for s in self.chunk_out_by_tags(s, tokenize=False):
             if s.startswith("lmql:"):
                 tokens.append(s)
             else:
                 tokens += self.tokenizer_impl.tokenize(s)
+
+        if asbytes:
+            return [t.encode("utf-8") for t in tokens]
         return tokens
     
     def decode_bytes(self, input_ids):
+        """
+        Transforms a list of input ids into a byte sequences.
+        """
         # use overriding
         if hasattr(self.tokenizer_impl, "decode_tokens_bytes"):
             return self.tokenizer_impl.decode_tokens_bytes(input_ids)
-        text = self.decode(input_ids)
-        offsets = self.tokenizer_impl(text, return_offsets_mapping=True)["offset_mapping"]
-        results = []
-        last_offset = -1
-        for start, end in offsets:
-            start = max(start, last_offset)
-            text_as_bytes = text[:end].encode("utf-8")
-            leading_text = text[:start].encode("utf-8")
-            byte_text = text_as_bytes[len(leading_text):]
-            if len(results) > 0 and results[-1] == byte_text:
-                results[-1] = b""
-            results.append(byte_text)
-            last_offset = end
-        return results
-        # return [t.encode("utf-8") for t in self.tokenizer_impl.convert_ids_to_tokens(input_ids)]
+        
+        # text = self.decode(input_ids)
+        # offsets = self.tokenizer_impl(text, return_offsets_mapping=True)["offset_mapping"]
+        # results = []
+        # last_offset = -1
+        # for start, end in offsets:
+        #     start = max(start, last_offset)
+        #     text_as_bytes = text[:end].encode("utf-8")
+        #     leading_text = text[:start].encode("utf-8")
+        #     byte_text = text_as_bytes[len(leading_text):]
+        #     if len(results) > 0 and results[-1] == byte_text:
+        #         results[-1] = b""
+        #     results.append(byte_text)
+        #     last_offset = end
+        # return results
+        return [t.encode("utf-8") for t in self.tokenizer_impl.convert_ids_to_tokens(input_ids)]
 
-    def encode_bytes(self, token_bytes):
-        # return self.tokenizer_impl.convert_tokens_to_string([t.decode("utf-8") for t in token_bytes])
-        # return self.convert_tokens_to_string([t.decode("utf-8") for t in token_bytes])
-        return b"".join(token_bytes).decode("utf-8")
+    def convert_bytes_to_ids(self, token_bytes):
+        """
+        Transforms text into a tokenized byte sequence.
+        """
+        if hasattr(self.tokenizer_impl, "convert_token_bytes_to_ids"):
+            return self.tokenizer_impl.convert_token_bytes_to_ids(token_bytes)
+        return self.tokenizer_impl.convert_tokens_to_ids([t.decode("utf-8") for t in token_bytes])
+
+    def convert_bytes_to_string(self, token_bytes):
+        """
+        Transforms token bytes into a text.
+        """
+        if hasattr(self.tokenizer_impl, "bytes_can_concat") and self.tokenizer_impl.bytes_can_concat:
+            return b"".join(token_bytes).decode("utf-8", errors="ignore")
+
+        return self.tokenizer_impl.convert_tokens_to_string([t.decode("utf-8") for t in token_bytes])
 
     def decode(self, input_ids):
         if len(input_ids) > 0 and type(input_ids[0]) is np.bytes_:
-            return b''.join(input_ids).decode("utf-8", errors="replace")
+            return self.convert_bytes_to_string(input_ids)
 
         s = ""
         for chunk in self.chunk_out_by_special_ids(input_ids):

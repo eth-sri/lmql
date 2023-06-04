@@ -10,6 +10,7 @@ import numpy as np
 import aiohttp
 import lmql.utils.nputil as nputil
 import lmql.runtime.masks as masks
+from lmql.runtime.token_distribution import TokenDistribution
 
 from typing import List, Union
 
@@ -75,6 +76,8 @@ class LMTPModel(DcModel):
             scores = [payload["logprob"]] + scores
             edge_type = [sampling_mode] + edge_type
 
+        tokens = self.tokenizer.decode_bytes(tokens)
+
         return (s, tokens, scores, edge_type, {})
 
     async def stream_and_return_first(self, s, iterator, sampling_mode):
@@ -139,7 +142,9 @@ class LMTPModel(DcModel):
     async def singleton_result(self, token, score):
         yield {"token": token, "logprob": score, "top_logprobs": {token: score}}
 
-    async def generate(self, s, temperature, **kwargs):
+    async def generate(self, s, temperature, top_logprobs = 1, chunk_size=None, **kwargs):
+        if chunk_size is None:
+            chunk_size = self.model.chunk_size
         kwargs = {**self.model_args, **kwargs}
 
         constrained_seqs = np.array([s.is_query_constrained], dtype=np.bool_)
@@ -161,7 +166,9 @@ class LMTPModel(DcModel):
             mask_value = 100 if invert else -100
             mask = {int(idx): mask_value for idx in np.nonzero(masked)[0]}
 
-        return self.client.generate(s.input_ids.tolist(), max_tokens=self.model.chunk_size, temperature=temperature, logit_bias=mask)
+        ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
+
+        return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
 
     async def argmax(self, sequences: dc.DataArray, **kwargs):
         return await self.sample(sequences, temperature=0.0, **kwargs)
@@ -180,6 +187,7 @@ class LMTPModel(DcModel):
             if all(type(s) is dc.DeterministicDecoderSequence for s in seqs) and all(len(s.next_ids) > 0 for s in seqs):
                 next_token_ids = np.array([s.next_ids[0] for s in seqs])
                 next_token_scores = np.array([s.next_logprobs[0] for s in seqs])
+                next_token_ids = np.array([self.tokenizer.decode_bytes([t])[0] for t in next_token_ids])
                 return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=None) for i,s in enumerate(seqs)]
             
             self.model.num_queries += len(seqs)
@@ -189,9 +197,62 @@ class LMTPModel(DcModel):
             next_token_scores = np.array([t['logprob'] for t in tokens], dtype=np.float32)
             next_logits = np.array([self.make_logits(t) for t in tokens], dtype=np.float32)
 
-            return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=next_logits[i]) for i,s in enumerate(seqs)]
+            next_tokens = np.array([self.tokenizer.decode_bytes([t])[0] for t in next_token_ids])
+
+            return [s.make_successors(next_tokens[i].reshape(1), next_token_scores[i], logits=next_logits[i]) for i,s in enumerate(seqs)]
         
         return await sequences.aelement_wise(op_sample)
+
+    async def topk_continuations(self, sequences, k, **kwargs):
+        await self.ensure_connected()
+
+        kwargs = {**self.model_args, **kwargs}
+
+        async def op_topk(seqs, k):
+            if len(seqs) == 0:
+                return []
+
+            if all(type(s) is dc.DeterministicDecoderSequence for s in seqs) and all(len(s.next_ids) > 0 for s in seqs):
+                next_token_ids = np.array([s.next_ids[0] for s in seqs])
+                next_token_scores = np.array([s.next_logprobs[0] for s in seqs])
+                next_token_ids = np.array([self.tokenizer.decode_bytes([t])[0] for t in next_token_ids])
+                return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=None) for i,s in enumerate(seqs)]
+
+            self.model.num_queries += len(seqs)
+            result = await asyncio.gather(*[self.stream_and_return_first(s, await self.generate(s, temperature=0.0, top_logprobs=k, chunk_size=None if k == 1 else 1, **kwargs), "top-1") for s in seqs])
+
+            logits = []
+            next_token_ids = []
+            next_token_scores = []
+
+            for i, s in enumerate(seqs):
+                # prepare distribution
+                distribution = TokenDistribution()
+                logprob_items = result[i]["top_logprobs"].items()
+                
+                logprobs = [logprob for _, logprob in logprob_items]
+                tokens = [int(token) for token, _ in logprob_items]                
+                chosen_token = result[i]["token"]
+                chosen_logprob = result[i]["logprob"]
+                tokens += [chosen_token]
+                logprobs += [chosen_logprob]
+                
+                tokens = np.array([self.tokenizer.decode_bytes([t])[0] for t in tokens])
+
+                distribution[tokens] = logprobs
+
+                # make sure all token_ids are unique
+                tokens = np.array(list(set(tokens)))
+
+                tokens, logprobs = distribution.topk(k)
+
+                next_token_ids.append(tokens)
+                next_token_scores.append(logprobs)
+                logits.append(distribution)
+
+            return [s.make_successors(next_token_ids[i], next_token_scores[i], logits=logits[i], user_data=None) for i,s in enumerate(seqs)]
+
+        return await sequences.aelement_wise(op_topk, k=k)
 
     def report_stats(self, printer, decoder_step=None):
         if printer is None:
@@ -210,9 +271,25 @@ class LMTPModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens, noscore=False):
         if noscore:
             return np.zeros(len(next_tokens), dtype=np.float32)
-        return (await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids)))
+        
+        scores = []
+        i = 0
+        
+        ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
+        next_tokens = self.tokenizer.convert_bytes_to_ids(next_tokens)
+
+        async for token in self.client.score(ids, next_tokens):
+            t = next_tokens[i]
+            assert token["token"] == t, "Expected token {}, got {}".format(t, token["token"])
+            scores.append(token["logprob"])
+            i += 1
+        assert len(scores) == len(next_tokens), "Expected {} scores, got {}".format(len(next_tokens), len(scores))
+        
+        return np.array(scores, dtype=np.float32)
     
     async def score(self, sqs: List[dc.DecoderSequence], tokens: List[List[int]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
+        await self.ensure_connected()
+        
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
 
         def make_detseq(s, token_score, completion):
@@ -248,7 +325,7 @@ class LMTPModel(DcModel):
     async def score_tokens(self, sqs: List[dc.DecoderSequence], tokens: List[List[int]], max_batch_size=None, noscore=False):
         completion = [np.array(cont) for cont in tokens]
 
-        for s, tokens,scores in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
+        for s, tokens, scores in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
             yield (s, tokens, scores)
 
 def lmtp_model(model_identifier, inprocess=False, endpoint=None):
@@ -277,7 +354,7 @@ def lmtp_model(model_identifier, inprocess=False, endpoint=None):
             return LMTPModel(self, self.get_tokenizer(), inprocess=inprocess, endpoint=endpoint, **self.decoder_args)
 
         async def tokenize(self, text):
-            return self.get_tokenizer()(text)["input_ids"]
+            return self.get_tokenizer().tokenize(text, asbytes=True)
         
         async def detokenize(self, input_ids):
             return self.get_tokenizer().decode(input_ids)

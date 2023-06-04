@@ -152,7 +152,7 @@ class LMQLQueryFunction(LMQLChainMixIn):
                 results = await postprocessor.process(results, self.output_writer)
         
         interpreter.print_stats()
-        interpreter.dcmodel.save()
+        interpreter.dcmodel.close()
 
         return results
 

@@ -89,15 +89,6 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         return mc
     
     def close(self):
-        self.model.cache_delegate = None
-        for ts in self.token_streams:
-            ts.cancel()
-        self.token_streams = []
-
-        if hasattr(self.delegate, "close"):
-            self.delegate.close()
-
-    def save(self):
         if self.cache_file is not None:
             cf = CacheFile(self.cache_file, self.initial_ids, self.delegate.model_identifier)
             try:
@@ -105,6 +96,14 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             except Exception as e:
                 print("error: failed to save token cache to file", e, flush=True)
                 pass
+
+        self.model.cache_delegate = None
+        for ts in self.token_streams:
+            ts.cancel()
+        self.token_streams = []
+
+        if hasattr(self.delegate, "close"):
+            self.delegate.close()
     
     def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
@@ -387,7 +386,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         for tok, score in zip(tokens, scores):
             print(ids, tok, score)
             value = (np.array(tok).reshape(1), np.array(score).reshape(1))
-            self.set_cache([(self.base_key(ids, user_data), str(int(tok)))], value)
+            self.set_cache([(self.base_key(ids, user_data), tok)], value)
             ids = np.append(ids, tok)
 
     # async def prescore(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, 

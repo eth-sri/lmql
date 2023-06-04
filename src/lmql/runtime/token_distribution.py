@@ -1,5 +1,5 @@
 import lmql.utils.nputil as nputil
-import random
+import numpy as np
 
 class TokenDistribution:
     """
@@ -25,6 +25,8 @@ class TokenDistribution:
             self.probs[k] = v
 
     def broadcast(self, a, b):
+        if len(a) == len(b):
+            return a, b
         if len(a) == 1:
             return [a[0] for _ in range(len(b))], b
         elif len(b) == 1:
@@ -55,3 +57,17 @@ class TokenDistribution:
             tokens (list): List of tokens to get logprobs for.
         """
         return [self.probs[t] for t in tokens]
+
+    def topk(self, k=1):
+        """
+        Returns the top-k tokens and their logprobs.
+        """
+        items = list(self.probs.items())
+        keys = [k for k, v in items]
+        logprobs = np.array([v for k, v in items])
+        
+        k = min(k, len(logprobs))
+        
+        scores, key_ids = nputil.topk(logprobs, k=k)
+
+        return [keys[i] for i in key_ids], scores

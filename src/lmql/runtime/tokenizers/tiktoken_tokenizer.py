@@ -13,6 +13,8 @@ class TiktokenTokenizer:
         self.model_identifier = model_identifier
         self.enc = tiktoken.encoding_for_model(model_identifier)
 
+        self.bytes_can_concat = True
+
         self.vocab = {self.enc.decode([i]): i for i in range(self.enc.max_token_value)}
         self.stats = Stats("tiktoken")
 
@@ -58,6 +60,10 @@ class TiktokenTokenizer:
 
     def decode(self, ids, clean_up_tokenization_spaces=True):
         return self.enc.decode(ids)
+    
+    def convert_token_bytes_to_ids(self, tokens):
+        tokens = [self.enc.encode(t.decode("utf-8", "ignore"), allowed_special={"<|endoftext|>"}) for t in tokens]
+        return [t[0] for t in tokens if len(t) > 0]
 
     def __call__(self, text_or_list, add_special_tokens=False):
         if isinstance(text_or_list, str):

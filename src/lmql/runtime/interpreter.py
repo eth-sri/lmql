@@ -320,7 +320,7 @@ class PromptInterpreter:
         # check for tail and prescore
         if hasattr(self.dcmodel, "prescore_tokens"):
             if has_tail(mask):
-                tail_tokenized = self.tokenizer(mask.tail)["input_ids"]
+                tail_tokenized = self.tokenizer.tokenize(mask.tail, asbytes=True)
                 await self.dcmodel.prescore_tokens(s, tail_tokenized, noscore=kwargs.get("noscore", False))
         
         return logit_mask, state
@@ -682,7 +682,9 @@ class PromptInterpreter:
         prompt_ids = await self.tokenize(self.root_state.prompt)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
-        n = 1
+        
+        prompt = self.tokenizer.tokenize(self.root_state.prompt, asbytes=True)
+        n = len(prompt)
         
         # make sure that the initial prompt is not considered part of a variable
         self.root_state = self.root_state.updated(variable_offset=n)
@@ -761,7 +763,7 @@ class PromptInterpreter:
             self.decoder_step = 0
             average_step_time = None
             start = time.time()
-            async for _ in decoder_fct([self.root_state.prompt.encode("utf-8")], **decoder_args):
+            async for _ in decoder_fct(prompt, **decoder_args):
                 await debug_out(self.decoder_step)
                 self.decoder_step += 1
 
@@ -818,12 +820,6 @@ class PromptInterpreter:
             self.decoder_step += 1
 
             return results
-        finally:
-            # make sure token cache is saved if possible
-            self.dcmodel.save()
-
-            if hasattr(self.dcmodel, "close"):
-                self.dcmodel.close()
 
     def validate_args(self, decoder_args, decoder_fct):
         INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", 

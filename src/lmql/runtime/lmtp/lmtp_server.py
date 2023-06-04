@@ -8,6 +8,7 @@ import threading
 import time
 import torch
 import atexit
+from typing import Optional, Tuple
 
 from transformers import AutoModelForCausalLM
 
@@ -23,6 +24,8 @@ class GenerateCall:
         self.result_queue.put(token)
 
     def generation_mode(self):
+        is_score = self.kwargs.get("score", False)
+        if is_score: return "score"
         # string that describes the generation mode for this call (same string = can run in batch)
         return f"{self.kwargs.get('temperature', 0.0)}"
 
@@ -36,6 +39,9 @@ class GenerateBatch:
     logit_biases: list
 
     calls: list
+
+    is_score: bool = False
+    scoring_offsets: list = None
     
     @classmethod
     def from_calls(cls, calls):
@@ -47,7 +53,19 @@ class GenerateBatch:
         temperature = calls[0].kwargs.get("temperature", 0.0)
         max_tokens = max(c.kwargs.get("max_tokens", 32) for c in calls)
         logit_biases = [c.logit_bias or {} for c in calls]
-        return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls)
+        
+        is_score = any(c.kwargs.get("score", False) for c in calls)
+        assert not is_score or all(c.kwargs.get("score", False) for c in calls), "cannot mix score and non-score calls in batch"
+        
+        if is_score:
+            scoring_offsets = []
+            for i, c in enumerate(calls):
+                padding = max_len - len(c.prompt)
+                scoring_offsets.append(c.kwargs.get("scoring_offset", 0) + padding)
+        else:
+            scoring_offsets = None
+
+        return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets)
 
     def logits_processor(self):
         bias_tensors = None
@@ -80,13 +98,32 @@ class GenerateBatch:
             "max_new_tokens": self.max_tokens,
             "logits_processor": [self.logits_processor()],
             "output_scores": True,
-            "return_dict_in_generate": True
+            "return_dict_in_generate": True,
+            **({"scoring_offsets": self.scoring_offsets} if self.is_score else {})
         }
 
+class ScoreStreamer:
+    def log_token(self, batch: GenerateBatch, all_scores: torch.FloatTensor, **kwargs):
+        batch_size = all_scores.shape[0]
+        
+        for i in range(batch_size):
+            offset = batch.scoring_offsets[i]
+            scores = all_scores[i][offset:]
+            scored_ids = batch.input_ids[i][offset:]
+            call = batch.calls[i]
+
+            for i, (score, token) in enumerate(zip(scores, scored_ids)):
+                token_payload = {
+                    "token": int(token),
+                    "stream_id": call.stream_id,
+                    "logprob": float(score),
+                    "finish_reason": "stop" if i == len(scores) - 1 else None
+                }
+                call.put(token_payload)
+
 class TokenStreamer:
-    def __init__(self, batch: GenerateBatch, eos_token_id, top_logprobs=1):
+    def __init__(self, batch: GenerateBatch, eos_token_id):
         self.batch = batch
-        self.top_logprobs = top_logprobs
         self.eos_token_id = eos_token_id
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
@@ -99,16 +136,23 @@ class TokenStreamer:
         last_tokens = input_ids[:, -1]
         last_scores = scores[-1]
         
+        max_num_top_logprobs = max([c.kwargs.get("top_logprobs", 1) for c in self.batch.calls])
+
         # for each sample get top logprobs
-        top_logprobs = torch.topk(last_scores, self.top_logprobs, dim=-1, largest=True, sorted=True)
+        top_logprobs = torch.topk(last_scores, max_num_top_logprobs, dim=-1, largest=True, sorted=True)
         for i in range(batch_size):
             logprobs = top_logprobs.values[i]
             tokens = top_logprobs.indices[i]
+            token_score = last_scores[i][last_tokens[i]]
+
+            num_top_logprobs = self.batch.calls[i].kwargs.get("top_logprobs", 1)
+            logprobs = logprobs[:num_top_logprobs]
+            tokens = tokens[:num_top_logprobs]
 
             token_payload = {
                 "token": int(last_tokens[i].item()),
                 "stream_id": self.batch.calls[i].stream_id,
-                "logprob": float(logprobs[0].item()),
+                "logprob": float(token_score.item()),
                 "finish_reason": ("stop" if last_tokens[i].item() == self.eos_token_id else "length" if last else None),
                 "top_logprobs": {
                     int(token.item()): float(logprob.item()) for logprob, token in zip(logprobs, tokens)
@@ -154,6 +198,33 @@ class Scheduler:
             batches_by_mode.setdefault(mode, []).append(c)
         return batches_by_mode.values()
 
+    def score(
+        self,
+        model,
+        input_ids: torch.LongTensor,
+        attention_mask: torch.LongTensor,
+        eos_token_id: Optional[int] = None,
+        **model_kwargs,
+    ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
+        # prepare model inputs
+        model_inputs = model.prepare_inputs_for_generation(input_ids, **model_kwargs, eos_token_id=eos_token_id)
+        model_inputs["attention_mask"] = attention_mask
+
+        token_scores = []
+        
+        outputs = model(
+            **model_inputs,
+            return_dict=True,
+            output_attentions=False,
+            output_hidden_states=False,
+        )
+
+        next_token_logits = outputs.logits[:, -len(input_ids), :]
+        next_token_logits = torch.log_softmax(next_token_logits, dim=-1)
+        token_scores = next_token_logits.gather(-1, input_ids)
+
+        return token_scores
+
     def worker(self):
         print("[Loading ", self.model_identifier, "]", flush=True, sep="")
         model = AutoModelForCausalLM.from_pretrained(self.model_identifier, device_map="auto")
@@ -168,11 +239,21 @@ class Scheduler:
 
                 try:
                     b = GenerateBatch.from_calls(batch)
-                    streamer = TokenStreamer(b, model.config.eos_token_id)
-                    kwargs = b.generate_args()
-                    kwargs["input_ids"] = kwargs["input_ids"].to(model.device)
-                    result = model.generate(**kwargs, stopping_criteria=[streamer], eos_token_id=eos_token, pad_token_id=eos_token)
-                    streamer.log_token(result.sequences, result.scores, last=True)
+                    
+                    if b.is_score:
+                        kwargs = b.generate_args()
+                        input_ids = kwargs["input_ids"].to(model.device)
+                        attention_mask = kwargs["attention_mask"].to(model.device)
+                        
+                        scores = self.score(model, input_ids, attention_mask, eos_token_id=eos_token)
+                        ScoreStreamer().log_token(b, scores)
+                    else:
+                        streamer = TokenStreamer(b, model.config.eos_token_id)
+                        kwargs = b.generate_args()
+                        kwargs["input_ids"] = kwargs["input_ids"].to(model.device)
+                        kwargs["attention_mask"] = kwargs["attention_mask"].to(model.device)
+                        result = model.generate(**kwargs, stopping_criteria=[streamer], eos_token_id=eos_token, pad_token_id=eos_token)
+                        streamer.log_token(result.sequences, result.scores, last=True)
                 except Exception as e:
                     print("[Error during generate()]", e, flush=True)
                     for c in batch:
@@ -234,19 +315,34 @@ class TokenSession:
 
     async def handle(self, cmd, kwargs):
         try:
-            if not cmd == "GENERATE":
-                raise Exception("Unknown command: {}".format(cmd))
-            
-            prompt = kwargs.pop("prompt")
-            stream_id = kwargs.pop("stream_id")
-            logit_bias = kwargs.pop("logit_bias", {})
-            model = kwargs.pop("model")
-            self.used_models.add(model)
+            if cmd == "GENERATE":
+                prompt = kwargs.pop("prompt")
+                stream_id = kwargs.pop("stream_id")
+                logit_bias = kwargs.pop("logit_bias", {})
+                model = kwargs.pop("model")
+                self.used_models.add(model)
 
-            scheduler = Scheduler.instance(model, user=self)
-            scheduler.put(GenerateCall(prompt, logit_bias, kwargs, stream_id, self.token_queue))
+                scheduler = Scheduler.instance(model, user=self)
+                scheduler.put(GenerateCall(prompt, logit_bias, kwargs, stream_id, self.token_queue))
+            elif cmd == "SCORE":
+                prompt = kwargs.pop("prompt")
+                scored = kwargs.pop("scored")
+                model = kwargs.pop("model")
+                stream_id = kwargs.pop("stream_id")
+                self.used_models.add(model)
+                
+                kwargs["score"] = True
+                # full sequence to score
+                full_ids = prompt + scored 
+                # determines the offset from which on the scoring starts in full_ids
+                kwargs["scoring_offset"] = len(prompt)
+
+                scheduler = Scheduler.instance(model, user=self)
+                scheduler.put(GenerateCall(full_ids, {}, kwargs, stream_id, self.token_queue))
+            else:
+                raise Exception("Unknown command: {}".format(cmd))
         except Exception as e:
-            print(e, flush=True)
+            print("Error in lmtp_server.TokenSession.handle", e, flush=True)
 
     async def queue_loop(self):
         try:

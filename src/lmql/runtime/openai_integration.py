@@ -164,7 +164,7 @@ class DclibOpenAiModel(DcModel):
         if input_ids[0] == self.tokenizer.bos_token_id:
             input_ids = input_ids[1:]
 
-        prompt_str = self.tokenizer.encode_bytes(input_ids)
+        prompt_str = self.tokenizer.convert_bytes_to_string(input_ids)
 
         # rstripped_eos = False
         # if prompt_str.endswith("<|endoftext|>"):
@@ -206,7 +206,7 @@ class DclibOpenAiModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens, noscore=False):
         if noscore: return np.zeros(len(next_tokens), dtype=np.float32)
         
-        prompt_str = self.tokenizer.encode_bytes(s.input_ids)
+        prompt_str = self.tokenizer.convert_bytes_to_string(s.input_ids)
         tokenized_input_ids = await self.tokenize(prompt_str)
         print(tokenized_input_ids, [prompt_str], next_tokens, flush=True)
 
@@ -256,7 +256,7 @@ class DclibOpenAiModel(DcModel):
 
         batch_size = 1
         input_ids = completion_call.input_ids.reshape(-1)
-        prompt_str = self.tokenizer.encode_bytes(input_ids)
+        prompt_str = self.tokenizer.convert_bytes_to_string(input_ids)
         tokenized_input_ids = await self.tokenize(prompt_str)
 
         # do not include bos token in prompt for request

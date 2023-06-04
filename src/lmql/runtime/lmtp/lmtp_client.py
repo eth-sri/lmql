@@ -8,7 +8,7 @@ from multiprocessing.connection import Connection
 from .lmtp_server import TokenSession
 
 class LMTPWebSocketClient:
-    def __init__(self, model_identifier, ws):
+    def __init__(self, model_identifier, ws: aiohttp.ClientWebSocketResponse):
         self.ws = ws
         self.stream_id = 0
         self.model_identifier = model_identifier
@@ -27,6 +27,21 @@ class LMTPWebSocketClient:
         if payload.get("logit_bias", None) is None:
             payload.pop("logit_bias", None)
         await self.ws.send_str("GENERATE {}".format(json.dumps(payload)))
+
+        async for token in self.stream_iterator(self.stream_id):
+            yield token
+
+    async def score(self, prompt, scored_prompt, **kwargs):
+        self.stream_id += 1
+        payload = {
+            **kwargs,
+            "model": self.model_identifier,
+            "prompt": prompt,
+            "scored": scored_prompt,
+            "stream_id": self.stream_id
+        }
+
+        await self.ws.send_str("SCORE {}".format(json.dumps(payload)))
 
         async for token in self.stream_iterator(self.stream_id):
             yield token
