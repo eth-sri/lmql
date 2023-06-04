@@ -60,7 +60,7 @@ class ConditionalDistributionPostprocessor:
 
             # print("Computing P({} | {}) for result {}...".format(distribution_variable, result.prompt[:10] + "...", i))
 
-            scores = np.stack([s.sum() for s in scores], axis=0)
+            scores = np.stack([s.mean() for s in scores], axis=0)
             log_probs = nputil.log_softmax(scores)
             probs = np.exp(log_probs)
             
