@@ -983,7 +983,6 @@ class Truncated extends React.Component {
     content = content.replace(/\\t/g, "\t")
 
     /* convert text to char code */
-    console.log("content", content)
     let bytes = []
     for (let i = 0; i < content.length; i++) {
       /* check for \xXX and parse charcode from hex */
@@ -991,6 +990,7 @@ class Truncated extends React.Component {
         if (content[i + 1] == "x") {
           let hex = content.substring(i + 2, i + 4)
           let charCode = parseInt(hex, 16)
+          console.log("found", hex, charCode)
           bytes.push(charCode)
           i += 3
           continue;

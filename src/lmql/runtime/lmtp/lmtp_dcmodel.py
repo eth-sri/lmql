@@ -349,7 +349,7 @@ def lmtp_model(model_identifier, inprocess=False, endpoint=None):
             bos_token_id = self.get_tokenizer().bos_token_id
             eos_token_id = self.get_tokenizer().eos_token_id
 
-            dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
+            dc.set_dclib_tokenizer(self.get_tokenizer())
 
             return LMTPModel(self, self.get_tokenizer(), inprocess=inprocess, endpoint=endpoint, **self.decoder_args)
 

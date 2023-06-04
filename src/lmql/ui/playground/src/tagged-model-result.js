@@ -6,9 +6,6 @@ export function reconstructTaggedModelResult(nodes) {
   function unescapeBytes(s) {
     if (s.length == 1) {
       // unpack array
-      if (Array.isArray(s[0])) {
-        return s[0]
-      }
       if (s[0].startsWith("bytes:")) {
         return [s[0].substring(6)]
       } else {

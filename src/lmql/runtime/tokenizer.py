@@ -1,4 +1,5 @@
 import os
+import pickle
 import numpy as np
 from lmql.runtime.caching import cache_file_exists, cachefile
 
@@ -51,52 +52,27 @@ class LMQLTokenizer:
             if s.startswith("lmql:"):
                 tokens.append(s)
             else:
-                tokens += self.tokenizer_impl.tokenize(s)
+                tokens += self.tokenizer_impl.tokenize(s, asbytes=asbytes)
 
-        if asbytes:
-            return [t.encode("utf-8") for t in tokens]
         return tokens
     
     def decode_bytes(self, input_ids):
         """
         Transforms a list of input ids into a byte sequences.
         """
-        # use overriding
-        if hasattr(self.tokenizer_impl, "decode_tokens_bytes"):
-            return self.tokenizer_impl.decode_tokens_bytes(input_ids)
-        
-        # text = self.decode(input_ids)
-        # offsets = self.tokenizer_impl(text, return_offsets_mapping=True)["offset_mapping"]
-        # results = []
-        # last_offset = -1
-        # for start, end in offsets:
-        #     start = max(start, last_offset)
-        #     text_as_bytes = text[:end].encode("utf-8")
-        #     leading_text = text[:start].encode("utf-8")
-        #     byte_text = text_as_bytes[len(leading_text):]
-        #     if len(results) > 0 and results[-1] == byte_text:
-        #         results[-1] = b""
-        #     results.append(byte_text)
-        #     last_offset = end
-        # return results
-        return [t.encode("utf-8") for t in self.tokenizer_impl.convert_ids_to_tokens(input_ids)]
+        return self.tokenizer_impl.decode_tokens_bytes(input_ids)
 
     def convert_bytes_to_ids(self, token_bytes):
         """
         Transforms text into a tokenized byte sequence.
         """
-        if hasattr(self.tokenizer_impl, "convert_token_bytes_to_ids"):
-            return self.tokenizer_impl.convert_token_bytes_to_ids(token_bytes)
-        return self.tokenizer_impl.convert_tokens_to_ids([t.decode("utf-8") for t in token_bytes])
+        return self.tokenizer_impl.convert_token_bytes_to_ids(token_bytes)
 
     def convert_bytes_to_string(self, token_bytes):
         """
         Transforms token bytes into a text.
         """
-        if hasattr(self.tokenizer_impl, "bytes_can_concat") and self.tokenizer_impl.bytes_can_concat:
-            return b"".join(token_bytes).decode("utf-8", errors="ignore")
-
-        return self.tokenizer_impl.convert_tokens_to_string([t.decode("utf-8") for t in token_bytes])
+        return self.tokenizer_impl.convert_bytes_to_string(token_bytes)
 
     def decode(self, input_ids):
         if len(input_ids) > 0 and type(input_ids[0]) is np.bytes_:
@@ -185,12 +161,6 @@ def load_tokenizer_notransformers(model_identifier):
     return PythonBackedTokenizer(model_identifier)
 
 def load_tokenizer(model_identifier, type="auto"):
-    import os
-
-    # first try to load pickled tokenizer from cache (faster)
-    import pickle
-    import pathlib
-
     cache_identifier = model_identifier.replace("/", "-")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
@@ -220,13 +190,15 @@ def load_tokenizer(model_identifier, type="auto"):
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
         import torch
-        from transformers import AutoTokenizer
+        from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
+
+        assert TransformersTokenizer.is_available(model_identifier), "TransformersTokenizer not available. Please make sure the 'transformers' package is installed."
 
         if cache_file_exists(cache_path):
             with cachefile(cache_path, "rb") as f:
                 return LMQLTokenizer(pickle.load(f), model_identifier)
         else:
-            t = AutoTokenizer.from_pretrained(model_identifier)
+            t = TransformersTokenizer(model_identifier)
 
             with cachefile(cache_path, "wb") as f:
                 pickle.dump(t, f)
@@ -243,6 +215,8 @@ def get_vocab(tokenizer):
         return tokenizer.get_vocab()
     elif hasattr(tokenizer, "tokenizer_impl"):
         return get_vocab(tokenizer.tokenizer_impl)
+    elif hasattr(tokenizer, "tokenizer"):
+        return get_vocab(tokenizer.tokenizer)
     else:
         assert False, "Could not obtain full vocabulary from unknown tokenizer type: {}".format(type(tokenizer))
 

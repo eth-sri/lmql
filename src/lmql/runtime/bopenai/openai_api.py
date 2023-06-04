@@ -62,6 +62,13 @@ async def complete(**kwargs):
 global tokenizer
 tokenizer = None
 
+def tokenize_ids(text):
+    global tokenizer
+    if tokenizer is None:
+        tokenizer = load_tokenizer("gpt2")
+    ids = tokenizer(text)["input_ids"]
+    return ids
+
 def tokenize(text):
     global tokenizer
     if tokenizer is None:

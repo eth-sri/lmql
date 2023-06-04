@@ -52,8 +52,13 @@ class TiktokenTokenizer:
     def encode(self, text):
         return self.enc.encode(text, allowed_special={"<|endoftext|>"})
 
-    def tokenize(self, text):
-        return [self.enc.decode([i]) for i in self.enc.encode(text)]
+    def tokenize(self, text, asbytes=False):
+        ids = self.encode(text)
+        tokens = self.enc.decode_tokens_bytes(ids)
+        
+        if asbytes:
+            return tokens
+        return [t.decode("raw-unicode-escape", "backslashreplace") for t in tokens]
 
     def decode_tokens_bytes(self, ids):
         return self.enc.decode_tokens_bytes(ids)
@@ -61,9 +66,12 @@ class TiktokenTokenizer:
     def decode(self, ids, clean_up_tokenization_spaces=True):
         return self.enc.decode(ids)
     
+    def convert_bytes_to_string(self, token_bytes):
+        return b"".join(token_bytes).decode("utf-8", "replace")
+    
     def convert_token_bytes_to_ids(self, tokens):
-        tokens = [self.enc.encode(t.decode("utf-8", "ignore"), allowed_special={"<|endoftext|>"}) for t in tokens]
-        return [t[0] for t in tokens if len(t) > 0]
+        text = self.convert_bytes_to_string(tokens)
+        return self.encode(text)
 
     def __call__(self, text_or_list, add_special_tokens=False):
         if isinstance(text_or_list, str):
@@ -71,9 +79,7 @@ class TiktokenTokenizer:
         else:
             input_ids = [self.encode(text) for text in text_or_list]
 
-        return {
-            "input_ids": input_ids,
-        }
+        return {"input_ids": input_ids}
 
     @property
     def vocab_size(self):

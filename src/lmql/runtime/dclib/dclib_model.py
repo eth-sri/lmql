@@ -473,17 +473,3 @@ def model(model=None, **kwargs) -> DcModel:
         model.model_args = {**model.model_args, **kwargs}
         return model
     return DcModel(model, **kwargs)
-
-def tokenizer(name, tokenize, detokenize, bos_token_id, eos_token_id):
-    class AsyncTokenizer:
-        def __init__(self, eos_token_id, bos_token_id):
-            self.name = name
-            self.eos_token_id = eos_token_id
-            self.bos_token_id = bos_token_id
-        async def __call__(self, text):
-            return await tokenize(text)
-        async def decode(self, tokens):
-            return await detokenize(tokens)
-        async def decode_bytes(self, tokens):
-            return await detokenize(tokens)
-    return AsyncTokenizer(eos_token_id=eos_token_id, bos_token_id=bos_token_id)

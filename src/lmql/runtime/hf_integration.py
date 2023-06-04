@@ -74,7 +74,7 @@ def transformers_model(endpoint, model_identifier):
             return (await t)
 
         def get_dclib_model(self):
-            dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, self.tokenizer.bos_token_id, self.tokenizer.eos_token_id))
+            dc.set_dclib_tokenizer(self.get_tokenizer())
             return dc.DcModel(self.served_model, self.tokenizer)
     
     return TransformersModel

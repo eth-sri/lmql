@@ -16,6 +16,7 @@ from lmql.runtime.dclib.dclib_seq import (DecoderSequence, deepcopy, deepmerge,
                                           detseq, is_deterministic)
 from lmql.runtime.stats import Stats
 from lmql.runtime.tokenizer import load_tokenizer
+from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
 
@@ -114,6 +115,8 @@ class DclibOpenAiModel(DcModel):
 
         self.stats = Stats("openai")
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
+
+        assert type(self.tokenizer.tokenizer_impl) is TiktokenTokenizer, "openai/ models can only be used with TiktokenTokenizer. Please make sure 'tiktoken' is installed."
 
     def log_billable_tokens(self, n: int):
         pass # openai keeps track of billable tokens vai bopenai
@@ -966,7 +969,7 @@ def openai_model(model_identifier, endpoint=None, mock=False):
             bos_token_id = self.get_tokenizer().bos_token_id
             eos_token_id = self.get_tokenizer().eos_token_id
 
-            dc.set_dclib_tokenizer(dc.tokenizer("lmql-adapter-tokenizer", self.tokenize, self.detokenize, bos_token_id, eos_token_id))
+            dc.set_dclib_tokenizer(self.get_tokenizer())
 
             return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **self.decoder_args)
 
