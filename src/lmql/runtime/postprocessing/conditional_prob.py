@@ -11,8 +11,8 @@ class ConditionalDistributionPostprocessor:
         self.output_writer = interpreter.output_writer
 
     async def score(self, prompt: str, values, dcmodel: dc.DcModel):
-        prompt_seq = dc.seq([dcmodel.bos_token_id] + await dcmodel.tokenize(prompt))
-        value_ids = [await dcmodel.tokenize(value) for value in values]
+        prompt_seq = dc.seq(dcmodel.tokenizer.tokenize(prompt, asbytes=True))
+        value_ids = [dcmodel.tokenizer.tokenize(value, asbytes=True) for value in values]
 
         dcmodel.log_billable_tokens(sum(len(ids) + 1 for ids in value_ids) + len(value_ids) * (len(prompt_seq.input_ids)))
         dcmodel.log_queries(sum(len(ids) + 1 for ids in value_ids))

@@ -88,6 +88,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         return mc
     
+    @property
+    def tokenizer(self):
+        return self.delegate.tokenizer
+
     def close(self):
         if self.cache_file is not None:
             cf = CacheFile(self.cache_file, self.initial_ids, self.delegate.model_identifier)
@@ -389,40 +393,6 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             self.set_cache([(self.base_key(ids, user_data), tok)], value)
             ids = np.append(ids, tok)
 
-    # async def prescore(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, 
-    #                 deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, 
-    #                 user_data=None, noscore=False):
-    #     async def op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, user_data, noscore):
-    #         assert len(user_data) == len(tok)
-    #         sq, tok, det, user_data = self.expand_through_cache(sq, tok, det, user_data)
-
-    #         # handle short and fully cached sequences
-    #         if len(tok) == 0:
-    #             return [sq]
-    #         elif len(tok) <= 1 and not noscore:
-    #             return
-
-    #         # do actual scoring with delegate model
-    #         result = await self.delegate.score([sq], [tok], max_batch_size, det, stop_phrase, needs_rewrite, None, noscore, internal=True)
-
-    #         # add initial cache entry
-    #         s = result[0]
-    #         s.user_data = user_data[0]
-    #         c = Continuation(np.array([s.input_ids[-1]]), np.array([s.logprobs[-1]]), [user_data[0]])
-    #         self.set_cache([(self.base_key(sq), str(int(s.input_ids[-1])))], c)
-    #         user_data_offset = 1
-            
-    #         # add additional cache entries for deterministic tokens
-    #         while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
-    #             c = Continuation(np.array([s.next_ids[0]]), np.array([s.next_logprobs[0]]), [user_data[user_data_offset]])
-    #             sq = s
-    #             s = sq.extend(c)
-    #             user_data_offset += 1
-    #             self.set_cache([(self.base_key(sq), str(s.input_ids[-1]))], c)
-        
-    #     assert len(sqs) == len(tokens)
-    #     return await asyncio.gather(*[op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, ud, noscore) for sq, tok, det, ud in zip(sqs, tokens, deterministic, user_data)])
-    
     @property
     def model_args(self):
         return self.delegate.model_args
@@ -533,7 +503,6 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                         
                         for token, score, edge_type in reversed(list(zip(tokens, scores, edge_types))):
                             assert type(edge_type) is str or edge_type is None, "edge_types is {}".format(edge_types)
-                            
 
                             if ids is None:
                                 ids = s.input_ids
@@ -557,13 +526,14 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                                 if edge_type == "top-1":
                                     sq = cs
 
-                            # set future for next token (so get_cache can wait for it if needed)
-                            fut_keys = [(self.base_key(np.append(ids, token)), edge_type, *k[2:]) for k in keys]
-                            waiting_token_keys.append(fut_keys)
-                            # set future for next token (if k is not already set)
-                            fut = asyncio.Future()
-                            unset_keys = [k for k in fut_keys if k not in self.cache]
-                            self.set_cache(unset_keys, (fut, fut))
+                            if edge_type is not None and (edge_type == "top-1" or "top" not in edge_type):
+                                # set future for next token (so get_cache can wait for it if needed)
+                                fut_keys = [(self.base_key(np.append(ids, token)), edge_type, *k[2:]) for k in keys]
+                                waiting_token_keys.append(fut_keys)
+                                # set future for next token (if k is not already set)
+                                fut = asyncio.Future()
+                                unset_keys = [k for k in fut_keys if k not in self.cache]
+                                self.set_cache(unset_keys, (fut, fut))
                         
                         # extend ids
                         ids = np.append(ids, tokens[0])

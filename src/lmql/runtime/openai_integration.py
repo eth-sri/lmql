@@ -211,7 +211,6 @@ class DclibOpenAiModel(DcModel):
         
         prompt_str = self.tokenizer.convert_bytes_to_string(s.input_ids)
         tokenized_input_ids = await self.tokenize(prompt_str)
-        print(tokenized_input_ids, [prompt_str], next_tokens, flush=True)
 
         return await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(tokenized_input_ids))
     
@@ -409,7 +408,7 @@ class DclibOpenAiModel(DcModel):
                         topprobs = res["logprobs"]["top_logprobs"]
                         if topprobs is not None and logprobs > 1:
                             topk_tokens = list(topprobs.items())
-                            topk_tokens = [(tok[0], score) for (tok_str, score), tok in zip(topk_tokens, await self.tokenize_list([s for s,_ in topk_tokens]))]
+                            topk_tokens = [(tok, score) for (tok_str, score), tok in zip(topk_tokens, [s for s,_ in topk_tokens])]
                             topk_tokens += [(tokens[0], scores)]
                             topk_tokens = list(dict.fromkeys(topk_tokens))
                             topk_tokens = sorted(topk_tokens, key=lambda x: x[1], reverse=True)
@@ -434,6 +433,7 @@ class DclibOpenAiModel(DcModel):
                                 continuation.continuation_type: continuation
                             }
                         }
+                        # print("token stream gives", s.input_ids, [tokens], res["logprobs"]["tokens"], edge_type)
 
                         yield (s, tokens, scores, edge_type, user_data)
                     except IndexError:
