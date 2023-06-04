@@ -30,8 +30,6 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
             cmdline_args += f"--{k} {v} "
     cmdline_args += "--subprocess"
 
-    port = kwargs.get("port", 8080)
-
     if cmdline_args in inprocess_models:
         return inprocess_models[cmdline_args]
     

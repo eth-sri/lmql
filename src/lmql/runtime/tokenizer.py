@@ -26,6 +26,10 @@ class LMQLTokenizer:
             assert type(self.tokenizer_impl) is TiktokenTokenizer
 
     @property
+    def name(self):
+        return self.tokenizer_impl.name
+
+    @property
     def vocab_size(self):
         # in LMQL vocab_size is the vocab_range (the highest vocabulary ID + 1)
         # this allows us to use a dense one hot array where no IDs are skipped

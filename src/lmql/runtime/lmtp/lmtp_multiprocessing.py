@@ -37,8 +37,6 @@ class LMTPMultiProcessingClient:
     def __init__(self, model_identifier):
         self.model_identifier = model_identifier
         
-        multiprocessing.set_start_method('spawn')
-
         (c2, c1) = multiprocessing.Pipe(duplex=True)
         self.subprocess = multiprocessing.Process(target=multiprocessing_main, args=(c1,), name="lmtp-model-server", daemon=True)
         self.subprocess.start()
@@ -49,25 +47,37 @@ class LMTPMultiProcessingClient:
         self.iterators = {}
 
         self.poll_task = asyncio.create_task(self.poll_messages())
+        self.poll_running = asyncio.Event()
+
+    def __del__(self):
+        if self.poll_task is not None and self.poll_running.is_set():
+            self.poll_task.cancel()
 
     async def poll_messages(self):
-        while True:
-            if not self.connection.poll():
-                await asyncio.sleep(0.001)
-                continue
-            try:
-                msg = self.connection.recv()
-                if msg is None: continue
-                type, d = msg
-                
-                if type == "TOKEN":
-                    stream_id = d["stream_id"]
-                    consumers = self.iterators.get(stream_id, [])
-                    for q in consumers: q.put_nowait(d)
-            except Exception as e:
-                print("failed to handle msg", e, flush=True)
+        try:
+            self.poll_running.set()
+
+            while True:
+                if not self.connection.poll():
+                    await asyncio.sleep(0.001)
+                    continue
+                try:
+                    msg = self.connection.recv()
+                    if msg is None: continue
+                    type, d = msg
+                    
+                    if type == "TOKEN":
+                        stream_id = d["stream_id"]
+                        consumers = self.iterators.get(stream_id, [])
+                        for q in consumers: q.put_nowait(d)
+                except Exception as e:
+                    print("failed to handle msg", e, flush=True)
+        except asyncio.CancelledError:
+            return
 
     async def close(self):
+        if self.poll_task is not None and self.poll_running.is_set():
+            self.poll_task.cancel()
         for itr_list in self.iterators.values():
             for it in itr_list:
                 it.put_nowait(None)
