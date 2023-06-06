@@ -25,6 +25,7 @@ from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
 from lmql.models.model import model
+from lmql.models.lmtp.lmtp_serve import serve
 
 model_registry = LMQLModelRegistry
 

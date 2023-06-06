@@ -1,7 +1,28 @@
-from .lmtp_server import *
+from .lmtp_inference_server import *
 
-global args
-args = None
+def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, **kwargs):
+    """
+    Serves the provided model as an LMTP/LMQL inference endpoint.
+
+    Args:
+        model_name (str): The model to load or 'auto' if any model should automatically be loaded on client request.
+        host (str, optional): The host to serve the model on. Defaults to "localhost".
+        port (int, optional): The port to serve the model on. Defaults to 8080.
+        cuda (bool, optional): If set, the model will be loaded on the GPU. Defaults to False.
+        dtype (str, optional): What format to load the model weights. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes). Defaults to None.
+        static (bool, optional): If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument. Defaults to False.
+        **kwargs: Any other argument will be passed as a keyword argument to the AutoModelForCausalLM.from_pretrained function.
+
+    """
+    return lmtp_serve_main({
+        "model": model_name,
+        "host": host,
+        "port": port,
+        "cuda": cuda,
+        "dtype": dtype,
+        "static": static,
+        **kwargs
+    })
 
 def rename_model_args(model_args):
     cuda = model_args.pop("cuda", False)
@@ -28,23 +49,23 @@ def lmtp_serve_main(model_args):
     """
 
     # extract explicit arguments
-    host = args.pop("host", "localhost")
-    port = args.pop("port", 8080)
-    model = args.pop("model", None)
-    static = args.pop("static", False)
+    host = model_args.pop("host", "localhost")
+    port = model_args.pop("port", 8080)
+    model = model_args.pop("model", None)
+    static = model_args.pop("static", False)
     
     # check 'auto' vs static
     assert not static or model != "auto", "Cannot use --static mode with model 'auto'. Please specify a specific model."
 
     # all other arguments are model arguments
-    model_args = rename_model_args(args)    
+    model_args = rename_model_args(model_args)    
 
     # stream endpoint
     async def stream(request):
         # bidirectional websocket 
         ws = web.WebSocketResponse()
         await ws.prepare(request)
-        await LMTPWebSocketTransport.listen(ws, model_args)
+        await LMTPWebSocketTransport.listen(ws, model_args, static=static)
 
     if model != "auto":
         Scheduler.instance(model, model_args, user=None)

@@ -1,4 +1,4 @@
-from lmql.models.lmtp.cli import rename_model_args
+from lmql.models.lmtp.lmtp_serve import rename_model_args
 
 class LMQLModel:
     def __init__(self, model_identifier, model=None, **kwargs):
@@ -38,8 +38,13 @@ try:
         Return:
             InProcessServer: An object representing the loaded model, can be passed in the 'from' clause of a query.
         """
+        assert not model_name.startswith("openai/"), "openai/ models cannot be loaded with inprocess=True, they always use the remote API."
+
         # extract/reassign renamed like 'cuda'
         kwargs = rename_model_args(kwargs)
+
+        if "endpoint" in kwargs:
+            print("info: 'endpoint' argument is ignored for inprocess=True/local: models.")
 
         cmdline_args = f"{model_name} "
         for k,v in kwargs.items():
@@ -49,6 +54,7 @@ try:
                 cmdline_args += f"--{k} {v} "
 
         if cmdline_args in inprocess_models:
+            print("info: reusing existing in-process model.")
             model = inprocess_models[cmdline_args]
             return LMQLModel(model_name, model=model)
         
@@ -65,8 +71,11 @@ except:
     def inprocess(*args, **kwargs): raise NotImplementedError("Your installation of LMQL does not support local models via inprocess(). Please make sure you have 'transformers' installed.")
 
 def model(model_identifier, **kwargs):
-    is_inprocess = kwargs.pop("inprocess", False)
-    
+    # handle inprocess models
+    is_inprocess = kwargs.pop("inprocess", False) or model_identifier.startswith("local:")
+    if is_inprocess and model_identifier.startswith("local:"):
+        model_identifier = model_identifier[6:]
+
     if is_inprocess:
         return inprocess(model_identifier, **kwargs)
     else:

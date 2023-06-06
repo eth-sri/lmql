@@ -5,7 +5,8 @@ import sys
 import multiprocessing
 from multiprocessing.connection import Connection
 
-from .lmtp_server import TokenSession
+class LMTPStreamError(Exception):
+    pass
 
 class LMTPWebSocketClient:
     def __init__(self, model_identifier, ws: aiohttp.ClientWebSocketResponse):
@@ -52,6 +53,10 @@ class LMTPWebSocketClient:
         
         while True:
             item = await q.get()
+
+            if item.get("error") is not None:
+                raise LMTPStreamError(item["error"])
+
             if item is None: 
                 break
             if item.get("finish_reason") is not None:
@@ -75,7 +80,7 @@ class LMTPWebSocketClient:
         cmd, args = msg.data.split(" ",1)
         if cmd == "TOKEN":
             data = json.loads(args)
-            
+
             for d in data:
                 stream_id = d["stream_id"]
                 consumers = self.iterators.get(stream_id, [])

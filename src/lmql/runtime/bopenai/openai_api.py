@@ -92,19 +92,27 @@ def tagged_segments(s):
     return segments
 
 
-def get_endpoint_and_headers(**kwargs):
-    model = kwargs["model"]
-    
-    endpoint = kwargs.pop("endpoint", None)
+def get_azure_config(model, api_config):
+    endpoint = api_config.get("endpoint", None)
 
-    # if a custom endpoint is specified, use it
-    if endpoint is not None:
-        if not endpoint.endswith("http"):
-            endpoint = f"http://{endpoint}"
-        return endpoint + "/completions", {
-            "Content-Type": "application/json"
+    # first check endpoint configuration
+    if endpoint is not None and endpoint.startswith("azure:"):
+        endpoint = "https:" + endpoint[6:]
+        env_name = model.upper().replace(".", "_")
+        
+        azure_key = api_config.get("azure_api_key", None)
+        if azure_key is None:
+            assert "AZURE_OPENAI_" + env_name + "_KEY" in os.environ, f"Please set the environment variable AZURE_OPENAI_{env_name}_KEY to your Azure API key, or specify it in code as 'lmql.model(..., azure_api_key=...')"
+            azure_key = os.environ["AZURE_OPENAI_" + env_name + "_KEY"]
+        
+        headers = {
+            "Content-Type": "application/json",
+            "api-key": azure_key,
         }
 
+        return endpoint, headers
+
+    # then check env
     if os.environ.get("OPENAI_API_TYPE", 'openai') == 'azure':
         model_env_name = model.upper().replace(".", "_")
         endpoint = os.environ[f"AZURE_OPENAI_{model_env_name}_ENDPOINT"]
@@ -114,17 +122,35 @@ def get_endpoint_and_headers(**kwargs):
             "api-key": key,
         }
         return endpoint, headers
-    else:
-        from lmql.runtime.openai_secret import openai_secret, openai_org
-        if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
-            endpoint = "https://api.openai.com/v1/chat/completions"
-        else:
-            endpoint = "https://api.openai.com/v1/completions"
-        return endpoint, {
-            "Authorization": f"Bearer {openai_secret}",
-            "Content-Type": "application/json",
-        }
 
+def get_endpoint_and_headers(kwargs):
+    model = kwargs["model"]
+    api_config = kwargs.pop("api_config", {})
+    endpoint = api_config.get("endpoint", None)
+
+    # try to get azure config from endpoint or env
+    azure_config = get_azure_config(model, api_config)
+    if azure_config is not None:
+        return azure_config
+    
+    # otherwise use custom endpoint as plain URL without authorization
+    if endpoint is not None:
+        if not endpoint.endswith("http"):
+            endpoint = f"http://{endpoint}"
+        return endpoint + "/completions", {
+            "Content-Type": "application/json"
+        }
+    
+    # use standard public API config
+    from lmql.runtime.openai_secret import openai_secret, openai_org
+    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
+        endpoint = "https://api.openai.com/v1/chat/completions"
+    else:
+        endpoint = "https://api.openai.com/v1/completions"
+    return endpoint, {
+        "Authorization": f"Bearer {openai_secret}",
+        "Content-Type": "application/json",
+    }
 
 async def chat_api(**kwargs):
     global stream_semaphore
@@ -193,7 +219,7 @@ async def chat_api(**kwargs):
         stream_start = time.time()
         
         async with aiohttp.ClientSession() as session:
-            endpoint, headers = get_endpoint_and_headers(**kwargs)
+            endpoint, headers = get_endpoint_and_headers(kwargs)
             async with session.post(
                     endpoint,
                     headers=headers,
@@ -327,7 +353,7 @@ async def completion_api(**kwargs):
         stream_start = time.time()
         
         async with aiohttp.ClientSession() as session:
-            endpoint, headers = get_endpoint_and_headers(**kwargs)
+            endpoint, headers = get_endpoint_and_headers(kwargs)
             async with session.post(
                     endpoint,
                     headers=headers,

@@ -3,7 +3,7 @@ from lmql.runtime.tokenizer import load_tokenizer
 from .lmtp_client import LMTPWebSocketClient
 from .lmtp_multiprocessing import LMTPMultiProcessingClient
 from .lmtp_threading import LMTPThreadedClient
-from .lmtp_server import Scheduler
+from .lmtp_inference_server import Scheduler
 import lmql.runtime.dclib as dc
 import asyncio
 import numpy as np
@@ -12,10 +12,10 @@ import lmql.utils.nputil as nputil
 import lmql.runtime.masks as masks
 from lmql.runtime.token_distribution import TokenDistribution
 
-from typing import List, Union
+from typing import Any, List, Union
 
 class LMTPModel(DcModel):
-    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, **kwargs):
+    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, **kwargs):
         super().__init__(model, tokenizer, truncation_threshold, init_workers, **kwargs)
 
         self.model.chunk_size = kwargs.get("chunksize", 16)
@@ -28,6 +28,8 @@ class LMTPModel(DcModel):
         self.connected_signal = asyncio.Event()
         # set to termiante self._client_loop
         self.close_signal = asyncio.Event()
+        # error signal
+        self.error_signal = asyncio.Event()
         
         # endpoint in case of remote model
         self.endpoint = endpoint
@@ -37,13 +39,15 @@ class LMTPModel(DcModel):
         self.inprocess = inprocess
         self.lmtp_server_kwargs = lmtp_server_kwargs
         assert self.inprocess or  lmtp_server_kwargs is None, "LMTP server kwargs can only be set when using lmql.inprocess mode"
+        if inprocess:
+            self.inprocess_client_constructor = inprocess_client_constructor or LMTPMultiProcessingClient
 
         # model statistics
         self.requests = 0
         self.tokens = 0
 
     async def inprocess_client_loop(self):
-        self.client = LMTPMultiProcessingClient(self.model.model_identifier, **self.lmtp_server_kwargs)
+        self.client = self.inprocess_client_constructor(self.model.model_identifier, **self.lmtp_server_kwargs)
 
         self.connected_signal.set()
         await self.close_signal.wait()
@@ -51,13 +55,18 @@ class LMTPModel(DcModel):
         self.client = None
 
     async def ws_client_loop(self):
-        async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(self.endpoint) as ws:
-                self.client = LMTPWebSocketClient(self.model.model_identifier, ws)
-                self.client.connect()
-                
-                self.connected_signal.set()
-                await self.close_signal.wait()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.ws_connect(self.endpoint) as ws:
+                    self.client = LMTPWebSocketClient(self.model.model_identifier, ws)
+                    self.client.connect()
+                    
+                    self.connected_signal.set()
+                    await self.close_signal.wait()
+        except Exception as e:
+            print("Failed to communicate with lmtp endpoint: {}".format(self.endpoint), flush=True)
+            self.error_signal.set()
+            self.connected_signal.set()
 
     def make_cache_entry(self, s, payload, sampling_mode):
         scores = {}
@@ -115,12 +124,20 @@ class LMTPModel(DcModel):
         return buffer[0]
 
     async def ensure_connected(self):
+        if self.error_signal.is_set():
+            raise RuntimeError("LMTP client encountered an error")
+
         if self.client is None:
             if not self.inprocess:
                 self._client_loop = asyncio.create_task(self.ws_client_loop())
             else:
                 self._client_loop = asyncio.create_task(self.inprocess_client_loop())
+        
         await self.connected_signal.wait()
+        
+        # double check for errors
+        if self.error_signal.is_set():
+            raise RuntimeError("LMTP client encountered an error")
 
     # on deinit
     def close(self):
@@ -330,46 +347,91 @@ class LMTPModel(DcModel):
         for s, tokens, scores in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
             yield (s, tokens, scores)
 
-def lmtp_model(model_identifier, inprocess=False, endpoint=None, **kwargs):
-    class LMTPModelCls:
-        def __init__(self) -> None:
-            self.model_identifier = model_identifier
-            self.served_model = None
-            self._tokenizer = None
+class lmtp_model:
+    """
+    Factory class for LMTPModelCls client instances.
 
-            self.decoder_args = {}
+    In case of inprocess=True, lmtp_model keeps a reference to the internally instantiated 
+    LMTPMultiProcessingClient to share it between all uses of the resulting LMTPModelCls 
+    across several queries.
+    """
+    def __init__(self, model_identifier, inprocess=False, endpoint=None, **kwargs):
+        self.model_identifier = model_identifier
+        self.tokenizer_identifier = kwargs.pop("tokenizer", self.model_identifier)
 
-            self.num_queries = 0
+        self.inprocess = inprocess
+        self.endpoint = endpoint
+        self.kwargs = kwargs
 
-        def get_tokenizer(self):
-            if self._tokenizer is None:
-                self._tokenizer = load_tokenizer(self.model_identifier)
-            self.served_model = self
-            return self._tokenizer
-
-        def get_dclib_model(self):
-            bos_token_id = self.get_tokenizer().bos_token_id
-            eos_token_id = self.get_tokenizer().eos_token_id
-
-            dc.set_dclib_tokenizer(self.get_tokenizer())
-
-            if inprocess:
-                lmtp_server_kwargs = kwargs
-            else:
-                lmtp_server_kwargs = None
-
-            return LMTPModel(self, self.get_tokenizer(), inprocess=inprocess, endpoint=endpoint, lmtp_server_kwargs=lmtp_server_kwargs, **self.decoder_args)
-
-        async def tokenize(self, text):
-            return self.get_tokenizer().tokenize(text, asbytes=True)
+        self.lmtp_inprocess_client = None
+    
+    # ensures that all inprocess lmtp models instantiated via this class 
+    # share the same underlying LMTPMultiProcessingClient instance
+    # (uses reference counting to ensure that the client is only shut down 
+    # once all LMTPModel instances have closed)
+    def inprocess_client_constructor_factory(self, identifier, **kwargs):
+        assert identifier == self.model_identifier, "Model identifier mismatch: {} vs {}".format(self.model_identifier, identifier)
         
-        async def detokenize(self, input_ids):
-            return self.get_tokenizer().decode(input_ids)
-
-        def sync_tokenize(self, text):
-            return self.get_tokenizer()(text)["input_ids"]
+        if self.lmtp_inprocess_client is None:
+            # ref owned by self
+            self.lmtp_inprocess_client = LMTPMultiProcessingClient(identifier, **kwargs).ref()
+            # ref owned by caller
+            return self.lmtp_inprocess_client.ref()
         
-        def report_metrics(self, metrics):
-            pass
+        # ref owned by caller
+        return self.lmtp_inprocess_client.ref()
 
-    return LMTPModelCls
+    def __del__(self):
+        if self.lmtp_inprocess_client is not None:
+            self.lmtp_inprocess_client.close()
+            # print("closing shared LMTPMultiProcessingClient instance for model {}".format(self.model_identifier), self.lmtp_inprocess_client.refs, flush=True)
+
+    def __call__(self):
+        # reference to factory instance
+        this = self
+
+        class LMTPModelCls:
+            def __init__(self) -> None:
+                self.model_identifier = this.model_identifier
+                self.served_model = None
+                self._tokenizer = None
+
+                self.decoder_args = {}
+
+                self.num_queries = 0
+
+            def get_tokenizer(self):
+                if self._tokenizer is None:
+                    self._tokenizer = load_tokenizer(this.tokenizer_identifier)
+                self.served_model = self
+                return self._tokenizer
+
+            def get_dclib_model(self):
+                bos_token_id = self.get_tokenizer().bos_token_id
+                eos_token_id = self.get_tokenizer().eos_token_id
+
+                dc.set_dclib_tokenizer(self.get_tokenizer())
+
+                inprocess_client_constructor = None
+
+                if this.inprocess:
+                    lmtp_server_kwargs = this.kwargs
+                    inprocess_client_constructor = this.inprocess_client_constructor_factory
+                else:
+                    lmtp_server_kwargs = None
+
+                return LMTPModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, inprocess_client_constructor=inprocess_client_constructor, **self.decoder_args)
+
+            async def tokenize(self, text):
+                return self.get_tokenizer().tokenize(text, asbytes=True)
+            
+            async def detokenize(self, input_ids):
+                return self.get_tokenizer().decode(input_ids)
+
+            def sync_tokenize(self, text):
+                return self.get_tokenizer()(text)["input_ids"]
+            
+            def report_metrics(self, metrics):
+                pass
+
+        return LMTPModelCls()

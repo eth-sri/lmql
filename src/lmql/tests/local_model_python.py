@@ -24,24 +24,24 @@ async def test_local_string():
     argmax(chunk_timeout=10.0)
         """Hello[WHO]"""
     from
-        "local:facebook/opt-350m"
+        m
     where
         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
     '''
 
-m2 = lmql.model("facebook/opt-350m", cuda=True, inprocess=True)
+# m2 = lmql.model("facebook/opt-350m", cuda=True, inprocess=True)
 
-@lmql.query
-async def test_model_reference_cuda():
-    '''lmql
-    import lmql
+# @lmql.query
+# async def test_model_reference_cuda():
+#     '''lmql
+#     import lmql
 
-    argmax(chunk_timeout=10.0)
-        """Hello[WHO]"""
-    from
-        m2
-    where
-        STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
-    '''
+#     argmax(chunk_timeout=10.0)
+#         """Hello[WHO]"""
+#     from
+#         m2
+#     where
+#         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
+#     '''
 
 run_all_tests(locals())

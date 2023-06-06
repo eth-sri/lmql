@@ -14,6 +14,9 @@ from typing import Optional, Tuple
 
 from transformers import AutoModelForCausalLM
 
+class LMTPCannotLoadModelByPolicy(Exception):
+    pass
+
 @dataclass
 class GenerateCall:
     prompt: str
@@ -24,6 +27,12 @@ class GenerateCall:
 
     def put(self, token):
         self.result_queue.put(token)
+
+    def error(self, msg):
+        self.result_queue.put({
+            "stream_id": self.stream_id,
+            "error": msg
+        })
 
     def generation_mode(self):
         is_score = self.kwargs.get("score", False)
@@ -69,9 +78,12 @@ class GenerateBatch:
 
         return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets)
 
-    def logits_processor(self):
+    def logits_processors(self):
         bias_tensors = None
         logit_biases = self.logit_biases
+        
+        if len(logit_biases) == 0:
+            return []
 
         class BatchLogitsProcessor:
             def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
@@ -86,10 +98,10 @@ class GenerateBatch:
                             values = torch.tensor(list(bias.values()), dtype=torch.float32)
                             bias_tensors[i][indices] = values
                     bias_tensors = torch.stack(bias_tensors).to(scores.device)
-                
+
                 return scores + bias_tensors
 
-        return BatchLogitsProcessor()
+        return [BatchLogitsProcessor()]
 
     def generate_args(self):
         return {
@@ -98,7 +110,7 @@ class GenerateBatch:
             "attention_mask": torch.tensor(self.attention_mask),
             "temperature": self.temperature,
             "max_new_tokens": self.max_tokens,
-            "logits_processor": [self.logits_processor()],
+            "logits_processor": self.logits_processors(),
             "output_scores": True,
             "return_dict_in_generate": True,
             **({"scoring_offsets": self.scoring_offsets} if self.is_score else {})
@@ -263,13 +275,16 @@ class Scheduler:
                 except Exception as e:
                     print("[Error during generate()]", e, flush=True)
                     for c in batch:
-                        c.put({"error": str(e)})
+                        c.error("failed to generate tokens '" + str(e) + "'")
+                    raise e
 
     @staticmethod
-    def instance(model_identifier, model_args, user):
+    def instance(model_identifier, model_args, user, only_existing=False):
         identifier = (model_identifier, pickle.dumps(model_args).hex())
 
         if identifier not in Scheduler._instances:
+            if only_existing:
+                raise LMTPCannotLoadModelByPolicy("Model '" + model_identifier + "' is not loaded and server is not configured to load it on demand.")
             Scheduler._instances[identifier] = Scheduler(model_identifier, model_args)
 
         s = Scheduler._instances[identifier]
@@ -308,8 +323,8 @@ class Scheduler:
         
         # total = len(Scheduler._instances)
         
-        if total >= n:
-            print("[Warning] {} models loaded, even though the configured limit is {}.".format(total, n), flush=True)
+        # if total >= n:
+        #     print("[Warning] {} models loaded, even though the configured limit is {}.".format(total, n), flush=True)
             # print("Active Models:")
             # for k, v in Scheduler._instances.items():
             #     print("  ", k, "used by", v.users)
@@ -321,30 +336,33 @@ class TokenSession:
     A LMTP token session, which is a single user generating tokens with a fixed model, 
     using several token streams in parallel and varying sampling configurations.
     """
-    def __init__(self, transport, model_args, longrunning=False):
+    def __init__(self, transport, model_args, static=False, longrunning=False):
         self.transport = transport
         self.token_queue = Queue()
         self.queue_processor = asyncio.create_task(self.queue_loop())
         self.used_models = set()
         self.model_args = model_args
+        self.static = static
 
         self.longrunning = longrunning
 
     async def handle(self, cmd, kwargs):
+        stream_id = kwargs.get("stream_id")
+
         try:
+            model = kwargs.pop("model")
+
             if cmd == "GENERATE":
                 prompt = kwargs.pop("prompt")
                 stream_id = kwargs.pop("stream_id")
                 logit_bias = kwargs.pop("logit_bias", {})
-                model = kwargs.pop("model")
                 self.used_models.add(model)
 
-                scheduler = Scheduler.instance(model, self.model_args, user=self)
+                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
                 scheduler.put(GenerateCall(prompt, logit_bias, kwargs, stream_id, self.token_queue))
             elif cmd == "SCORE":
                 prompt = kwargs.pop("prompt")
                 scored = kwargs.pop("scored")
-                model = kwargs.pop("model")
                 stream_id = kwargs.pop("stream_id")
                 self.used_models.add(model)
                 
@@ -354,12 +372,22 @@ class TokenSession:
                 # determines the offset from which on the scoring starts in full_ids
                 kwargs["scoring_offset"] = len(prompt)
 
-                scheduler = Scheduler.instance(model, self.model_args, user=self)
+                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
                 scheduler.put(GenerateCall(full_ids, {}, kwargs, stream_id, self.token_queue))
             else:
                 raise Exception("Unknown command: {}".format(cmd))
+        except LMTPCannotLoadModelByPolicy as e:
+            print("Client requested model that is not loaded and server is not configured to load it on demand.", flush=True)
+            self.token_queue.put({
+                "stream_id": stream_id,
+                "error": "The requested model is not loaded and the server is not configured to load it on demand."
+            })
         except Exception as e:
             print("Error in lmtp_server.TokenSession.handle", e, flush=True)
+            self.token_queue.put({
+                "stream_id": stream_id,
+                "error": str(e)
+            })        
 
     async def queue_loop(self):
         try:
@@ -379,13 +407,16 @@ class TokenSession:
         self.queue_processor.cancel()
         
         for m in self.used_models:
-            scheduler = Scheduler.instance(m, model_args=self.model_args, user=None)
-            scheduler.unregister(self)
-            
-            if self.longrunning:
-                scheduler.gc()
-            else:
-                Scheduler.gc(0)
+            try:
+                scheduler = Scheduler.instance(m, model_args=self.model_args, user=None, only_existing=self.static)
+                scheduler.unregister(self)
+                
+                if self.longrunning:
+                    scheduler.gc()
+                else:
+                    Scheduler.gc(0)
+            except LMTPCannotLoadModelByPolicy:
+                pass
 
 class LMTPWebSocketTransport:
     """
@@ -416,11 +447,9 @@ class LMTPWebSocketTransport:
         await self.queue.put(payload)
 
     @staticmethod
-    async def listen(ws, model_args):
+    async def listen(ws, model_args, static):
         transport = LMTPWebSocketTransport(ws)
-        session = TokenSession(transport, model_args, longrunning=True)
-
-        print("Session started", id(session), flush=True)
+        session = TokenSession(transport, model_args, static=static, longrunning=True)
 
         try:
             async for msg in ws:
@@ -436,8 +465,6 @@ class LMTPWebSocketTransport:
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
         finally:
-            print("Session ended", id(session), flush=True)
-
             transport._dumper.cancel()
             session.close()
             await ws.close()

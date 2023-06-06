@@ -110,7 +110,7 @@ class DclibOpenAiModel(DcModel):
         self.num_billed_tokens = {}
         self.num_requests = 0
         
-        self.endpoint = endpoint
+        self.api_config = {**({"endpoint": endpoint}  if endpoint is not None else {}), **kwargs}
         self.timeout = kwargs.get("chunk_timeout", 1.5 if not self.mock else 4.5)
 
         self.stats = Stats("openai")
@@ -185,7 +185,7 @@ class DclibOpenAiModel(DcModel):
             "logprobs": 1,
             "user": "lmql",
             "echo": True,
-            **({"endpoint": self.endpoint} if self.endpoint is not None else {}),
+            **({"api_config": self.api_config} if self.api_config is not None else {}),
             **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
@@ -278,7 +278,7 @@ class DclibOpenAiModel(DcModel):
             "user": "lmql",
             "stream": True,
             "echo": True,
-            **({"endpoint": self.endpoint} if self.endpoint is not None else {}),
+            **({"api_config": self.api_config} if self.api_config is not None else {}),
             **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
@@ -945,7 +945,7 @@ class HFModelStatsAdapter:
     def cost_estimate(self, model):
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
-def openai_model(model_identifier, endpoint=None, mock=False):
+def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
     # make sure openai org and secret are available
     if not mock: from lmql.runtime.openai_secret import openai_secret, openai_org
     class OpenAIModel:
@@ -971,7 +971,8 @@ def openai_model(model_identifier, endpoint=None, mock=False):
 
             dc.set_dclib_tokenizer(self.get_tokenizer())
 
-            return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **self.decoder_args)
+            full_args = {**kwargs, **self.decoder_args}
+            return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **full_args)
 
         async def tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]

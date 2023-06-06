@@ -37,6 +37,29 @@ def ensure_picklable(kwargs, msg=""):
         pickle.dumps(kwargs)
     except Exception as e:
         raise AssertionError(msg)
+
+class LMTPMultiProcessingClientRef:
+    def __init__(self, client):
+        self.client = client
+        self.refs = 0
+    
+    # forwarda ttribute access to generate, score
+    def __getattr__(self, name):
+        if name in ["generate", "score"]:
+            return getattr(self.client, name)
+        return super().__getattr__(name)
+
+    async def close(self):
+        assert self.refs > 0, "LMTPMultiProcessingClientRef.close() called too many times"
+        
+        self.refs -= 1
+        if self.refs == 0:
+            await self.client.close()
+
+    def ref(self):
+        self.refs += 1
+        return self
+
 class LMTPMultiProcessingClient:
     """
     Allows use of a LMTP TokenSession from within the same process (model runs in the same process too).
@@ -58,6 +81,9 @@ class LMTPMultiProcessingClient:
 
         self.poll_task = asyncio.create_task(self.poll_messages())
         self.poll_running = asyncio.Event()
+
+    def ref(self):
+        return LMTPMultiProcessingClientRef(self).ref()
 
     def __del__(self):
         if self.poll_task is not None and self.poll_running.is_set():
@@ -134,6 +160,10 @@ class LMTPMultiProcessingClient:
 
             if item is None: 
                 break
+            
+            if item.get("error") is not None:
+                raise LMTPStreamError(item["error"])
+
             if item.get("finish_reason") is not None:
                 yield item
                 break

@@ -35,7 +35,7 @@ def resolve(model_name, endpoint=None, **kwargs):
         from lmql.runtime.openai_integration import openai_model
 
         # hard-code openai/ namespace to be openai-API-based
-        Model = openai_model(model_name[7:])
+        Model = openai_model(model_name[7:], endpoint=endpoint, **kwargs)
         register_model(model_name, Model)
         register_model("*", Model)
     else:
@@ -58,9 +58,9 @@ def resolve(model_name, endpoint=None, **kwargs):
         # determine model name and if we run in-process
         if model_name.startswith("local:"):
             model_name = model_name[6:]
-            Model = model(model_name, inprocess=True, use_existing_configuration=True).model
-        else:
-            Model = lmtp_model(model_name, endpoint=endpoint)
+            kwargs["inprocess"] = True
+        
+        Model = lmtp_model(model_name, endpoint=endpoint, **kwargs)
         
         register_model(model_name, Model)
         return
