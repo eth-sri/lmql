@@ -95,4 +95,4 @@ class TransformersTokenizer:
 
     @property
     def name(self):
-        raise "hf-" + self.model_identifier
+        return "hf-" + self.model_identifier

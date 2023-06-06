@@ -1,7 +1,9 @@
+import sys
 import aiohttp
 from aiohttp import web
 import asyncio
 import json
+import pickle
 from dataclasses import dataclass
 from queue import Queue, Empty as QueueEmpty
 import threading
@@ -168,8 +170,11 @@ class Scheduler:
     Can be shared between multiple clients, make sure to call unregister(<user>) when done,
     to allow the scheduler to shut down when no longer needed by anyone.
     """
-    def __init__(self, model_identifier):
+    def __init__(self, model_identifier, model_args = None):
         self.model_identifier = model_identifier
+        if model_args is None: self.model_args = {}
+        else: self.model_args = model_args
+        
         self.queue = Queue()
         self.kill_event = threading.Event()
         
@@ -226,9 +231,10 @@ class Scheduler:
         return token_scores
 
     def worker(self):
-        print("[Loading ", self.model_identifier, "]", flush=True, sep="")
-        model = AutoModelForCausalLM.from_pretrained(self.model_identifier, device_map="auto")
-        print("Ready", flush=True)
+        print("[Loading", self.model_identifier, "with", f"AutoModelForCausalLM.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+        model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
+
+        print("[", self.model_identifier, " ready on device ", model.device, flush=True, sep="", end="]\n")
 
         while True:
             if self.kill_event.is_set():
@@ -260,25 +266,32 @@ class Scheduler:
                         c.put({"error": str(e)})
 
     @staticmethod
-    def instance(model_identifier, user):
-        if model_identifier not in Scheduler._instances:
-            Scheduler._instances[model_identifier] = Scheduler(model_identifier)
+    def instance(model_identifier, model_args, user):
+        identifier = (model_identifier, pickle.dumps(model_args).hex())
 
-        s = Scheduler._instances[model_identifier]
+        if identifier not in Scheduler._instances:
+            Scheduler._instances[identifier] = Scheduler(model_identifier, model_args)
+
+        s = Scheduler._instances[identifier]
         s.last_use = time.time()
-        s.users.add(user)
+        
+        if user is not None:
+            s.users.add(user)
 
         Scheduler.gc() # unload any unused models
     
         return s
     
     def unregister(self, user):
-        self.users.remove(user)
-        self.last_use = time.time()
+        if user in self.users:
+            self.users.remove(user)
+            self.last_use = time.time()
 
     def dealloc(self):
         print("[Unloading ", self.model_identifier, "]", flush=True, sep="")
-        Scheduler._instances.pop(self.model_identifier)
+        identifier = (self.model_identifier, pickle.dumps(self.model_args).hex())
+        
+        Scheduler._instances.pop(identifier)
         
         self.kill_event.set()
         self.worker_thread.join()
@@ -295,8 +308,11 @@ class Scheduler:
         
         # total = len(Scheduler._instances)
         
-        # if total >= n:
-        #     print("[Warning] {} models loaded, even though the configured limit is {}. Not needed {}".format(total, n, len(not_needed)), flush=True)
+        if total >= n:
+            print("[Warning] {} models loaded, even though the configured limit is {}.".format(total, n), flush=True)
+            # print("Active Models:")
+            # for k, v in Scheduler._instances.items():
+            #     print("  ", k, "used by", v.users)
 
 Scheduler._instances = {}
 
@@ -305,11 +321,12 @@ class TokenSession:
     A LMTP token session, which is a single user generating tokens with a fixed model, 
     using several token streams in parallel and varying sampling configurations.
     """
-    def __init__(self, transport, longrunning=False):
+    def __init__(self, transport, model_args, longrunning=False):
         self.transport = transport
         self.token_queue = Queue()
         self.queue_processor = asyncio.create_task(self.queue_loop())
         self.used_models = set()
+        self.model_args = model_args
 
         self.longrunning = longrunning
 
@@ -322,7 +339,7 @@ class TokenSession:
                 model = kwargs.pop("model")
                 self.used_models.add(model)
 
-                scheduler = Scheduler.instance(model, user=self)
+                scheduler = Scheduler.instance(model, self.model_args, user=self)
                 scheduler.put(GenerateCall(prompt, logit_bias, kwargs, stream_id, self.token_queue))
             elif cmd == "SCORE":
                 prompt = kwargs.pop("prompt")
@@ -337,7 +354,7 @@ class TokenSession:
                 # determines the offset from which on the scoring starts in full_ids
                 kwargs["scoring_offset"] = len(prompt)
 
-                scheduler = Scheduler.instance(model, user=self)
+                scheduler = Scheduler.instance(model, self.model_args, user=self)
                 scheduler.put(GenerateCall(full_ids, {}, kwargs, stream_id, self.token_queue))
             else:
                 raise Exception("Unknown command: {}".format(cmd))
@@ -362,10 +379,9 @@ class TokenSession:
         self.queue_processor.cancel()
         
         for m in self.used_models:
-            if not m in Scheduler._instances:
-                continue
-            scheduler = Scheduler.instance(m, user=self)
+            scheduler = Scheduler.instance(m, model_args=self.model_args, user=None)
             scheduler.unregister(self)
+            
             if self.longrunning:
                 scheduler.gc()
             else:
@@ -400,40 +416,31 @@ class LMTPWebSocketTransport:
         await self.queue.put(payload)
 
     @staticmethod
-    async def listen(ws):
+    async def listen(ws, model_args):
         transport = LMTPWebSocketTransport(ws)
-        session = TokenSession(transport, longrunning=True)
+        session = TokenSession(transport, model_args, longrunning=True)
 
-        async for msg in ws:
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                cmd, kwargs = msg.data.split(" ", 1)
-                
-                kwargs = json.loads(kwargs)
-                logit_bias = kwargs.pop("logit_bias", {})
-                logit_bias = {int(k): float(v) for k, v in logit_bias.items()}
-                kwargs["logit_bias"] = logit_bias
-                
-                await session.handle(cmd, kwargs)
-            elif msg.type == aiohttp.WSMsgType.ERROR:
-                break
+        print("Session started", id(session), flush=True)
 
-        transport._dumper.cancel()
-        session.close()
-        await ws.close()
+        try:
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    cmd, kwargs = msg.data.split(" ", 1)
+                    
+                    kwargs = json.loads(kwargs)
+                    logit_bias = kwargs.pop("logit_bias", {})
+                    logit_bias = {int(k): float(v) for k, v in logit_bias.items()}
+                    kwargs["logit_bias"] = logit_bias
+                    
+                    await session.handle(cmd, kwargs)
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    break
+        finally:
+            print("Session ended", id(session), flush=True)
+
+            transport._dumper.cancel()
+            session.close()
+            await ws.close()
 
     async def close(self):
         await self.ws.close()
-
-async def stream(request):
-    # bidirectional websocket 
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
-    await LMTPWebSocketTransport.listen(ws)
-
-def main():
-    app = web.Application()
-    app.add_routes([web.get('/', stream)])
-    web.run_app(app, host='localhost', port=8080)
-
-if __name__ == "__main__":
-    main()

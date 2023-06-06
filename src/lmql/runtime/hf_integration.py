@@ -1,7 +1,7 @@
 import numpy as np
 import asyncio
 
-from lmql.model.served_model import ServedPretrainedModel
+from lmql.models.served_model import ServedPretrainedModel
 import lmql.runtime.dclib as dc
 from lmql.runtime.tokenizer import load_tokenizer
 

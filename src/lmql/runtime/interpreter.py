@@ -16,6 +16,7 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.runtime.model_registry import LMQLModelRegistry
+from lmql.models.model import LMQLModel
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -192,28 +193,34 @@ class PromptInterpreter:
             LMQLModelRegistry.backend_configuration = kwargs["backend"]
 
     def set_model(self, model_name):
+        model_args = {}
+
         if type(model_name) is not str:
-            # derive model endpoint from model object
-            if hasattr(model_name, "port"):
-                endpoint = "localhost:" + str(model_name.port)
-                if self.decoder_kwargs.get("backend") is not None:
-                    if self.decoder_kwargs["backend"] != endpoint:
-                        print("warning: The provided query specifies a backend at " + self.decoder_kwargs["backend"] + " but the passed model is served at " + 
-                              endpoint + ".", "Using the model's backend instead.")
-                self.decoder_kwargs["backend"] = endpoint
-                LMQLModelRegistry.backend_configuration = endpoint
-            
-            # read the model name from the model object
-            if hasattr(model_name, "model"):
-                model_name = model_name.model
+            assert isinstance(model_name, LMQLModel), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
+            model_object = model_name
+
+            if model_name.model is not None:
+                model_object = model_name.model
+                # if model_object is a type reference, we can use the model_identifier
+                if type(model_object) is type:
+                    model_object = model_object()
+
+                self.model_identifier = model_object.model_identifier
+                self.model = model_object
+
+                # setup the VocabularyMatcher to use the concrete vocabulary of the model
+                VocabularyMatcher.init(self.model.get_tokenizer())
+
+                return
             else:
-                assert False, "LMQL query specifies an invalid model name"
+                model_name = model_object.model_identifier
+                model_args = model_object.kwargs
 
         if self.model is None:
             self.model = model_name
             self.model_identifier = model_name
 
-        client = LMQLModelRegistry.get(self.model)
+        client = LMQLModelRegistry.get(self.model, **model_args)
 
         # setup the VocabularyMatcher to use the concrete vocabulary of the model
         VocabularyMatcher.init(client.get_tokenizer())
@@ -823,7 +830,7 @@ class PromptInterpreter:
 
     def validate_args(self, decoder_args, decoder_fct):
         INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", 
-                         "backend", "chunk_timeout", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", 
+                         "chunk_timeout", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", 
                          "show_speculative", "openai_nonstop", "chunksize"]
 
         # get all arg names and kwarg names of decoder function

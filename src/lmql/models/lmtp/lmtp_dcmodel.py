@@ -15,7 +15,7 @@ from lmql.runtime.token_distribution import TokenDistribution
 from typing import List, Union
 
 class LMTPModel(DcModel):
-    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, **kwargs):
+    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, **kwargs):
         super().__init__(model, tokenizer, truncation_threshold, init_workers, **kwargs)
 
         self.model.chunk_size = kwargs.get("chunksize", 16)
@@ -35,13 +35,15 @@ class LMTPModel(DcModel):
             self.endpoint = "http://" + self.endpoint
 
         self.inprocess = inprocess
+        self.lmtp_server_kwargs = lmtp_server_kwargs
+        assert self.inprocess or  lmtp_server_kwargs is None, "LMTP server kwargs can only be set when using lmql.inprocess mode"
 
         # model statistics
         self.requests = 0
         self.tokens = 0
 
     async def inprocess_client_loop(self):
-        self.client = LMTPMultiProcessingClient(self.model.model_identifier)
+        self.client = LMTPMultiProcessingClient(self.model.model_identifier, **self.lmtp_server_kwargs)
 
         self.connected_signal.set()
         await self.close_signal.wait()
@@ -328,7 +330,7 @@ class LMTPModel(DcModel):
         for s, tokens, scores in zip(sqs, completion, await asyncio.gather(*(self._score_next_tokens(s, compl, noscore=noscore) for s, compl in zip(sqs, completion)))):
             yield (s, tokens, scores)
 
-def lmtp_model(model_identifier, inprocess=False, endpoint=None):
+def lmtp_model(model_identifier, inprocess=False, endpoint=None, **kwargs):
     class LMTPModelCls:
         def __init__(self) -> None:
             self.model_identifier = model_identifier
@@ -351,7 +353,12 @@ def lmtp_model(model_identifier, inprocess=False, endpoint=None):
 
             dc.set_dclib_tokenizer(self.get_tokenizer())
 
-            return LMTPModel(self, self.get_tokenizer(), inprocess=inprocess, endpoint=endpoint, **self.decoder_args)
+            if inprocess:
+                lmtp_server_kwargs = kwargs
+            else:
+                lmtp_server_kwargs = None
+
+            return LMTPModel(self, self.get_tokenizer(), inprocess=inprocess, endpoint=endpoint, lmtp_server_kwargs=lmtp_server_kwargs, **self.decoder_args)
 
         async def tokenize(self, text):
             return self.get_tokenizer().tokenize(text, asbytes=True)

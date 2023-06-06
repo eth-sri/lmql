@@ -10,7 +10,7 @@ import warnings
 from tqdm import tqdm
 from transformers import BeamScorer, LogitsProcessorList, PretrainedConfig, StoppingCriteriaList
 
-from lmql.model.async_generation_utils import GenerationMixin
+from lmql.models.async_generation_utils import GenerationMixin
 
 from lmql.utils import nputil
 import numpy as np

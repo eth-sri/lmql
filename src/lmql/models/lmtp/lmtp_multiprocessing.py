@@ -1,8 +1,10 @@
+import multiprocessing
+import pickle
 from .lmtp_client import *
 
-async def multiprocessing_main_async(pipe: Connection):
+async def multiprocessing_main_async(pipe: Connection, kwargs):
     transport = LMTPMulitprocessingTransport(pipe)
-    session = TokenSession(transport)
+    session = TokenSession(transport, kwargs)
 
     while True:
         if not pipe.poll():
@@ -19,8 +21,8 @@ async def multiprocessing_main_async(pipe: Connection):
         await session.handle(type, payload)
 
 
-def multiprocessing_main(pipe: Connection):
-    asyncio.run(multiprocessing_main_async(pipe))
+def multiprocessing_main(pipe: Connection, kwargs):
+    asyncio.run(multiprocessing_main_async(pipe, kwargs))
 
 class LMTPMulitprocessingTransport:
     def __init__(self, pipe):
@@ -29,16 +31,24 @@ class LMTPMulitprocessingTransport:
     async def send(self, type, payload):
         self.connection.send((type, payload))
 
+def ensure_picklable(kwargs, msg=""):
+    try:
+        # make sure kwargs can be pickled
+        pickle.dumps(kwargs)
+    except Exception as e:
+        raise AssertionError(msg)
 class LMTPMultiProcessingClient:
     """
     Allows use of a LMTP TokenSession from within the same process (model runs in the same process too).
     """
 
-    def __init__(self, model_identifier):
-        self.model_identifier = model_identifier
+    def __init__(self, model_identifier, **kwargs):
+        ensure_picklable(kwargs, "lmtp.inprocess kwargs must be pickleable as it has to be sent to a subprocess")
         
+        self.model_identifier = model_identifier
+
         (c2, c1) = multiprocessing.Pipe(duplex=True)
-        self.subprocess = multiprocessing.Process(target=multiprocessing_main, args=(c1,), name="lmtp-model-server", daemon=True)
+        self.subprocess = multiprocessing.Process(target=multiprocessing_main, args=(c1,kwargs), name="lmtp-model-server", daemon=True)
         self.subprocess.start()
         
         self.connection = c2

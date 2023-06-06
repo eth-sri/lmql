@@ -1,7 +1,7 @@
 import lmql
 from lmql.tests.expr_test_utils import run_all_tests
 
-m = lmql.inprocess("facebook/opt-350m")
+m = lmql.model("facebook/opt-350m", inprocess=True)
 
 @lmql.query
 async def test_model_reference():
@@ -29,7 +29,7 @@ async def test_local_string():
         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
     '''
 
-m2 = lmql.inprocess("facebook/opt-350m", cuda=True, port=12345)
+m2 = lmql.model("facebook/opt-350m", cuda=True, inprocess=True)
 
 @lmql.query
 async def test_model_reference_cuda():
