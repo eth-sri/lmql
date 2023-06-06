@@ -664,6 +664,9 @@ class DclibOpenAiModel(DcModel):
         
         with self.stats.timer("topk"):
             return await sequences.aelement_wise(op_topk)
+        
+    def close(self):
+        pass
 
 class Struct:
     def __init__(self, **entries):

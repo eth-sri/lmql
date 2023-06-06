@@ -1,5 +1,6 @@
 import multiprocessing
 import pickle
+import sys
 from .lmtp_client import *
 from .lmtp_inference_server import TokenSession
 
@@ -7,19 +8,22 @@ async def multiprocessing_main_async(pipe: Connection, kwargs):
     transport = LMTPMulitprocessingTransport(pipe)
     session = TokenSession(transport, kwargs)
 
-    while True:
-        if not pipe.poll():
-            await asyncio.sleep(0.01)
-            continue
-        if not multiprocessing.parent_process().is_alive():
-            session.close()
-            print("[Parent process died, exiting]", flush=True)
-            sys.exit(0)
-        
-        msg = pipe.recv()
-        if msg is None: continue
-        type, payload = msg
-        await session.handle(type, payload)
+    try:
+        while True:
+            if not multiprocessing.parent_process().is_alive():
+                print("[Parent process died, exiting]", flush=True)
+                break
+
+            if not pipe.poll():
+                await asyncio.sleep(0.01)
+                continue
+                
+            msg = pipe.recv()
+            if msg is None: continue
+            type, payload = msg
+            await session.handle(type, payload)
+    finally:
+        sys.exit(0)
 
 
 def multiprocessing_main(pipe: Connection, kwargs):
