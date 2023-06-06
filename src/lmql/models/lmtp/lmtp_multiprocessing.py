@@ -1,6 +1,7 @@
 import multiprocessing
 import pickle
 from .lmtp_client import *
+from .lmtp_inference_server import TokenSession
 
 async def multiprocessing_main_async(pipe: Connection, kwargs):
     transport = LMTPMulitprocessingTransport(pipe)

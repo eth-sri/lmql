@@ -1,6 +1,8 @@
 import lmql
 from lmql.tests.expr_test_utils import run_all_tests
 
+m = lmql.model("local:gpt2", cuda=True)
+
 @lmql.query
 async def test_special_characters1():
     '''lmql
@@ -11,7 +13,7 @@ async def test_special_characters1():
         assert REPEAT.count("Ø") == 1, "REPEAT should contain Ø once"
         assert context.prompt.count("Ø") >= 3, "Ø should occur at least 3 times in full prompt"
     from
-        'local:gpt2'
+        m
     where
         len(TOKENS(REPEAT)) < 10 and len(TOKENS(REP2)) < 10
     '''
@@ -25,7 +27,7 @@ async def test_special_characters_pi():
         """
         assert "π" in formula, "π must occur in the formula"
     from
-        "local:gpt2"
+        m
     where
         len(TOKENS(formula)) < 20
     '''
