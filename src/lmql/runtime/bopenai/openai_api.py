@@ -116,6 +116,7 @@ def get_azure_config(model, api_config):
     if os.environ.get("OPENAI_API_TYPE", 'openai') == 'azure':
         model_env_name = model.upper().replace(".", "_")
         endpoint = os.environ[f"AZURE_OPENAI_{model_env_name}_ENDPOINT"]
+        assert "AZURE_OPENAI_" + model_env_name + "_KEY" in os.environ, f"Please set the environment variable AZURE_OPENAI_{model_env_name}_KEY to your Azure API key, or specify it in code as 'lmql.model(..., azure_api_key=...')"
         key = os.environ[f"AZURE_OPENAI_{model_env_name}_KEY"]
         headers = {
             "Content-Type": "application/json",
