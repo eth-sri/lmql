@@ -690,6 +690,8 @@ class AsyncOpenAIAPI:
                         self.stats.errors += 1
                         retries -= 1            
                         print("OpenAI:", str(e), '"' + str(type(e)) + '"', flush=True)
+                        if kwargs.get("api_config", {}).get("errors", None) == "raise":
+                            raise e
                         await asyncio.sleep(0.5)
                         if retries <= 0 or self.is_definitive_error(e):
                             raise e

@@ -157,6 +157,8 @@ class PromptScope(ast.NodeVisitor):
         # make sure "input" can be intercepted
         if name in ["input"]:
             return False
+        if name in ["lmql"]:
+            return True
         if name in self.free_vars:
             return True
         if name in self.written_vars:

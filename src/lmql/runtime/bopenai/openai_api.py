@@ -69,14 +69,17 @@ def tokenize_ids(text):
     ids = tokenizer(text)["input_ids"]
     return ids
 
-def tokenize(text):
+def tokenize(text, openai_byte_encoding=False):
     global tokenizer
     if tokenizer is None:
         tokenizer = load_tokenizer("gpt2")
     ids = tokenizer(text)["input_ids"]
     raw = tokenizer.decode_bytes(ids)
-    raw = [str(t)[2:-1] for t in raw]
-    return [t if not "\\x" in t else "bytes:" + t for t in raw]
+    if openai_byte_encoding:
+        raw = [str(t)[2:-1] for t in raw]
+        return [t.encode("utf-8").decode("unicode_escape") if not "\\x" in t else "bytes:" + t for t in raw]
+    else:
+        return raw
 
 def tagged_segments(s):
     import re
@@ -160,7 +163,7 @@ async def chat_api(**kwargs):
     max_tokens = kwargs.get("max_tokens", 0)
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
-    prompt_tokens = tokenize(kwargs["prompt"][0])
+    prompt_tokens = tokenize(kwargs["prompt"][0], openai_byte_encoding=True)
 
     timeout = kwargs.pop("timeout", 1.5)
     
@@ -305,8 +308,11 @@ async def chat_api(**kwargs):
                                         })
                                     continue
                                 text = delta["content"]
-                                tokens = tokenize((" " if received_text == "" else "") + text)
+                                tokens = tokenize((" " if received_text == "" else "") + text, openai_byte_encoding=True)
                                 received_text += text
+
+                                # convert tokens to OpenAI format
+                                tokens = [str(t) for t in tokens]
                                 
                                 choices.append({
                                     "text": text,
@@ -334,9 +340,8 @@ async def chat_api(**kwargs):
                     message = last_message.get("error", {}).get("message", "")
                     if "rate limit" in message.lower():
                         raise OpenAIRateLimitError(message + "local client capacity" + str(Capacity.reserved))
-                    else:
-                        raise OpenAIStreamError(last_message["error"]["message"] + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
-                        # raise OpenAIStreamError(last_message["error"]["message"])
+                    else:   
+                        raise OpenAIStreamError(message + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
                 except json.decoder.JSONDecodeError:
                     raise OpenAIStreamError("Error in API response:", current_chunk)
     
@@ -436,7 +441,7 @@ async def completion_api(**kwargs):
                     if "rate limit" in message.lower():
                         raise OpenAIRateLimitError(message + "local client capacity" + str(Capacity.reserved))
                     else:
-                        raise OpenAIStreamError(last_message["error"]["message"] + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
+                        raise OpenAIStreamError((message or str(last_message)) + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
                         # raise OpenAIStreamError(last_message["error"]["message"])
                 except json.decoder.JSONDecodeError:
                     raise OpenAIStreamError("Error in API response:", current_chunk)

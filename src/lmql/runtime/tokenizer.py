@@ -54,7 +54,10 @@ class LMQLTokenizer:
         tokens = []
         for s in self.chunk_out_by_tags(s, tokenize=False):
             if s.startswith("lmql:"):
-                tokens.append(s)
+                if asbytes:
+                    tokens.append(f"<{s}/>".encode("utf-8"))
+                else:
+                    tokens.append(s)
             else:
                 tokens += self.tokenizer_impl.tokenize(s, asbytes=asbytes)
 
@@ -64,18 +67,36 @@ class LMQLTokenizer:
         """
         Transforms a list of input ids into a byte sequences.
         """
-        return self.tokenizer_impl.decode_tokens_bytes(input_ids)
+        chunk = []
+        result = []
+        global reverse_special_token_mappings
+        
+        for i in input_ids:
+            if i in reverse_special_token_mappings.keys():
+                chunk_result = self.tokenizer_impl.decode_tokens_bytes(chunk)
+                result += chunk_result
+                result.append(reverse_special_token_mappings[i].encode("utf-8"))
+                chunk = []
+            else:
+                chunk.append(i)
+
+        if len(chunk) > 0:
+            result += self.tokenizer_impl.decode_tokens_bytes(chunk)
+
+        return result
 
     def convert_bytes_to_ids(self, token_bytes):
         """
         Transforms text into a tokenized byte sequence.
         """
+        # TODO: handle special IDs, i.e. tags (only relevant for tag use with LMTP backend)
         return self.tokenizer_impl.convert_token_bytes_to_ids(token_bytes)
 
     def convert_bytes_to_string(self, token_bytes):
         """
         Transforms token bytes into a text.
         """
+        # TODO: handle special IDs, i.e. tags (only relevant for tag use with LMTP backend)
         return self.tokenizer_impl.convert_bytes_to_string(token_bytes)
 
     def decode(self, input_ids):
@@ -156,6 +177,7 @@ class LMQLTokenizer:
             offset = m.end()
         segments.append(s[offset:])
         return segments
+            
 
 def load_tokenizer_notransformers(model_identifier):
     if not "SLOW_TOKENIZER_OK" in os.environ.keys():
