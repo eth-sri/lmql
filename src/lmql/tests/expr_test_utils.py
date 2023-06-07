@@ -166,6 +166,13 @@ def run_all_tests(g):
 
     # wait for all tasks to finish
     try:
+        for t in asyncio.all_tasks(loop=loop):
+            if t.done(): continue
+            try:
+                t.cancel()
+                loop.run_until_complete(t)
+            except asyncio.CancelledError:
+                pass
         loop.close()
     except RuntimeError:
         pass

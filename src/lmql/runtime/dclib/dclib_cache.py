@@ -12,6 +12,7 @@ from .dclib_model import DcModel, CacheDelegate
 from .dclib_rewrite import DcModelRewriteMixin
 import lmql.runtime.masks as masks
 from lmql.utils.nputil import ensure_iterable
+from concurrent.futures import ThreadPoolExecutor
 
 class CacheFile:
     def __init__(self, filename, initial_ids, model):
@@ -87,13 +88,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         return mc
     
-    def close(self):
-        self.model.cache_delegate = None
-        for ts in self.token_streams:
-            ts.cancel()
-        self.token_streams = []
+    @property
+    def tokenizer(self):
+        return self.delegate.tokenizer
 
-    def save(self):
+    def close(self):
         if self.cache_file is not None:
             cf = CacheFile(self.cache_file, self.initial_ids, self.delegate.model_identifier)
             try:
@@ -101,11 +100,19 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             except Exception as e:
                 print("error: failed to save token cache to file", e, flush=True)
                 pass
+
+        self.model.cache_delegate = None
+        for ts in self.token_streams:
+            ts.cancel()
+        self.token_streams = []
+
+        if hasattr(self.delegate, "close"):
+            self.delegate.close()
     
     def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
             return self.base_key(ids.input_ids)
-        return str(ids[self.input_id_key_offset:])
+        return str(ids)
 
     async def get_mask(self, s: DecoderSequence, **kwargs):
         if s.id in self.mask_cache:
@@ -151,9 +158,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 else:
                     keys.append((self.base_key(s), edge_type, "-".join([str(i) for i in np.where(mask >= 0)[0]])))
         else:
-            if edge_type != "sample":
-                # standard key is sequence id + edge type
-                keys.append((self.base_key(s), edge_type))
+            # standard key is sequence id + edge type
+            keys.append((self.base_key(s), edge_type))
 
         return keys
     
@@ -246,7 +252,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             self.calls += len(seqs)
 
             # check cache for all
-            cache_entries = [await self.get_cache(s, 'sample', **kwargs) for s in seqs]
+            temperature = kwargs.get('temperature', 1.0)
+            sampling_mode = "top-1" if temperature == 0.0 else "sample-{}".format(temperature)
+            
+            cache_entries = [await self.get_cache(s, sampling_mode, **kwargs) for s in seqs]
             cached_tokens = [e[1] for e in cache_entries]
             cache_keys = [e[0] for e in cache_entries]
             
@@ -376,47 +385,14 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         sq, tokens, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
         self.save_cached(sq.input_ids, tokens, scores, user_data)
         
-    def save_cached(self, ids: List[int], tokens, scores, user_data):
+    def save_cached(self, ids: List[bytes], tokens, scores, user_data):
         # add cache entries along pre-scored trajectory
         for tok, score in zip(tokens, scores):
+            print(ids, tok, score)
             value = (np.array(tok).reshape(1), np.array(score).reshape(1))
-            self.set_cache([(self.base_key(ids, user_data), str(int(tok)))], value)
+            self.set_cache([(self.base_key(ids, user_data), tok)], value)
             ids = np.append(ids, tok)
 
-    # async def prescore(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, 
-    #                 deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, 
-    #                 user_data=None, noscore=False):
-    #     async def op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, user_data, noscore):
-    #         assert len(user_data) == len(tok)
-    #         sq, tok, det, user_data = self.expand_through_cache(sq, tok, det, user_data)
-
-    #         # handle short and fully cached sequences
-    #         if len(tok) == 0:
-    #             return [sq]
-    #         elif len(tok) <= 1 and not noscore:
-    #             return
-
-    #         # do actual scoring with delegate model
-    #         result = await self.delegate.score([sq], [tok], max_batch_size, det, stop_phrase, needs_rewrite, None, noscore, internal=True)
-
-    #         # add initial cache entry
-    #         s = result[0]
-    #         s.user_data = user_data[0]
-    #         c = Continuation(np.array([s.input_ids[-1]]), np.array([s.logprobs[-1]]), [user_data[0]])
-    #         self.set_cache([(self.base_key(sq), str(int(s.input_ids[-1])))], c)
-    #         user_data_offset = 1
-            
-    #         # add additional cache entries for deterministic tokens
-    #         while type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
-    #             c = Continuation(np.array([s.next_ids[0]]), np.array([s.next_logprobs[0]]), [user_data[user_data_offset]])
-    #             sq = s
-    #             s = sq.extend(c)
-    #             user_data_offset += 1
-    #             self.set_cache([(self.base_key(sq), str(s.input_ids[-1]))], c)
-        
-    #     assert len(sqs) == len(tokens)
-    #     return await asyncio.gather(*[op_score(sq, tok, max_batch_size, det, stop_phrase, needs_rewrite, ud, noscore) for sq, tok, det, ud in zip(sqs, tokens, deterministic, user_data)])
-    
     @property
     def model_args(self):
         return self.delegate.model_args
@@ -513,25 +489,26 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 waiting_token_keys = []
 
                 async for (s, tokens, scores, edge_types, user_data) in itr():
-                    if type(tokens) is int or len(tokens) == 1:
-                        tokens = ensure_iterable(tokens)
-                        scores = ensure_iterable(scores)
-                        if type(edge_types) is str or edge_types is None:
-                            edge_types = [edge_types]
-                    else:
-                        assert len(tokens) == len(scores) == len(edge_types), f"token_consumer: expected all lists to have the same length, but got {len(tokens)}, {len(scores)}, {len(edge_type)}"
-                        # print("setting entries for", edge_types)
-                    
-                    waiting_token_keys = []
-                    
                     async with self.cache_lock:
-                        for token, score, edge_type in zip(tokens, scores, edge_types):
+                        if type(tokens) is int or len(tokens) == 1:
+                            tokens = ensure_iterable(tokens)
+                            scores = ensure_iterable(scores)
+                            if type(edge_types) is str or edge_types is None:
+                                edge_types = [edge_types]
+                        else:
+                            assert len(tokens) == len(scores) == len(edge_types), f"token_consumer: expected all lists to have the same length, but got {len(tokens)}, {len(scores)}, {len(edge_type)}"
+                            # print("setting entries for", edge_types)
+                        
+                        waiting_token_keys = []
+                        
+                        for token, score, edge_type in reversed(list(zip(tokens, scores, edge_types))):
                             assert type(edge_type) is str or edge_type is None, "edge_types is {}".format(edge_types)
-                            
+
                             if ids is None:
                                 ids = s.input_ids
                                 keys = await self.get_keys(s, edge_type, **self.model_args)
                                 sq = s
+                            
                             token_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
                             token_keys += [(self.base_key(ids), str(token))]
                             # filter out keys with edge_type=None
@@ -541,24 +518,26 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             #     if tk in self.cache and type(self.cache[tk][0]) is not asyncio.Future:
                             #         print("token_consumer: token for {} from stream already in cache ({} streams): {}".format(tk, len(self.token_streams), self.cache[tk]))
 
-                            self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data)
+                            self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data, verbose=False)
 
                             if self.show_speculative:
                                 c = Continuation(np.array(token), np.array(score), None)
-                                sq = sq.extend(c)
+                                cs = sq.extend(c)
+                                if edge_type == "top-1":
+                                    sq = cs
 
-                            # set future for next token (so get_cache can wait for it if needed)
-                            fut_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
-                            waiting_token_keys.append(fut_keys)
-                            # set future for next token (if k is not already set)
-                            fut = asyncio.Future()
-                            unset_keys = [k for k in fut_keys if k not in self.cache]
-                            self.set_cache(unset_keys, (fut, fut))
+                            if edge_type is not None and (edge_type == "top-1" or "top" not in edge_type):
+                                # set future for next token (so get_cache can wait for it if needed)
+                                fut_keys = [(self.base_key(np.append(ids, token)), edge_type, *k[2:]) for k in keys]
+                                waiting_token_keys.append(fut_keys)
+                                # set future for next token (if k is not already set)
+                                fut = asyncio.Future()
+                                unset_keys = [k for k in fut_keys if k not in self.cache]
+                                self.set_cache(unset_keys, (fut, fut))
+                        
+                        # extend ids
+                        ids = np.append(ids, tokens[0])
 
-                    # extend ids
-                    ids = np.append(ids, tokens[0])
-                        # print(waiting_token_keys)
-                
                 # remove last waiting token entry (since it will not be provided by this stream)
                 for future_keys in waiting_token_keys:
                     for k in future_keys:
@@ -574,7 +553,9 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 raise e
 
         self.token_streams = [s for s in self.token_streams if not s.done()]
-        self.token_streams.append(asyncio.create_task(token_consumer(token_iterator)))
+
+        task = token_consumer(token_iterator)
+        self.token_streams.append(asyncio.ensure_future(task))
         
     async def wait_for_active_streams(self):
         """

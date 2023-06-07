@@ -90,8 +90,8 @@ def make_request_args(tasks):
     futures = [t["future"] for t in tasks]
     request_ids = [t["request_id"] for t in tasks]
 
-    endpoints = [t.get("endpoint", None) for t in tasks if t.get("endpoint") is not None]
-    endpoint = endpoints[0] if len(endpoints) > 0 else None
+    api_configs = [t.get("api_config", None) for t in tasks if t.get("api_config") is not None]
+    api_config = api_configs[0] if len(api_configs) > 0 else None
 
     timeouts = [t.get("timeout", None) for t in tasks if t.get("timeout") is not None]
     timeout = max(timeouts) if len(timeouts) > 0 else None
@@ -106,8 +106,8 @@ def make_request_args(tasks):
     request_args["stream"] = True
     request_args["timeout"] = timeout
     
-    if endpoint is not None: 
-        request_args["endpoint"] = endpoint
+    if api_config is not None: 
+        request_args["api_config"] = api_config
 
     return request_args
 
@@ -318,8 +318,6 @@ class response_buffer:
         while self.num_tokens <= i and self.iterator is not None:
             try:
                 chunk = await anext(self.iterator)
-                chunk["logprobs"]["tokens"] = await self.tokenizer(chunk["logprobs"]["tokens"])
-                # self.tokenizer(data["logprobs"]["tokens"])
                 self._append(chunk)
             except StopAsyncIteration:
                 break
@@ -692,6 +690,8 @@ class AsyncOpenAIAPI:
                         self.stats.errors += 1
                         retries -= 1            
                         print("OpenAI:", str(e), '"' + str(type(e)) + '"', flush=True)
+                        if kwargs.get("api_config", {}).get("errors", None) == "raise":
+                            raise e
                         await asyncio.sleep(0.5)
                         if retries <= 0 or self.is_definitive_error(e):
                             raise e

@@ -12,6 +12,9 @@ Specifically, we have tested the following models, with the corresponding model 
 * `openai/gpt-3.5-turbo` also available as `chatgpt`
 * `openai/gpt-4` also available as `gpt-4`
 
+
+Additionally, LMQL supports Azure OpenAI models. To learn more, please refer to the [Azure API Models](azure.md) section.
+
 ### Configuring OpenAI API Credentials
 
 If you want to use OpenAI models, you have to configure your API credentials. To do so you can either define the `OPENAI_API_KEY` environment variable or create a file `api.env` in the active working directory, with the following contents.

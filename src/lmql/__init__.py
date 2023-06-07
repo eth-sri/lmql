@@ -24,12 +24,7 @@ from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
-
-try:
-    import transformers
-    from lmql.model.serve_oai import inprocess
-except:
-    def inprocess(*args, **kwargs): raise NotImplementedError("Your installation of LMQL does not support local models via inprocess(). Please make sure you have 'transformers' installed.")
+from lmql.models.model import model
 
 model_registry = LMQLModelRegistry
 
@@ -154,3 +149,8 @@ def main(query_fct, **kwargs):
     """
     import asyncio
     return asyncio.run(query_fct(**kwargs))
+
+def serve(*args, **kwargs):
+    assert not "LMQL_BROWSER" in os.environ, "lmql.serve is not available in the browser distribution of LMQL."
+    from lmql.models.lmtp.lmtp_serve import serve
+    return serve(*args, **kwargs)
