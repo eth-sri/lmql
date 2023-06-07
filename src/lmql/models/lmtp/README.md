@@ -52,7 +52,7 @@ The following `MESSAGE_TYPE` values are supported:
 
     > JSON is formatted for readability, but is sent as a single line of text.
 
-    The `TOKEN` message contains a list of tokens (for message efficiency) with fields as shown above. Each sent token is associated with a `stream_id` as previosly set by the client's `GENERATE` request.
+    The `TOKEN` message contains a list of tokens (for message efficiency) with fields as shown above. Each sent token is associated with a `stream_id` as previously set by the client's `GENERATE` request.
 
 ## Testing the Implementation
 
@@ -75,7 +75,32 @@ python src/lmql/models/lmtp/lmtp_client.py  gpt2-medium
 In the interactive client, you can now enter a prompt and see the generated tokens as they are received from the inference process. To specify custom parameters just add them to the end of the prompt, e.g.:
 
 ```bash
-Hello there temperature=1.2
+>>>> Hello there temperature=1.2
+```
+
+## Example Trace
+
+```
+Server:
+> lmql serve-model --cuda gpt2-medium
+[Loading gpt2-medium with AutoModelForCausalLM.from_pretrained(gpt2-medium, 'device_map': 'auto')]
+======== Running on http://localhost:8080 ========
+(Press CTRL+C to quit)
+[gpt2-medium ready on device cuda:0]
+GENERATE {"model": "gpt2-medium", "prompt": [15496, 612, 220], "stream_id": 1}
+```
+
+Client:
+>>>> Hello there max_tokens=5
+>>>> {'token': 10185, 'stream_id': 2, 'logprob': -42.2973747253418, 'finish_reason': None, 'top_logprobs': {'10185': -42.2973747253418}}
+>>>> {'token': 198, 'stream_id': 2, 'logprob': -49.23591613769531, 'finish_reason': None, 'top_logprobs': {'198': -49.23591613769531}}
+>>>> {'token': 198, 'stream_id': 2, 'logprob': 21.557533264160156, 'finish_reason': None, 'top_logprobs': {'198': 21.557533264160156}}
+>>>> {'token': 40, 'stream_id': 2, 'logprob': -91.37769317626953, 'finish_reason': None, 'top_logprobs': {'40': -91.37769317626953}}
+>>>> {'token': 1101, 'stream_id': 2, 'logprob': -131.75880432128906, 'finish_reason': 'length', 'top_logprobs': {'1101': -131.75880432128906}}
+Hello there !!!
+
+I'm
+>>>>
 ```
 
 ## Future Work
