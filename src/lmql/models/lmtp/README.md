@@ -80,8 +80,8 @@ In the interactive client, you can now enter a prompt and see the generated toke
 
 ## Example Trace
 
+**Server:**
 ```
-Server:
 > lmql serve-model --cuda gpt2-medium
 [Loading gpt2-medium with AutoModelForCausalLM.from_pretrained(gpt2-medium, 'device_map': 'auto')]
 ======== Running on http://localhost:8080 ========
@@ -89,8 +89,8 @@ Server:
 [gpt2-medium ready on device cuda:0]
 GENERATE {"model": "gpt2-medium", "prompt": [15496, 612, 220], "stream_id": 1}
 ```
-
-Client:
+**Client:**
+```
 >>>> Hello there max_tokens=5
 >>>> {'token': 10185, 'stream_id': 2, 'logprob': -42.2973747253418, 'finish_reason': None, 'top_logprobs': {'10185': -42.2973747253418}}
 >>>> {'token': 198, 'stream_id': 2, 'logprob': -49.23591613769531, 'finish_reason': None, 'top_logprobs': {'198': -49.23591613769531}}
