@@ -48,7 +48,14 @@ The following `MESSAGE_TYPE` values are supported:
 * `GENERATE` This message is used to begin a new generation stream of tokens.
 
     ```json
-    GENERATE {"temperature": 1.2, "max_tokens": 64, "logit_bias": {"1": 100}, "model": "gpt2-medium", "prompt": [15496, 220], "stream_id": 2}
+    GENERATE {
+        "temperature": 1.2, 
+        "max_tokens": 64, 
+        "logit_bias": {"1": 100}, 
+        "model": "gpt2-medium", 
+        "prompt": [15496, 220], 
+        "stream_id": 1
+    }
     ```
     
     As JSON data, a client provides decoder arguments such as `temperature` and `max_tokens`, but also logit masks and the prompt (of tokenized input IDs). Most importantly, each `GENERATE` request has a (session) unique stream ID that allows to distinguish between different streams of tokens, once they are received. 
