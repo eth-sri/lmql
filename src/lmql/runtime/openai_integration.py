@@ -115,7 +115,7 @@ class DclibOpenAiModel(DcModel):
         self.stats = Stats("openai")
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
 
-        assert type(self.tokenizer.tokenizer_impl) is TiktokenTokenizer, "openai/ models can only be used with TiktokenTokenizer. Please make sure 'tiktoken' is installed."
+        assert not "hf-" in self.tokenizer.name, "OpenAI models are not compatible with HuggingFace tokenizers. Please use 'tiktoken' or 'gpt3_tokenizer' instead."
 
     def log_billable_tokens(self, n: int):
         pass # openai keeps track of billable tokens vai bopenai

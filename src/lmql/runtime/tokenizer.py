@@ -196,7 +196,7 @@ def load_tokenizer(model_identifier, type="auto"):
     cache_identifier = model_identifier.replace("/", "-")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
-    if type != "hf":
+    if type in ["auto", "tiktoken"]:
         tiktoken_available = False
         # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
         try:
@@ -218,6 +218,8 @@ def load_tokenizer(model_identifier, type="auto"):
             return LMQLTokenizer(t, model_identifier)
 
     try:
+        assert type in ["auto", "hf"]
+
         import os
         os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
