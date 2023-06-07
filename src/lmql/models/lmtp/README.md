@@ -2,7 +2,7 @@
 
 The Language Model Transport Protocol (LMTP) is a lightweight transport-agnostic protocol for streaming language model output between peers, processes, backends and frontend applications. 
 
-It relieso on the idea of separating model loading and inference into a separate process (long-lived), which is then communicated with via a simple protocol. This allows for the model to be loaded once and then used by multiple clients, which each can be short-lived, startup and shutdown quickly, and be written in any language.
+It relies on the idea of separating model loading and inference into a separate process (long-lived), which is then communicated with via a simple protocol. This allows for the model to be loaded once and then used by multiple clients, which each can be short-lived, startup and shutdown quickly, and be written in any language. For example, in the context of LMQL, LMTP's architecture looks as follows:
 
 ![Architecture](../../../../docs/source/images/inference.svg)
 
@@ -12,7 +12,7 @@ LMTP relies on two asynchronous communication channels:
 
 * **Inference Process -> Client** This channel is used to send (multiple streams) of currently generated tokens to the client. Tokens from different streams are interleaved, but the order of tokens within a stream is preserved.
 
-* **Client -> Inference Process** This channel is used to send new generation requests to the inference process. New generation requests can be sent at any time, and the inference process will respond with a stream of tokens as soon it schedules the request.
+* **Client -> Inference Process** This channel is used to send new generation requests to the inference process. New generation requests can be sent at any time, and the inference process will respond with a stream of tokens as soon as it schedules the request.
 
 ## Format
 
@@ -24,16 +24,7 @@ LMTP is based on a simple message-based two-way protocol. Each message is a sing
 
 The following `MESSAGE_TYPE` values are supported:
 
-* `GENERATE` This message is used to begin a new generation stream of tokens.
-
-    ```json
-    GENERATE {"temperature": 1.2, "max_tokens": 64, "logit_bias": {"1": 100}, "model": "gpt2-medium", "prompt": [15496, 220], "stream_id": 2}
-    ```
-    
-    As JSON data, a client provides decoder arguments such as `temperature` and `max_tokens`, but also logit masks and the prompt (of tokenized input IDs). Most importantly, each `GENERATE` request has a (session) unique stream ID that allows to distinguish between different streams of tokens, once they are received. 
-
-
-* `TOKEN` This message type is used by the inference process to send a token to the client. The JSON data is of the following format:
+* `TOKEN` This message type is used by the inference process to send token data to the client. The JSON data is of the following format:
 
     ```json
     TOKEN [
@@ -52,7 +43,19 @@ The following `MESSAGE_TYPE` values are supported:
 
     > JSON is formatted for readability, but is sent as a single line of text.
 
-    The `TOKEN` message contains a list of tokens (for message efficiency) with fields as shown above. Each sent token is associated with a `stream_id` as previously set by the client's `GENERATE` request.
+    The `TOKEN` message contains a list of tokens (for message efficiency) with fields as shown above. Each sent token is associated with a `stream_id` as previously set by a client's `GENERATE` or `SCORE` request.
+
+* `GENERATE` This message is used to begin a new generation stream of tokens.
+
+    ```json
+    GENERATE {"temperature": 1.2, "max_tokens": 64, "logit_bias": {"1": 100}, "model": "gpt2-medium", "prompt": [15496, 220], "stream_id": 2}
+    ```
+    
+    As JSON data, a client provides decoder arguments such as `temperature` and `max_tokens`, but also logit masks and the prompt (of tokenized input IDs). Most importantly, each `GENERATE` request has a (session) unique stream ID that allows to distinguish between different streams of tokens, once they are received. 
+
+* `SCORE` This message can be used to obtain scores (log probabilities) for a sequence of tokens. It behaves just like `GENERATE`, but in addition to the `prompt` field, it also accepts a `scored` field of additional tokens that will be scored, appending them to `prompt`. 
+
+    The resulting token stream looks just like a generation stream, however, without the `top_logprobs` attribute.
 
 ## Testing the Implementation
 
