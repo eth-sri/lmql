@@ -623,7 +623,7 @@ class PromptInterpreter:
         else:
             return input(*args)
 
-    async def run(self, fct, **kwargs):
+    async def run(self, fct, *args, **kwargs):
         self.fct = fct
 
         # intercept symbol table entry for input
@@ -632,7 +632,7 @@ class PromptInterpreter:
 
         # prepare initial program state
         context = LMQLContext(self, None)
-        query_head = InterpretationHead(fct, context, None, kwargs)
+        query_head = InterpretationHead(fct, context, args, kwargs)
         self.root_state = PromptState(variable=None, prompt="", stmt_buffer=[],
             query_head=query_head, program_state=context.program_state,
             recurring_variable_counter={}, variable_offset=0,

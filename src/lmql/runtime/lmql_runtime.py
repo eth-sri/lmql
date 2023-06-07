@@ -128,20 +128,28 @@ class LMQLQueryFunction(LMQLChainMixIn):
         kwargs = self.make_kwargs(*args, **kwargs)
 
         interpreter = PromptInterpreter(force_model=self.model)
-        
+
+        self_ref = kwargs.pop("self", None)
+
         if self.output_writer is not None:
             kwargs["output_writer"] = self.output_writer
         interpreter.set_extra_args(**kwargs)
 
         query_kwargs = {}
         for a in self.args:
+            if a == "self":
+                continue
             if a in kwargs.keys():
                 query_kwargs[a] = kwargs[a]
             else:
                 query_kwargs[a] = self.scope.resolve(a)
-        
+
+        query_args = ()
+        if self_ref is not None:
+            query_args = (self_ref,)
+
         # execute main prompt
-        results = await interpreter.run(self.fct, **query_kwargs)
+        results = await interpreter.run(self.fct, *query_args, **query_kwargs)
 
         # applies distribution postprocessor if required
         results = await (ConditionalDistributionPostprocessor(interpreter).process(results))

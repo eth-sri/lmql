@@ -131,12 +131,20 @@ def query(fct):
     # print code of module.query.fct
     for a in argnames:
         if a not in args_of_query:
-            print(f"warning: @lmql.query {fct.__name__} has an argument '{a}' that is not used in the query.")
+            if a != "self":
+                print(f"warning: @lmql.query {fct.__name__} has an argument '{a}' that is not used in the query.")
     
     # set the function context of the query based on the function context of the decorated function
     module.query.function_context = FunctionContext(argnames, args_of_query, scope)
     
-    return module.query
+    def lmql_query_wrapper(*args, **kwargs):
+        return module.query(*args, **kwargs)
+
+    # copy all attributes of model.query to the wrapper function
+    for attr in ["chain"]:
+        setattr(lmql_query_wrapper, attr, getattr(module.query, attr))
+
+    return lmql_query_wrapper
 
 async def static_prompt(query_fct, *args, **kwargs):
     """

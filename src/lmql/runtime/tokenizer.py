@@ -3,6 +3,7 @@ from lmql.runtime.caching import cache_file_exists, cachefile
 
 from lmql.runtime.tokenizers.pure_python_tokenizer import PythonBackedTokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
+from threading import Thread
 
 global special_token_mappings
 special_token_mappings = {}
@@ -12,8 +13,20 @@ reverse_special_token_mappings = {}
 class LMQLTokenizer:
     INVALID_CHARACTER = "\uFFFD"
 
-    def __init__(self, tokenizer_impl, model_identifier):
-        self.tokenizer_impl = tokenizer_impl
+    def __init__(self, model_identifier, tokenizer_impl=None, loader=None):
+        self._tokenizer_impl = None
+        self.loader_thread = None
+
+        if loader is not None:
+            def load():
+                t = loader()
+                self._tokenizer_impl = t
+                self.loader_thread = None
+            self.loader_thread = Thread(target=load)
+            self.loader_thread.start()
+        else:
+            self._tokenizer_impl = tokenizer_impl
+
         self.model_identifier = model_identifier
         self.detokenizer_cache = {}
 
@@ -22,6 +35,12 @@ class LMQLTokenizer:
 
         if "FORCE_TIKTOKEN" in os.environ:
             assert type(self.tokenizer_impl) is TiktokenTokenizer
+
+    @property
+    def tokenizer_impl(self):
+        if self._tokenizer_impl is None:
+            self.loader_thread.join()
+        return self._tokenizer_impl
 
     @property
     def vocab_size(self):
@@ -182,34 +201,40 @@ def load_tokenizer(model_identifier, type="auto"):
             tiktoken_available = False
         
         if tiktoken_available:
+            def loader():
+                if cache_file_exists(cache_path):
+                    with cachefile(cache_path, "rb") as f:
+                        return LMQLTokenizer(model_identifier, pickle.load(f))
+                else:
+                    t = TiktokenTokenizer(model_identifier)
+
+                    with cachefile(cache_path, "wb") as f:
+                        pickle.dump(t, f)
+                return t
+            
+            return LMQLTokenizer(model_identifier, loader=loader)
+
+    try:
+        def loader():
+            import torch
+            from transformers import AutoTokenizer
+
             if cache_file_exists(cache_path):
                 with cachefile(cache_path, "rb") as f:
-                    return LMQLTokenizer(pickle.load(f), model_identifier)
+                    return LMQLTokenizer(model_identifier, pickle.load(f))
             else:
-                t = TiktokenTokenizer(model_identifier)
+                t = AutoTokenizer.from_pretrained(model_identifier)
 
                 with cachefile(cache_path, "wb") as f:
                     pickle.dump(t, f)
-            
-            return LMQLTokenizer(t, model_identifier)
-
-    try:
-        import torch
-        from transformers import AutoTokenizer
-
-        if cache_file_exists(cache_path):
-            with cachefile(cache_path, "rb") as f:
-                return LMQLTokenizer(pickle.load(f), model_identifier)
-        else:
-            t = AutoTokenizer.from_pretrained(model_identifier)
-
-            with cachefile(cache_path, "wb") as f:
-                pickle.dump(t, f)
+            return t
+        
+        return LMQLTokenizer(model_identifier, loader=loader)
     except Exception as e:
         # fallback to non-transformers tokenizer
         t = load_tokenizer_notransformers(model_identifier)
 
-    return LMQLTokenizer(t, model_identifier)
+        return LMQLTokenizer(model_identifier, t)
 
 def get_vocab(tokenizer):
     if hasattr(tokenizer, "vocab"):

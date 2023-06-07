@@ -1,10 +1,9 @@
 from typing import List, Dict, Any
 
-# check if langchain is available
-try:
-    from langchain.chains.base import Chain
+class LMQLChainMixIn:
+    def chain(self):
+        from langchain.chains.base import Chain
 
-    class LMQLChainMixIn(Chain):
         def _call(self, inputs: Dict[str, str]) -> Dict[str, str]:
             import asyncio
 
@@ -31,7 +30,8 @@ try:
 
             return res
 
-    LMQLChainMixIn.loop = None
-except ImportError as e:
-    class LMQLChainMixIn:
-        pass
+        LMQLChainMixIn.loop = None
+        setattr(self, "chain", _call)
+
+        return self
+

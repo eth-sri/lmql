@@ -634,7 +634,7 @@ class LMQLCompiler:
             output_variables = "output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
 
             # generate function that runs query
-            parameters = list(sorted(list(scope.free_vars.union(set(["context"])))))
+            parameters = list(sorted(list(scope.free_vars)))
 
             with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
