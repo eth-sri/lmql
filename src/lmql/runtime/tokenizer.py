@@ -1,3 +1,9 @@
+"""
+Tokenizer interface required by LMQL. 
+
+See .tokenizers for concrete implementations.
+"""
+
 import os
 import pickle
 import numpy as np

@@ -1,4 +1,7 @@
 class ProgramState:
+    """
+    Program state tracked by the interpreter during program execution.
+    """
     def __init__(self, runtime=None):
         self.variable_values = {}
         # postprocessed, converted variable values if not just str (e.g. objects, int)

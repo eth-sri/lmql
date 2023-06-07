@@ -27,7 +27,6 @@ def is_allowed(m):
     """
     return np.isclose(m, 0, atol=1e-8)
 
-
 @dataclass
 class CompleteTask:
     op: Callable

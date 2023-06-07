@@ -30,7 +30,9 @@ class CacheDelegate:
 class DcModel(DcModelRewriteMixin):
     def __init__(self, model, tokenizer, truncation_threshold=-3e38, init_workers=True, textmode=False, **kwargs):
         """
-        Parameters:
+        An abstract interface of an LLM used in the decoder.
+
+        For concrete implementations, see openai_integration.py and lmtp_dcmodel.py.
         
         model: The model to use for inference.
         bos_token_id: The token id to use for the beginning of a sequence.

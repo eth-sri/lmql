@@ -6,6 +6,9 @@ model_name_aliases = {
     "gpt-4": "openai/gpt-4",
 }
 class LMQLModelRegistry: 
+    """
+    Central registry of models and backends that can be used in LMQL.
+    """
     backend_configuration = None
 
     @staticmethod
