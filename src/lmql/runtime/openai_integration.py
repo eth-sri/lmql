@@ -212,7 +212,16 @@ class DclibOpenAiModel(DcModel):
         prompt_str = self.tokenizer.convert_bytes_to_string(s.input_ids)
         tokenized_input_ids = await self.tokenize(prompt_str)
 
-        return await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(tokenized_input_ids))
+        res = await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(tokenized_input_ids))
+
+        server_side_swallowed_tokens = 0
+        while len(res) < len(next_tokens):
+            res = np.append(res, 0.0)
+            server_side_swallowed_tokens += 1
+        if server_side_swallowed_tokens > 0:
+            print("warning: The OpenAI API has merged {} token(s) server-side, which will reflect in inaccurate 0.0 scores in the decoding tree".format(server_side_swallowed_tokens))
+
+        return res
     
     async def score(self, sqs: List[DecoderSequence], tokens: List[List[bytes]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
@@ -380,16 +389,18 @@ class DclibOpenAiModel(DcModel):
             completion_result = await self.async_complete(completion_call)
             # eagerly expand and cache full completion if a cache_delegate is available
             if self.cache_delegate is not None:
-                await self.expand_and_cache(s, completion_result, "top-1", logprobs=kwargs.get("logprobs", 1))
+                await self.expand_and_cache(s, completion_result, 
+                                            "top-1" if temperature == 0.0 else f"sample-{temperature}",
+                                            logprobs=kwargs.get("logprobs", 1))
             
             assert not await completion_result.buffer.empty(), "Completion result is empty on arrival: {}".format(str([await self.detokenize(completion_call.input_ids)]))
             return completion_result
 
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
 
-    async def expand_and_cache(self, s: DecoderSequence, completion_result: CompletionResult, edge_type, logprobs=1):
+    async def expand_and_cache(self, s: DecoderSequence, completion_result: CompletionResult, sampling_mode, logprobs=1):
         async def token_stream():
-            nonlocal edge_type, s, completion_result
+            nonlocal sampling_mode, s, completion_result
             response_buffer = completion_result.buffer
             
             try:
@@ -400,11 +411,10 @@ class DclibOpenAiModel(DcModel):
                     try:
                         if await response_buffer.empty():
                             break
-
                         res = await response_buffer.get(0)
-                        tokens = [res["logprobs"]["tokens"]]
-                        scores = res["logprobs"]["token_logprobs"]
-
+                        
+                        # prepare top_entries
+                        top_entries = {}
                         topprobs = res["logprobs"]["top_logprobs"]
                         if topprobs is not None and logprobs > 1:
                             topk_tokens = list(topprobs.items())
@@ -413,11 +423,25 @@ class DclibOpenAiModel(DcModel):
                             topk_tokens = list(dict.fromkeys(topk_tokens))
                             topk_tokens = sorted(topk_tokens, key=lambda x: x[1], reverse=True)
                             topk_tokens = topk_tokens[:logprobs]
-                            
-                            tokens = [tok for tok, _ in topk_tokens]
-                            scores = [score for _, score in topk_tokens]
-                            edge_type = ["top-{}".format(i+1) for i in range(len(topk_tokens))]
-                        
+                            top_entries = {tok: score for tok, score in topk_tokens}
+
+                        scores = {}
+                        for t, s in top_entries:
+                            scores[t] = s
+                        if sampling_mode == "top-1":
+                            scores[res["logprobs"]["tokens"]] = res["logprobs"]["token_logprobs"]
+
+                        top_entries = list(sorted(scores.items(), key=lambda x: x[1], reverse=True))
+                        tokens = [t for t, _ in top_entries]
+                        scores = [s for _, s in top_entries]
+                        edge_type = ["top-{}".format(i+1) for i in range(len(tokens))]
+
+                        # for non argmax sampling modes, add the sampled token to the beginning of the list
+                        if sampling_mode != "top-1":
+                            tokens = [res["logprobs"]["tokens"]] + tokens
+                            scores = [res["logprobs"]["token_logprobs"]] + scores
+                            edge_type = [sampling_mode] + edge_type
+
                         # convert tokens to bytes
                         tokens = self.convert(tokens)
 
@@ -433,7 +457,7 @@ class DclibOpenAiModel(DcModel):
                                 continuation.continuation_type: continuation
                             }
                         }
-                        # print("token stream gives", s.input_ids, [tokens], res["logprobs"]["tokens"], edge_type)
+                        # print("token stream gives", result_id, tokens, scores, edge_type, flush=True)
 
                         yield (s, tokens, scores, edge_type, user_data)
                     except IndexError:
@@ -472,7 +496,7 @@ class DclibOpenAiModel(DcModel):
         kwargs = {**self.model_args, **kwargs}
 
         async def op_sample(seqs):
-            completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=1, **kwargs)
+            completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=num_samples, **kwargs)
             
             next_token_ids = []
             next_token_scores = []
