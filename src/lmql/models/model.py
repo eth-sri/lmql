@@ -1,4 +1,4 @@
-from lmql.models.lmtp.lmtp_serve import rename_model_args
+from lmql.models.lmtp.utils import rename_model_args
 
 class LMQLModel:
     def __init__(self, model_identifier, model=None, **kwargs):
@@ -7,11 +7,6 @@ class LMQLModel:
 
         # if this is a fixed reference to an existing model
         self.model = model
-
-"""
-Define inprocess() if transformers is installed.
-"""
-from .lmtp.lmtp_dcmodel import lmtp_model
 
 global inprocess_models
 inprocess_models = {}
@@ -37,6 +32,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
     """
     try:
         import transformers
+        from .lmtp.lmtp_dcmodel import lmtp_model
     except ImportError:
         raise NotImplementedError("Your installation of LMQL does not support local models via inprocess(). Please make sure you have 'transformers' installed.")
 

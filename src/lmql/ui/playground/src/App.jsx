@@ -998,9 +998,7 @@ class Truncated extends React.Component {
       }
       bytes = bytes.concat(Array.from(new TextEncoder("utf-8").encode(content[i])))
     }
-    console.log("bytes", bytes, bytes.length)
     content = new TextDecoder("utf-8").decode(new Uint8Array(bytes))
-    console.log("content", content)
 
     let EXPLICIT_CHARS = {
       "\n": "⏎",

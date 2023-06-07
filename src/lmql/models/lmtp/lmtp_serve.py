@@ -1,4 +1,5 @@
 from .lmtp_inference_server import *
+from .utils import rename_model_args
 
 def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, **kwargs):
     """
@@ -23,25 +24,6 @@ def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, stati
         "static": static,
         **kwargs
     })
-
-def rename_model_args(model_args):
-    cuda = model_args.pop("cuda", False)
-    dtype = model_args.pop("dtype", None)
-
-    # parse dtype
-    if dtype is not None:
-        model_args["torch_dtype"] = dtype
-    
-    if dtype == "float16":
-        model_args["torch_dtype"] = torch.float16
-    elif dtype == "8bit":
-        model_args["load_in_8bit"] = dtype == "8bit"
-
-    # parse cuda
-    if cuda:
-        model_args["device_map"] = "auto"
-    
-    return model_args
 
 def lmtp_serve_main(model_args):
     """
