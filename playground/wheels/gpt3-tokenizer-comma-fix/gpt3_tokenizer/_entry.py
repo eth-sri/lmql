@@ -42,7 +42,7 @@ def decode(tokens):
     """
     text = ''.join([_decoder[x] for x in tokens])
     textarr = [int(_byte_decoder[x]) for x in list(text)]
-    text = bytearray(textarr).decode("utf-8")
+    text = bytearray(textarr).decode("utf-8", errors="replace")
     return text
 
 def count_tokens(text):

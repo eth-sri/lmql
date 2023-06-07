@@ -1,1 +1,1 @@
-{"lmql-editor-contents": "argmax(chunk_timeout=10.0)\n    \"Hello[WHO]\"\nfrom\n    lmql.inprocess(\"gpt2\", cuda=True)\nwhere\n    STOPS_AT(WHO, \"\\n\") and len(TOKENS(WHO)) < 10", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
+{"lmql-editor-contents": "import lmql\n\nargmax\n    \"Hello[WHO]\"\nfrom\n    lmql.model(\"local:gpt2\", cuda=True)\nwhere\n    STOPS_AT(WHO, \"\\n\") and len(TOKENS(WHO)) < 10", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
