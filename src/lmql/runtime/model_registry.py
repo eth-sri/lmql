@@ -13,6 +13,9 @@ class LMQLModelRegistry:
 
     @staticmethod
     def get(model, **kwargs):
+        if model in model_name_aliases:
+            model = model_name_aliases[model]
+
         client = LMQLModelRegistry.clients.get(model, None)
 
         if client is None:

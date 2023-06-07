@@ -20,7 +20,8 @@ from lmql.utils.docstring_parser import *
 from lmql.language.compiler import LMQLCompiler
 # re-export lmql runtime functions
 from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
-                                       LMQLQueryFunction, compiled_query, tag)
+                                       LMQLQueryFunction, compiled_query, tag,
+                                       EmptyVariableScope)
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
@@ -76,38 +77,40 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     output_variables = module.query.output_variables
     query_args = list(set(query_args) - set(output_variables))
 
-    if len(args) > 0:
-        assert False, "Positional arguments for queries are not supported yet"
-    else:
-        assert len(kwargs) == len(query_args), f"Expected {len(query_args)} keyword arguments for query, got {len(kwargs)}: Expected: {query_args}, got: {kwargs}"
+    return await module.query(*args, **kwargs)
 
-        for query_kw in kwargs.keys():
-            assert query_kw in query_args, f"Unknown query argument '{query_kw}'"
-            
-    return await module.query(**kwargs)
-
-async def run(code, *args, output_writer=None, **kwargs):
-    temp_lmql_file = tempfile.mktemp(suffix=".lmql")
-    with open(temp_lmql_file, "w") as f:
-        f.write(code)
-    
-    os.chdir(os.path.join(os.path.dirname(__file__), "../../")) 
-    return await run_file(temp_lmql_file, *args, output_writer=output_writer, **kwargs)
+async def run(code, *args, **kwargs):
+    q = _query_from_string(code)
+    return await q(*args, **kwargs)
         
-def _query_from_string(s):
+def _query_from_string(s, input_variables=None):
+    if input_variables is None: input_variables = []
+
+    import inspect
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(s)
     module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
+    
+    # lmql.query(str) does not capture function context
+    scope = EmptyVariableScope()
+    compiled_query_fct_args = inspect.getfullargspec(module.query.fct).args
+    fct_signature = inspect.Signature(parameters=[inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in input_variables])
+
+    module.query.function_context = FunctionContext(fct_signature, compiled_query_fct_args, scope)
+    
     return module.query
 
-def query(fct):
+def query(fct, input_variables=None):
     import inspect
 
     if type(fct) is LMQLQueryFunction: return fct
 
     # support for lmql.query(<query string>)
-    if type(fct) is str: return _query_from_string(fct)
+    if type(fct) is str: 
+        return _query_from_string(fct, input_variables)
+    else:
+        assert input_variables is None, "input_variables must be None when using @lmql.query as a decorator."
     
     calling_frame = inspect.stack()[1]
     scope = LMQLInputVariableScope(fct, calling_frame)
@@ -120,18 +123,12 @@ def query(fct):
     
     assert inspect.iscoroutinefunction(fct), f"@lmql.query {fct.__name__} must be declared async."
     
-    argnames = inspect.getfullargspec(fct).args
-    
-    args_of_query = [a for a in inspect.getfullargspec(module.query.fct).args if a != "context"]
-    # print code of module.query.fct
-    for a in argnames:
-        if a not in args_of_query:
-            if a != "self":
-                print(f"warning: @lmql.query {fct.__name__} has an argument '{a}' that is not used in the query.")
+    decorate_fct_signature = inspect.signature(fct)
+    compiled_query_fct_args = inspect.getfullargspec(module.query.fct).args
     
     # set the function context of the query based on the function context of the decorated function
-    module.query.function_context = FunctionContext(argnames, args_of_query, scope)
-    
+    module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
+
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)
 

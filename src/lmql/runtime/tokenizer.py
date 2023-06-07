@@ -50,6 +50,7 @@ class LMQLTokenizer:
             self.loader_thread.join()
         return self._tokenizer_impl
     
+    @property
     def name(self):
         return self.tokenizer_impl.name
 
@@ -238,46 +239,27 @@ def load_tokenizer(model_identifier, type="auto"):
             return LMQLTokenizer(model_identifier, loader=loader)
 
     try:
+        assert type in ["auto", "hf"]
+
         def loader():
+            import os
+            os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
             import torch
-            from transformers import AutoTokenizer
+            from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
+
+            assert TransformersTokenizer.is_available(model_identifier), "TransformersTokenizer not available. Please make sure the 'transformers' package is installed."
 
             if cache_file_exists(cache_path):
                 with cachefile(cache_path, "rb") as f:
-                    return LMQLTokenizer(model_identifier, pickle.load(f))
+                    return LMQLTokenizer(pickle.load(f), model_identifier)
             else:
-                t = AutoTokenizer.from_pretrained(model_identifier)
+                t = TransformersTokenizer(model_identifier)
 
                 with cachefile(cache_path, "wb") as f:
                     pickle.dump(t, f)
-<<<<<<< HEAD
             return t
-        
         return LMQLTokenizer(model_identifier, loader=loader)
-=======
-            
-            return LMQLTokenizer(t, model_identifier)
-
-    try:
-        assert type in ["auto", "hf"]
-
-        import os
-        os.environ["TOKENIZERS_PARALLELISM"] = "true"
-
-        import torch
-        from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
-
-        assert TransformersTokenizer.is_available(model_identifier), "TransformersTokenizer not available. Please make sure the 'transformers' package is installed."
-
-        if cache_file_exists(cache_path):
-            with cachefile(cache_path, "rb") as f:
-                return LMQLTokenizer(pickle.load(f), model_identifier)
-        else:
-            t = TransformersTokenizer(model_identifier)
-
-            with cachefile(cache_path, "wb") as f:
-                pickle.dump(t, f)
->>>>>>> ce6254a5728a375eb41028bd2a318ffe5172fd3c
     except Exception as e:
         # fallback to non-transformers tokenizer
         t = load_tokenizer_notransformers(model_identifier)

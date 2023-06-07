@@ -22,7 +22,7 @@ class LMQLInputVariableScope:
         self.globals =  calling_frame.frame.f_globals
         self.locals = calling_frame.frame.f_locals
     
-    def resolve(self, name):
+    def resolve(self, name, errors=None):
         if name in self.locals.keys():
             return self.locals[name]
         elif name in self.globals.keys():
@@ -30,12 +30,18 @@ class LMQLInputVariableScope:
         elif name in self.builtins.keys():
             return self.builtins[name]
         else:
-            return None
-            # assert False, "Failed to resolve variable '" + name + "' in @lmql.query " + str(self.fct)
+            if errors == "ignore":
+                return None
+            else:
+                raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query " + str(self.fct), name)
+
+class EmptyVariableScope:
+    def resolve(self, name):
+        return None
 
 @dataclass
 class FunctionContext:
-    argnames: List[str]
+    argnames: inspect.Signature
     args_of_query: List[str]
     scope: LMQLInputVariableScope
 
@@ -88,35 +94,68 @@ class LMQLQueryFunction(LMQLChainMixIn):
         self.model = model
 
     def make_kwargs(self, *args, **kwargs):
-        if self.function_context is None:
-            return kwargs
-        else:
-            argnames = self.function_context.argnames
-            args_of_query = self.function_context.args_of_query
-            scope = self.function_context.scope
+        """
+        Binds args and kwargs to the function signature and returns a dict of all user-defined kwargs.
 
-        # do not consider kwargs that are already set
-        argnames = [a for a in argnames if a not in kwargs.keys()]
+        Resolves additional captured variables using the surrounding function context.
+        """
+        assert self.function_context is not None, "Cannot call @lmql.query function without context."
+        
+        signature = self.function_context.argnames
+        args_of_query = self.function_context.args_of_query
+        scope = self.function_context.scope
 
-        assert len(args) == len(argnames), f"@lmql.query {self.fct.__name__} expects {len(argnames)} positional arguments, but got {len(args)}."
+        runtime_args = {k:v for k,v in kwargs.items() if not k in signature.parameters.keys() and k not in args_of_query}
+        query_kwargs = {k:v for k,v in kwargs.items() if k in signature.parameters.keys()}
+
+        compiled_query_args = {}
+        
+        # initialize with default values
+        for name, param in signature.parameters.items():
+            if param.default is not inspect.Parameter.empty:
+                compiled_query_args[name] = param.default
+
+        # bind args and kwargs to signature
+        try:
+            signature = signature.bind(*args, **query_kwargs)
+        except TypeError as e:
+            if len(e.args) == 1 and e.args[0].startswith("missing "):
+                e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
+            raise e
+        
+        # special case, if signature is empty (no input variables provided)
+        if len(signature.arguments) == 0:
+            # bind kwargs dynamically in compiled_query_args
+            for k,v in kwargs.items():
+                if k in args_of_query:
+                    # compiled_query_args[k] = v
+                    compiled_query_args[k] = v
+                else:
+                    runtime_args[k] = v
+
+        # resolve remaining variables from function context
         captured_variables = set(args_of_query)
-        for name, value in zip(argnames, args):
+        for name, value in signature.arguments.items():
             if name in args_of_query:
-                kwargs[name] = value
+                compiled_query_args[name] = value
                 captured_variables.remove(name)
+
+        failed_to_resolve = []
 
         # resolve remaining unset args from scope
         for v in captured_variables:
-            if not v in kwargs:
-                kwargs[v] = scope.resolve(v)
-        
-        if "output_writer" in kwargs:
-            self.output_writer = kwargs["output_writer"]
-            del kwargs["output_writer"]
-        else:
-            self.output_writer = silent
+            if not v in compiled_query_args:
+                try:
+                    compiled_query_args[v] = scope.resolve(v, errors="raise")
+                except TypeError:
+                    failed_to_resolve.append(v)
 
-        return kwargs
+        if len(failed_to_resolve) == 1:
+            raise TypeError("Failed to resolve variable '" + failed_to_resolve[0] + "' in LMQL query.")
+        elif len(failed_to_resolve) > 0:
+            raise TypeError("Failed to resolve variables in LMQL query: " + ", ".join(f"'{v}'" for v in sorted(failed_to_resolve)))
+
+        return compiled_query_args, runtime_args
 
     def __call__(self, *args, **kwargs):
         if not self.is_langchain_use:
@@ -125,31 +164,19 @@ class LMQLQueryFunction(LMQLChainMixIn):
             return super().__call__(*args, **kwargs)
 
     async def __acall__(self, *args, **kwargs):
-        kwargs = self.make_kwargs(*args, **kwargs)
-
+        query_kwargs, runtime_args = self.make_kwargs(*args, **kwargs)
         interpreter = PromptInterpreter(force_model=self.model)
 
-        self_ref = kwargs.pop("self", None)
-
         if self.output_writer is not None:
-            kwargs["output_writer"] = self.output_writer
-        interpreter.set_extra_args(**kwargs)
+            runtime_args["output_writer"] = self.output_writer
+        interpreter.set_extra_args(**runtime_args)
 
-        query_kwargs = {}
-        for a in self.args:
-            if a == "self":
-                continue
-            if a in kwargs.keys():
-                query_kwargs[a] = kwargs[a]
-            else:
-                query_kwargs[a] = self.scope.resolve(a)
-
-        query_args = ()
-        if self_ref is not None:
-            query_args = (self_ref,)
+        # rename 'self'
+        if "self" in query_kwargs:
+            query_kwargs["__self__"] = query_kwargs.pop("self")
 
         # execute main prompt
-        results = await interpreter.run(self.fct, *query_args, **query_kwargs)
+        results = await interpreter.run(self.fct, **query_kwargs)
 
         # applies distribution postprocessor if required
         results = await (ConditionalDistributionPostprocessor(interpreter).process(results))
