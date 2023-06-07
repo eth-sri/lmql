@@ -1,4 +1,12 @@
+"""
+Tokenizer interface required by LMQL. 
+
+See .tokenizers for concrete implementations.
+"""
+
 import os
+import pickle
+import numpy as np
 from lmql.runtime.caching import cache_file_exists, cachefile
 
 from lmql.runtime.tokenizers.pure_python_tokenizer import PythonBackedTokenizer
@@ -41,6 +49,9 @@ class LMQLTokenizer:
         if self._tokenizer_impl is None:
             self.loader_thread.join()
         return self._tokenizer_impl
+    
+    def name(self):
+        return self.tokenizer_impl.name
 
     @property
     def vocab_size(self):
@@ -63,37 +74,58 @@ class LMQLTokenizer:
     def convert_tokens_to_string(self, tokens):
         return self.tokenizer_impl.convert_tokens_to_string(tokens)
 
-    def tokenize(self, s):
+    def tokenize(self, s, asbytes=False):
         tokens = []
         for s in self.chunk_out_by_tags(s, tokenize=False):
             if s.startswith("lmql:"):
-                tokens.append(s)
-            else:
-                tokens += self.tokenizer_impl.tokenize(s)
-        return tokens
-        
-    def decode(self, input_ids):
-        key = str(input_ids)
-        n = len(input_ids)
-        if n in self.detokenizer_cache.keys():
-            if key in self.detokenizer_cache[n].keys():
-                # print("cache hit")
-                return self.detokenizer_cache[n][key]
-        if n-1 in self.detokenizer_cache.keys():
-            key = str(input_ids[:-1])
-            if key in self.detokenizer_cache[n-1].keys():
-                global reverse_special_token_mappings
-                # print("secondary cache hit")
-                if input_ids[-1] >= self.vocab_size:
-                    extended = self.detokenizer_cache[n-1][key] + "<" + reverse_special_token_mappings[input_ids[-1]] + "/>"
+                if asbytes:
+                    tokens.append(f"<{s}/>".encode("utf-8"))
                 else:
-                    extended = self.detokenizer_cache[n-1][key] + self.tokenizer_impl.decode([input_ids[-1]], clean_up_tokenization_spaces=False)
-                    if self.INVALID_CHARACTER in extended:
-                        return self.detokenizer_cache[n-1][key]
-                if not n in self.detokenizer_cache.keys():
-                    self.detokenizer_cache[n] = {}
-                self.detokenizer_cache[n][str(input_ids)] = extended
-                return extended
+                    tokens.append(s)
+            else:
+                tokens += self.tokenizer_impl.tokenize(s, asbytes=asbytes)
+
+        return tokens
+    
+    def decode_bytes(self, input_ids):
+        """
+        Transforms a list of input ids into a byte sequences.
+        """
+        chunk = []
+        result = []
+        global reverse_special_token_mappings
+        
+        for i in input_ids:
+            if i in reverse_special_token_mappings.keys():
+                chunk_result = self.tokenizer_impl.decode_tokens_bytes(chunk)
+                result += chunk_result
+                result.append(reverse_special_token_mappings[i].encode("utf-8"))
+                chunk = []
+            else:
+                chunk.append(i)
+
+        if len(chunk) > 0:
+            result += self.tokenizer_impl.decode_tokens_bytes(chunk)
+
+        return result
+
+    def convert_bytes_to_ids(self, token_bytes):
+        """
+        Transforms text into a tokenized byte sequence.
+        """
+        # TODO: handle special IDs, i.e. tags (only relevant for tag use with LMTP backend)
+        return self.tokenizer_impl.convert_token_bytes_to_ids(token_bytes)
+
+    def convert_bytes_to_string(self, token_bytes):
+        """
+        Transforms token bytes into a text.
+        """
+        # TODO: handle special IDs, i.e. tags (only relevant for tag use with LMTP backend)
+        return self.tokenizer_impl.convert_bytes_to_string(token_bytes)
+
+    def decode(self, input_ids):
+        if len(input_ids) > 0 and type(input_ids[0]) is np.bytes_:
+            return self.convert_bytes_to_string(input_ids)
 
         s = ""
         for chunk in self.chunk_out_by_special_ids(input_ids):
@@ -101,10 +133,6 @@ class LMQLTokenizer:
                 s += chunk
             else:
                 s += self.tokenizer_impl.decode(chunk, clean_up_tokenization_spaces=False)
-
-        if not n in self.detokenizer_cache.keys():
-            self.detokenizer_cache[n] = {}
-        self.detokenizer_cache[n][key] = s
 
         return s
 
@@ -173,6 +201,7 @@ class LMQLTokenizer:
             offset = m.end()
         segments.append(s[offset:])
         return segments
+            
 
 def load_tokenizer_notransformers(model_identifier):
     if not "SLOW_TOKENIZER_OK" in os.environ.keys():
@@ -182,16 +211,10 @@ def load_tokenizer_notransformers(model_identifier):
     return PythonBackedTokenizer(model_identifier)
 
 def load_tokenizer(model_identifier, type="auto"):
-    import os
-
-    # first try to load pickled tokenizer from cache (faster)
-    import pickle
-    import pathlib
-
     cache_identifier = model_identifier.replace("/", "-")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
-    if type != "hf":
+    if type in ["auto", "tiktoken"]:
         tiktoken_available = False
         # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
         try:
@@ -227,9 +250,34 @@ def load_tokenizer(model_identifier, type="auto"):
 
                 with cachefile(cache_path, "wb") as f:
                     pickle.dump(t, f)
+<<<<<<< HEAD
             return t
         
         return LMQLTokenizer(model_identifier, loader=loader)
+=======
+            
+            return LMQLTokenizer(t, model_identifier)
+
+    try:
+        assert type in ["auto", "hf"]
+
+        import os
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
+        import torch
+        from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
+
+        assert TransformersTokenizer.is_available(model_identifier), "TransformersTokenizer not available. Please make sure the 'transformers' package is installed."
+
+        if cache_file_exists(cache_path):
+            with cachefile(cache_path, "rb") as f:
+                return LMQLTokenizer(pickle.load(f), model_identifier)
+        else:
+            t = TransformersTokenizer(model_identifier)
+
+            with cachefile(cache_path, "wb") as f:
+                pickle.dump(t, f)
+>>>>>>> ce6254a5728a375eb41028bd2a318ffe5172fd3c
     except Exception as e:
         # fallback to non-transformers tokenizer
         t = load_tokenizer_notransformers(model_identifier)
@@ -243,6 +291,8 @@ def get_vocab(tokenizer):
         return tokenizer.get_vocab()
     elif hasattr(tokenizer, "tokenizer_impl"):
         return get_vocab(tokenizer.tokenizer_impl)
+    elif hasattr(tokenizer, "tokenizer"):
+        return get_vocab(tokenizer.tokenizer)
     else:
         assert False, "Could not obtain full vocabulary from unknown tokenizer type: {}".format(type(tokenizer))
 

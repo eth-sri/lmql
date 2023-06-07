@@ -84,7 +84,7 @@ source scripts/activate-dev.sh
 
 This section outlines how to setup an LMQL development environment without local GPU support. Note that LMQL without local GPU support only supports the use of API-integrated models like `openai/text-davinci-003`. Please see the OpenAI API documentation (https://platform.openai.com/docs/models/gpt-3-5) to learn more about the set of available models.
 
-To setup a `conda` environment for LMQL with GPU support, run the following commands:
+To setup a `conda` environment for LMQL with no GPU support, run the following commands:
 
 ```
 # prepare conda environment

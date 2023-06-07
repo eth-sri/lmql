@@ -15,7 +15,7 @@ def ensure_array(v, dtype=None):
     else: return np.array(v, dtype=dtype)
 
 def ensure_iterable(v):
-    if type(v) is np.float32 or type(v) is np.float64 or type(v) is np.int32 or type(v) is np.int64 or type(v) is float or type(v) is int:
+    if type(v) is np.float32 or type(v) is np.float64 or type(v) is np.int32 or type(v) is np.int64 or type(v) is float or type(v) is int or type(v) is str:
         return [v]
     elif type(v) is np.ndarray:
         if v.ndim == 0:
@@ -31,7 +31,12 @@ def ensure_iterable(v):
 
 
 def log_softmax(a):
-    return a - np.log(np.sum(np.exp(a)))
+    # check for log div by zero
+    normalizer = np.sum(np.exp(a))
+    if normalizer == 0:
+        # assign 1.0 to max value
+        return np.where(a == np.max(a), 0.0, -np.inf)
+    return a - np.log(normalizer)
 
 def topk(a, k:int, sorted: bool = False, axis=-1):
     assert k > 0, "topk(): k must be > 0"

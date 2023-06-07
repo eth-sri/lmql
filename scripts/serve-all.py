@@ -1,6 +1,7 @@
 import subprocess
 import os
 import termcolor
+import sys
 
 """
 Serves all web-facing content:
@@ -14,6 +15,16 @@ Serves all web-facing content:
 
 # chdir to project root 
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# ensure web-deploy/ exists
+os.makedirs("web-deploy", exist_ok=True)
+os.makedirs("docs/build/html", exist_ok=True)
+
+# make sure 'onchange' is installed
+try:
+    subprocess.run(["onchange", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+except:
+    print("Please install 'onchange' with 'npm install -g onchange'")
+    sys.exit(1)
 
 processes = []
 

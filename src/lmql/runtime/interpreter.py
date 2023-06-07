@@ -16,6 +16,7 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.runtime.model_registry import LMQLModelRegistry
+from lmql.models.model import LMQLModel
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -192,28 +193,34 @@ class PromptInterpreter:
             LMQLModelRegistry.backend_configuration = kwargs["backend"]
 
     def set_model(self, model_name):
+        model_args = {}
+
         if type(model_name) is not str:
-            # derive model endpoint from model object
-            if hasattr(model_name, "port"):
-                endpoint = "localhost:" + str(model_name.port)
-                if self.decoder_kwargs.get("backend") is not None:
-                    if self.decoder_kwargs["backend"] != endpoint:
-                        print("warning: The provided query specifies a backend at " + self.decoder_kwargs["backend"] + " but the passed model is served at " + 
-                              endpoint + ".", "Using the model's backend instead.")
-                self.decoder_kwargs["backend"] = endpoint
-                LMQLModelRegistry.backend_configuration = endpoint
-            
-            # read the model name from the model object
-            if hasattr(model_name, "model"):
-                model_name = model_name.model
+            assert isinstance(model_name, LMQLModel), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
+            model_object = model_name
+
+            if model_name.model is not None:
+                model_object = model_name.model
+                # if model_object is a type reference, we can use the model_identifier
+                if callable(model_object):
+                    model_object = model_object()
+
+                self.model_identifier = model_object.model_identifier
+                self.model = model_object
+
+                # setup the VocabularyMatcher to use the concrete vocabulary of the model
+                VocabularyMatcher.init(self.model.get_tokenizer())
+
+                return
             else:
-                assert False, "LMQL query specifies an invalid model name"
+                model_name = model_object.model_identifier
+                model_args = model_object.kwargs
 
         if self.model is None:
             self.model = model_name
             self.model_identifier = model_name
 
-        client = LMQLModelRegistry.get(self.model)
+        client = LMQLModelRegistry.get(self.model, **model_args)
 
         # setup the VocabularyMatcher to use the concrete vocabulary of the model
         VocabularyMatcher.init(client.get_tokenizer())
@@ -320,7 +327,7 @@ class PromptInterpreter:
         # check for tail and prescore
         if hasattr(self.dcmodel, "prescore_tokens"):
             if has_tail(mask):
-                tail_tokenized = self.tokenizer(mask.tail)["input_ids"]
+                tail_tokenized = self.tokenizer.tokenize(mask.tail, asbytes=True)
                 await self.dcmodel.prescore_tokens(s, tail_tokenized, noscore=kwargs.get("noscore", False))
         
         return logit_mask, state
@@ -520,7 +527,6 @@ class PromptInterpreter:
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
             text_diff = text[len(await seq.text(state.variable_offset, limit=-2, pretty=False)):]
             
-            assert seq.input_ids[-1] == self.tokenizer.eos_token_id, "last token must be eos token"
             variable_value = text
             # set raw variable value
             program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin")
@@ -576,6 +582,23 @@ class PromptInterpreter:
                 variable_offset = len(combined_new_ids)
 
                 rewritten_state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
+
+
+                if type(combined_new_ids[0]) is bytes:
+                    res = []
+                    i = 0
+                    while i < len(combined_new_ids):
+                        if type(combined_new_ids[i]) is bytes:
+                            res += [combined_new_ids[i]]
+                            i += 1
+                        else:
+                            j = i+1
+                            while j < len(combined_new_ids) and type(combined_new_ids[j]) is not bytes:
+                                j += 1
+                            r = self.tokenizer.decode_bytes(combined_new_ids[i:j])
+                            res += r
+                            i = j
+                    combined_new_ids = np.array(res, dtype=np.bytes_)
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(
@@ -666,7 +689,9 @@ class PromptInterpreter:
         prompt_ids = await self.tokenize(self.root_state.prompt)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
-        n = len(prompt_ids)
+        
+        prompt = self.tokenizer.tokenize(self.root_state.prompt, asbytes=True)
+        n = len(prompt)
         
         # make sure that the initial prompt is not considered part of a variable
         self.root_state = self.root_state.updated(variable_offset=n)
@@ -745,7 +770,7 @@ class PromptInterpreter:
             self.decoder_step = 0
             average_step_time = None
             start = time.time()
-            async for _ in decoder_fct(prompt_ids, **decoder_args):
+            async for _ in decoder_fct(prompt, **decoder_args):
                 await debug_out(self.decoder_step)
                 self.decoder_step += 1
 
@@ -802,17 +827,11 @@ class PromptInterpreter:
             self.decoder_step += 1
 
             return results
-        finally:
-            # make sure token cache is saved if possible
-            self.dcmodel.save()
-
-            if hasattr(self.dcmodel, "close"):
-                self.dcmodel.close()
 
     def validate_args(self, decoder_args, decoder_fct):
         INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", 
-                         "backend", "chunk_timeout", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", 
-                         "show_speculative", "openai_nonstop"]
+                         "chunk_timeout", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", 
+                         "show_speculative", "openai_nonstop", "chunksize"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args

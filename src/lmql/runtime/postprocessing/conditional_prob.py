@@ -11,13 +11,14 @@ class ConditionalDistributionPostprocessor:
         self.output_writer = interpreter.output_writer
 
     async def score(self, prompt: str, values, dcmodel: dc.DcModel):
-        prompt_seq = dc.seq([dcmodel.bos_token_id] + await dcmodel.tokenize(prompt))
-        value_ids = [await dcmodel.tokenize(value) for value in values]
+        prompt_seq = dc.seq(dcmodel.tokenizer.tokenize(prompt, asbytes=True))
+        value_ids = [dcmodel.tokenizer.tokenize(value, asbytes=True) for value in values]
 
         dcmodel.log_billable_tokens(sum(len(ids) + 1 for ids in value_ids) + len(value_ids) * (len(prompt_seq.input_ids)))
         dcmodel.log_queries(sum(len(ids) + 1 for ids in value_ids))
 
         value_scores = []
+
         scoring_results = await dcmodel.score([prompt_seq] * len(value_ids), value_ids)
         for s, value in zip(scoring_results, value_ids):
             s = s.expand()
@@ -59,7 +60,7 @@ class ConditionalDistributionPostprocessor:
 
             # print("Computing P({} | {}) for result {}...".format(distribution_variable, result.prompt[:10] + "...", i))
 
-            scores = np.stack([s.sum() for s in scores], axis=0)
+            scores = np.stack([s.mean() for s in scores], axis=0)
             log_probs = nputil.log_softmax(scores)
             probs = np.exp(log_probs)
             

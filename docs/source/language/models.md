@@ -8,5 +8,6 @@ Due to the modular design of LMQL, it is easy to add support for new models and 
 :maxdepth: 1
 
 openai.md
+azure.md
 hf.md
 ```

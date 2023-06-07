@@ -111,6 +111,7 @@ async def beam_sample(prompt_ids: np.ndarray, n=4, max_len=None, temperature=Non
     n = kwargs.get("num_beams", n)
     max_len = max_len or 2048
     model = dc.model(**kwargs)
+    temperature = temperature or 1.0
 
     # keep track of active beams and finished sequences
     h = dc.seqs([dc.seq(prompt_ids)] * 1)
