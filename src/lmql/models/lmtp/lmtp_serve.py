@@ -1,3 +1,7 @@
+"""
+Command Line Interface for lmtp_inference_server.py.
+"""
+
 from .lmtp_inference_server import *
 from .utils import rename_model_args
 

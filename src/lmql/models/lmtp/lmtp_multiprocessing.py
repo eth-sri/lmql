@@ -1,3 +1,8 @@
+"""
+A client/server implementation for LMTP that runs the model in a subprocess
+and communicates with it via multiprocessing pipes (IPC).
+"""
+
 import multiprocessing
 import pickle
 import sys
