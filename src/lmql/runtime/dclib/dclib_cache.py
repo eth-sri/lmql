@@ -388,7 +388,6 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     def save_cached(self, ids: List[bytes], tokens, scores, user_data):
         # add cache entries along pre-scored trajectory
         for tok, score in zip(tokens, scores):
-            print(ids, tok, score)
             value = (np.array(tok).reshape(1), np.array(score).reshape(1))
             self.set_cache([(self.base_key(ids, user_data), tok)], value)
             ids = np.append(ids, tok)

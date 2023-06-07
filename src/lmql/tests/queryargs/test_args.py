@@ -71,13 +71,13 @@ async def test_query_args():
     input_value = "Hi there"
     a_value = 8 
     
-    # positional, keyword, self as chain()
-    i = agent.interact.chain()
-    s, a, ag, captured = (await i(agent, input_value, a=a_value, output_writer=lmql.stream("ANSWER")))[0]
-    assert s == input_value, f"Expected {input_value}, got {s}"
-    assert a == a_value, f"Expected {a_value}, got {a}"
-    assert ag == agent, f"Expected {agent}, got {a}"
-    assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
+    # method use in LC currently not supported
+    # i = agent.interact.aschain()
+    # s, a, ag, captured = (await i({"self": agent, "s": input_value, "CONSTANT": CONSTANT, "a": a_value}))[0]
+    # assert s == input_value, f"Expected {input_value}, got {s}"
+    # assert a == a_value, f"Expected {a_value}, got {a}"
+    # assert ag == agent, f"Expected {agent}, got {a}"
+    # assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
 
     # positional, keyword, self
     s, a, ag, captured = (await agent.interact(input_value, a=a_value, output_writer=lmql.stream("ANSWER")))[0]
@@ -124,3 +124,44 @@ async def test_query_args():
     s, captured = (await capture(input_value))[0]
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
+
+# multi kw default
+@lmql.query
+async def multi_kw_chain(s: str = 'default', a: int = 12):
+    '''lmql
+    argmax
+        return {"result": (s, a)}
+    from
+        "chatgpt"
+    '''
+
+# multi kw default
+@lmql.query
+async def no_return_chain(s: str = 'default', a: int = 12):
+    '''lmql
+    argmax
+        "This is [R1] and [R2]"
+    from
+        "chatgpt"
+    where
+        R1 == s and R2 == "8"
+    '''
+
+
+def test_decorated_chain():
+    c = multi_kw_chain.aschain(output_keys=["result"])
+    
+    input_value = "Hi there"
+    a_value = 8
+
+    # as chain
+    s,a = c({"s": input_value, "a": a_value})["result"]
+    assert s == input_value, f"Expected {input_value}, got {s}"
+    assert a == a_value, f"Expected {a_value}, got {a}"
+
+    c = no_return_chain.aschain()
+    res = c({"s": input_value, "a": a_value})
+    s = res["R1"]
+    a = res["R2"]
+    assert s == input_value, f"Expected {input_value}, got {s}"
+    assert a == str(a_value), f"Expected {a_value}, got {a}"

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from lmql.ops.ops import *
-from lmql.runtime.langchain import LMQLChainMixIn
+from lmql.runtime.langchain import chain
 from lmql.runtime.output_writer import silent
 from lmql.runtime.interpreter import PromptInterpreter
 from lmql.runtime.postprocessing.conditional_prob import \
@@ -46,7 +46,7 @@ class FunctionContext:
     scope: LMQLInputVariableScope
 
 
-class LMQLQueryFunction(LMQLChainMixIn):
+class LMQLQueryFunction:
     fct: Any
     output_variables: List[str]
     postprocessors: List[Any]
@@ -62,15 +62,10 @@ class LMQLQueryFunction(LMQLChainMixIn):
     lmql_code: str = None
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
-        # check for pydantic base class and do kw initialization then
-        if hasattr(self, "schema_json"):
-            super().__init__(fct=fct, output_variables=output_variables, postprocessors=postprocessors, scope=scope, *args, **kwargs)
-        else:
-            # otherwise, do standard initialization
-            self.fct = fct
-            self.output_variables = output_variables
-            self.postprocessors = postprocessors
-            self.scope = scope
+        self.fct = fct
+        self.output_variables = output_variables
+        self.postprocessors = postprocessors
+        self.scope = scope
         
         self.output_writer = None
         self.args = [a for a in inspect.getfullargspec(fct).args if a != "context"]
@@ -80,7 +75,6 @@ class LMQLQueryFunction(LMQLChainMixIn):
 
     @property
     def input_keys(self) -> List[str]:
-        self.is_langchain_use = True
         return self.args
     
     def __getattribute__(self, __name: str) -> Any:
@@ -104,15 +98,15 @@ class LMQLQueryFunction(LMQLChainMixIn):
         signature = self.function_context.argnames
         args_of_query = self.function_context.args_of_query
         scope = self.function_context.scope
-
+        
         runtime_args = {k:v for k,v in kwargs.items() if not k in signature.parameters.keys() and k not in args_of_query}
         query_kwargs = {k:v for k,v in kwargs.items() if k in signature.parameters.keys()}
 
         compiled_query_args = {}
-        
+
         # initialize with default values
         for name, param in signature.parameters.items():
-            if param.default is not inspect.Parameter.empty:
+            if param.default is not inspect.Parameter.empty and name in args_of_query:
                 compiled_query_args[name] = param.default
 
         # bind args and kwargs to signature
@@ -121,6 +115,8 @@ class LMQLQueryFunction(LMQLChainMixIn):
         except TypeError as e:
             if len(e.args) == 1 and e.args[0].startswith("missing "):
                 e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
+            elif len(e.args) == 1:
+                e.args = (e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
             raise e
         
         # special case, if signature is empty (no input variables provided)
@@ -190,6 +186,16 @@ class LMQLQueryFunction(LMQLChainMixIn):
         interpreter.dcmodel.close()
 
         return results
+
+    def aschain(self, output_keys=None):
+        """
+        Returns a LangChain 'Chain' object that can be used to chain multiple queries together.
+
+        Args:
+            output_keys: List of output keys in LangChain. If None, output keys are automatically derived from 
+                the set of template variables in the query.
+        """
+        return chain(self, output_keys=output_keys)
 
 def context_call(fct_name, *args, **kwargs):
     return ("call:" + fct_name, args, kwargs)

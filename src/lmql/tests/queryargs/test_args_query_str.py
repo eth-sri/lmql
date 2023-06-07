@@ -27,6 +27,14 @@ from
 '''
 , input_variables=['s', 'a'])
 
+multipos_chain = lmql.query('''lmql
+argmax
+    return {"result": (s, a)}
+from
+    "chatgpt"
+'''
+, input_variables=['s', 'a']).aschain(output_keys=['result'])
+
 async def test_query_args_with_str():
     input_value = "Hi there"
     a_value = 8 
@@ -64,8 +72,11 @@ async def test_query_args_with_str():
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert a == a_value, f"Expected {a_value}, got {a}"
 
+def test_query_args_with_str_aschain():
+    input_value = "Hi there"
+    a_value = 8
+
     # as chain
-    multipos_chain = multipos.chain()
-    s, a = (await multipos_chain(input_value, a_value))[0]
+    s,a = multipos_chain({"s": input_value, "a": a_value})["result"]
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert a == a_value, f"Expected {a_value}, got {a}"

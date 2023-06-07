@@ -133,7 +133,7 @@ def query(fct, input_variables=None):
         return module.query(*args, **kwargs)
 
     # copy all attributes of model.query to the wrapper function
-    for attr in ["chain"]:
+    for attr in ["aschain"]:
         setattr(lmql_query_wrapper, attr, getattr(module.query, attr))
 
     return lmql_query_wrapper
