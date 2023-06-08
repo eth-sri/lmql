@@ -1,3 +1,9 @@
+"""
+Thread-based LMTP client/server implementation.
+
+Experimental and not usable with LMQL, due to threading issues.
+"""
+
 from queue import Queue
 from .lmtp_client import *
 import threading

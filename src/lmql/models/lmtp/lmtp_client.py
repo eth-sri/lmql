@@ -1,3 +1,9 @@
+"""
+This file includes a simple 'websocket' based client for LMTP. 
+
+For debugging purposes, run this file directly for an interactive client CLI.
+"""
+
 import aiohttp
 import asyncio
 import json
@@ -9,6 +15,9 @@ class LMTPStreamError(Exception):
     pass
 
 class LMTPWebSocketClient:
+    """
+    Simple 'websockets' based client for LMTP.
+    """
     def __init__(self, model_identifier, ws: aiohttp.ClientWebSocketResponse):
         self.ws = ws
         self.stream_id = 0
@@ -111,8 +120,57 @@ async def main():
             
             print("[LMTP connection closed]", flush=True)
 
+def parse_kwargs(line):
+    kwargs = {}
+    prompt = ""
+    for arg in line.split(" "):
+        if "=" in arg:
+            k, v = arg.split("=", 1)
+            kwargs[k] = eval(v)
+        elif len(kwargs) == 0:
+            prompt += arg + " "
+    return prompt, kwargs
+
+async def interactive_client():
+    import aioconsole
+    import termcolor
+
+    async with aiohttp.ClientSession() as session:
+        async with session.ws_connect('http://localhost:8080') as ws:
+            import tiktoken
+
+            model = sys.argv[1]
+            tokenizer = tiktoken.encoding_for_model("text-ada-001")
+
+            client = LMTPWebSocketClient(model, ws)
+            client.connect()
+
+            consumer_tasks = []
+
+            while True:
+                prompt = await aioconsole.ainput(">>>> ")
+                prompt, kwargs = parse_kwargs(prompt)
+                if prompt == "quit":
+                    break
+                prompt = tokenizer.encode(prompt)
+                ids = [*prompt]
+
+                async def consume():
+                    try:
+                        tokens = [*ids]
+                        async for t in client.generate(ids, **kwargs):
+                            tokens += [t["token"]]
+                            print(t, flush=True)
+                            termcolor.cprint(tokenizer.decode(tokens), flush=True, color="green")
+                            print(">>>> ", end="", flush=True)
+                    except Exception as e:
+                        print("Failed to consume", e, flush=True)
+
+                consumer_tasks.append(asyncio.create_task(consume()))
+            
+            print("[LMTP connection closed]", flush=True)
 
 # time.sleep(1.5)
 # print("Starting LMTP client", flush=True)
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(interactive_client())

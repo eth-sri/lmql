@@ -1,3 +1,13 @@
+"""
+HuggingFace Transformers LMTP inference server implementation.
+
+To run an instance of this LMTP server, run e.g. the following command:
+
+lmql serve-model --cuda gpt2-medium
+
+See lmtp_client for an example how to connect to this server via 'websocket'.
+"""
+
 import sys
 import aiohttp
 from aiohttp import web

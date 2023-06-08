@@ -1,3 +1,8 @@
+"""
+LMQL model implementation that uses the LMTP protocol to communicate with a
+hosted model server, or a model running in a separate process.
+"""
+
 from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.tokenizer import load_tokenizer
 from .lmtp_client import LMTPWebSocketClient
