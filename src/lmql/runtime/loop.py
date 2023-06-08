@@ -21,7 +21,10 @@ def call_sync(lmql_query_function, *args, **kwargs):
     global lmql_loop
 
     if lmql_loop is None:
-        lmql_loop = asyncio.new_event_loop()
+        try:
+            lmql_loop = asyncio.get_event_loop()
+        except RuntimeError as e:
+            lmql_loop = asyncio.new_event_loop()
     loop = lmql_loop
     
     asyncio.set_event_loop(loop)
