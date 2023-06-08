@@ -925,9 +925,9 @@ class Truncated extends React.Component {
   }
 
   componentDidMount() {
-    /* this.stepper = setInterval(() => {
+    this.stepper = setInterval(() => {
       this.setState(s => Object.assign(s, { typingOffset: s.typingOffset + 16 }))
-    }, 5) */
+    }, 5)
   }
 
   componentWillUnmount() {
