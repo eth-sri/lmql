@@ -7,7 +7,12 @@ module.exports = { queries: [
             // hello world
             name: "👋 Hello World",
             description: "Who This?",
-            code: `argmax "Hello[WHO]" from "openai/text-ada-001" where len(WHO) < 10`,
+            code: `argmax 
+            "Say 'this is a test':[RESPONSE]" 
+         from 
+            "openai/text-ada-001" 
+         where 
+            len(TOKENS(RESPONSE)) < 10`,
             state: 'precomputed/hello.json'
          },
          {
