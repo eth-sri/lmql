@@ -178,6 +178,8 @@ def hello():
         asyncio.run(lmql.run(code_local, output_writer=lmql.printing))
     
     if backend is None or backend == "openai":
+        import lmql.runtime.dclib as dc
+        dc.clear_tokenizer()
         print("[Greeting OpenAI]")
         code_openai = """
     argmax "Hello[WHO]" from "openai/text-ada-001" where len(WHO) < 10    
