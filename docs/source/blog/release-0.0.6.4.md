@@ -3,9 +3,9 @@ metadata:authors: team
 
 # Releasing LMQL 0.0.6.4: LMTP, Azure, Synchronous API, and more
 
-Among many things the update contains several bug fixes and improvements. The most notable changes are:
+Among many things, this update contains several bug fixes and improvements. The most notable changes are:
 
-* **Azure OpenAPI support** LMQL now supports OpenAI models that are served via Azure. For more information on how to use Azure models, please see the corresponding chapter in the [documentation](https://docs.lmql.ai/en/stable/language/azure.html). Many thanks to [@veqtor](https://github.com/veqtor) for contributing this feature.
+* **Azure OpenAI support** LMQL now supports OpenAI models that are served via Azure. For more information on how to use Azure models, please see the corresponding chapter in the [documentation](https://docs.lmql.ai/en/stable/language/azure.html). Many thanks to [@veqtor](https://github.com/veqtor) for contributing this feature.
 
 * **Local Models via the Language Model Transport Protocol** LMQL 0.0.6.4 implements a novel protocol to stream token output from local models, vastly improving performance. In our first benchmarks, we observed a 5-6x speedup for local model inference. For more information on how to use local models, please see the corresponding chapter in the [documentation](https://docs.lmql.ai/en/stable/language/hf.html).
 
