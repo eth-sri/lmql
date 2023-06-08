@@ -26,6 +26,7 @@ from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
 from lmql.models.model import model
+from lmql.runtime.loop import main
 
 model_registry = LMQLModelRegistry
 
@@ -80,10 +81,24 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     return await module.query(*args, **kwargs)
 
 async def run(code, *args, **kwargs):
+    """
+    Compiles and runs the given query string asynchronously.
+
+    For synchronous execution (w/o await), use `lmql.run_sync` instead.
+    """
     q = _query_from_string(code)
     return await q(*args, **kwargs)
         
-def _query_from_string(s, input_variables=None):
+def run_sync(code, *args, **kwargs):
+    """
+    Compiles and runs the given query string synchronously.
+
+    For async execution, use `lmql.run` instead.
+    """
+    q = _query_from_string(code, is_async=False)
+    return q(*args, **kwargs)
+
+def _query_from_string(s, input_variables=None, is_async=True):
     if input_variables is None: input_variables = []
 
     import inspect
@@ -98,10 +113,38 @@ def _query_from_string(s, input_variables=None):
     fct_signature = inspect.Signature(parameters=[inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD) for name in input_variables])
 
     module.query.function_context = FunctionContext(fct_signature, compiled_query_fct_args, scope)
+    module.query.is_async = is_async
     
     return module.query
 
-def query(fct, input_variables=None):
+def query(fct, input_variables=None, is_async=True):
+    """
+    Constructs a new LMQL query function from the given function and or string of code.
+
+    You can use `lmql.query` as a function decorator or to compile a string of LMQL code.
+
+    * As a decorator, it can be used as follows:
+
+        ```python
+        @lmql.query
+        def my_query_function():
+            '''
+            <LMQL codee>
+            '''
+        ```
+
+        @lmql.query functions can also be annotated as async, in which case the returned query function will be async as well.
+
+    * As an alternative @lmql.query, you can also pass a string of LMQL code to `lmql.query` directly:
+
+        ```python
+        my_query_function = lmql.query('''
+            <LMQL code>
+        ''')
+
+        By default the returned query function is asynchronous (has to be called as `await my_query_function(...)`).
+        To construct a synchronous query function, use lmql.query(<query string>, is_async=False).
+    """
     import inspect
 
     if type(fct) is LMQLQueryFunction: return fct
@@ -121,13 +164,14 @@ def query(fct, input_variables=None):
         f.write(code)
     module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
     
-    assert inspect.iscoroutinefunction(fct), f"@lmql.query {fct.__name__} must be declared async."
+    is_async = inspect.iscoroutinefunction(fct)
     
     decorate_fct_signature = inspect.signature(fct)
     compiled_query_fct_args = inspect.getfullargspec(module.query.fct).args
     
     # set the function context of the query based on the function context of the decorated function
     module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
+    module.query.is_async = is_async
 
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)
@@ -144,16 +188,6 @@ async def static_prompt(query_fct, *args, **kwargs):
     """
     res = await query_fct(*args, **kwargs, return_prompt_string=True)
     return res[0]
-
-def main(query_fct, **kwargs):
-    """
-    Runs the provided query function in the main thread
-    and returns the result.
-
-    This call is blocking.
-    """
-    import asyncio
-    return asyncio.run(query_fct(**kwargs))
 
 def serve(*args, **kwargs):
     assert not "LMQL_BROWSER" in os.environ, "lmql.serve is not available in the browser distribution of LMQL."

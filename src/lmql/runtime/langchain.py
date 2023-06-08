@@ -2,6 +2,7 @@ from typing import List, Dict, Any
 
 global lmql_chain_loop
 lmql_chain_loop = None
+from .loop import call_sync
 
 def chain(lmql_query_function, output_keys=None):
     from langchain.chains.base import Chain
@@ -21,21 +22,7 @@ def chain(lmql_query_function, output_keys=None):
 
         def _call(self, inputs: Dict[str, str]) -> Dict[str, str]:
             import asyncio
-            global lmql_chain_loop
-
-            if lmql_chain_loop is None:
-                lmql_chain_loop = asyncio.new_event_loop()
-            loop = lmql_chain_loop
-            
-            asyncio.set_event_loop(loop)
-
-            task = lmql_query_function.__acall__(**inputs)
-            res = loop.run_until_complete(task)
-            
-            # except Exception as e:
-            #     print("Exception in lmql chain", e)
-            #     lmql_chain_loop = asyncio.get_event_loop()
-            #     res = lmql_chain_loop.run_in_executor(None, task)
+            res = call_sync(lmql_query_function, **inputs)
             
             assert type(res) is not asyncio.Future, "Failed to async call lmql query function"
             
