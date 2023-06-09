@@ -85,6 +85,7 @@ Contents
     python/llama_index.ipynb
     python/pandas.ipynb
     python/output.md
+    python/comparison.md
    
 .. toctree::
     :maxdepth: 1
