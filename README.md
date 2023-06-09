@@ -6,7 +6,7 @@
   <h3 align="center">LMQL</h3>
 
   <p align="center">
-    A query language for programming (large) language models.
+    A programming language for large) language models.
     <br />
     <a href="https://docs.lmql.ai"><strong>Documentation »</strong></a>
     <br />
