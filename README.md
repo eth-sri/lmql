@@ -38,29 +38,59 @@ Features:
 - [X] **Flexible Tooling**: Enjoy an interactive development experience with [LMQL's Interactive Playground IDE](https://lmql.ai/playground), and [Visual Studio Code Extension](https://marketplace.visualstudio.com/items?itemName=lmql-team.lmql).
 - [X] **Output Streaming**: Stream model output easily via [WebSocket, REST endpoint, or Server-Sent Event streaming](https://github.com/eth-sri/lmql/blob/main/src/lmql/output/).
 
-## Example Showcase
+## Explore LMQL
 
-Learn more about LMQL by exploring our [Example Showcase](https://lmql.ai) or by running your programs in our [browser-based Playground IDE](https://lmql/playground).
+A simple example program in LMQL looks like this:
 
+```python
+argmax
+   "Greet LMQL:[GREETINGS]\n"
+   
+   if "Hi there" in GREETINGS:
+      "Can you reformulate your greeting in the speech of victorian-era English: [VIC_GREETINGS]\n"
+   
+   "Analyse what part of this response makes it typically victorian:\n"
+   for i in range(4):
+      "-[THOUGHT]\n"
+   
+   "To summarize:[SUMMARY]"
+from 
+   "openai/text-davinci-003" 
+where 
+   stops_at(GREETINGS, ".") and not "\n" in GREETINGS and 
+   stops_at(VIC_GREETINGS, ".") and 
+   stops_at(THOUGHT, ".")
+```
+
+Program Output:
 <div align="center">
+  <img src="https://github.com/eth-sri/lmql/assets/17903049/243176f1-dfd4-4129-a59e-ca3dee068295"/>
   <br/>
-<a href="https://lmql.ai/playground">
-  <img width="700pt" alt="playground" src="https://github.com/eth-sri/lmql/assets/17903049/3beea8c3-e914-4cd4-aacb-2bbcff55dec0"/>
-  <br/>
-</a>
-  <br/>
-  <i>LMQL's Playground IDE</i>
 </div>
+
+
+
+The main body of an LMQL program reads like standard Python (with control-flow), where top-level strings are interpreted as model input with template variables like `[GREETINGS]`. 
+
+The `argmax` keyword in the beginning specifies the decoding algorithm used to generate tokens, e.g. `argmax`, `sample` or
+even advanced branching decoders like [beam search and `best_k`](https://docs.lmql.ai/en/stable/language/decoders.html).
+
+The `from` and `where` clauses specify the model and constraints that are employed during decoding. 
+
+Overall, this style of language model programming facilitates guidance of the model's reasoning process, and constraining
+of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
+
+Learn more about LMQL by exploring our **[Example Showcase](https://lmql.ai)** or by running your own programs in our **[browser-based Playground IDE](https://lmql/playground)**.
 
 ## Getting Started
 
-To install the latest version of LMQL run the following command with Python >=3.10 installed.
+To install the latest version of LMQL run the following command with Python ==3.10 installed.
 
 ```
 pip install lmql
 ```
 
-**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/).
+**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/) and install via `pip install lmql[hf]`.
 
 ## Running LMQL Programs
 
