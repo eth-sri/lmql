@@ -23,7 +23,9 @@
   </p>
 </div>
 
-LMQL is a programming language for large language models (LLMs) based on a superset of Python. LMQL goes beyond traditional templating languages by providing full Python support yet a lightweight programming interface. LMQL is designed to make working with language models like OpenAI, 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatype constraints and control flow.
+LMQL is an open source programming language for large language models (LLMs) based on a *superset of Python*. LMQL goes beyond traditional templating languages by providing full Python support, yet a lightweight programming interface. 
+
+LMQL is designed to make working with language models like OpenAI, 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatype constraints and control flow.
 
 Features:
 
@@ -50,6 +52,7 @@ argmax
       "Can you reformulate your greeting in the speech of victorian-era English: [VIC_GREETINGS]\n"
    
    "Analyse what part of this response makes it typically victorian:\n"
+   
    for i in range(4):
       "-[THOUGHT]\n"
    
