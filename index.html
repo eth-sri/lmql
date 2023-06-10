@@ -507,7 +507,8 @@ Q: From which countries did the Norse originate?<br/>Action: Let's search Wikipe
      <span style="color: grey">➥</span> these actions, let's solve the following
      <span style="color: grey">➥</span> question.
    
-    Q: Alice, Bob, and Claire are playing
+    <anchor class="anchor-3">Q: Alice, Bob, and Claire are playing<label><div class="multiline">After our action instructions, we provide the model with the actual reasoning task.</div><div class="bridge"></div>
+                </label><div class="dot"></div></anchor>
      <span style="color: grey">➥</span> a game. At the start of the game, they
      <span style="color: grey">➥</span> are each holding a ball: Alice has
      <span style="color: grey">➥</span> a black ball, Bob has a brown ball,
@@ -519,7 +520,7 @@ Q: From which countries did the Norse originate?<br/>Action: Let's search Wikipe
      <span style="color: grey">➥</span> balls. At the end of the game, what
      <span style="color: grey">➥</span> ball does Alice have?
     A: Let's think step by step.\n"""</span>
-    <anchor class="anchor-3"><span class="lmql-kw">for</span> i <span class="lmql-kw">in</span> range(32):<label><div class="multiline">During reasoning, we make sure to intercept any <tt>assign</tt> and <tt>get</tt> actions, and inject the corresponding return values on the fly.</div><div class="bridge"></div>
+    <anchor class="anchor-4"><span class="lmql-kw">for</span> i <span class="lmql-kw">in</span> range(32):<label><div class="multiline">During reasoning, we make sure to intercept any <tt>assign</tt> and <tt>get</tt> actions, and inject the corresponding return values on the fly.</div><div class="bridge"></div>
                 </label><div class="dot"></div></anchor>
         <span class="lmql-str">"<span class="lmql-var sync val1">[REASONING]</span>"</span>
         <span class="lmql-kw">if</span> REASONING.endswith(<span class="lmql-str">"# result"</span>):
@@ -1015,7 +1016,7 @@ Review: We had a great stay. Hiking in the mountains was fabulous and the food i
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Sat, Jun 10, 2:56 PM (UTC)<br/>
+        Last updated on Sat, Jun 10, 3:16 PM (UTC)<br/>
       </div>
     </div>
   </div>
