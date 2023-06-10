@@ -328,8 +328,18 @@ class DclibOpenAiModel(DcModel):
             args = kwargs.copy()
             # args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
             print(f"openai complete: {args}", flush=True)
-        
-        return CompletionResult((await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))[len(tokenized_input_ids):], completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
+
+        buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
+        t = ""
+
+        # skip echoed prompt prefix (cannot just offset by tokenized_input_ids since server-side the prompt may be tokenized differently)
+        while len(t) < len(prompt_str):
+            skipped = await buffer.get(0)
+            skipped = skipped["logprobs"]["tokens"]
+            t += skipped
+            buffer = buffer[1:]
+
+        return CompletionResult(buffer, completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     
     async def tokenize_list(self, tokens: List[str]):
         if len(tokens) > 0 and type(tokens[0]) is str:
