@@ -100,7 +100,7 @@ class LMQLTokenizer:
             if i in reverse_special_token_mappings.keys():
                 chunk_result = self.tokenizer_impl.decode_tokens_bytes(chunk)
                 result += chunk_result
-                result.append(reverse_special_token_mappings[i].encode("utf-8"))
+                result.append(("<" + reverse_special_token_mappings[i] + "/>").encode("utf-8"))
                 chunk = []
             else:
                 chunk.append(i)

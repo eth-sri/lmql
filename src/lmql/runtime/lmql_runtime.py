@@ -36,8 +36,14 @@ class LMQLInputVariableScope:
                 raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query " + str(self.fct), name)
 
 class EmptyVariableScope:
-    def resolve(self, name):
-        return None
+    def resolve(self, name, errors=None):
+        if name in __builtins__.keys():
+            return __builtins__[name]
+        else:
+            if errors == "ignore":
+                return None
+            else:
+                raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query " + str(self.fct), name)
 
 @dataclass
 class FunctionContext:
@@ -137,6 +143,7 @@ class LMQLQueryFunction:
                 captured_variables.remove(name)
 
         failed_to_resolve = []
+
 
         # resolve remaining unset args from scope
         for v in captured_variables:

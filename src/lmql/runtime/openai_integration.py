@@ -330,14 +330,19 @@ class DclibOpenAiModel(DcModel):
             print(f"openai complete: {args}", flush=True)
 
         buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
-        t = ""
+        t = b""
+        to_skip = b"".join([i if not i.startswith(b"<lmql:") else i[len(b"<"):-len(b"/>")] for i in input_ids])
 
         # skip echoed prompt prefix (cannot just offset by tokenized_input_ids since server-side the prompt may be tokenized differently)
-        while len(t) < len(prompt_str):
+        while len(t) < len(to_skip):
             skipped = await buffer.get(0)
             skipped = skipped["logprobs"]["tokens"]
+            skipped = b"".join(self.convert([skipped]))
             t += skipped
+            # print("skipped in request echo ", [skipped], [to_skip[len(t) - len(skipped):len(t)]],  flush=True)
             buffer = buffer[1:]
+        
+        # print("skipped in request echo ", [t], [to_skip], flush=True)
 
         return CompletionResult(buffer, completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
     

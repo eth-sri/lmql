@@ -81,6 +81,35 @@ A list of things not to forget when going to the sea (not travelling):
 
 Because we decode our list `THING` by `THING`, we can easily access the individual items, without having to think about parsing or validation. We just add them to a `backpack` list of things, which we then can process further.
 
+## Escaping `[`, `]`, `{`, `}`
+
+Inside prompt strings, the characters `[`, `]`, `{`, and `}` are reserved for template variable use and cannot be used directly. To use them as literals, they need to be escaped as `[[`, `]]`, `{{`, and `}}`, respectively. 
+
+For instance, if you want to use JSON syntax as part of your prompt string, you need to escape the curly braces and squared brackets as follows:
+
+```{lmql}
+name::bruno-mars-json
+
+argmax 
+    """
+    Write a summary of Bruno Mars, the singer:
+    {{
+      "name": "[STRING_VALUE]",
+      "age": [INT_VALUE],
+      "top_songs": [[
+         "[STRING_VALUE]",
+         "[STRING_VALUE]"
+      ]]
+    }}
+    """
+from
+    "openai/text-davinci-003" 
+where
+    STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) < 2
+         
+         
+```
+
 ## Python Compatibility
 
-Going beyond simple control flow, LMQL supports most valid Python constructs in the prompt clause of a query, where top-level strings like `"-[THING]"` are automatically interpreted as model input and template variables are assigned accordingly. For more advanced usage, also see the [External Functions](functions.md) chapter.
+Going beyond simple control flow, LMQL also supports most valid Python constructs in the prompt clause of a query, where top-level strings like `"-[THING]"` are automatically interpreted as model input and template variables are assigned accordingly. For more advanced usage, see also the [External Functions](functions.md) chapter.

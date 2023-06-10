@@ -86,7 +86,7 @@ async def run(code, *args, **kwargs):
 
     For synchronous execution (w/o await), use `lmql.run_sync` instead.
     """
-    q = _query_from_string(code)
+    q = _query_from_string(code, output_writer=kwargs.get("output_writer", None))
     return await q(*args, **kwargs)
         
 def run_sync(code, *args, **kwargs):
@@ -98,14 +98,14 @@ def run_sync(code, *args, **kwargs):
     q = _query_from_string(code, is_async=False)
     return q(*args, **kwargs)
 
-def _query_from_string(s, input_variables=None, is_async=True):
+def _query_from_string(s, input_variables=None, is_async=True, output_writer=None):
     if input_variables is None: input_variables = []
 
     import inspect
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(s)
-    module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
+    module = load(temp_lmql_file, autoconnect=True, output_writer=output_writer or silent)
     
     # lmql.query(str) does not capture function context
     scope = EmptyVariableScope()

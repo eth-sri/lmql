@@ -89,7 +89,6 @@ class DcModel(DcModelRewriteMixin):
         """
         raise NotImplementedError()
 
-
     async def score(self, sqs: List[DecoderSequence], tokens: List[List[int]], max_batch_size=None, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         raise NotImplementedError()
         

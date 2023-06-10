@@ -458,7 +458,7 @@ function EditorPanel(props) {
           // line wrap
           wordWrap: "on",
           // tabs are spaces
-          // tabSize: 6,
+          tabSize: 4,
           // show whitespace
           renderWhitespace: "all",
           // set font family
