@@ -766,7 +766,7 @@ const ModelResultText = styled.div`
     display: block;
     text-align: center;
     background-color: #ffffff13;
-    border-radius: 8pt;
+    border-radius: 2pt;
     font-size: 90%;
     margin-top: 10pt;
     margin-bottom: 10pt;
@@ -774,24 +774,24 @@ const ModelResultText = styled.div`
   }
 
   div .tag-assistant {
-    display: inline-block;
-    border: 1pt solid #5c5c5c;
-    margin-top: 5pt;
-    margin-right: 4%;
+    /* display: inline-block; */
+    /* border: 1pt solid #5c5c5c; */
+    /* margin-top: 5pt;
+    margin-right: 4%; */
 
-    border-radius: 8pt;
+    /* border-radius: 8pt; */
     overflow: hidden;
-    padding: 4pt;
+    /* padding: 4pt; */
   }
 
   div .tag-user {
     display: block;
-    margin-left: 4%;
+    margin-left: 10%;
     position: relative;
     border: 1pt solid #5c5c5c;
     border-radius: 8pt;
     padding: 4pt;
-    margin-bottom: 2pt;
+    margin-bottom: 10pt;
     margin-top: 5pt;
   }
   

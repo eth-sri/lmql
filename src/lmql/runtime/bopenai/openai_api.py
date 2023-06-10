@@ -212,8 +212,6 @@ async def chat_api(**kwargs):
             "content": s["text"]
         })
 
-    print(kwargs["prompt"][0])
-
     for m in messages:
         print(m)
     
