@@ -83,7 +83,7 @@ The `from` and `where` clauses specify the model and constraints that are employ
 Overall, this style of language model programming facilitates guidance of the model's reasoning process, and constraining
 of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
 
-Learn more about LMQL by exploring our **[Example Showcase](https://lmql.ai)** or by running your own programs in our **[browser-based Playground IDE](https://lmql/playground)**.
+Learn more about LMQL by exploring our **[Example Showcase](https://lmql.ai)** or by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)**.
 
 ## Getting Started
 
