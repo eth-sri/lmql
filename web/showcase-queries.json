@@ -97,7 +97,7 @@
         "anchors": {
             "# simple kv storage": "The utility functions invoked by the model, can also be used to mutate state during decoding. For example, here, <tt>assign</tt> and <tt>get</tt> implement a simple key-value storage.",
             "\"\"\"In your reasoning you can use actions.": "In the prompt, we explicitly instruct the model to make use of the <tt>assign</tt> and <tt>get</tt> actions.",
-            "Q: Alice, Bob, and Claire are playing a": "After our action instructions, we provide the model with the actual reasoning task.",
+            "Q: Alice, Bob, and Claire are playing": "After our action instructions, we provide the model with the actual reasoning task.",
             "<span class=\"lmql-kw\">for</span> i <span class=\"lmql-kw\">in</span> range(32):": "During reasoning, we make sure to intercept any <tt>assign</tt> and <tt>get</tt> actions, and inject the corresponding return values on the fly."
         },
         "truncate_output": 740

@@ -212,9 +212,6 @@ async def chat_api(**kwargs):
             "content": s["text"]
         })
 
-    for m in messages:
-        print(m)
-    
     del kwargs["prompt"]
     kwargs["messages"] = messages
     

@@ -121,8 +121,13 @@ class LMQLTokenizer:
         """
         Transforms token bytes into a text.
         """
-        # TODO: handle special IDs, i.e. tags (only relevant for tag use with LMTP backend)
-        return self.tokenizer_impl.convert_bytes_to_string(token_bytes)
+        result = ""
+        for chunk in self.chunk_out_by_special_ids_bytes(token_bytes):
+            if type(chunk) is str:
+                result += chunk
+            else:
+                result += self.tokenizer_impl.convert_bytes_to_string(chunk)
+        return result
 
     def decode(self, input_ids):
         if len(input_ids) > 0 and type(input_ids[0]) is np.bytes_:
@@ -185,6 +190,25 @@ class LMQLTokenizer:
                 c = []
                 yield "<" + reverse_special_token_mappings[i] + "/>"
             else:
+                c.append(i)
+        yield c
+    
+    def chunk_out_by_special_ids_bytes(self, token_bytes, tokenize=True):
+        global reverse_special_token_mappings
+        global special_token_mappings
+        c = []
+        for i in token_bytes:
+            try:
+                decoded = i.decode("utf-8")
+                
+                if decoded.startswith("<") and decoded.endswith("/>") and decoded[1:-2] in special_token_mappings.keys():
+                    if len(c) > 0:
+                        yield c
+                    c = []
+                    yield decoded
+                else:
+                    c.append(i)
+            except:
                 c.append(i)
         yield c
     
