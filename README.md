@@ -120,6 +120,16 @@ openai-secret: <api secret>
 
 For system-wide configuration, you can also create an `api.env` file at `$HOME/.lmql/api.env` or at the project root of your LMQL distribution (e.g. `src/` in a development copy).
 
+## Installing the Latest Development Version
+
+To install the latest (bleeding-edge) version of LMQL, you can also run the following command:
+
+```
+pip install git+https://github.com/eth-sri/lmq
+```
+
+This will install the `lmql` package directly from the `main` branch of this repository. We do not continously test the `main` version, so it may be less stable than the latest PyPI release.
+
 ## Setting Up a Development Environment
 
 To setup a `conda` environment for local LMQL development with GPU support, run the following commands:
