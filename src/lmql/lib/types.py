@@ -186,7 +186,7 @@ async def is_type(ty, description=False):
             print("Failed to parse JSON from", payload)
         return type_dict_to_type_instance(json_payload, ty)
     where
-        STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and # STOPS_AT(INT_VALUE, ",") and 
+        STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) < 4 and
         ESCAPED(STRING_VALUE) and STOPS_AT(COMMA_OR_BRACKET, "]") and 
         STOPS_AT(COMMA_OR_BRACKET, ",") and ERASE(COMMA_OR_BRACKET)
     '''

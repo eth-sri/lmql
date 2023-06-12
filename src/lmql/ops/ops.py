@@ -170,10 +170,20 @@ class IntOp(Node):
 
         if context.runtime.prefers_compact_mask:
             number_tokens = tset("1","2","3","4","5","6","7","8","9","Ġ2","Ġ3","Ġ4","Ġ5","Ġ0","Ġ6","Ġ7","Ġ8","Ġ9","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","37","48","66","55","47","49","65","68","31","67","59","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True, name="number_tokens")
-            number_continuation_tokens = tset("0","1","2","3","4","5","6","7","8","9","00","01","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","05","37","48","66","55","47","08","49","09","65","07","02","04","03","68","31","67","59","06","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True, name="number_continuation_tokens")
         else:
             number_tokens = tset("[ 1-9][0-9]*$", regex=True, name="full_number_tokens")
-            number_continuation_tokens = tset("[0-9]+$", regex=True, name="full_number_continuation_tokens")
+            number_cont_tokens = tset("[1-9][0-9]*$", regex=True, name="number_continuation_tokens")
+
+        if not has_next_token:
+            return fmap(
+                ("eos", len(v.strip()) != 0),
+                ("*", self.forward(v))
+            )
+
+        if not all([c.strip() in ",0123456789" for c in v]) and len(v.strip()) > 0:
+            return fmap(
+                ("*", False)
+            )
 
         if "turbo" in context.runtime.model_identifier or "gpt-4" in context.runtime.model_identifier:
             if not all([c in "0123456789" for c in v]):
@@ -185,12 +195,6 @@ class IntOp(Node):
                     ("*", True)
                 )
 
-        if not has_next_token:
-            return fmap(
-                ("eos", len(v.strip()) != 0),
-                ("*", self.forward(v))
-            )
-
         if len(v) == 0:
             return fmap(
                 (number_tokens, True),
@@ -200,21 +204,22 @@ class IntOp(Node):
             if len(v.strip()) == 0:
                 # do not allow empty strings
                 return fmap(
-                    (number_continuation_tokens, True),
+                    (number_cont_tokens, True),
                     ("eos", False),
                     ("*", False)
                 )
 
+            # allow anything (either continue as number or stop by predicting any other 
+            # token, which will be removed by the postprocessing)
             return fmap(
-                (number_continuation_tokens, True),
-                ("eos", True),
-                ("*", False)
+                ("*", True)
             )
         
     def postprocess_var(self, var_name):
         return var_name == self.predecessors[0].name
 
     def postprocess(self, operands, raw):
+        raw = "".join([c for c in raw if c in "0123456789"])
         value = int(raw)
         return postprocessed_rewrite(str(value)), postprocessed_value(value)
 

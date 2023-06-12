@@ -98,19 +98,38 @@ class Person:
     job: str
 
 argmax
-    "Alice is a 21 years old and works as an engineer at LMQL Inc in Zurich, Switzerland: [p]\\n"
-    "The name is {p.name} and she works in {p.employer.location}."
+    "Alice is a 21 years old and works as an engineer at LMQL Inc in Zurich, Switzerland.\n"
+    "Structured: [PERSON_DATA]\n"
+    "Their name is {PERSON_DATA.name} and she works in {PERSON_DATA.employer.location}."
 from 
     "openai/text-davinci-003" 
 where 
-    type(p) is Person
+    type(PERSON_DATA) is Person
+          
 `,
-          state: ''
+          state: 'precomputed/json-robust.json'
+       },
+       {
+          name: "🛠️ Multi-Tool Use",
+          description: "Simply expose Python functions as LLM tools.",
+          code: `from lmql.lib.actions import inline_use, calc, wiki
+
+argmax
+    "Q: What is the population of the US and Germany combined?\\n"
+    "A: Let's think step by step\\n"
+    "[REASONING]\\n"
+    "Therefore the answer is[ANSWER]"
+from 
+    'openai/text-davinci-003'
+where
+    inline_use(REASONING, [wiki, calc]) and INT(ANSWER)
+          `,
+            state: ''
        },
        {
           // hello world
-          name: "❤️ In-Context Functions",
-          description: "Affect sentiment with constraints.",
+          name: "❤️ Sentiment Constraints",
+          description: "Affect sentiment with in-context prompting.",
           code: `@lmql.query
 async def mood_description(m: str):
   '''lmql
@@ -151,7 +170,7 @@ where
        {
           // hello world
           name: "📝 Write A Poem",
-          description: "incontext for intermediate instr..",
+          description: "Insert dynamic instructions with incontext.",
           code: `@lmql.query
 async def rhyme():
  '''
@@ -188,32 +207,7 @@ where
   rhyme(VERSE) and first_verse(FIRST_VERSE)
 `,
           state: ''
-       },
-       {
-          name: "📝 Timestamp Formatting",
-          description: "incontext timestamp instruction..",
-          code: `@lmql.query
-async def timestring():
-  '''lmql
-  incontext
-      """
-      Instruction: Answer as a timestring in YYYY-MM-DDTHH:MM:SS format:
-      Answer: [RESPONSE]
-      """
-      return RESPONSE.strip(); 
-  where
-      stops_at(RESPONSE, ".") and stops_at(RESPONSE, "\\n")
-  '''
-
-argmax
-  "It is the 10th of Aug, 2020 today: [RESPONSE]"
-from 
-  "chatgpt" 
-where 
-  timestring(RESPONSE)
-`,
-          state: ''
-       },
+       }
     ]
  },
    {
