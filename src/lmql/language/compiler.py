@@ -416,7 +416,7 @@ class WhereClauseTransformation():
             if is_type_constraint(expr):
                 type_name = expr.comparators[0].id
                 var_name = expr.left.args[0].id
-                return snf.add(f"{OPS_NAMESPACE}.CallOp([{LIB_NAMESPACE}.type_constraints.is_type, [{OPS_NAMESPACE}.Var('{var_name}'), {type_name}]], locals(), globals())")
+                return snf.add(f"{OPS_NAMESPACE}.CallOp([{LIB_NAMESPACE}.types.is_type, [{OPS_NAMESPACE}.Var('{var_name}'), {type_name}]], locals(), globals())")
                 # return snf.add(f"{LIB_NAMESPACE}.is_type([{type_name}, {OPS_NAMESPACE}.Var('{var_name}')])")
             
             assert False, "operator {} is not supported.".format(astunparse.unparse(expr))

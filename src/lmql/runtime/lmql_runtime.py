@@ -43,7 +43,7 @@ class EmptyVariableScope:
             if errors == "ignore":
                 return None
             else:
-                raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query " + str(self.fct), name)
+                raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query function.")
 
 @dataclass
 class FunctionContext:

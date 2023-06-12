@@ -319,11 +319,11 @@ class LMTPModel(DcModel):
         def make_detseq(s, token_score, completion):
             # compose deterministic flags
             if type(deterministic) is bool:
-                deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])])
+                deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])], dtype=np.bool_)
                 next_deterministic = np.array([deterministic] * len(completion[1:]))
             else:
                 assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
-                deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])])
+                deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])], dtype=np.bool_)
                 next_deterministic = np.array(deterministic[1:])
 
             return dc.detseq(ids=np.concatenate([s.input_ids, completion[:1]], axis=0), 

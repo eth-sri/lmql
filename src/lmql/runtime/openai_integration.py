@@ -163,7 +163,7 @@ class DclibOpenAiModel(DcModel):
         return CompletionCall("complete", mask, s.input_ids, kwargs, invert=invert, stopping_phrases=stopping_phrases)
 
     async def api_score(self, input_ids, offset):
-        if input_ids[0] == self.tokenizer.bos_token_id:
+        if len(input_ids) > 0 and input_ids[0] == self.tokenizer.bos_token_id:
             input_ids = input_ids[1:]
 
         prompt_str = self.tokenizer.convert_bytes_to_string(input_ids)
@@ -228,11 +228,11 @@ class DclibOpenAiModel(DcModel):
         def make_detseq(s, token_score, completion):
             # compose deterministic flags
             if type(deterministic) is bool:
-                deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])])
+                deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])], dtype=np.bool_)
                 next_deterministic = np.array([deterministic] * len(completion[1:]))
             else:
                 assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
-                deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])])
+                deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])], dtype=np.bool_)
                 next_deterministic = np.array(deterministic[1:])
 
             return detseq(ids=np.concatenate([s.input_ids, completion[:1]], axis=0), 
@@ -270,7 +270,7 @@ class DclibOpenAiModel(DcModel):
         tokenized_input_ids = await self.tokenize(prompt_str)
 
         # do not include bos token in prompt for request
-        if input_ids[0] == self.tokenizer.bos_token_id:
+        if len(input_ids) > 0 and input_ids[0] == self.tokenizer.bos_token_id:
             input_ids = input_ids[1:]
 
         temperature = completion_call.kwargs.get("temperature", 0.0)

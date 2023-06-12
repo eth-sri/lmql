@@ -50,8 +50,8 @@ where
             state: 'precomputed/list.json'
          },
          {
-            name: "📝 Generate JSON",
-            description: "Template-Based Generation",
+            name: "📝 Templates",
+            description: "Template-Based Generation for JSON data",
             code: `argmax 
     """
     Write a summary of Bruno Mars, the singer:
@@ -81,29 +81,29 @@ where
        {
           // hello world
           name: "👨‍👩‍👧 Types / JSON",
-          description: "Robust generation of typed data.",
+          description: "Generate schema-safe, typed data.",
           code: `import lmql
 from dataclasses import dataclass
 
 @dataclass
 class Employer:
- employer_name: str
- location: str
+    employer_name: str
+    location: str
 
 @dataclass
 class Person:
- name: str
- age: int
- employer: Employer
- job: str
+    name: str
+    age: int
+    employer: Employer
+    job: str
 
 argmax
-  "Alice is a 21 years old and works as an engineer at LMQL Inc in Zurich, Switzerland: [p]\\n"
-  "The name is {p.name} and she works in {p.employer.location}."
+    "Alice is a 21 years old and works as an engineer at LMQL Inc in Zurich, Switzerland: [p]\\n"
+    "The name is {p.name} and she works in {p.employer.location}."
 from 
-  "chatgpt" 
+    "openai/text-davinci-003" 
 where 
-  type(p) is Person
+    type(p) is Person
 `,
           state: ''
        },

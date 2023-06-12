@@ -110,8 +110,11 @@ class DecoderSequence:
         self.epsilon_node = epsilon_node
 
         # if no deterministic is provided assume all tokens to be deterministic
-        if deterministic is None: self.deterministic = np.array([True for _ in range(len(input_ids))])
+        if deterministic is None: self.deterministic = np.array([True for _ in range(len(input_ids))], dtype=np.bool_)
         else: self.deterministic = deterministic
+
+        assert self.deterministic.dtype == np.bool_
+
         assert len(self.deterministic) == len(self.input_ids), "Length of determinism status does not match length of inputs"
 
         # if no stop_phrase is provided assume no tokens to be stop_phrase
@@ -250,13 +253,38 @@ class DecoderSequence:
             # text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
             root = True
 
+        # handle empty seq
+        if len(self.input_ids) == 0:
+            return {
+                "seq_id": self.id,
+                "text": [""],
+                "seqtext": "",
+                "root": root,
+                "logprob": [],
+                "logprobs": [],
+                "logprobs_det": [],
+                "logprobs_norm": [],
+                "seqlogprob": 0,
+                **({"deterministic": True} if self.epsilon_node else {}),
+                "score_det": 0,
+                "score_nor": 0,
+                "score_tot": 0,
+                "pool": self.pool,
+                "user_data": await self.user_data_json(),
+                "token_id": "",
+                "deterministic_5": [],
+                "stop_phrase_5": [],
+                "prompt_len" : self.prompt_len,
+                "sticky_user_data_keys": list(self.sticky_user_data_keys)
+            }
+
         return {
             "seq_id": self.id,
             # "input_ids": self.input_ids.tolist(),
             "text": [text],
             "seqtext": seqtext,
             "root": root,
-            "logprob": self.logprobs[-1],
+            "logprob": self.logprobs[-1:] if len(self.logprobs) > 0 else [],
             "logprobs": self.logprobs[-5:].tolist(),
             "logprobs_det": self.logprobs[-5:][self.deterministic[-5:]].tolist(),
             "logprobs_norm": self.logprobs[-5:][~self.deterministic[-5:]].tolist(),
@@ -335,7 +363,7 @@ class DecoderSequence:
             logprobs=np.concatenate([self.logprobs, continuation.logprob.reshape(1)]),
             # deterministic tokens are only extended in DeterministicDecoderSequence.extend.
             # So here, all extended tokens are non-deterministic, i.e. model predictions.
-            deterministic=np.concatenate([self.deterministic, np.array([False])]),
+            deterministic=np.concatenate([self.deterministic, np.array([False])], dtype=np.bool_),
             stop_phrase=stop_phrase,
             predecessor=self,
             user_data=self.extend_user_data(continuation),
@@ -561,7 +589,7 @@ class DeterministicDecoderSequence(DecoderSequence):
 
         extended_input_ids = np.concatenate([self.input_ids, continuation.token.reshape(1)])
         extended_logprobs = np.concatenate([self.logprobs, continuation.logprob.reshape(1)])
-        extended_deterministic = np.concatenate([self.deterministic, np.array([True]) if self.next_deterministic is None else self.next_deterministic[0:1]])
+        extended_deterministic = np.concatenate([self.deterministic, np.array([True]) if self.next_deterministic is None else self.next_deterministic[0:1]], dtype=np.bool_)
 
         reduced_next_ids = self.next_ids[1:]
         reduced_next_logprobs = self.next_logprobs[1:] if self.next_logprobs is not None else None
@@ -571,7 +599,6 @@ class DeterministicDecoderSequence(DecoderSequence):
 
         stop_phrase = self.detect_stop_phrase(continuation)
         if self.data("injected_stop_phrase"):
-            print(self)
             assert not extended_deterministic[-1]
 
         return DeterministicDecoderSequence(

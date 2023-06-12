@@ -661,6 +661,7 @@ function CheckableToolbarIconButton(props) {
 
 function OutputPanelContent(props) {
   const [output, setOutput] = useState("Client ready.\n");
+  const [alwaysShow, setAlwaysShow] = useState(false);
 
   const onConsoleOut = data => {
     let newOutput = ""
@@ -693,7 +694,9 @@ function OutputPanelContent(props) {
   }, props.style)
 
   return <>
-    <OutputText style={props.style} className={props.className} readOnly={true} value={output}></OutputText>
+    {props.className == "simple" &&
+    <ToggleButton checked={alwaysShow} onClick={() => setAlwaysShow(s => !s)} style={{ float: "right", color: "white" }}>...</ToggleButton>}
+    <OutputText style={props.style} className={props.className + (alwaysShow ? " always" : "")} readOnly={true} value={output}></OutputText>
   </>
 }
 
@@ -1343,9 +1346,16 @@ const OutputText = styled.textarea`
   padding: 0;
 
   &.simple {
-    flex: 0.5;
+    flex: 0;
     border-top: 1px solid #444;
     padding-top: 10pt;
+    display: none !important;
+  }
+
+  &.simple.always {
+    flex: 0.4;
+    height: 40pt;
+    display: flex !important;
   }
 `
 const CompiledCodeEditorContainer = styled.div`
@@ -1773,6 +1783,7 @@ function SidePanel(props) {
   const clearTrigger = useState(new TriggerState())[0];
   const [clearOnRun, setClearOnRun] = useState(true);
   const [perVariableColor, setPerVariableColor] = useState(true);
+  const [alwaysShowOutput, setAlwaysShowOutput] = useState(true);
 
   const [trackMostLikly, setTrackMostLiklyInternal] = useState(window.localStorage.getItem("trackMostLikely") === "true");
   trackingState.setTrackMostLikely = setTrackMostLiklyInternal
@@ -1852,7 +1863,12 @@ function SidePanel(props) {
         onTrackLatest={() => setTrackMostLikly(true)}
         processStatus={props.processStatus}
       />
-      <OutputPanelContent className={!props.simpleMode && sidepanel != 'output' ? "simple" : ""} style={{ display: (!props.simpleMode || sidepanel === 'output') ? 'block' : 'none' }} clearTrigger={clearTrigger} />
+      <OutputPanelContent 
+        className={!props.simpleMode && sidepanel != 'output' ? "simple" : ""} 
+        style={{ display: ((!props.simpleMode && alwaysShowOutput) || sidepanel === 'output') ? 'block' : 'none' }} 
+        alwaysShow={alwaysShowOutput}
+        clearTrigger={clearTrigger} 
+      />
       {/* <StatisticsPanelContent style={{display: sidepanel === 'stats' ? 'flex' : 'none'}}/> */}
 
       <Sidebar>

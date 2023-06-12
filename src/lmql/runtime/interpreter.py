@@ -43,15 +43,6 @@ def set_dclib_debug_printer(printer):
 
 emoji_mapping = {}
 
-def int_to_emoji(i):
-    global emoji_mapping
-    emojis = ["🛑", "🧠", "🌿", "🏈"]
-    if i in emoji_mapping:
-        return emoji_mapping[i]
-    else:
-        emoji_mapping[i] = emojis[len(emoji_mapping) % len(emojis)]
-        return emoji_mapping[i]
-
 @dataclass
 class RewrittenInputIds:
     appended_input_ids: List[np.ndarray]
@@ -489,7 +480,6 @@ class PromptInterpreter:
                 del stop_trace[sc]
                 # check if stopping phrase applies in this step
                 if ops.execute_op(sc, stop_trace, context=program_state, semantics="stop"):
-                    # print(int_to_emoji(id(self)), "apply stopping phrase to", variable, sc.stopping_phrase(trace), "at", [await s.text()])
                     mask = tset("eos")
                     logit_mask = mask.mask
                     follow_map = fmap(
@@ -580,6 +570,20 @@ class PromptInterpreter:
         # obtain interpreter state from predecessor node
         state = self.interpreter_state_from_user_data(seq.predecessor, noroot=True)
         assert state is not None, "prompt interpreter state must be set in predecessor node"
+
+        if state.tail is not None:
+            rewritten_state = state.updated(tail=None)
+            prompt_ids = seq.input_ids.tolist()
+            tail_ids = self.tokenizer.tokenize(state.tail, asbytes=True)
+            updated_ids = prompt_ids + tail_ids[1:]
+
+            return RewrittenInputIds(
+                appended_input_ids=updated_ids,
+                strip_eos=False,
+                value_offset=state.variable_offset + len(tail_ids) - 1,
+                user_data=self.interpreter_state_user_data(state),
+                rewritten_seq_user_data=self.interpreter_state_user_data(rewritten_state)
+            )
 
         # first check for sub-interpreters
         subinterpreters: Set[SubInterpreter] = state.subinterpreters.copy()
@@ -704,21 +708,20 @@ class PromptInterpreter:
 
                 rewritten_state = state.updated(prompt=prompt, variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
 
-                if type(combined_new_ids[0]) is bytes:
-                    res = []
-                    i = 0
-                    while i < len(combined_new_ids):
-                        if type(combined_new_ids[i]) is bytes:
-                            res += [combined_new_ids[i]]
-                            i += 1
-                        else:
-                            j = i+1
-                            while j < len(combined_new_ids) and type(combined_new_ids[j]) is not bytes:
-                                j += 1
-                            r = self.tokenizer.decode_bytes(combined_new_ids[i:j])
-                            res += r
-                            i = j
-                    combined_new_ids = np.array(res, dtype=np.bytes_)
+                res = []
+                i = 0
+                while i < len(combined_new_ids):
+                    if type(combined_new_ids[i]) is bytes:
+                        res += [combined_new_ids[i]]
+                        i += 1
+                    else:
+                        j = i+1
+                        while j < len(combined_new_ids) and type(combined_new_ids[j]) is not bytes:
+                            j += 1
+                        r = self.tokenizer.decode_bytes(combined_new_ids[i:j])
+                        res += r
+                        i = j
+                combined_new_ids = np.array(res, dtype=np.bytes_)
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(
@@ -993,7 +996,6 @@ class PromptInterpreter:
             
             # prepare subinterpreter if this is the first time it is used
             if si.root_state is None:
-                # print("prepare subinterpreter", int_to_emoji(id(si)), calling_state.variable_offset)
                 await si.prepare(calling_state.variable_offset, calling_state.prompt)
 
             state = si.interpreter_state_from_user_data(s)

@@ -4,7 +4,7 @@ from dataclasses import dataclass, fields, is_dataclass
 from typing import List
 
 global _oneshot
-_oneshot = False
+_oneshot = True
 
 def type_schema(t):
     if is_dataclass(t):
@@ -50,6 +50,33 @@ def oneshot(state):
     global _oneshot
     _oneshot = state
 
+def extract_json(s):
+    stack = []
+    start = -1
+    for i, c in enumerate(s):
+        if len(stack) == 0 or stack[-1] != '"':
+            if c == "{":
+                start = i if start == -1 else start
+                stack.append("{")
+            elif c == "}":
+                assert stack.pop() == "{"
+            elif c == "[":
+                start = i if start == -1 else start
+                stack.append("[")
+            elif c == "]":
+                assert stack.pop() == "["
+            elif c == '"':
+                if len(stack) > 0 and stack[-1] == '"':
+                    stack.pop()
+                else:
+                    stack.append('"')
+        else:
+            if c == '"':
+                stack.pop()
+        if len(stack) == 0 and start != -1:
+                return s[start:i+1]
+    return s
+
 @lmql.query
 async def single_shot_as_type(s, ty, model="chatgpt"):
     '''lmql
@@ -58,7 +85,8 @@ async def single_shot_as_type(s, ty, model="chatgpt"):
         "Provided a data schema of the following schema: {schema_description}\n"
         "Translate the following into a JSON payload: {s}\n"
         "JSON: [JSON]"
-        return JSON
+        e = extract_json(JSON)
+        return e
     from 
         model
     '''
@@ -73,7 +101,8 @@ async def is_type(ty, description=False):
             simple_json_result = single_shot_as_type(context.prompt, ty, model=context.interpreter.model_identifier)
             try:
                 already_parsed = json.loads(simple_json_result)
-            except:
+            except Exception as e:
+                print("Failed to parse JSON result from one-shot query: ", e, [simple_json_result])
                 already_parsed = {}
         else:
             already_parsed = {}

@@ -220,7 +220,7 @@ const Tile = styled.div.attrs({
 `
 
 export const ExploreState = {
-    visible: true,
+    visible: false,
     setVisibility: (s) => {
         ExploreState.visible = s;
         ExploreState.listeners.forEach((l) => l(s));
@@ -451,7 +451,7 @@ export function Explore() {
     if (!visible) return null;
 
     let description = <>
-    LMQL is a query language for large language models. This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below, demonstrating <i>constrained model use</i>, <i>control-flow guided generation</i>, and tool-augmented LLMs.
+    LMQL is a programming language for interacting with large language models. This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below, demonstrating <i>constrained model use</i>, <i>control-flow guided generation</i>, and tool-augmented LLMs.
     </>
 
     if (configuration.NEXT_MODE) {
