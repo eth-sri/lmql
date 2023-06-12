@@ -89,6 +89,13 @@ const ExploreDialog = styled(Dialog)`
   max-height: 100vh;
   max-width: 100vh;
   overflow-y: auto;
+
+  /* invisible scroll bar */
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
+
   position: relative;
   padding: 0pt;
   

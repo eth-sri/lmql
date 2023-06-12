@@ -295,6 +295,8 @@ class LMTPModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens, noscore=False):
         if noscore:
             return np.zeros(len(next_tokens), dtype=np.float32)
+    
+        await self.ensure_connected()
         
         scores = []
         i = 0

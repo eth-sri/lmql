@@ -307,7 +307,7 @@ class DclibOpenAiModel(DcModel):
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=0), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
             else:
                 if noscore: logprob = 0.0
-                else: logprob = (await self.api_score(np.append(input_ids, fixed_next_token, axis=0), len(tokenized_input_ids)))
+                else: logprob = (await self.api_score(np.append(input_ids, np.array(fixed_next_token).reshape(1), axis=0), len(tokenized_input_ids)))
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=logprob), 
                                         completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
         else:

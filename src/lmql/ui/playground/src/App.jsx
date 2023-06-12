@@ -915,6 +915,7 @@ const TypingIndicator = styled.span`
   width: 8pt;
   height: 12pt;
   position: relative;
+  border-radius: 2pt;
   top: 3.5pt;
   left: 2pt;
   background-color: #d7d5d5;
