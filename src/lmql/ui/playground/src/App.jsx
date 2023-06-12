@@ -469,7 +469,7 @@ function EditorPanel(props) {
           // line wrap
           wordWrap: "on",
           // tabs are spaces
-          // tabSize: 6,
+          tabSize: 4,
           // show whitespace
           renderWhitespace: "all",
           // set font family
@@ -586,7 +586,7 @@ const Row = styled.div`
         width: calc(100% - 15pt - 27.5pt);
       }
     }
-
+  }
 `
 
 const IconButton = styled.button`
@@ -775,22 +775,35 @@ const ModelResultText = styled.div`
 
   div .tag-system {
     display: block;
-    background-color: #ffffff1f !important;
-    margin: 4pt 0pt;
-    position: relative;
+    text-align: center;
+    background-color: #ffffff13;
+    border-radius: 2pt;
+    font-size: 90%;
+    margin-top: 10pt;
+    margin-bottom: 10pt;
+    color: #c0c0c0;
   }
 
   div .tag-assistant {
+    /* display: inline-block; */
+    /* border: 1pt solid #5c5c5c; */
+    /* margin-top: 5pt;
+    margin-right: 4%; */
+
+    /* border-radius: 8pt; */
+    overflow: hidden;
+    /* padding: 4pt; */
   }
 
   div .tag-user {
     display: block;
-    margin-top: 20pt;
-    margin-bottom: 5pt;
-    background-color: #ffffff25;
-    margin-left: 15%;
-    border-radius: 5pt;;
-    padding: 5pt;
+    margin-left: 10%;
+    position: relative;
+    border: 1pt solid #5c5c5c;
+    border-radius: 8pt;
+    padding: 4pt;
+    margin-bottom: 10pt;
+    margin-top: 5pt;
   }
   
   &>div>span:first-child {
@@ -916,7 +929,7 @@ class Truncated extends React.Component {
     super(props)
     
     this.state = {
-      typingOffset: 0,
+      typingOffset: 1024,
       expandedText: ""
     }
     this.stepper = null
@@ -979,6 +992,23 @@ class Truncated extends React.Component {
     // make sure to render model output control characters
     content = content.replace(/\\n/g, "\n")
     content = content.replace(/\\t/g, "\t")
+
+    /* convert text to char code */
+    let bytes = []
+    for (let i = 0; i < content.length; i++) {
+      /* check for \xXX and parse charcode from hex */
+      if (content[i] == "\\") {
+        if (content[i + 1] == "x") {
+          let hex = content.substring(i + 2, i + 4)
+          let charCode = parseInt(hex, 16)
+          bytes.push(charCode)
+          i += 3
+          continue;
+        }
+      }
+      bytes = bytes.concat(Array.from(new TextEncoder("utf-8").encode(content[i])))
+    }
+    content = new TextDecoder("utf-8").decode(new Uint8Array(bytes))
 
     let EXPLICIT_CHARS = {
       "\n": "⏎",
@@ -1313,7 +1343,7 @@ const OutputText = styled.textarea`
   padding: 0;
 
   &.simple {
-    flex: 0.3;
+    flex: 0.5;
     border-top: 1px solid #444;
     padding-top: 10pt;
   }

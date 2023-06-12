@@ -204,6 +204,8 @@ function initDecoderGraphCy(element) {
         maxZoom: 2.0,
         boxSelectionEnabled: false,
         autounselectify: true,
+        // dpi scale
+        pixelRatio: 3,
 
         style: [
             {
@@ -503,9 +505,6 @@ export function DecoderGraph(props) {
         const cy = cyRef.current
         if (cy) {
             if (cyData) {
-                // cy.nodes().remove()
-                // cy.edges().remove()
-
                 // collect unique edges
                 const uniqueEdges = new Map()
                 cyData.edges.forEach(e => {
@@ -518,6 +517,14 @@ export function DecoderGraph(props) {
                 })
 
                 function strLabel(label) {
+                    // unpack arrays
+                    if (Array.isArray(label)) {
+                        return label.map(strLabel).join(", ")
+                    }
+                    if (label.startsWith("bytes:")) {
+                        label = label.substring(6)
+                        return label
+                    }
                     if (label === "") {
                         // epsilon
                         return "\u03b5"

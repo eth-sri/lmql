@@ -98,11 +98,6 @@ def remove_comments(s):
     return tokenize.untokenize([transform_token(t) for t in s if t.type != tokenize.COMMENT])
 
 def transform_token(t):
-    if is_keyword(t, "as"):
-        # return tokenize.Token
-        # print(t)
-        return tokenize.TokenInfo(tokenize.OP, "=", start = t.start, end = t.end, line = t.line)
-
     return t
 
 def ast_parse(s, unindent=False, oneline=False, loc=None):

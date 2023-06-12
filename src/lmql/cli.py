@@ -12,10 +12,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def cmd_serve_model():
     """emoji:🏄 Serve a 🤗 Transformers model via the LMQL inference API"""
     os.chdir(project_root)
-    if "--legacy" in sys.argv:
-        os.system("python -m lmql.model.serve_legacy " + " ".join(sys.argv[2:]))
-    else:
-        os.system("python -m lmql.model.serve_oai " + " ".join(sys.argv[2:]))
+    os.system("python -m lmql.models.lmtp.lmtp_serve " + " ".join(sys.argv[2:]))
 
 def cmd_run():
     """
@@ -181,6 +178,8 @@ def hello():
         asyncio.run(lmql.run(code_local, output_writer=lmql.printing))
     
     if backend is None or backend == "openai":
+        import lmql.runtime.dclib as dc
+        dc.clear_tokenizer()
         print("[Greeting OpenAI]")
         code_openai = """
     argmax "Hello[WHO]" from "openai/text-ada-001" where len(WHO) < 10    

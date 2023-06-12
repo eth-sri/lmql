@@ -91,6 +91,8 @@ class InterpretationHead:
     async def materialize_copy_if_necessary(self):
         # materialize lazy copy if not yet done
         if self._iterator_fct is None:
+            if "__self__" in self.kwargs:
+                self.kwargs["self"] = self.kwargs.pop("__self__")
             self._iterator_fct = self.fct(*self.args, **self.kwargs)
 
             if len(self.future_trace) > 0:

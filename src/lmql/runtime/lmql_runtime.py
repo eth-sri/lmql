@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from lmql.ops.ops import *
-from lmql.runtime.langchain import LMQLChainMixIn
+from lmql.runtime.langchain import chain, call_sync
 from lmql.runtime.output_writer import silent
 from lmql.runtime.interpreter import PromptInterpreter
 from lmql.runtime.postprocessing.conditional_prob import \
@@ -22,7 +22,7 @@ class LMQLInputVariableScope:
         self.globals =  calling_frame.frame.f_globals
         self.locals = calling_frame.frame.f_locals
     
-    def resolve(self, name):
+    def resolve(self, name, errors=None):
         if name in self.locals.keys():
             return self.locals[name]
         elif name in self.globals.keys():
@@ -30,17 +30,29 @@ class LMQLInputVariableScope:
         elif name in self.builtins.keys():
             return self.builtins[name]
         else:
-            return None
-            # assert False, "Failed to resolve variable '" + name + "' in @lmql.query " + str(self.fct)
+            if errors == "ignore":
+                return None
+            else:
+                raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query " + str(self.fct), name)
+
+class EmptyVariableScope:
+    def resolve(self, name, errors=None):
+        if name in __builtins__.keys():
+            return __builtins__[name]
+        else:
+            if errors == "ignore":
+                return None
+            else:
+                raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query " + str(self.fct), name)
 
 @dataclass
 class FunctionContext:
-    argnames: List[str]
+    argnames: inspect.Signature
     args_of_query: List[str]
     scope: LMQLInputVariableScope
 
 
-class LMQLQueryFunction(LMQLChainMixIn):
+class LMQLQueryFunction:
     fct: Any
     output_variables: List[str]
     postprocessors: List[Any]
@@ -53,22 +65,16 @@ class LMQLQueryFunction(LMQLChainMixIn):
     model: Optional[Any] = None
     function_context: Optional[FunctionContext] = None
 
-    is_langchain_use: bool = False
-
     lmql_code: str = None
 
     __lmql_query_function__ = True
+    is_async: bool = True
     
     def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
-        # check for pydantic base class and do kw initialization then
-        if hasattr(self, "schema_json"):
-            super().__init__(fct=fct, output_variables=output_variables, postprocessors=postprocessors, scope=scope, *args, **kwargs)
-        else:
-            # otherwise, do standard initialization
-            self.fct = fct
-            self.output_variables = output_variables
-            self.postprocessors = postprocessors
-            self.scope = scope
+        self.fct = fct
+        self.output_variables = output_variables
+        self.postprocessors = postprocessors
+        self.scope = scope
         
         self.output_writer = None
         self.args = [a for a in inspect.getfullargspec(fct).args if a != "context"]
@@ -81,7 +87,6 @@ class LMQLQueryFunction(LMQLChainMixIn):
 
     @property
     def input_keys(self) -> List[str]:
-        self.is_langchain_use = True
         return self.args
     
     def __getattribute__(self, __name: str) -> Any:
@@ -95,63 +100,95 @@ class LMQLQueryFunction(LMQLChainMixIn):
         self.model = model
 
     def make_kwargs(self, *args, **kwargs):
-        if self.function_context is None:
-            return kwargs
-        else:
-            argnames = self.function_context.argnames
-            args_of_query = self.function_context.args_of_query
-            scope = self.function_context.scope
+        """
+        Binds args and kwargs to the function signature and returns a dict of all user-defined kwargs.
 
-        # do not consider kwargs that are already set
-        argnames = [a for a in argnames if a not in kwargs.keys()]
+        Resolves additional captured variables using the surrounding function context.
+        """
+        assert self.function_context is not None, "Cannot call @lmql.query function without context."
+        
+        signature = self.function_context.argnames
+        args_of_query = self.function_context.args_of_query
+        scope = self.function_context.scope
+        
+        runtime_args = {k:v for k,v in kwargs.items() if not k in signature.parameters.keys() and k not in args_of_query}
+        query_kwargs = {k:v for k,v in kwargs.items() if k in signature.parameters.keys()}
 
-        assert len(args) == len(argnames), f"@lmql.query {self.fct.__name__} expects {len(argnames)} positional arguments, but got {len(args)}."
+        compiled_query_args = {}
+
+        # initialize with default values
+        for name, param in signature.parameters.items():
+            if param.default is not inspect.Parameter.empty and name in args_of_query:
+                compiled_query_args[name] = param.default
+
+        # bind args and kwargs to signature
+        try:
+            signature = signature.bind(*args, **query_kwargs)
+        except TypeError as e:
+            if len(e.args) == 1 and e.args[0].startswith("missing "):
+                e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
+            elif len(e.args) == 1:
+                e.args = (e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
+            raise e
+        
+        # special case, if signature is empty (no input variables provided)
+        if len(signature.arguments) == 0:
+            # bind kwargs dynamically in compiled_query_args
+            for k,v in kwargs.items():
+                if k in args_of_query:
+                    # compiled_query_args[k] = v
+                    compiled_query_args[k] = v
+                else:
+                    runtime_args[k] = v
+
+        # resolve remaining variables from function context
         captured_variables = set(args_of_query)
-        for name, value in zip(argnames, args):
+        for name, value in signature.arguments.items():
             if name in args_of_query:
-                kwargs[name] = value
+                compiled_query_args[name] = value
                 captured_variables.remove(name)
+
+        failed_to_resolve = []
+
 
         # resolve remaining unset args from scope
         for v in captured_variables:
-            if not v in kwargs:
-                kwargs[v] = scope.resolve(v)
-        
-        if "output_writer" in kwargs:
-            self.output_writer = kwargs["output_writer"]
-            del kwargs["output_writer"]
-        else:
-            self.output_writer = silent
+            if not v in compiled_query_args:
+                try:
+                    compiled_query_args[v] = scope.resolve(v, errors="raise")
+                except TypeError:
+                    failed_to_resolve.append(v)
 
-        return kwargs
+        if len(failed_to_resolve) == 1:
+            raise TypeError("Failed to resolve variable '" + failed_to_resolve[0] + "' in LMQL query.")
+        elif len(failed_to_resolve) > 0:
+            raise TypeError("Failed to resolve variables in LMQL query: " + ", ".join(f"'{v}'" for v in sorted(failed_to_resolve)))
 
-    def __call__(self, *args, **kwargs):
-        if not self.is_langchain_use:
-            return self.__acall__(*args, **kwargs)
-        else:
-            return super().__call__(*args, **kwargs)
+        return compiled_query_args, runtime_args
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        if not self.is_async:
+            return call_sync(self, *args, **kwargs)
+
+        return self.__acall__(*args, **kwargs)
 
     async def __acall__(self, *args, **kwargs):
-        kwargs = self.make_kwargs(*args, **kwargs)
-
+        query_kwargs, runtime_args = self.make_kwargs(*args, **kwargs)
         interpreter = PromptInterpreter(force_model=self.model)
-        interpreter.set_extra_args(
-            output_writer = self.output_writer,
-            **kwargs
-        )
 
-        query_kwargs = {}
-        for a in self.args:
-            if a in kwargs.keys():
-                query_kwargs[a] = kwargs[a]
-            else:
-                query_kwargs[a] = self.scope.resolve(a)
-        
+        if self.output_writer is not None:
+            runtime_args["output_writer"] = self.output_writer
+        interpreter.set_extra_args(**runtime_args)
+
+        # rename 'self'
+        if "self" in query_kwargs:
+            query_kwargs["__self__"] = query_kwargs.pop("self")
+
         # keep track of the main interpreter (only produces debug output for this one)
         try:
             if PromptInterpreter.main is None:
                 PromptInterpreter.main = interpreter
-            # execute the program
+            # execute main prompt
             results = await interpreter.run(self.fct, **query_kwargs)
         finally:
             if PromptInterpreter.main == interpreter:
@@ -166,15 +203,28 @@ class LMQLQueryFunction(LMQLChainMixIn):
                 results = await postprocessor.process(results, self.output_writer)
         
         interpreter.print_stats()
-        interpreter.dcmodel.save()
+        interpreter.dcmodel.close()
 
         return results
+
+    def aschain(self, output_keys=None):
+        """
+        Returns a LangChain 'Chain' object that can be used to chain multiple queries together.
+
+        Args:
+            output_keys: List of output keys in LangChain. If None, output keys are automatically derived from 
+                the set of template variables in the query.
+        """
+        return chain(self, output_keys=output_keys)
 
 def context_call(fct_name, *args, **kwargs):
     return ("call:" + fct_name, args, kwargs)
 
 def interrupt_call(fct_name, *args, **kwargs):
     return ("interrupt:" + fct_name, args, kwargs)
+
+def f_escape(s):
+    return str(s).replace("[", "[[").replace("]", "]]")
 
 def tag(t):
     return f"<lmql:{t}/>"
@@ -201,7 +251,7 @@ def compiled_query(output_variables=None, group_by=None):
     
 
 async def call(fct, *args, **kwargs):
-    if type(fct) is LMQLQueryFunction:
+    if type(fct) is LMQLQueryFunction or (hasattr(fct, "__lmql_query_function__") and fct.__lmql_query_function__.is_async):
         result = await fct(*args, **kwargs)
         if len(result) == 1: 
             return result[0]

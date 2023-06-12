@@ -1,3 +1,7 @@
+"""
+Mocked aiohttp client session for use in pyodide.
+"""
+
 import asyncio
 import js
 from pyodide.ffi import to_js

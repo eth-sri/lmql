@@ -6,7 +6,7 @@
   <h3 align="center">LMQL</h3>
 
   <p align="center">
-    A query language for programming (large) language models.
+    A programming language for large language models.
     <br />
     <a href="https://docs.lmql.ai"><strong>Documentation »</strong></a>
     <br />
@@ -23,24 +23,79 @@
   </p>
 </div>
 
-LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python. With only a few lines of LMQL code, users can express advanced, multi-part and tool-augmented LM queries, which then are optimized by the LMQL runtime to run efficiently as part of the LM decoding loop.
+LMQL is an open source programming language for large language models (LLMs) based on a *superset of Python*. LMQL goes beyond traditional templating languages by providing full Python support, yet a lightweight programming interface. 
 
-![lmql-overview](https://user-images.githubusercontent.com/17903049/222918379-84a00b9a-1ef0-45bf-9384-15a20f2874f0.png)
+LMQL is designed to make working with language models like OpenAI, 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatype constraints and control flow.
 
-<p align="center">Example of a simple LMQL program.</p>
+Features:
 
+- [X] **Python Syntax**: Write your queries using [familiar Python syntax](https://docs.lmql.ai/en/stable/language/overview.html), fully integrated with your Python environment (classes, variable captures, etc.)
+- [X] **Rich Control-Flow**: LMQL offers full Python support, enabling powerful [control flow and logic](https://docs.lmql.ai/en/stable/language/scripted_prompts.html) in your prompting logic.
+- [X] **Advanced Decoding**: Take advantage of advanced decoding techniques like [beam search, best_k, and more](https://docs.lmql.ai/en/stable/language/decoders.html).
+- [X] **Powerful Constraints Via Logit Masking**: Apply [constraints to model output](https://docs.lmql.ai/en/stable/language/constraints.html), e.g. to specify token length, character-level constraints, datatype and stopping phrases to get more control of model behavior.
+- [X] **Sync and Async API**: Execute hundreds of queries in parallel with LMQL's [asynchronous API](https://docs.lmql.ai/en/stable/python/python.html), which enables cross-query batching.
+- [X] **Multi-Model Support**: Seamlessly use LMQL with [OpenAI API, Azure OpenAI, and 🤗 Transformers models](https://docs.lmql.ai/en/stable/language/models.html).
+- [X] **Extensive Applications**: Use LMQL to implement advanced applications like [schema-safe JSON decoding](https://github.com/microsoft/guidance#guaranteeing-valid-syntax-json-example-notebook), [algorithmic prompting](https://twitter.com/lbeurerkellner/status/1648076868807950337), [interactive chat interfaces](https://twitter.com/lmqllang/status/1645776209702182917), and [inline tool use](https://lmql.ai/#kv).
+- [X] **Library Integration**: Easily employ LMQL in your existing stack leveraging [LangChain](https://docs.lmql.ai/en/stable/python/langchain.html) or [LlamaIndex](https://docs.lmql.ai/en/stable/python/llama_index.html).
+- [X] **Flexible Tooling**: Enjoy an interactive development experience with [LMQL's Interactive Playground IDE](https://lmql.ai/playground), and [Visual Studio Code Extension](https://marketplace.visualstudio.com/items?itemName=lmql-team.lmql).
+- [X] **Output Streaming**: Stream model output easily via [WebSocket, REST endpoint, or Server-Sent Event streaming](https://github.com/eth-sri/lmql/blob/main/src/lmql/output/).
+
+## Explore LMQL
+
+A simple example program in LMQL looks like this:
+
+```python
+argmax
+   "Greet LMQL:[GREETINGS]\n"
+   
+   if "Hi there" in GREETINGS:
+      "Can you reformulate your greeting in the speech of victorian-era English: [VIC_GREETINGS]\n"
+   
+   "Analyse what part of this response makes it typically victorian:\n"
+   
+   for i in range(4):
+      "-[THOUGHT]\n"
+   
+   "To summarize:[SUMMARY]"
+from 
+   "openai/text-davinci-003" 
+where 
+   stops_at(GREETINGS, ".") and not "\n" in GREETINGS and 
+   stops_at(VIC_GREETINGS, ".") and 
+   stops_at(THOUGHT, ".")
+```
+
+Program Output:
+<div align="center">
+  <img src="https://github.com/eth-sri/lmql/assets/17903049/243176f1-dfd4-4129-a59e-ca3dee068295"/>
+  <br/>
+</div>
+
+
+
+The main body of an LMQL program reads like standard Python (with control-flow), where top-level strings are interpreted as model input with template variables like `[GREETINGS]`. 
+
+The `argmax` keyword in the beginning specifies the decoding algorithm used to generate tokens, e.g. `argmax`, `sample` or
+even advanced branching decoders like [beam search and `best_k`](https://docs.lmql.ai/en/stable/language/decoders.html).
+
+The `from` and `where` clauses specify the model and constraints that are employed during decoding. 
+
+Overall, this style of language model programming facilitates guidance of the model's reasoning process, and constraining
+of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
+
+Learn more about LMQL by exploring our **[Example Showcase](https://lmql.ai)** or by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)**.
 
 ## Getting Started
 
-To install the latest version of LMQL run the following command with Python >=3.10 installed.
+To install the latest version of LMQL run the following command with Python ==3.10 installed.
 
 ```
 pip install lmql
 ```
 
-**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/).
+**Local GPU Support:** If you want to run models on a local GPU, make sure to install LMQL in an environment with a GPU-enabled installation of PyTorch >= 1.11 (cf. https://pytorch.org/get-started/locally/) and install via `pip install lmql[hf]`.
 
-### Running LMQL Programs
+## Running LMQL Programs
 
 After installation, you can launch the LMQL playground IDE with the following command:
 
@@ -65,6 +120,16 @@ openai-secret: <api secret>
 
 For system-wide configuration, you can also create an `api.env` file at `$HOME/.lmql/api.env` or at the project root of your LMQL distribution (e.g. `src/` in a development copy).
 
+## Installing the Latest Development Version
+
+To install the latest (bleeding-edge) version of LMQL, you can also run the following command:
+
+```
+pip install git+https://github.com/eth-sri/lmq
+```
+
+This will install the `lmql` package directly from the `main` branch of this repository. We do not continously test the `main` version, so it may be less stable than the latest PyPI release.
+
 ## Setting Up a Development Environment
 
 To setup a `conda` environment for local LMQL development with GPU support, run the following commands:
@@ -84,7 +149,7 @@ source scripts/activate-dev.sh
 
 This section outlines how to setup an LMQL development environment without local GPU support. Note that LMQL without local GPU support only supports the use of API-integrated models like `openai/text-davinci-003`. Please see the OpenAI API documentation (https://platform.openai.com/docs/models/gpt-3-5) to learn more about the set of available models.
 
-To setup a `conda` environment for LMQL with GPU support, run the following commands:
+To setup a `conda` environment for LMQL with no GPU support, run the following commands:
 
 ```
 # prepare conda environment

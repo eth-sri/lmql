@@ -10,7 +10,7 @@ import re
 from io import StringIO
 from lmql.ops.ops import lmql_operation_registry
 
-from lmql.language.qstrings import qstring_to_stmts, TemplateVariable
+from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, FExpression, DistributionVariable, TagExpression, stmts_to_qstring
 from lmql.language.validator import LMQLValidator, LMQLValidationError
 from lmql.language.fragment_parser import LMQLDecoderConfiguration, LMQLQuery, LanguageFragmentParser, FragmentParserError
 from lmql.runtime.model_registry import model_name_aliases
@@ -110,40 +110,44 @@ class PromptScope(ast.NodeVisitor):
 
         query.scope = self
 
-    def visit_Constant(self, node):
+    def visit_Expr(self, expr):
+        if type(expr.value) is ast.Constant:
+            self.scope_Constant(expr.value)
+
+    def scope_Constant(self, node):
         if type(node.value) is not str: return super().visit_Constant(node)
         qstring = node.value
 
+        stmts = qstring_to_stmts(qstring, mode="all")
+
         # capture set of defined vars
-        declared_template_vars = [v.name for v in qstring_to_stmts(qstring) if type(v) is TemplateVariable]
+        declared_template_vars = [v.name for v in stmts if type(v) is TemplateVariable]
         for v in declared_template_vars: 
             self.defined_vars.add(v)
             self.written_vars.add(v)
             if v in self.free_vars: self.free_vars.remove(v)
 
-        # capture set of format vars (exclude {{ and }})
-        # replace {{ and }} with escape sequence \u007b and \u007d 
-        qstring = qstring.replace("{{", "__curly_open__").replace("}}", "__curly_close__")
-        used_fstring_expr = [v[1:-1] for v in re.findall("\{[^\}\{]+\}", qstring)]
+        used_fstring_expr = [s.expr for s in stmts if type(s) is FExpression]
         for v in used_fstring_expr:
-            if v.startswith(":"):
-                continue
             try:
-                parsed = ast.parse(v).body[0].value
+                parsed = ast.parse(v, mode="eval")
                 self.visit(parsed)
-            except:
-                print("info: failed to parse fstring expression: ", v)
+            except Exception as e:
+                print("info: failed to parse fstring expression: ", [v])
+                raise e
                 # raise RuntimeError("Failed to parse fstring expression: ", v)
                 return super().visit_Constant(node)
 
-        # put double curly braces back in
-        qstring = qstring.replace("__curly_open__", "{{").replace("__curly_close__", "}}")
-                
-        template_tags = [v[1:-1] for v in re.findall("\{:[A-z0-9]+\}", qstring)]
-        for tt in template_tags:
-            qstring = qstring.replace(f"{{{tt}}}", f"{{lmql.tag('{tt[1:]}')}}")
-        
-        node.value = qstring
+        def transform_qexpr(qexpr):
+            if type(qexpr) is TemplateVariable and qexpr.name in self.distribution_vars:
+                return DistributionVariable(qexpr.name)
+            if type(qexpr) is FExpression:
+                return FExpression(f"lmql.lmql_runtime.f_escape({qexpr.expr})")
+            elif type(qexpr) is TagExpression:
+                return TagExpression(f"lmql.lmql_runtime.tag(\"{qexpr.tag[1:]}\")")
+            return str(qexpr)
+
+        node.value = stmts_to_qstring([transform_qexpr(s) for s in stmts])
 
         return super().visit_Constant(node)
 
@@ -151,6 +155,8 @@ class PromptScope(ast.NodeVisitor):
         # make sure "input" can be intercepted
         if name in ["input"]:
             return False
+        if name in ["lmql", "context"]:
+            return True
         if name in self.free_vars:
             return True
         if name in self.written_vars:
@@ -242,22 +248,24 @@ class QueryStringTransformation(FunctionCallTransformation):
 
     def transform_Constant(self, constant):
         if type(constant.value) is not str: return constant
+        
         qstring = constant.value
-        # TODO: handle escaping more completely and gracefully
+        if len(qstring) == 0: return constant
+        
         qstring = qstring.replace("\n", "\\\\n")
+        
         compiled_qstring = ""
 
         declared_template_vars = set()
 
-        for i, stmt in enumerate(qstring_to_stmts(qstring)):
+        for stmt in qstring_to_stmts(qstring, mode="square-only"):
             if type(stmt) is str:
                 compiled_qstring += stmt
+            elif type(stmt) is DistributionVariable:
+                compiled_qstring += str(stmt)
             elif type(stmt) is TemplateVariable:
-                if stmt.name in self.query.scope.distribution_vars:
-                    compiled_qstring += f"[distribution:{stmt.name}]"
-                else:
-                    declared_template_vars.add(stmt.name)
-                    compiled_qstring += "[" + stmt.name + "]"
+                declared_template_vars.add(stmt.name)
+                compiled_qstring += str(stmt)
 
         if len(compiled_qstring) == 0:
             return constant
@@ -669,7 +677,7 @@ class LMQLCompiler:
             output_variables = "output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
 
             # generate function that runs query
-            parameters = list(sorted(list(scope.free_vars.union(set(["context"])))))
+            parameters = list(sorted(list(scope.free_vars)))
 
             with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:

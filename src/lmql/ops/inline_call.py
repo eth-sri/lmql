@@ -1,12 +1,15 @@
 from typing import Optional, Any
 from .node import *
 from .booleans import *
+import inspect
 
 class InlineCallOp(Node):
     def __init__(self, predecessors, lcls, glbs):
         super().__init__(predecessors)
         
         fct, args = predecessors
+        fct = fct.__lmql_query_function__
+
         variable_arg, self.args = args[0], args[1:]
         assert hasattr(fct, "__lmql_query_function__"), f"InlineQueryCallOp only support LMQLQueryFunction as first argument, got {fct}"
         assert type(variable_arg) is Var, f"LMQL constraint function {fct} expects a single variable as argument, got {args}"
@@ -23,21 +26,13 @@ class InlineCallOp(Node):
                 self.captures[arg] = glbs[arg]
         
         # set positional arguments
-        if fct.function_context is not None:
-            assert len(self.args) == len(fct.function_context.argnames), f"LMQL in-context function '{fct.name or str(fct)[:120]}' expects {len(fct.function_context.argnames)} positional arguments {fct.function_context.argnames} arguments, but got {len(self.args)} positional arguments: {self.args}"
+        assert fct.function_context is not None, "LMQL in-context function " + str(fct) + " has no function context."
+        signature: inspect.Signature = fct.function_context.argnames
+        signature_args = signature.parameters
+        
+        # assert len(self.args) == len(signature_args), f"LMQL in-context function '{fct.name or str(fct)[:120]}' expects {len(signature_args)} positional arguments {fct.function_context.argnames} arguments, but got {len(self.args)} positional arguments: {self.args}"
 
-            for argname, arg in zip(fct.function_context.argnames, self.args):
-                self.captures[argname] = arg
-
-        # try to resolve remaining arguments from the function context if available
-        for arg in fct.args:
-            if not arg in self.captures.keys() and self.query_fct.function_context is not None:
-                symbol = self.query_fct.function_context.scope.resolve(arg)
-                if symbol is not None:
-                    self.captures[arg] = symbol
-
-        for arg in fct.args:
-            assert arg in self.captures.keys(), "failed to resolve in-context function argument " + str(arg) + " from the local/global scope of the calling query.\n"
+        self.query_kwargs, _ = fct.make_kwargs(*self.args)
 
     def execute_predecessors(self, trace, context):
         return super().execute_predecessors(trace, context) + [context]
@@ -56,7 +51,7 @@ class InlineCallOp(Node):
         return context.subinterpreter_results[si]
     
     def subinterpreter(self, runtime, prompt):
-        return runtime.subinterpreter(id(self), prompt, self.query_fct, self.captures)
+        return runtime.subinterpreter(id(self), prompt, self.query_fct, self.query_kwargs)
 
     def follow(self, *args, context=None, **kwargs):
         if any([a is None for a in args]): return None

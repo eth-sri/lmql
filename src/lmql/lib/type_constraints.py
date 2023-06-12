@@ -1,34 +1,76 @@
 import lmql
 import json
+from dataclasses import dataclass, fields, is_dataclass
+from typing import List
 
 global _oneshot
-_oneshot = True
+_oneshot = False
+
+def type_schema(t):
+    if is_dataclass(t):
+        return {f.name: type_schema(f.type) for f in fields(t)}
+    elif t is int:
+        return int
+    elif t is str:
+        return str
+    elif hasattr(t, "__origin__") and t.__origin__ is list:
+        element_type = t.__args__[0]
+        return [type_schema(element_type)]
+    else:
+        assert False, "not a supported type " + str(t)
+
+def type_schema_description(t):
+    s = type_schema(t)
+    return inner_schema_example(s)
+
+def inner_schema_example(s):
+    if s is int:
+        return "21 // just an integer"
+    elif s is str:
+        return "\"hello\" // just a string"
+    elif type(s) is list:
+        return "[\n" + inner_schema_example(s[0]) + "\n..." + "\n] // a list of the above"
+    elif type(s) is dict:
+        return "{\n" + ",\n".join([f"\"{k}\": {inner_schema_example(v)}" for k, v in s.items()]) + "\n} // an object with the above fields"
+
+def type_dict_to_type_instance(data, t):
+    if is_dataclass(t):
+        return t(**{f.name: type_dict_to_type_instance(data[f.name], f.type) for f in fields(t)})
+    elif t is int:
+        return int(data)
+    elif t is str:
+        return str(data)
+    elif hasattr(t, "__origin__") and t.__origin__ is list:
+        element_type = t.__args__[0]
+        return [type_dict_to_type_instance(d, element_type) for d in data]
+    else:
+        assert False, "not a supported type " + str(t)
 
 def oneshot(state):
     global _oneshot
     _oneshot = state
 
 @lmql.query
-async def single_shot_as_type(s, ty):
+async def single_shot_as_type(s, ty, model="chatgpt"):
     '''lmql
     argmax(openai_chunksize=256)
-        schema_description = lmql.types.schema_description(ty)
+        schema_description = type_schema_description(ty)
         "Provided a data schema of the following schema: {schema_description}\n"
         "Translate the following into a JSON payload: {s}\n"
         "JSON: [JSON]"
         return JSON
     from 
-        "chatgpt"
+        model
     '''
 
 @lmql.query
-async def is_type(ty):
+async def is_type(ty, description=False):
     '''lmql
     incontext
         if _oneshot and "openai/" in context.interpreter.model_identifier:
             # "oneshot type prediction is only needed with openai/ models"
             # first run a simple one-shot query to get an initial result
-            simple_json_result = single_shot_as_type(context.prompt, ty)
+            simple_json_result = single_shot_as_type(context.prompt, ty, model=context.interpreter.model_identifier)
             try:
                 already_parsed = json.loads(simple_json_result)
             except:
@@ -37,8 +79,11 @@ async def is_type(ty):
             already_parsed = {}
         
         # then do scripted parsing as a fallback (does not query the model if already_parsed already contains all the keys we need)
+        if description:
+            "JSON Format:"
+            "{type_schema_description(ty)}\n"
         "As JSON: "
-        schema = lmql.types.schema(ty)
+        schema = type_schema(ty)
         stack = [("", "top-level", schema, already_parsed)]
         indent = ""
         while len(stack) > 0:
@@ -72,7 +117,7 @@ async def is_type(ty):
                         "{existing_value}{line_end}"
                     else:
                         "[INT_VALUE]"
-                        if not (INT_VALUE.endswith(",") and line_end.startswith(",")):
+                        if line_end.startswith(","):
                             ","
                 elif type(key_type) is dict:
                     "{{"
@@ -106,10 +151,13 @@ async def is_type(ty):
             else:
                 assert False, "not a supported type" + str(t)
         payload = context.prompt.rsplit("JSON: ",1)[1]
-        json_payload = json.loads(payload)
-        return lmql.types.dict_to_type_instance(json_payload, ty)
+        try:
+            json_payload = json.loads(payload)
+        except Exception as e:
+            print("Failed to parse JSON from", payload)
+        return type_dict_to_type_instance(json_payload, ty)
     where
-        STOPS_BEFORE(STRING_VALUE, '"') and STOPS_AT(INT_VALUE, ",") and 
+        STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and # STOPS_AT(INT_VALUE, ",") and 
         ESCAPED(STRING_VALUE) and STOPS_AT(COMMA_OR_BRACKET, "]") and 
         STOPS_AT(COMMA_OR_BRACKET, ",") and ERASE(COMMA_OR_BRACKET)
     '''

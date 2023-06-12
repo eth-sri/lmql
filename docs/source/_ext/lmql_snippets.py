@@ -96,10 +96,13 @@ class LmqlSnippet(Directive):
         output = []
         is_output = False
         name = None
+        noplayground = False
 
         for l in self.content:
             if l.startswith("name::"):
                 name = l[6:]
+            elif l.startswith("noplayground::"):
+                noplayground = True
             elif l.startswith("model-output::"):
                 is_output = True
             else:
@@ -123,7 +126,10 @@ class LmqlSnippet(Directive):
 
         # create output
         paragraph_node = nodes.paragraph()
-        prefix = """<button href onclick="openPlaygroundSnippet(this, 'doc-snippets/{}')">Open In Playground</button>""".format(snippet_id)
+        if not noplayground:
+            prefix = """<button href onclick="openPlaygroundSnippet(this, 'doc-snippets/{}')">Open In Playground</button>""".format(snippet_id)
+        else:
+            prefix = ""
 
         code = highlight(code, LmqlLexer(), HtmlFormatter(cssclass="highlight lmql"))
         code = code.replace("""<div class="highlight lmql">""", """<div class="highlight lmql">""" + prefix)

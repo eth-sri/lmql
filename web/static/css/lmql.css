@@ -353,20 +353,20 @@ lmql-var:hover, lmql-var.is-hover, lmql-var-hover lmql-var {
     color: rgba(101, 98, 98, 0.777) !important;
 }
 
-.lmql-fct, .highlight.lmql .n {
+.lmql-fct, .highlight .n {
     color: #E5C07B;
 }
 
-.lmql-kw, .highlight.lmql .kn, .highlight.lmql .kp, .highlight.lmql .ow, .highlight.lmql .nb {
+.lmql-kw, .highlight .k, .highlight .kn, .highlight .kp, .highlight .ow, .highlight .nb {
     font-weight: bold;
     color: #c678dd;
 }
 
-.lmql-str, .highlight.lmql .sd, .highlight.lmql .s2, .highlight.lmql .s1 {
+.lmql-str, .highlight .sd, .highlight .s2, .highlight .s1 {
     color: #a7d884;
 }
 
-.lmql-comment, .highlight.lmql .c1 {
+.lmql-comment, .highlight .c1 {
     color: #5c6370;
 }
 

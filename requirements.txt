@@ -1,6 +1,0 @@
-astunparse==1.6.3
-openai
-termcolor
-transformers>=4.28.1
-accelerate
-tiktoken

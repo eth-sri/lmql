@@ -14,6 +14,7 @@ export const PromptPopup = styled.div`
   z-index: 999;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 
   animation: fade-in 0.2s;
 
@@ -39,12 +40,14 @@ export const PromptPopup = styled.div`
 export const Dialog = styled.div`
   background-color: #ffffff;
   border-radius: 4pt;
+  overflow: hidden;
   padding: 10pt;
   margin: auto;
-  max-width: 500pt;
+  max-width: 800pt;
   max-height: 500pt;
-  overflow: auto;
   color: black;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica;
 
   input {
     border: none;
@@ -81,13 +84,14 @@ export const Dialog = styled.div`
 `
 
 const ExploreDialog = styled(Dialog)`
-  width: 550pt;
+  width: 600pt;
   height: 550pt;
   max-height: 100vh;
   max-width: 100vh;
   overflow-y: auto;
   position: relative;
-  padding: 20pt;
+  padding: 0pt;
+  
 
   @media (max-width: 550pt) {
     width: calc(100vw - 20pt);
@@ -104,6 +108,14 @@ const ExploreDialog = styled(Dialog)`
   background: linear-gradient(180deg, #ffffff 0%, #e4e2e2 100%);
 
   >div {
+    padding: 5pt 20pt;
+  }
+
+  div.highlight {
+    background-color: #c9c9c9;
+  }
+
+  >div>div {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -111,6 +123,11 @@ const ExploreDialog = styled(Dialog)`
 
   p {
     text-align: justify;
+  }
+
+  h1 {
+    margin: 0;
+    padding: 20pt;
   }
 
   h1 img {
@@ -131,6 +148,7 @@ const ExploreDialog = styled(Dialog)`
     color: #373737;
     margin: 0;
     z-index: 999;
+    font-weight: 500;
   }
 
   .close {
@@ -149,7 +167,7 @@ const ExploreDialog = styled(Dialog)`
 const Tile = styled.div.attrs({
   className: "tile"
 })`
-  background-color: #1e1e1e;
+  background-color: #f5f5f5;
   border-radius: 4pt;
   padding: 10pt;
   margin: 10pt;
@@ -159,13 +177,14 @@ const Tile = styled.div.attrs({
   transition: 0.1s;
   height: 80pt;
   width: 100pt;
-  border: 2pt solid white;
+  border: 0.5pt solid #ababab;
   opacity: 0.9;
   position: relative;
   display: flex;
   flex-direction: column;
+  
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: flex-start;
 
   :hover {
     transform: scale(1.05);
@@ -173,7 +192,7 @@ const Tile = styled.div.attrs({
   }
 
   h3 {
-    color: #e9e8e8;
+    color: #212121;
   }
 
   code {
@@ -181,7 +200,7 @@ const Tile = styled.div.attrs({
   }
 
   p {
-    color: white;
+    color: #010101;
     font-size: 10pt;
     font-style: italic;
     z-index: 999;
@@ -201,7 +220,7 @@ const Tile = styled.div.attrs({
 `
 
 export const ExploreState = {
-    visible: false,
+    visible: true,
     setVisibility: (s) => {
         ExploreState.visible = s;
         ExploreState.listeners.forEach((l) => l(s));
@@ -224,7 +243,7 @@ const CodeContainer = styled.div.attrs({
   top: 0;
   left: 0;
   width: 100%;
-  color: white;
+  color: #323232;
 
   .keyword {
     color: #ff79c6;
@@ -256,7 +275,7 @@ const CodeContainer = styled.div.attrs({
     left: 0;
     right: 0;
     height: 20pt;
-    background: linear-gradient(180deg, transparent 0%, #1e1e1e 100%);
+    /* background: linear-gradient(180deg, transparent 0%, #f5f5f561 100%); */
   }
 `
 
@@ -335,11 +354,12 @@ function BasicHighlighted(props) {
 const Description = styled.p`
   font-size: 12pt;
   color: #696969;
+  padding: 0pt 20pt;
 `
 
 const CiteBox = styled.code`
   display: block;
-  background-color: #dfdede;
+  background-color: #dbdbdb;
   padding: 4pt;
   border-radius: 4pt;
 `
@@ -450,7 +470,7 @@ export function Explore() {
             &times;
           </span>
           {exploreQueries.map(c => 
-            <>
+            <div className={c.highlight ? "highlight" : ""} key={c.category + "-container"}>
             <h2 key={c.category}>{c.category}</h2>
             <div key={c.category + "-div"}>
             {c.queries.map((q,i) => <Tile key={c.category + "-" + i} onClick={() => onClickTile(q)}>
@@ -460,14 +480,17 @@ export function Explore() {
               <p>{q.description}</p>
             </Tile>)}
             </div>
-            </>
+            </div>
           )}
           {!configuration.NEXT_MODE && <>
+          <div>
           <h2 key="read-paper">Read the Paper</h2>
           <CiteBox key="cite">
           Beurer-Kellner, Luca, Marc Fischer, and Martin Vechev. "Prompting Is Programming: A Query Language For Large Language Models." 
           <a target="_blank" rel="noreferrer" href="https://arxiv.org/pdf/2212.06094">arXiv preprint arXiv:2212.06094</a> (2022).
           </CiteBox>
+          <br/>
+          </div>
           </>}
         </ExploreDialog>
     </PromptPopup>

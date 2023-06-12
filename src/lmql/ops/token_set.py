@@ -189,6 +189,7 @@ class VocabularyMatcher:
                         t = t.replace(".", "\\.")
                         t = t.replace(" ", self.space_repr)
                         t = t.replace("\n", self.nl_repr)
+                        t = re.escape(t)
                         return t
                     if exact: 
                         # only allow exact matches
