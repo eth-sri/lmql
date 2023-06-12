@@ -98,8 +98,8 @@ class Person:
     job: str
 
 argmax
-    "Alice is a 21 years old and works as an engineer at LMQL Inc in Zurich, Switzerland.\n"
-    "Structured: [PERSON_DATA]\n"
+    "Alice is a 21 years old and works as an engineer at LMQL Inc in Zurich, Switzerland.\\n"
+    "Structured: [PERSON_DATA]\\n"
     "Their name is {PERSON_DATA.name} and she works in {PERSON_DATA.employer.location}."
 from 
     "openai/text-davinci-003" 

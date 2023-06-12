@@ -439,6 +439,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
             if sample:
                 active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
             else:
+                kwargs.pop("temperature", None)
                 active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
             
             active = await model.rewrite(active)
@@ -462,6 +463,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
             if sample:
                 active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
             else:
+                kwargs.pop("temperature", None)
                 active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
             
             for s in active.flatten().items():

@@ -430,6 +430,7 @@ class DecoderSequence:
         
         tokens = [t for t, s in zip(next_tokens, next_token_scores) if s > DecoderSequence.truncation_threshold]
         scores = [s for s in next_token_scores if s > DecoderSequence.truncation_threshold]
+
         if len(tokens) == 0:
             print("WARNING: all continuation token fall below truncation threshold. This is likely due to a too small truncation factor. Try increasing it. Continuing with the top 1 token.")
             tokens = [t for t, s in zip(next_tokens, next_token_scores)][:1]

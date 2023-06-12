@@ -470,6 +470,8 @@ class DclibOpenAiModel(DcModel):
                         }
                         # print("token stream gives", result_id, tokens, scores, edge_type, flush=True)
 
+                        scores = [0.0 if str(s) == "[]" else s for s in scores]
+
                         yield (s, tokens, scores, edge_type, user_data)
                     except IndexError:
                         break
@@ -504,6 +506,7 @@ class DclibOpenAiModel(DcModel):
         """
         Returns a pool with `n` sampled successor nodes per node in the pool.
         """
+
         kwargs = {**self.model_args, **kwargs}
 
         async def op_sample(seqs):
@@ -526,13 +529,15 @@ class DclibOpenAiModel(DcModel):
                 if "fixed" in complete_data.keys():
                     next_token = [complete_data["logprobs"]["tokens"]]
                     next_token_score = complete_data["logprobs"]["token_logprobs"]
+                    if str(next_token_score) == "[]": next_token_score = np.array([0.0])
                     next_token_ids.append(np.array([next_token]))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
-                    
+
                     full_logits = TokenDistribution()
                     full_logits[next_token] = next_token_score
 
                     logits.append(full_logits)
+
                     continue
 
                 # get sampled token and score
@@ -625,7 +630,7 @@ class DclibOpenAiModel(DcModel):
 
         kwargs = {**self.model_args, **kwargs}
         kwargs.update({"temperature": 0.0})
-        
+
         async def op_topk(seqs):
             completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=k, **kwargs)
             
@@ -644,6 +649,7 @@ class DclibOpenAiModel(DcModel):
                 if "fixed" in complete_data.keys():
                     next_token = [complete_data["logprobs"]["tokens"]]
                     next_token_score = complete_data["logprobs"]["token_logprobs"]
+                    if str(next_token_score) == "[]": next_token_score = np.array([0.0])
                     next_token_ids.append(np.array([next_token]))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
