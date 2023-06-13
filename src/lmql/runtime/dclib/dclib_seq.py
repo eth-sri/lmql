@@ -482,6 +482,7 @@ class DeterministicDecoderSequence(DecoderSequence):
 
     def align_user_data(self):
         if self.user_data is None: return
+        if not "head" in self.user_data: return
 
         # lmql-specific user data should be different for deterministic sequences
         head_variable = resolve_path(self.user_data, "head.variable")

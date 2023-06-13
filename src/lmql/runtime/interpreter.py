@@ -579,26 +579,25 @@ class PromptInterpreter:
                 value_offset = state.variable_offset + len(value_ids)
                 
                 combined_new_ids = seq.input_ids[:-n_tokens_to_strip].tolist() + appended_ids
+
+                res = []
+                i = 0
+                while i < len(combined_new_ids):
+                    if type(combined_new_ids[i]) is bytes:
+                        res += [combined_new_ids[i]]
+                        i += 1
+                    else:
+                        j = i+1
+                        while j < len(combined_new_ids) and type(combined_new_ids[j]) is not bytes:
+                            j += 1
+                        r = self.tokenizer.decode_bytes(combined_new_ids[i:j])
+                        res += r
+                        i = j
+                combined_new_ids = np.array(res, dtype=np.bytes_)
+
                 variable_offset = len(combined_new_ids)
-
                 rewritten_state = state.updated(variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
-
-
-                if type(combined_new_ids[0]) is bytes:
-                    res = []
-                    i = 0
-                    while i < len(combined_new_ids):
-                        if type(combined_new_ids[i]) is bytes:
-                            res += [combined_new_ids[i]]
-                            i += 1
-                        else:
-                            j = i+1
-                            while j < len(combined_new_ids) and type(combined_new_ids[j]) is not bytes:
-                                j += 1
-                            r = self.tokenizer.decode_bytes(combined_new_ids[i:j])
-                            res += r
-                            i = j
-                    combined_new_ids = np.array(res, dtype=np.bytes_)
+                # state = state.updated(variable_offset=variable_offset)
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(
