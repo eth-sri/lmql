@@ -575,15 +575,18 @@ class PromptInterpreter:
             rewritten_state = state.updated(tail=None)
             prompt_ids = seq.input_ids.tolist()
             tail_ids = self.tokenizer.tokenize(state.tail, asbytes=True)
-            updated_ids = prompt_ids + tail_ids[1:]
+            tail_ids = tail_ids[:-1]
+            if len(tail_ids) > 0:
+                print("tail ids", tail_ids)
+                updated_ids = prompt_ids + tail_ids[1:]
 
-            return RewrittenInputIds(
-                appended_input_ids=updated_ids,
-                strip_eos=False,
-                value_offset=state.variable_offset + len(tail_ids) - 1,
-                user_data=self.interpreter_state_user_data(state),
-                rewritten_seq_user_data=self.interpreter_state_user_data(rewritten_state)
-            )
+                return RewrittenInputIds(
+                    appended_input_ids=updated_ids,
+                    strip_eos=False,
+                    value_offset=state.variable_offset + len(tail_ids),
+                    user_data=self.interpreter_state_user_data(state),
+                    rewritten_seq_user_data=self.interpreter_state_user_data(rewritten_state)
+                )
 
         # first check for sub-interpreters
         subinterpreters: Set[SubInterpreter] = state.subinterpreters.copy()
@@ -704,9 +707,6 @@ class PromptInterpreter:
                 value_offset = state.variable_offset + len(value_ids)
                 
                 combined_new_ids = seq.input_ids[:-n_tokens_to_strip].tolist() + appended_ids
-                variable_offset = len(combined_new_ids)
-
-                rewritten_state = state.updated(prompt=prompt, variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
 
                 res = []
                 i = 0
@@ -722,6 +722,25 @@ class PromptInterpreter:
                         res += r
                         i = j
                 combined_new_ids = np.array(res, dtype=np.bytes_)
+
+                variable_offset = len(combined_new_ids)
+
+                res = []
+                i = 0
+                while i < len(combined_new_ids):
+                    if type(combined_new_ids[i]) is bytes or type(combined_new_ids[i]) is np.bytes_:
+                        res += [combined_new_ids[i]]
+                        i += 1
+                    else:
+                        j = i+1
+                        while j < len(combined_new_ids) and type(combined_new_ids[j]) is not bytes:
+                            j += 1
+                        r = self.tokenizer.decode_bytes(combined_new_ids[i:j])
+                        res += r
+                        i = j
+                combined_new_ids = np.array(res, dtype=np.bytes_)
+                
+                rewritten_state = state.updated(prompt=prompt, variable_offset=variable_offset, variable="__done__" if state.variable is None else state.variable + ":before")
 
                 # appended input ids are now a full replacement for input ids
                 return RewrittenInputIds(

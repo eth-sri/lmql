@@ -32,7 +32,7 @@ const ResizeObservers = {
   notify: () => ResizeObservers.listeners.forEach(l => l()),
 }
 
-const bg = '#1e1e1e';
+const bg = '#252526';
 
 const ContentContainer = styled.div`
   /* width: 900pt; */
@@ -453,7 +453,7 @@ function EditorPanel(props) {
     <Panel className='stretch max-width-50' id='editor-panel' style={{
       display: "flex",
     }}>
-      <h2>Query</h2>
+      <h2>Program</h2>
       <EditorContainer ref={editorContainer}>
       <Editor
         defaultValue={persistedState.getItem("lmql-editor-contents") || ""}
@@ -1950,7 +1950,7 @@ const FancyButton = styled.button`
   border: 0pt solid #6b77ff;
   padding: 8pt 10pt;
   font-size: 10pt;
-  border-radius: 3pt;
+  border-radius: 2pt;
   font-weight: bold;
   color: white;
 

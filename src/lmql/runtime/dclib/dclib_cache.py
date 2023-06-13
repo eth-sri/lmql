@@ -223,9 +223,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
             # apply operation for non-cached
             non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
+            # if len(non_cached) == 0:
+            #     print("cache hit for", cache_keys[0][0][0][-50:], "with", cached_tokens[0][0])
             # generator over new results
-            non_cached_argmax = iter((await self.delegate.argmax(DataArray(non_cached), **kwargs)).items())
-            
+            non_cached_argmax = iter((await self.delegate.argmax(DataArray(non_cached), **kwargs)).items())                
             results = []
             # put new results in cache
             for i, (s, key, c) in enumerate(zip(seqs, cache_keys, cached_tokens)):
@@ -450,8 +451,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 # store in cache
                 ids = continued_seq.input_ids
                 for i, (score, token) in enumerate(zip(token_scores[-len(tok):], tok)):
-                    # TODO: is this the correct user_data?
-                    self.set_cache([(self.base_key(ids, user_data if i > 0 else sq.user_data), str(token))], (np.array(token), np.array(score)))
+                    self.set_cache([(self.base_key(ids), str(token))], (np.array(token), np.array(score)))
                     ids = np.append(ids, token)
                 
             # determine detseq deterministic flags

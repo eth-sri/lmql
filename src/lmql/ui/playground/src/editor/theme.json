@@ -11,7 +11,7 @@
       "token": "comment"
     },
     {
-      "foreground": "98c379",
+      "foreground": "B8E38D",
       "token": "string"
     },
     {
@@ -51,7 +51,7 @@
       "token": "string source.ruby"
     },
     {
-      "foreground": "ff79c6",
+      "foreground": "C678DD",
       "fontStyle": "bold",
       "token": "keyword"
     },
@@ -198,7 +198,7 @@
   ],
   "colors": {
     "editor.foreground": "#f8f8f2",
-    "editor.background": "#1e1e1e",
+    "editor.background": "#252526",
     "editor.selectionBackground": "#44475a",
     "editor.lineHighlightBackground": "#3b3e4d",
     "editorCursor.foreground": "#f8f8f0",

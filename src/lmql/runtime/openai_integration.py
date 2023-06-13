@@ -225,6 +225,11 @@ class DclibOpenAiModel(DcModel):
     async def score(self, sqs: List[DecoderSequence], tokens: List[List[bytes]], max_batch_size=4, deterministic: Union[bool, List[bool]]=False, stop_phrase=False, needs_rewrite=True, user_data=None, noscore=False, internal=False):
         assert len(sqs) == len(tokens), "Number of sequences and number of tokens to be scored must match, but got {} and {}".format(len(sqs), len(tokens))
 
+        # make sure score erases any openai-continuations
+        if user_data is None:
+            user_data = {}
+        user_data["openai-continuations"] = None
+        
         def make_detseq(s, token_score, completion):
             # compose deterministic flags
             if type(deterministic) is bool:
@@ -774,10 +779,6 @@ class OpenAIModelOutputBuffer:
             self.process_next_result(next(self.res))
 
     def process_next_result(self, c):
-        # print("data is", data)
-        # choices = data.choices
-        # assert len(choices) == self.n, f"OpenAI model returned different number of choices than expected: {len(choices)} != {self.n}\n\n {json.dumps(data)}"
-        # index = int(c["index"])
         index = 0
         assert self.n == 1, "ModelOutputBuffer only supports n=1"
         self.tokens[index] += self.text_to_tokens(c.logprobs.tokens)
