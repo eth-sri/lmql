@@ -116,10 +116,24 @@ const ExploreDialog = styled(Dialog)`
 
   >div {
     padding: 5pt 20pt;
+    position: relative;
+  }
+
+  >div .sidenote a {
+    padding-left: 2pt;
+  }
+
+  >div .sidenote {
+    position: absolute;
+    top: 15pt;
+    right: 15pt;
+    font-size: 8pt;
+    /* italic */
+    font-style: italic;
   }
 
   div.highlight {
-    background-color: #c9c9c9;
+    background-color: #d4d3d3;
   }
 
   >div>div {
@@ -479,6 +493,9 @@ export function Explore() {
           {exploreQueries.map(c => 
             <div className={c.highlight ? "highlight" : ""} key={c.category + "-container"}>
             <h2 key={c.category}>{c.category}</h2>
+            {c.highlight && <span class="sidenote">
+              <a href="https://github.com/eth-sri/lmql/issues" target="_blank" rel="noreferrer"> Please report any issues you find.</a>
+            </span>}
             <div key={c.category + "-div"}>
             {c.queries.map((q,i) => <Tile key={c.category + "-" + i} onClick={() => onClickTile(q)}>
               {/* {q.state && <div className="badge">PRECOMPUTED</div>} */}
