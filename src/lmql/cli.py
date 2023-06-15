@@ -93,8 +93,9 @@ def cmd_playground():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     print(f"[lmql playground {project_root}, liveserver=localhost:{args.live_port}, ui=localhost:{args.ui_port}]")
 
-    # make sure yarn is installed
-    os.system("npm install -g yarn")
+    # # make sure yarn is installed
+    if os.system("yarn --version") != 0:
+        os.system("npm install -g yarn")
 
     # repo commit
     if os.path.exists(os.path.join(project_root, "../.git")):

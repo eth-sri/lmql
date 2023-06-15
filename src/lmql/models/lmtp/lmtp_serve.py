@@ -58,7 +58,13 @@ def lmtp_serve_main(model_args):
 
     app = web.Application()
     app.add_routes([web.get('/', stream)])
-    web.run_app(app, host=host, port=port)
+    
+    def web_print(*args):
+        if len(args) == 1 and args[0].startswith("======== Running on"):
+            print(f"[Serving LMTP endpoint on ws://{host}:{port}/]")
+        else:
+            print(*args)
+    web.run_app(app, host=host, port=port, print=web_print)
 
 def argparser(args):
     next_argument_name = None

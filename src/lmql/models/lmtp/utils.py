@@ -1,3 +1,5 @@
+import torch
+
 def rename_model_args(model_args):
     cuda = model_args.pop("cuda", False)
     dtype = model_args.pop("dtype", None)

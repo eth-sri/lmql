@@ -1,4 +1,4 @@
-from lmql.models.model import model, LMQLModel
+from lmql.models.model import model, LMQLModel, inprocess
 import os
 
 model_name_aliases = {
@@ -57,6 +57,11 @@ def resolve(model_name, endpoint=None, **kwargs):
 
         from lmql.models.lmtp.lmtp_dcmodel import lmtp_model
 
+        # special case for 'random' model (see random_model.py)
+        if model_name == "random":
+            kwargs["tokenizer"] = "gpt2"
+            kwargs["inprocess"] = True
+
         # determine endpoint URL
         if endpoint is None:
             endpoint = "localhost:8080"
@@ -65,8 +70,11 @@ def resolve(model_name, endpoint=None, **kwargs):
         if model_name.startswith("local:"):
             model_name = model_name[6:]
             kwargs["inprocess"] = True
-        
-        Model = lmtp_model(model_name, endpoint=endpoint, **kwargs)
+
+        if kwargs.get("inprocess", False):
+            Model = inprocess(model_name, use_existing_configuration=True, **kwargs).model
+        else:
+            Model = lmtp_model(model_name, endpoint=endpoint, **kwargs)
         
         register_model(model_name, Model)
         return

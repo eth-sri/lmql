@@ -152,7 +152,7 @@ def run_all_tests(g):
             if k.startswith("test"): 
                 print("Running", k, "." * (40 - len(k)), end=" ")
                 
-                if type(g[k]) is LMQLQueryFunction:
+                if (type(g[k]) is LMQLQueryFunction or hasattr(g[k], "lmql_code")) and g[k].is_async:
                     loop.run_until_complete(g[k]())
                 elif inspect.iscoroutinefunction(g[k]):
                     loop.run_until_complete(g[k]())

@@ -16,7 +16,7 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.runtime.model_registry import LMQLModelRegistry
-from lmql.models.model import LMQLModel
+from lmql.models.model import model, LMQLModel
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -195,26 +195,28 @@ class PromptInterpreter:
     def set_model(self, model_name):
         model_args = {}
 
-        if type(model_name) is not str:
-            assert isinstance(model_name, LMQLModel), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
-            model_object = model_name
+        if type(model_name) is str:
+            model_name = model(model_name)
 
-            if model_name.model is not None:
-                model_object = model_name.model
-                # if model_object is a type reference, we can use the model_identifier
-                if callable(model_object):
-                    model_object = model_object()
+        assert isinstance(model_name, LMQLModel), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
+        model_object = model_name
 
-                self.model_identifier = model_object.model_identifier
-                self.model = model_object
+        if model_name.model is not None:
+            model_object = model_name.model
+            # if model_object is a type reference, we can use the model_identifier
+            if callable(model_object):
+                model_object = model_object()
 
-                # setup the VocabularyMatcher to use the concrete vocabulary of the model
-                VocabularyMatcher.init(self.model.get_tokenizer())
+            self.model_identifier = model_object.model_identifier
+            self.model = model_object
 
-                return
-            else:
-                model_name = model_object.model_identifier
-                model_args = model_object.kwargs
+            # setup the VocabularyMatcher to use the concrete vocabulary of the model
+            VocabularyMatcher.init(self.model.get_tokenizer())
+
+            return
+        else:
+            model_name = model_object.model_identifier
+            model_args = model_object.kwargs
 
         if self.model is None:
             self.model = model_name

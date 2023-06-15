@@ -30,9 +30,9 @@ def ensure_iterable(v):
         assert False, f"ensure_iterable(): type {type(v)} cannot be converted to iterable"
 
 
-def log_softmax(a):
+def log_softmax(a, axis=-1):
     # check for log div by zero
-    normalizer = np.sum(np.exp(a))
+    normalizer = np.sum(np.exp(a), axis=axis)
     if normalizer == 0:
         # assign 1.0 to max value
         return np.where(a == np.max(a), 0.0, -np.inf)

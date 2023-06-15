@@ -8,8 +8,7 @@ class LMQLModel:
         # if this is a fixed reference to an existing model
         self.model = model
 
-global inprocess_models
-inprocess_models = {}
+LMQLModel.inprocess_instances = {}
 
 def inprocess(model_name, use_existing_configuration=False, **kwargs):
     """
@@ -51,19 +50,19 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
         else:
             cmdline_args += f"--{k} {v} "
 
-    if cmdline_args in inprocess_models:
-        print("info: reusing existing in-process model.")
-        model = inprocess_models[cmdline_args]
+    if cmdline_args in LMQLModel.inprocess_instances.keys():
+        print("info: reusing existing in-process model.", flush=True)
+        model = LMQLModel.inprocess_instances[cmdline_args]
         return LMQLModel(model_name, model=model)
-    
+
     if use_existing_configuration:
         # find existing match for model_name only
-        for cmdargs, p in inprocess_models.items():
+        for cmdargs, p in LMQLModel.inprocess_instances.items():
             if cmdargs.split(" ")[0] == model_name:
                 return LMQLModel(model_name, model=p)
     
     model = lmtp_model(model_name, inprocess=True, **kwargs)
-    inprocess_models[cmdline_args] = model
+    LMQLModel.inprocess_instances[cmdline_args] = model
     return LMQLModel(model_name, model=model)
 
 def model(model_identifier, **kwargs):

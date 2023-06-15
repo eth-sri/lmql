@@ -388,7 +388,10 @@ class lmtp_model:
 
     def __del__(self):
         if self.lmtp_inprocess_client is not None:
-            asyncio.ensure_future(self.lmtp_inprocess_client.close())
+            if asyncio.get_event_loop() == asyncio.get_event_loop_policy().get_event_loop():
+                pass
+            else:
+                asyncio.ensure_future(self.lmtp_inprocess_client.close())
             # print("closing shared LMTPMultiProcessingClient instance for model {}".format(self.model_identifier), self.lmtp_inprocess_client.refs, flush=True)
 
     def __call__(self):

@@ -1,10 +1,10 @@
 import lmql
 from lmql.tests.expr_test_utils import run_all_tests
 
-m = lmql.model("facebook/opt-350m", inprocess=True)
+m = lmql.model("gpt2-medium", inprocess=True)
 
 @lmql.query
-async def test_model_reference():
+def test_model_reference():
     '''lmql
     import lmql
 
@@ -17,22 +17,22 @@ async def test_model_reference():
     '''
 
 @lmql.query
-async def test_local_string():
+def test_local_string():
     '''lmql
     import lmql
 
     argmax(chunk_timeout=10.0)
         """Hello[WHO]"""
     from
-        m
+        "local:gpt2-medium"
     where
         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
     '''
 
-m2 = lmql.model("facebook/opt-350m", cuda=True, inprocess=True)
+m2 = lmql.model("gpt2-medium", cuda=True, inprocess=True)
 
 @lmql.query
-async def test_model_reference_cuda():
+def test_model_reference_cuda():
     '''lmql
     import lmql
 
@@ -44,4 +44,5 @@ async def test_model_reference_cuda():
         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
     '''
 
-run_all_tests(locals())
+if __name__ == "__main__":
+    run_all_tests(locals())
