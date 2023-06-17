@@ -43,7 +43,7 @@ class EmptyVariableScope:
             if errors == "ignore":
                 return None
             else:
-                raise TypeError("Failed to resolve value of variable '" + name + "' in @lmql.query " + str(self.fct), name)
+                raise TypeError("Failed to resolve value of variable '" + name + "' in LMQL query")
 
 @dataclass
 class FunctionContext:
@@ -62,6 +62,9 @@ class LMQLQueryFunction:
     args: Optional[List[str]] = None
     model: Optional[Any] = None
     function_context: Optional[FunctionContext] = None
+    
+    # extra arguments to consider as query context (e.g. passed to the @lmql.query(<args>) decorator)
+    extra_args: Dict = None
 
     lmql_code: str = None
 
@@ -168,10 +171,13 @@ class LMQLQueryFunction:
 
     async def __acall__(self, *args, **kwargs):
         query_kwargs, runtime_args = self.make_kwargs(*args, **kwargs)
-        interpreter = PromptInterpreter(force_model=self.model)
+        
+        forced_model = self.model or runtime_args.get("model") or (self.extra_args or {}).get("model")
+        interpreter = PromptInterpreter(force_model=forced_model)
 
         if self.output_writer is not None:
             runtime_args["output_writer"] = self.output_writer
+        runtime_args  = {**(self.extra_args or {}), **runtime_args}
         interpreter.set_extra_args(**runtime_args)
 
         # rename 'self'

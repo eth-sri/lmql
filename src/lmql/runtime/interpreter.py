@@ -41,11 +41,16 @@ class advance: pass # used as symbol
 class PromptState(NamedTuple):
     variable : str
     prompt : str
+    
     stmt_buffer : List[Any]
     query_head : Any
     program_state : Any
+    
     recurring_variable_counter : Dict[str, int]
     variable_offset : int
+
+    # optional extra constraint only applicable to current context (inline where)
+    constraints: Optional[ops.Node]
 
     # only set after processing where clause
     valid: Optional[bool]
@@ -61,6 +66,14 @@ class PromptState(NamedTuple):
         data_dict = self._asdict()
         data_dict.update(updated)
         return PromptState(**data_dict)
+    
+    def full_where_condition(self, interpreter):
+        if interpreter.where is None:
+            return self.constraints
+        elif self.constraints is None:
+            return interpreter.where
+        else:
+            return ops.AndOp([interpreter.where, self.constraints])
 
 class LMQLContext:
     def __init__(self, interpreter, state):
@@ -93,8 +106,8 @@ class LMQLContext:
     async def get_var(self, name):
         return self.program_state.get_program_value(name)
 
-    async def query(self, qstring):
-        return InterpreterCall(qstring, loc=None)
+    async def query(self, qstring, __locals, constraints=None):
+        return InterpreterCall(qstring, __locals, constraints, loc=None)
 
     async def set_model(self, model_name):
         self.interpreter.set_model(model_name)
@@ -238,7 +251,11 @@ class PromptInterpreter:
             return state
         
         variable = state.variable
+        constraints = state.constraints
+        
         stmt_buffer = state.stmt_buffer
+        constraints_after_last_continue = None
+        program_variables_after_last_continue = None
         prompt = state.prompt
 
         distribution_variable = None
@@ -247,8 +264,7 @@ class PromptInterpreter:
         query_head = state.query_head
 
         async def continue_for_more_prompt_stmts():
-            nonlocal stmt_buffer
-            nonlocal query_head
+            nonlocal stmt_buffer, query_head, constraints_after_last_continue, program_variables_after_last_continue
 
             if len(stmt_buffer) != 0: return
             
@@ -259,6 +275,11 @@ class PromptInterpreter:
                 await query_head.continue_()
 
             qstring = query_head.current_args[0]
+            constraints_after_last_continue = query_head.current_args[2] if len(query_head.current_args) > 2 else None
+            
+            if len(query_head.current_args) > 2:
+                program_variables_after_last_continue = query_head.current_args[1]
+            
             stmt_buffer = qstring_to_stmts(qstring) + [advance]
 
             # return context used for last continue_
@@ -274,10 +295,13 @@ class PromptInterpreter:
                 if type(s) is str:
                     prompt += unescape_qstring(s)
                     stmt_buffer = stmt_buffer[1:]
+                    constraints = None
+                    
                     # keep latest prompt in transient state
                     state = state.updated(prompt=prompt)
                 elif type(s) is TemplateVariable:
                     variable = s.name
+                    constraints = constraints_after_last_continue
                     # keep track of number of times a variable with this name has been decoded
                     if variable not in state.recurring_variable_counter.keys():
                         state.recurring_variable_counter[s.name] = -1
@@ -302,13 +326,17 @@ class PromptInterpreter:
         except InterpretationHeadDone:
             pass
 
-        # merge named tuple with new stmt_buffer
+        program_state = state.program_state.copy()
+        program_state.python_scope = program_variables_after_last_continue or program_state.python_scope
 
+        # merge named tuple with new stmt_buffer
         return state.updated(
             variable=variable,
             prompt=prompt,
+            constraints=constraints,
             stmt_buffer=stmt_buffer,
-            query_head=query_head
+            query_head=query_head,
+            program_state=program_state
         )
 
     def interpreter_state_user_data(self, state: PromptState):
@@ -400,6 +428,7 @@ class PromptInterpreter:
         variable_offset = state.variable_offset
 
         text = ""
+        where = self.where
 
         if is_done:
             mask = tset("eos")
@@ -421,14 +450,17 @@ class PromptInterpreter:
             follow_program_state: ProgramState = state.program_state.copy()
             follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc")
 
+            # determine full where condition
+            where = state.full_where_condition(self)
+
             # digest token with where expr
-            valid, is_final, trace, follow_trace = ops.digest(self.where,
+            valid, is_final, trace, follow_trace = ops.digest(where,
                 context=program_state,
                 follow_context=follow_program_state
             )
 
             # obtain where follow map
-            follow_map = follow_trace[self.where] if self.where is not None else None
+            follow_map = follow_trace[where] if where is not None else None
             # print(id(self), self.variable, [text], "mask", follow_map)
             mask = ops.create_mask(follow_map, valid, is_final)
 
@@ -438,7 +470,7 @@ class PromptInterpreter:
                 logit_mask = mask.mask
 
             # check stopping conditions
-            stopping_conditions: List[ops.StopAtOp] = ops.execute_op_stops_at_only(state.variable, self.where, trace)
+            stopping_conditions: List[ops.StopAtOp] = ops.execute_op_stops_at_only(state.variable, where, trace)
             for sc in stopping_conditions:
                 stop_trace = trace.copy()
                 del stop_trace[sc]
@@ -456,7 +488,7 @@ class PromptInterpreter:
         else:
             assert False, f"error: where() is called but current variable and current prompt are None and query head has result {state.query_head.result}"
 
-        await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace, text)
+        await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace, text, where)
 
         state = state.updated(
                         variable=variable,
@@ -465,7 +497,7 @@ class PromptInterpreter:
                         mask=mask,
                         program_state=program_state,
                         stopping_phrases=stopping_phrases,
-                        where=await self.where_graph_with_trace(trace, follow_trace)
+                        where=await self.where_graph_with_trace(where, trace, follow_trace)
         )
 
         # no mask, no logits processing
@@ -480,7 +512,7 @@ class PromptInterpreter:
         
         return mask, logit_mask, self.interpreter_state_user_data(state)
 
-    async def where_graph_with_trace(self, trace, follow_trace):
+    async def where_graph_with_trace(self, where, trace, follow_trace):
         from lmql.utils.graph import CytoscapeGraphWriter
 
         def node_data(op):
@@ -498,13 +530,13 @@ class PromptInterpreter:
             }
 
         writer = CytoscapeGraphWriter(extra_data_provider=node_data)
-        writer.write(self.where)
+        writer.write(where)
 
         return writer.graph.to_json(return_dict=True)
 
-    async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace, text):
+    async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace, text, where):
         if self.output_writer is not None:
-           await self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, self.where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
+           await self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
 
     async def where_processor(self, seqs, additional_logits_processor_mask, **kwargs):
         zipped_task_inputs = zip(seqs, additional_logits_processor_mask, range(len(seqs)))
@@ -532,11 +564,14 @@ class PromptInterpreter:
             variable_value = text
             # set raw variable value
             program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin")
-            
+
+            # get full where condition
+            where = state.full_where_condition(self)
+
             # apply postprocessing, if constraints specify it
             # - variable_value is the postprocessed, converted value (does not have to be a string)
             # - postprocessed_prompt is the string in the prompt that corresponds to the variable value
-            variable_value, postprocessed_prompt = ops.execute_postprocess(self.where, variable, variable_value, context=program_state)
+            variable_value, postprocessed_prompt = ops.execute_postprocess(where, variable, variable_value, context=program_state)
             
             # set postprocessed variable value and program value
             program_state.set(variable, postprocessed_prompt, program_value=variable_value, scores=(), diff="", montonicity="fin")
@@ -659,6 +694,7 @@ class PromptInterpreter:
         query_head = InterpretationHead(fct, context, args, kwargs)
         self.root_state = PromptState(variable=None, prompt="", stmt_buffer=[],
             query_head=query_head, program_state=context.program_state,
+            constraints=None,
             recurring_variable_counter={}, variable_offset=0,
             valid=None, final=None, mask=None, 
             stopping_phrases=None, where=None)
@@ -718,7 +754,12 @@ class PromptInterpreter:
                 if _DCLibDebugPrinter.printer.records_graph:
                     dc.set_record_graph()
 
+        # get decoder function
         mode = decoder_args["decoder"].lower()
+        # handle dynamically-set decoding (e.g. set via @lmql.query(decoder="beam", n=2))
+        if mode == "__dynamic__":
+            mode, extra_decoder_args = self.derive_decoder_args(self.extra_kwargs)
+            decoder_args = {**decoder_args, **extra_decoder_args}
         decoder_fct = dc.get_decoder(mode)
         self.validate_args(decoder_args, decoder_fct)
 
@@ -829,10 +870,30 @@ class PromptInterpreter:
 
             return results
 
+    def derive_decoder_args(self, extra_kwargs):
+        # default is argmax
+        decoder = extra_kwargs.get("decoder", "argmax")
+        # if temperature is != 0, use 'sample'
+        if extra_kwargs.get("temperature", 0.0) != 0.0:
+            decoder = "sample"
+
+        decoder_fct = dc.get_decoder(decoder)
+        
+        decoder_arg_names = inspect.getfullargspec(decoder_fct).args
+        decoder_kwarg_names = inspect.getfullargspec(decoder_fct).kwonlyargs
+        decoder_args = {}
+
+        for a in decoder_arg_names + decoder_kwarg_names:
+            if a in extra_kwargs.keys():
+                decoder_args[a] = extra_kwargs[a]
+        
+        return decoder, decoder_args
+    
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", "input_id_rewriter", "output_writer", 
-                         "chunk_timeout", "chatty_openai", "distribution_batch_size", "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", 
-                         "show_speculative", "openai_nonstop", "chunksize"]
+        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
+                         "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
+                         "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
+                         "openai_nonstop", "chunksize"]
 
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args

@@ -54,7 +54,7 @@ class LMTPModel:
         If the model does not support scoring, return an array of 
         zeros of the same shape as input_ids (default behavior).
         """
-        return torch.zeros_like(input_ids)
+        return np.zeros_like(input_ids)
 
     def generate(self,
         input_ids: torch.LongTensor,

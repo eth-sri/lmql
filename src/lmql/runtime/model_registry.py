@@ -13,6 +13,9 @@ class LMQLModelRegistry:
 
     @staticmethod
     def get(model, **kwargs):
+        if model == "<dynamic>":
+            model = LMQLModelRegistry.default_model
+
         if model in model_name_aliases:
             model = model_name_aliases[model]
 
@@ -87,3 +90,4 @@ LMQLModelRegistry.autoconnect = None
 LMQLModelRegistry.registry = {}
 # instance of model clients in this process
 LMQLModelRegistry.clients = {}
+LMQLModelRegistry.default_model = "openai/text-davinci-003"

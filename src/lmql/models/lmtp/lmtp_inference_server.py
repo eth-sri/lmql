@@ -218,8 +218,8 @@ class Scheduler:
                     
                     if b.is_score:
                         kwargs = b.generate_args()
-                        input_ids = kwargs["input_ids"].to(model.device)
-                        attention_mask = kwargs["attention_mask"].to(model.device)
+                        input_ids = kwargs["input_ids"]
+                        attention_mask = kwargs["attention_mask"]
                         
                         scores = model.score(input_ids, attention_mask)
                         ScoreStreamer().log_token(b, scores)

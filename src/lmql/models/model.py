@@ -61,7 +61,8 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
             if cmdargs.split(" ")[0] == model_name:
                 return LMQLModel(model_name, model=p)
     
-    model = lmtp_model(model_name, inprocess=True, **kwargs)
+    kwargs["inprocess"] = True
+    model = lmtp_model(model_name, **kwargs)
     LMQLModel.inprocess_instances[cmdline_args] = model
     return LMQLModel(model_name, model=model)
 

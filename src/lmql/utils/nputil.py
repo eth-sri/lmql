@@ -31,11 +31,14 @@ def ensure_iterable(v):
 
 
 def log_softmax(a, axis=-1):
+    a = ensure_array(a)
     # check for log div by zero
     normalizer = np.sum(np.exp(a), axis=axis)
-    if normalizer == 0:
+    if (normalizer == 0).any():
         # assign 1.0 to max value
         return np.where(a == np.max(a), 0.0, -np.inf)
+    if len(a.shape) > 1:
+        normalizer = normalizer.reshape(-1,1)
     return a - np.log(normalizer)
 
 def topk(a, k:int, sorted: bool = False, axis=-1):
