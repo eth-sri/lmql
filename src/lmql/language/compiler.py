@@ -255,9 +255,12 @@ class QueryStringTransformation(ast.NodeTransformer):
                 declared_template_vars.add(stmt.name)
                 compiled_qstring += str(stmt)
 
+        # keep track of last stmt in this qstring
+        last_stmt = stmt
+
         if compiled_qstring.endswith("\\"):
             compiled_qstring = compiled_qstring[:-1]
-        elif not compiled_qstring.endswith("\\n"):
+        elif not compiled_qstring.endswith("\\n") and not type(last_stmt) is DistributionVariable:
             compiled_qstring += "\\\\n"
 
         if len(compiled_qstring) == 0:
