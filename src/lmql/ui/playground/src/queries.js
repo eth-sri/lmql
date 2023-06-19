@@ -75,7 +75,7 @@ where
       ]
    },
    {
-    category: "Preview Features", 
+    category: "Features In Preview", 
     highlight: true,
     queries: [
        {
