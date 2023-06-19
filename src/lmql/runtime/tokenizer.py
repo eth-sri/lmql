@@ -11,7 +11,6 @@ from lmql.runtime.caching import cache_file_exists, cachefile
 
 from lmql.runtime.tokenizers.pure_python_tokenizer import PythonBackedTokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
-from threading import Thread
 
 global special_token_mappings
 special_token_mappings = {}
@@ -25,7 +24,13 @@ class LMQLTokenizer:
         self._tokenizer_impl = None
         self.loader_thread = None
 
+        self.model_identifier = model_identifier
+
+        self._vocab = None
+        self.vocab_range = None
+
         if loader is not None:
+            from threading import Thread
             def load():
                 t = loader()
                 self._tokenizer_impl = t
@@ -37,12 +42,8 @@ class LMQLTokenizer:
             self.loader_thread.start()
         else:
             self._tokenizer_impl = tokenizer_impl
-
-        self.model_identifier = model_identifier
-        self.detokenizer_cache = {}
-
-        self._vocab = None
-        self.vocab_range = None
+            self._vocab = get_vocab(self.tokenizer_impl)
+            self.vocab_range = max(max(self._vocab.values()) + 1, self.tokenizer_impl.vocab_size)
 
         if "FORCE_TIKTOKEN" in os.environ:
             assert type(self.tokenizer_impl) is TiktokenTokenizer

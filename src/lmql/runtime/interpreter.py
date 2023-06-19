@@ -577,7 +577,6 @@ class PromptInterpreter:
             tail_ids = self.tokenizer.tokenize(state.tail, asbytes=True)
             tail_ids = tail_ids[:-1]
             if len(tail_ids) > 0:
-                print("tail ids", tail_ids)
                 updated_ids = prompt_ids + tail_ids[1:]
 
                 return RewrittenInputIds(
