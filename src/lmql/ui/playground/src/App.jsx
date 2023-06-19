@@ -1784,7 +1784,6 @@ function SidePanel(props) {
   const clearTrigger = useState(new TriggerState())[0];
   const [clearOnRun, setClearOnRun] = useState(true);
   const [perVariableColor, setPerVariableColor] = useState(true);
-  const [alwaysShowOutput, setAlwaysShowOutput] = useState(true);
 
   const [trackMostLikly, setTrackMostLiklyInternal] = useState(window.localStorage.getItem("trackMostLikely") === "true");
   trackingState.setTrackMostLikely = setTrackMostLiklyInternal
@@ -1866,8 +1865,7 @@ function SidePanel(props) {
       />
       <OutputPanelContent 
         className={!props.simpleMode && sidepanel != 'output' ? "simple" : ""} 
-        style={{ display: ((!props.simpleMode && alwaysShowOutput) || sidepanel === 'output') ? 'block' : 'none' }} 
-        alwaysShow={alwaysShowOutput}
+        style={{ display: ((!props.simpleMode) || sidepanel === 'output') ? 'block' : 'none' }} 
         clearTrigger={clearTrigger} 
       />
       {/* <StatisticsPanelContent style={{display: sidepanel === 'stats' ? 'flex' : 'none'}}/> */}
