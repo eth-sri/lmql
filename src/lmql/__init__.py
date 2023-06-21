@@ -170,8 +170,8 @@ def query(__fct__=None, input_variables=None, is_async=True, **extra_args):
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)
 
-    # copy all attributes of model.query to the wrapper function
-    for attr in ["aschain", "lmql_code", "is_async"]:
+    # copy some attributes of model.query to the wrapper function
+    for attr in ["aschain", "lmql_code", "is_async", "output_variables"]:
         setattr(lmql_query_wrapper, attr, getattr(module.query, attr))
 
     return lmql_query_wrapper

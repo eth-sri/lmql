@@ -20,6 +20,9 @@ class UniformRandomSamplingLLM(LMTPModel):
     def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor, streamer: TokenStreamer) -> LMTPModelResult:
+        seed = input_ids.sum() + self.seed
+        rng = np.random.RandomState(seed)
+        
         scores = []
         
         if bias_tensor is not None:
@@ -34,7 +37,7 @@ class UniformRandomSamplingLLM(LMTPModel):
             logits = logits - np.log(np.exp(logits).sum(axis=-1)).reshape(-1,1)
             probs = np.exp(logits)
 
-            next_ids = np.array([np.random.choice(logits.shape[-1], size=1, p=probs[i]) for i in range(len(probs))]).reshape(-1,1)
+            next_ids = np.array([rng.choice(logits.shape[-1], size=1, p=probs[i]) for i in range(len(probs))]).reshape(-1,1)
 
             for i,j in enumerate(next_ids):
                 logits[i, j.item()] += 1e-2

@@ -451,7 +451,7 @@ class EqOpGeneric(Node):
             else:
                 return InOpStrInSet([]).follow(op2, [op1])
 
-        if type(op1) is str or type(op1) is str:
+        if type(op1) is str or type(op2) is str:
             op_shorter = op1 if len(strip_next_token(op1)) < len(strip_next_token(op2)) else op2
             op_longer = op1 if len(strip_next_token(op1)) > len(strip_next_token(op2)) else op2
 
@@ -617,6 +617,8 @@ class Var(Node):
         )
 
     def final(self, x, context, operands=None, result=None, **kwargs):
+        if self.python_variable:
+            return "fin"
         return context.final(self.name)
 
     def __repr__(self) -> str:

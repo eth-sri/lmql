@@ -258,6 +258,7 @@ class QueryStringTransformation(ast.NodeTransformer):
         # keep track of last stmt in this qstring
         last_stmt = stmt
 
+        # add \n to qstring if it is not already there
         if compiled_qstring.endswith("\\"):
             compiled_qstring = compiled_qstring[:-1]
         elif not compiled_qstring.endswith("\\n") and not type(last_stmt) is DistributionVariable:
@@ -272,9 +273,9 @@ class QueryStringTransformation(ast.NodeTransformer):
             result_code = code_str + "\n"
 
             # result_code = f'yield context.query(f"""{compiled_qstring}""")'
-            result_code += interrupt_call('query', f'f"""{compiled_qstring}"""', "locals()", "constraints=" + result_reference)
+            result_code += interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}", "constraints=" + result_reference)
         else:
-            result_code = interrupt_call('query', f'f"""{compiled_qstring}"""', "locals()")
+            result_code = interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}")
 
         for v in declared_template_vars:
             get_var_call = yield_call('get_var', f'"{v}"')

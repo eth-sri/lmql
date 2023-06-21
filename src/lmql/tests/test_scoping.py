@@ -3,7 +3,7 @@ from lmql.tests.expr_test_utils import run_all_tests
 
 
 @lmql.query
-async def test_q():
+async def test_q(actual_input: str = None):
     '''lmql
     a = 12
 
@@ -18,9 +18,7 @@ async def test_q():
         assert "actual_input" in locals().keys(), f"Input variable actual_input not in local scope. locals: {locals()}"
         assert "actual_input" not in globals().keys(), f"Input variable actual_input not in global scope. locals: {locals()}"
     from 
-        "openai/text-ada-001" 
-    where
-        len(TOKENS(WHO)) < 10
+        "openai/text-ada-001"
     '''
 
 async def test_decode_clause_scoping():
