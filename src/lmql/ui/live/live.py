@@ -65,13 +65,18 @@ class LiveDebuggerOutputWriter:
 async def lmql(code, *args, web=False):
     import lmql
     
+    model = None
+    if len(args) > 0 and type(args[0]) is dict:
+        model = args[0].get("model")
+        if model == "automatic": model = None
+
     if code.startswith("./"):
         with open(code) as f:
             code = f.read()
 
     output_writer = LiveDebuggerOutputWriter(web=web)
 
-    result = await lmql.run(code, output_writer=output_writer)
+    result = await lmql.run(code, output_writer=output_writer, model=model)
 
     for r in (result if type(result) is list else [result]):
         if r is None:

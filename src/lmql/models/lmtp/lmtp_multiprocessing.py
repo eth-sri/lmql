@@ -77,11 +77,11 @@ class LMTPMultiProcessingClient:
 
     def __init__(self, model_identifier, **kwargs):
         ensure_picklable(kwargs, "lmtp.inprocess kwargs must be pickleable as it has to be sent to a subprocess")
-        
         self.model_identifier = model_identifier
 
         (c2, c1) = multiprocessing.Pipe(duplex=True)
-        self.subprocess = multiprocessing.Process(target=multiprocessing_main, args=(c1,kwargs), name="lmtp-model-server", daemon=True)
+        self.subprocess = multiprocessing.Process(target=multiprocessing_main, args=(c1,kwargs), 
+                                                  name="lmtp-model-server", daemon=True)
         self.subprocess.start()
         
         self.connection = c2

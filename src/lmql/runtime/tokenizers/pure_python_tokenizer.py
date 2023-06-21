@@ -42,10 +42,10 @@ class PythonBackedTokenizer:
             return self._tokenize(s)
 
     def convert_bytes_to_string(self, token_bytes):
-        ids = self.convert_bytes_to_ids(token_bytes)
+        ids = self.convert_token_bytes_to_ids(token_bytes)
         return self.decode(ids)
 
-    def convert_bytes_to_ids(self, token_bytes):
+    def convert_token_bytes_to_ids(self, token_bytes):
         import gpt3_tokenizer
         result = []
         for b in token_bytes:

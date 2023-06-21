@@ -57,28 +57,11 @@ def load(filepath=None, autoconnect=False, force_model=None, output_writer=None)
 
 async def run_file(filepath, *args, output_writer=None, force_model=None, **kwargs):
     import inspect
-    module = load(filepath, autoconnect=True, output_writer=output_writer, force_model=force_model)
+    with open(filepath, "r") as f:
+        code = f.read()
     
-    if module is None: 
-        print("Failed to compile query.")
-        return
-
-    if output_writer is not None:
-        module.query.output_writer = output_writer
-
-    compiled_fct_args = module.query.args
-    query_args = []
-
-    calling_frame = inspect.stack()[1]
-    scope = LMQLInputVariableScope(module.query.fct, calling_frame)
-    for arg in compiled_fct_args:
-        if scope.resolve(arg) == None:
-            query_args.append(arg)
-
-    output_variables = module.query.output_variables
-    query_args = list(set(query_args) - set(output_variables))
-
-    return await module.query(*args, **kwargs)
+    q = _query_from_string(code, output_writer=printing)
+    return await q(*args, **kwargs)
 
 async def run(code, *args, **kwargs):
     """
@@ -114,10 +97,11 @@ def _query_from_string(s, input_variables=None, is_async=True, output_writer=Non
 
     module.query.function_context = FunctionContext(fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
+    module.query.output_writer = output_writer
     
     return module.query
 
-def query(fct, input_variables=None, is_async=True):
+def query(__fct__=None, input_variables=None, is_async=True, **extra_args):
     """
     Constructs a new LMQL query function from the given function and or string of code.
 
@@ -145,6 +129,15 @@ def query(fct, input_variables=None, is_async=True):
         By default the returned query function is asynchronous (has to be called as `await my_query_function(...)`).
         To construct a synchronous query function, use lmql.query(<query string>, is_async=False).
     """
+    fct = __fct__
+
+    # check for @lmql.query(<args>) def f(): ... use with additional arguments
+    if fct is None:
+        def wrapper(fct):
+            return query(fct, input_variables=input_variables, is_async=is_async, **extra_args)
+        return wrapper
+
+    # otherwise assume @lmql.query def f(): ...
     import inspect
 
     if type(fct) is LMQLQueryFunction: return fct
@@ -172,12 +165,13 @@ def query(fct, input_variables=None, is_async=True):
     # set the function context of the query based on the function context of the decorated function
     module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
+    module.query.extra_args = extra_args
 
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)
 
-    # copy all attributes of model.query to the wrapper function
-    for attr in ["aschain"]:
+    # copy some attributes of model.query to the wrapper function
+    for attr in ["aschain", "lmql_code", "is_async", "output_variables"]:
         setattr(lmql_query_wrapper, attr, getattr(module.query, attr))
 
     return lmql_query_wrapper

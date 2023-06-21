@@ -32,4 +32,5 @@ async def test_special_characters_pi():
         len(TOKENS(formula)) < 20
     '''
 
-run_all_tests(globals())
+if __name__ == "__main__":
+    run_all_tests(globals())

@@ -6,4 +6,5 @@ from lmql.tests.queryargs.test_sync import *
 
 from lmql.tests.queryargs.test_args import test_query_args, test_decorated_chain
 
-run_all_tests(globals())
+if __name__ == "__main__":
+    run_all_tests(globals())

@@ -8,21 +8,24 @@ lmql serve-model --cuda gpt2-medium
 See lmtp_client for an example how to connect to this server via 'websocket'.
 """
 
-import sys
-import aiohttp
-from aiohttp import web
 import asyncio
 import json
 import pickle
-from dataclasses import dataclass
-from queue import Queue, Empty as QueueEmpty
+import sys
 import threading
 import time
-import torch
-import atexit
-from typing import Optional, Tuple
+from dataclasses import dataclass
+from queue import Empty as QueueEmpty
+from queue import Queue
 
-from transformers import AutoModelForCausalLM
+import aiohttp
+import numpy as np
+from aiohttp import web
+
+import lmql.models.lmtp.backends as backends
+import lmql.utils.nputil as nputil
+from lmql.models.lmtp.backends.basemodel import LMTPModel
+
 
 class LMTPCannotLoadModelByPolicy(Exception):
     pass
@@ -88,46 +91,17 @@ class GenerateBatch:
 
         return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets)
 
-    def logits_processors(self):
-        bias_tensors = None
-        logit_biases = self.logit_biases
-        
-        if len(logit_biases) == 0:
-            return []
-
-        class BatchLogitsProcessor:
-            def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
-                nonlocal bias_tensors
-
-                vocab_size = scores.shape[-1]
-                if bias_tensors is None:
-                    bias_tensors = [torch.zeros(vocab_size) for _ in logit_biases]
-                    for i, bias in enumerate(logit_biases):
-                        if len(bias) > 0:
-                            indices = torch.tensor(list(bias.keys()), dtype=torch.long)
-                            values = torch.tensor(list(bias.values()), dtype=torch.float32)
-                            bias_tensors[i][indices] = values
-                    bias_tensors = torch.stack(bias_tensors).to(scores.device)
-
-                return scores + bias_tensors
-
-        return [BatchLogitsProcessor()]
-
     def generate_args(self):
         return {
-            "input_ids": torch.tensor(self.input_ids),
-            "do_sample": self.temperature > 0.0,
-            "attention_mask": torch.tensor(self.attention_mask),
+            "input_ids": self.input_ids,
+            "attention_mask": self.attention_mask,
             "temperature": self.temperature,
             "max_new_tokens": self.max_tokens,
-            "logits_processor": self.logits_processors(),
-            "output_scores": True,
-            "return_dict_in_generate": True,
-            **({"scoring_offsets": self.scoring_offsets} if self.is_score else {})
+            "bias_tensor": self.logit_biases if len(self.logit_biases) > 0 else None
         }
 
 class ScoreStreamer:
-    def log_token(self, batch: GenerateBatch, all_scores: torch.FloatTensor, **kwargs):
+    def log_token(self, batch: GenerateBatch, all_scores, **kwargs):
         batch_size = all_scores.shape[0]
         
         for i in range(batch_size):
@@ -150,11 +124,11 @@ class TokenStreamer:
         self.batch = batch
         self.eos_token_id = eos_token_id
 
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
+    def __call__(self, input_ids, scores, **kwargs) -> bool:
         self.log_token(input_ids, scores, **kwargs)
         return False
 
-    def log_token(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, last=False, **kwargs):
+    def log_token(self, input_ids, scores, last=False, **kwargs):
         batch_size = input_ids.shape[0]
         
         last_tokens = input_ids[:, -1]
@@ -162,11 +136,16 @@ class TokenStreamer:
         
         max_num_top_logprobs = max([c.kwargs.get("top_logprobs", 1) for c in self.batch.calls])
 
+        if not nputil.is_array(last_tokens):
+            last_tokens = last_tokens.numpy()
+        if not nputil.is_array(last_scores):
+            last_scores = last_scores.numpy()
+
         # for each sample get top logprobs
-        top_logprobs = torch.topk(last_scores, max_num_top_logprobs, dim=-1, largest=True, sorted=True)
+        all_logprobs, all_indices  = nputil.topk(last_scores, max_num_top_logprobs, sorted=True, axis=-1)
         for i in range(batch_size):
-            logprobs = top_logprobs.values[i]
-            tokens = top_logprobs.indices[i]
+            logprobs = all_logprobs[i]
+            tokens = all_indices[i]
             token_score = last_scores[i][last_tokens[i]]
 
             num_top_logprobs = self.batch.calls[i].kwargs.get("top_logprobs", 1)
@@ -225,62 +204,32 @@ class Scheduler:
             batches_by_mode.setdefault(mode, []).append(c)
         return batches_by_mode.values()
 
-    def score(
-        self,
-        model,
-        input_ids: torch.LongTensor,
-        attention_mask: torch.LongTensor,
-        eos_token_id: Optional[int] = None,
-        **model_kwargs,
-    ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-        # prepare model inputs
-        model_inputs = model.prepare_inputs_for_generation(input_ids, **model_kwargs, eos_token_id=eos_token_id)
-        model_inputs["attention_mask"] = attention_mask
-
-        token_scores = []
-        
-        outputs = model(
-            **model_inputs,
-            return_dict=True,
-            output_attentions=False,
-            output_hidden_states=False,
-        )
-
-        next_token_logits = outputs.logits[:, -len(input_ids), :]
-        next_token_logits = torch.log_softmax(next_token_logits, dim=-1)
-        token_scores = next_token_logits.gather(-1, input_ids)
-
-        return token_scores
-
     def worker(self):
-        print("[Loading", self.model_identifier, "with", f"AutoModelForCausalLM.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
-        model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
-
-        print("[", self.model_identifier, " ready on device ", model.device, flush=True, sep="", end="]\n")
+        model = LMTPModel.load(self.model_identifier, **self.model_args)
 
         while True:
             if self.kill_event.is_set():
                 break
 
             for batch in self.batches():
-                eos_token = model.config.eos_token_id
-
                 try:
                     b = GenerateBatch.from_calls(batch)
                     
                     if b.is_score:
                         kwargs = b.generate_args()
-                        input_ids = kwargs["input_ids"].to(model.device)
-                        attention_mask = kwargs["attention_mask"].to(model.device)
+                        input_ids = kwargs["input_ids"]
+                        attention_mask = kwargs["attention_mask"]
                         
-                        scores = self.score(model, input_ids, attention_mask, eos_token_id=eos_token)
+                        scores = model.score(input_ids, attention_mask)
                         ScoreStreamer().log_token(b, scores)
                     else:
-                        streamer = TokenStreamer(b, model.config.eos_token_id)
+                        streamer = TokenStreamer(b, model.eos_token_id)
                         kwargs = b.generate_args()
-                        kwargs["input_ids"] = kwargs["input_ids"].to(model.device)
-                        kwargs["attention_mask"] = kwargs["attention_mask"].to(model.device)
-                        result = model.generate(**kwargs, stopping_criteria=[streamer], eos_token_id=eos_token, pad_token_id=eos_token)
+                        
+                        kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)
+                        kwargs["attention_mask"] = np.array(kwargs["attention_mask"], dtype=np.int32)
+
+                        result = model.generate(**kwargs, streamer=streamer)
                         streamer.log_token(result.sequences, result.scores, last=True)
                 except Exception as e:
                     print("[Error during generate()]", e, flush=True)

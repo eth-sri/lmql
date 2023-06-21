@@ -111,11 +111,11 @@ async def test_stop_should_not_postprocess_if_sc_not_satisfied():
     '''lmql
     argmax 
         "A good movie review:[REVIEW] "
-        assert REVIEW.endswith("sad"), "Expected REVIEW to end with sad, but was " + str([REVIEW])
+        assert REVIEW.endswith("Heather"), "Expected REVIEW to end with Heather, but was " + str([REVIEW])
     from 
-        "openai/text-ada-001" 
+        lmql.model("random", seed=123)
     where
-        len(TOKENS(REVIEW)) > 10 and STOPS_AT(REVIEW, "sad") and STOPS_AT(REVIEW, "Fault")
+        len(TOKENS(REVIEW)) > 10 and STOPS_AT(REVIEW, "creating") and STOPS_AT(REVIEW, "Heather")
     '''
 
 @lmql.query
@@ -123,11 +123,12 @@ async def test_stop_before_should_not_postprocess_if_sc_not_satisfied():
     '''lmql
     argmax 
         "A good movie review:[REVIEW] "
-        assert REVIEW.endswith("sad"), "Expected REVIEW to end with sad, but was " + str([REVIEW])
+        assert REVIEW.endswith("Heather"), "Expected REVIEW to end with Heather, but was " + str([REVIEW])
     from 
-        "openai/text-ada-001" 
+        lmql.model("random", seed=123)
     where
-        len(TOKENS(REVIEW)) > 10 and STOPS_AT(REVIEW, "sad") and STOPS_BEFORE(REVIEW, "Fault")
+        len(TOKENS(REVIEW)) > 10 and STOPS_BEFORE(REVIEW, "creating") and STOPS_AT(REVIEW, "Heather")
     '''
 
-run_all_tests(globals())
+if __name__ == "__main__":
+    run_all_tests(globals())

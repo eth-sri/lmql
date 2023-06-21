@@ -451,7 +451,7 @@ class EqOpGeneric(Node):
             else:
                 return InOpStrInSet([]).follow(op2, [op1])
 
-        if type(op1) is str or type(op1) is str:
+        if type(op1) is str or type(op2) is str:
             op_shorter = op1 if len(strip_next_token(op1)) < len(strip_next_token(op2)) else op2
             op_longer = op1 if len(strip_next_token(op1)) > len(strip_next_token(op2)) else op2
 
@@ -573,9 +573,10 @@ class SelectOp(Node):
         else: return "var"
 
 class Var(Node):
-    def __init__(self, name):
+    def __init__(self, name, python_variable=False):
         super().__init__([])
         self.name = name
+        self.python_variable = python_variable
 
         self.depends_on_context = True
         
@@ -586,11 +587,18 @@ class Var(Node):
         return self.name
 
     def forward(self, context, **kwargs):
+        if self.python_variable:
+            return context.python_scope.get(self.name)
+
         if self.diff_aware_read:
             return (context.get(self.name, None), context.get_diff(self.name, None))
+        
         return context.get(self.name, None)
     
     def follow(self, context, **kwargs):
+        if self.python_variable:
+            return context.python_scope.get(self.name)
+
         value = context.get(self.name, None)
         if value is None: return None
         
@@ -609,6 +617,8 @@ class Var(Node):
         )
 
     def final(self, x, context, operands=None, result=None, **kwargs):
+        if self.python_variable:
+            return "fin"
         return context.final(self.name)
 
     def __repr__(self) -> str:

@@ -355,7 +355,7 @@ class DecoderSequence:
         ids = np.concatenate([self.input_ids, continuation.token.reshape(1)])
         for stop in stop_phrases:
             len_stop = len(stop)
-            if ids[-len_stop:] == stop:
+            if all(ids[-len_stop:] == stop):
                 new_stop_phrase[-len_stop:] = True
                 break
 

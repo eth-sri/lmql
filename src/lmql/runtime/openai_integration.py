@@ -312,7 +312,7 @@ class DclibOpenAiModel(DcModel):
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=0), completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
             else:
                 if noscore: logprob = 0.0
-                else: logprob = (await self.api_score(np.append(input_ids, fixed_next_token, axis=0), len(tokenized_input_ids)))
+                else: logprob = (await self.api_score(np.append(input_ids, nputil.ensure_array(fixed_next_token).reshape(-1), axis=0), -1))
                 return CompletionResult(openai.response_buffer.singleton(token=fixed_next_token, token_logprob=logprob), 
                                         completion_call.continuation_type, completion_call.logit_mask_or_fixed_id)
         else:
@@ -676,10 +676,7 @@ class DclibOpenAiModel(DcModel):
                 else: distribution[mask < 0] = np.finfo(np.float32).min
                 
                 # make sure all token_ids are unique
-                tokens = np.array(list(set(tokens)))
-
-                # re-determine logprobs with logits mask applied
-                logprobs = distribution.score(tokens)
+                tokens, logprobs = distribution.topk(k=k)
 
                 next_token_ids.append(tokens)
                 next_token_scores.append(logprobs)

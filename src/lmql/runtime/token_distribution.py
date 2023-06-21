@@ -68,6 +68,6 @@ class TokenDistribution:
         
         k = min(k, len(logprobs))
         
-        scores, key_ids = nputil.topk(logprobs, k=k)
+        scores, key_ids = nputil.topk(logprobs, k=k, sorted=True)
 
         return [keys[i] for i in key_ids], scores
