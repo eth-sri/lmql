@@ -420,7 +420,7 @@ const ModelSelectionDiv = styled.div`
     opacity: 1.0
   }
 
-  input {
+  >input {
     position: absolute;
     top: 0;
     left: 0;
@@ -446,10 +446,11 @@ const ModelSelectionDiv = styled.div`
     border-radius: 4pt;
     text-align: left;
     max-height: 300pt;
-    max-height: 80vh;
+    max-height: calc(100vh - 100pt);
     overflow-y: scroll;
     display: none;
     z-index: 999;
+    padding-bottom: 10pt;
   }
 
   .select.open {
@@ -493,11 +494,18 @@ const ModelSelectionDiv = styled.div`
     padding: 0;
   }
 
+  .select .instructions {
+    display: block;
+    font-size: 8pt;
+    padding: 5pt;
+    color: #3c3c3c;
+  }
+
   .option:hover.selected, .option.selected {
     background-color: #c4c4c4;
   }
   
-  input {
+  >input {
     z-index: 3;
     right: 20pt;
     font-size: 8pt;
@@ -549,20 +557,20 @@ function ModelSelection() {
 
   const PREDEFINED = {
     "": [
-      {"name": "automatic", note: "Use model as specified by the query."},
-      {"name": "random", note: "Random (uniform) token sampling."}
+      {"name": "automatic", note: "Use model as specified by the query.", inprocess: false},
+      {"name": "random", note: "Random (uniform) token sampling.", inprocess: false}
     ],
     "Other Suggestions": [
-      {"name": "gpt2", "note": "🤗 Tranformers"},
-      {"name": "gpt2-medium", "note": "🤗 Tranformers"},
-      {"name": "facebook/opt-350m", "note": "🤗 Tranformers"},
-      {"name": "openai/text-ada-001", "note": "OpenAI"},
-      {"name": "openai/text-curie-001", "note": "OpenAI"},
-      {"name": "openai/text-babbage-001", "note": "OpenAI"},
-      {"name": "openai/text-davinci-001", "note": "OpenAI"},
-      {"name": "openai/text-davinci-003", "note": "OpenAI"},
-      {"name": "chatgpt", "note": "OpenAI"},
-      {"name": "gpt-4", "note": "OpenAI"}
+      {"name": "gpt2", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "gpt2-medium", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "facebook/opt-350m", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "openai/text-ada-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-curie-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-babbage-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-davinci-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-davinci-003", "note": "OpenAI", inprocess: false},
+      {"name": "chatgpt", "note": "OpenAI", inprocess: false},
+      {"name": "gpt-4", "note": "OpenAI", inprocess: false}
     ]
   }
 
@@ -572,12 +580,16 @@ function ModelSelection() {
       e.target.blur()
     }
   }
-  
+
   return <ModelSelectionDiv className={(model == "automatic" ? "auto" : "") + (selectOpen ? " active" : "") }>
     <input placeholder="automatic" value={model} onChange={e => onChange(e.target.value)} autoCorrect={false} onKeyDown={onInputEnter}/>
-    <div onChange={e => onChange(e.target.value)} className={'select ' + (selectOpen ? "open" : "")}>
+    <div className={'select ' + (selectOpen ? "open" : "")}>
+      <span class="instructions">
+        <b>Custom Model</b><br/>
+        Specify the model to execute your query with. You can also type in the text field above.
+      </span>
       {Object.keys(PREDEFINED).map(k => <>
-        <h2 key={"key-"+k}>{k}</h2>
+        {k != "" ? <h2 key={"key-"+k}>{k}</h2> : null}
         {PREDEFINED[k].map(o => <div className={'option' + (o.name == model ? " selected" : "")} 
           onClick={() => {onChange(o.name); setSelectOpen(false);}} key={k+o}>
           {o.name}
