@@ -48,16 +48,6 @@ def resolve(model_name, endpoint=None, **kwargs):
         register_model(model_name, Model)
         register_model("*", Model)
     else:
-        try:
-            import transformers
-        except:
-            if "LMQL_BROWSER" in os.environ:
-                assert False, "The browser distribution of LMQL does not support HuggingFace Transformers models.\
-                    Please use openai/ models or install lmql with 'transformers' support (pip install lmql[hf])."
-            else:
-                assert False, "Your distribution of LMQL does not support HuggingFace Transformers models.\
-                    Please use openai/ models or install lmql with 'transformers' support (pip install lmql[hf])."
-
         from lmql.models.lmtp.lmtp_dcmodel import lmtp_model
 
         # special case for 'random' model (see random_model.py)

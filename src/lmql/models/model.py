@@ -29,12 +29,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
     Return:
         InProcessServer: An object representing the loaded model, can be passed in the 'from' clause of a query.
     """
-    try:
-        import transformers
-        from .lmtp.lmtp_dcmodel import lmtp_model
-    except ImportError:
-        raise NotImplementedError("Your installation of LMQL does not support local models via inprocess(). Please make sure you have 'transformers' installed.")
-
+    from .lmtp.lmtp_dcmodel import lmtp_model
     assert not model_name.startswith("openai/"), "openai/ models cannot be loaded with inprocess=True, they always use the remote API."
 
     # extract/reassign renamed like 'cuda'

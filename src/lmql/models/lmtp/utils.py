@@ -1,8 +1,4 @@
-import torch
-
 def rename_model_args(model_args):
-    import torch
-    
     cuda = model_args.pop("cuda", False)
     dtype = model_args.pop("dtype", None)
 
@@ -11,6 +7,7 @@ def rename_model_args(model_args):
     elif dtype == "8bit":
         model_args["load_in_8bit"] = True
     elif dtype is not None:
+        import torch
         model_args["torch_dtype"] = getattr(torch, dtype)
 
     # parse cuda

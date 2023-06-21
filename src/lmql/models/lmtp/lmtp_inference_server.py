@@ -21,7 +21,6 @@ from queue import Queue
 import aiohttp
 import numpy as np
 from aiohttp import web
-from transformers import AutoModelForCausalLM
 
 import lmql.models.lmtp.backends as backends
 import lmql.utils.nputil as nputil

@@ -7,8 +7,6 @@ from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.tokenizer import load_tokenizer
 from .lmtp_client import LMTPWebSocketClient
 from .lmtp_multiprocessing import LMTPMultiProcessingClient
-from .lmtp_threading import LMTPThreadedClient
-from .lmtp_inference_server import Scheduler
 import lmql.runtime.dclib as dc
 import asyncio
 import numpy as np

@@ -6,7 +6,7 @@ import numpy as np
 import lmql.utils.nputil as nputil
 
 class UniformRandomSamplingLLM(LMTPModel):
-    def __init__(self, seed=42, **kwargs):
+    def __init__(self, seed=None, **kwargs):
         self.seed = seed
         self.kwargs = kwargs
 
@@ -20,8 +20,11 @@ class UniformRandomSamplingLLM(LMTPModel):
     def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor, streamer: TokenStreamer) -> LMTPModelResult:
-        seed = input_ids.sum() + self.seed
-        rng = np.random.RandomState(seed)
+        if self.seed is not None:
+            seed = input_ids.sum() + self.seed
+            rng = np.random.RandomState(seed)
+        else:
+            rng = np.random.RandomState()
         
         scores = []
         
