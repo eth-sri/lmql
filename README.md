@@ -126,7 +126,7 @@ For system-wide configuration, you can also create an `api.env` file at `$HOME/.
 To install the latest (bleeding-edge) version of LMQL, you can also run the following command:
 
 ```
-pip install git+https://github.com/eth-sri/lmq
+pip install git+https://github.com/eth-sri/lmql
 ```
 
 This will install the `lmql` package directly from the `main` branch of this repository. We do not continously test the `main` version, so it may be less stable than the latest PyPI release.
