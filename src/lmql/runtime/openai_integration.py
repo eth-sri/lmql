@@ -995,7 +995,7 @@ def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
         def get_tokenizer(self):
             if self._tokenizer is None:
                 if not mock:
-                    self._tokenizer = load_tokenizer("gpt2")
+                    self._tokenizer = load_tokenizer("gpt3-tokenizer")
                 else:
                     self._tokenizer = load_tokenizer(self.model_identifier)
             self.served_model = self
