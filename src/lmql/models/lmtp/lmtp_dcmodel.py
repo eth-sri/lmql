@@ -31,6 +31,7 @@ class LMTPModel(DcModel):
         self.close_signal = asyncio.Event()
         # error signal
         self.error_signal = asyncio.Event()
+        self.error = None
         
         # endpoint in case of remote model
         self.endpoint = endpoint
@@ -68,8 +69,8 @@ class LMTPModel(DcModel):
                     self.connected_signal.set()
                     await self.close_signal.wait()
         except Exception as e:
-            print("Failed to communicate with lmtp endpoint: {}. Please check that the endpoint is correct and the server is running.".format(self.endpoint), flush=True)
             self.error_signal.set()
+            self.error = "Failed to communicate with lmtp endpoint: {}. Please check that the endpoint is correct and the server is running.".format(self.endpoint)
             self.connected_signal.set()
 
     def make_cache_entry(self, s, payload, sampling_mode):
@@ -129,7 +130,7 @@ class LMTPModel(DcModel):
 
     async def ensure_connected(self):
         if self.error_signal.is_set():
-            raise RuntimeError("LMTP client encountered an error")
+            raise RuntimeError("LMTP client encountered an error: {}".format(self.error))
 
         if self.client is None:
             if not self.inprocess:
@@ -141,7 +142,7 @@ class LMTPModel(DcModel):
         
         # double check for errors
         if self.error_signal.is_set():
-            raise RuntimeError("LMTP client encountered an error")
+            raise RuntimeError("LMTP client encountered an error: {}".format(self.error))
 
     # on deinit
     def close(self):
