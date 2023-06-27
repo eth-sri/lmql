@@ -8,11 +8,7 @@ import aiohttp
 import asyncio
 import json
 import sys
-import multiprocessing
-from multiprocessing.connection import Connection
-
-class LMTPStreamError(Exception):
-    pass
+from .errors import LMTPStreamError
 
 class LMTPWebSocketClient:
     """

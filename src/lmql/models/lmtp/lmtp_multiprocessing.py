@@ -4,6 +4,7 @@ and communicates with it via multiprocessing pipes (IPC).
 """
 
 import multiprocessing
+from multiprocessing.connection import Connection
 import pickle
 import sys
 from .lmtp_client import *

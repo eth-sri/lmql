@@ -5,13 +5,10 @@ hosted model server, or a model running in a separate process.
 
 from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.tokenizer import load_tokenizer
-from .lmtp_client import LMTPWebSocketClient
-from .lmtp_multiprocessing import LMTPMultiProcessingClient
 from .lmtp_async import LMTPAsyncClient
 import lmql.runtime.dclib as dc
 import asyncio
 import numpy as np
-import aiohttp
 import lmql.utils.nputil as nputil
 import lmql.runtime.masks as masks
 from lmql.runtime.token_distribution import TokenDistribution
@@ -44,7 +41,7 @@ class LMTPModel(DcModel):
         self.lmtp_server_kwargs = lmtp_server_kwargs
         assert self.inprocess or  lmtp_server_kwargs is None, "LMTP server kwargs can only be set when using lmql.inprocess mode"
         if inprocess:
-            self.inprocess_client_constructor = inprocess_client_constructor or LMTPMultiProcessingClient
+            self.inprocess_client_constructor = inprocess_client_constructor
 
         # model statistics
         self.requests = 0
@@ -59,6 +56,9 @@ class LMTPModel(DcModel):
         self.client = None
 
     async def ws_client_loop(self):
+        import aiohttp
+        from .lmtp_client import LMTPWebSocketClient
+        
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(self.endpoint) as ws:
@@ -68,7 +68,7 @@ class LMTPModel(DcModel):
                     self.connected_signal.set()
                     await self.close_signal.wait()
         except Exception as e:
-            print("Failed to communicate with lmtp endpoint: {}".format(self.endpoint), flush=True)
+            print("Failed to communicate with lmtp endpoint: {}. Please check that the endpoint is correct and the server is running.".format(self.endpoint), flush=True)
             self.error_signal.set()
             self.connected_signal.set()
 
@@ -377,8 +377,12 @@ class lmtp_model:
     def inprocess_client_constructor_factory(self, identifier, **kwargs):
         assert identifier == self.model_identifier, "Model identifier mismatch: {} vs {}".format(self.model_identifier, identifier)
         
+        # use in-process, async client
         if self.async_transport:
             return LMTPAsyncClient(identifier, **kwargs)
+
+        # otherwise, use multiprocessing
+        from .lmtp_multiprocessing import LMTPMultiProcessingClient
 
         if self.lmtp_inprocess_client is None:
             # ref owned by self

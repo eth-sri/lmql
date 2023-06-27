@@ -561,9 +561,6 @@ function ModelSelection() {
       {"name": "random", note: "Random (uniform) token sampling.", inprocess: false}
     ],
     "Other Suggestions": [
-      {"name": "gpt2", "note": "🤗 Tranformers", inprocess: true},
-      {"name": "gpt2-medium", "note": "🤗 Tranformers", inprocess: true},
-      {"name": "facebook/opt-350m", "note": "🤗 Tranformers", inprocess: true},
       {"name": "openai/text-ada-001", "note": "OpenAI", inprocess: false},
       {"name": "openai/text-curie-001", "note": "OpenAI", inprocess: false},
       {"name": "openai/text-babbage-001", "note": "OpenAI", inprocess: false},
@@ -572,6 +569,14 @@ function ModelSelection() {
       {"name": "chatgpt", "note": "OpenAI", inprocess: false},
       {"name": "gpt-4", "note": "OpenAI", inprocess: false}
     ]
+  }
+
+  if (!configuration.BROWSER_MODE) {
+    PREDEFINED["Other Suggestions"] = Array.from([
+      {"name": "gpt2", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "gpt2-medium", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "facebook/opt-350m", "note": "🤗 Tranformers", inprocess: true},
+    ]).concat(PREDEFINED["Other Suggestions"])
   }
 
   const onInputEnter = (e) => {
@@ -587,6 +592,9 @@ function ModelSelection() {
       <span class="instructions">
         <b>Custom Model</b><br/>
         Specify the model to execute your query with. You can also type in the text field above.
+        {configuration.BROWSER_MODE ? <><br/><a href={"https://docs.lmql.ai/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
+          Install LMQL locally </a> to use other models, e.g. from 🤗 Tranformers</>
+        : null}
       </span>
       {Object.keys(PREDEFINED).map(k => <>
         {k != "" ? <h2 key={"key-"+k}>{k}</h2> : null}

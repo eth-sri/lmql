@@ -1,13 +1,13 @@
 """
-A client/server implementation for LMTP that runs the model in a subprocess
-and communicates with it via multiprocessing pipes (IPC).
+A client/server implementation for LMTP that runs the model 
+asynchronously in the same process.
 """
 
-import multiprocessing
+import asyncio
 import pickle
-import sys
-from .lmtp_client import *
-from .lmtp_inference_server import TokenSession, Scheduler
+
+from .scheduler import TokenSession, Scheduler
+from .errors import LMTPStreamError
 
 class LMTPAsyncTransport:
     def __init__(self, queue):
