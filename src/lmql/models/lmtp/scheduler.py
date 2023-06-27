@@ -124,9 +124,9 @@ class TokenStreamer:
         max_num_top_logprobs = max([c.kwargs.get("top_logprobs", 1) for c in self.batch.calls])
 
         if not nputil.is_array(last_tokens):
-            last_tokens = last_tokens.numpy()
+            last_tokens = last_tokens.cpu().numpy()
         if not nputil.is_array(last_scores):
-            last_scores = last_scores.numpy()
+            last_scores = last_scores.cpu().numpy()
 
         # for each sample get top logprobs
         all_logprobs, all_indices  = nputil.topk(last_scores, max_num_top_logprobs, sorted=True, axis=-1)
