@@ -7,7 +7,7 @@ def test_curly_braces():
     '''lmql
     argmax 
         value = "[abc]"
-        "{{ Say {value} 'this is a test':[RESPONSE] }}\\"
+        "{{ Say {value} 'this is a test':[RESPONSE] }}"
         assert context.prompt == "{ Say [abc] 'this is a test':\n\nThis is a test. }"
     from 
         "openai/text-ada-001" 
@@ -19,7 +19,7 @@ def test_curly_braces():
 def test_curly_only():
     '''lmql
     argmax 
-        "{{ Say }}\\"
+        "{{ Say }}"
         assert context.prompt == "{ Say }"
     from 
         "openai/text-ada-001" 
@@ -30,7 +30,7 @@ def test_curly_only():
 def test_square_only():
     '''lmql
     argmax 
-        "[[Say]]\\"
+        "[[Say]]"
         assert context.prompt == "[Say]"
     from 
         "openai/text-ada-001" 
@@ -40,7 +40,7 @@ def test_square_only():
 def test_square_with_var_only():
     '''lmql
     argmax 
-        "[[[Say]]]\\"
+        "[[[Say]]]"
         assert context.prompt == "[Hello]"
     from 
         "openai/text-ada-001" 

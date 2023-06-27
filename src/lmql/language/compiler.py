@@ -1,4 +1,4 @@
-from _ast import And, AsyncFunctionDef, BinOp, ClassDef, Compare, FunctionDef, Import, ImportFrom
+from _ast import And, AsyncFunctionDef, BinOp, ClassDef, Compare, FunctionDef, Import, ImportFrom, Return
 import ast
 import sys
 from typing import Any
@@ -51,7 +51,7 @@ class DefinedVarsCollector(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
         self.defined_vars.add(node.name)
-    
+
     def visit_ClassDef(self, node: ClassDef) -> Any:
         self.defined_vars.add(node.name)
 
@@ -190,6 +190,19 @@ class PromptScope(ast.NodeVisitor):
             self.free_vars.add(name)
         
         return True
+    
+    def visit_FunctionDef(self, node: FunctionDef) -> Any:
+        self.defined_vars.add(node.name)
+    
+    def visit_AsyncFunctionDef(self, node: AsyncFunctionDef) -> Any:
+        self.defined_vars.add(node.name)
+
+    def visit_ClassDef(self, node: ClassDef) -> Any:
+        self.defined_vars.add(node.name)
+
+    def visit_ImportFrom(self, node: ImportFrom) -> Any:
+        for alias in node.names:
+            self.defined_vars.add(alias.asname or alias.name)
 
 def is_query_string_with_constraints(node: ast.BoolOp):
     if len(node.values) < 1:
@@ -240,7 +253,7 @@ class QueryStringTransformation(ast.NodeTransformer):
         if type(constant.value) is not str: return constant
         
         qstring = constant.value
-        qstring = qstring.replace("\n", "\\\\n")
+        qstring = qstring.encode("unicode_escape").decode("utf-8").encode('unicode_escape').decode('utf-8')
         
         compiled_qstring = ""
 
@@ -258,12 +271,6 @@ class QueryStringTransformation(ast.NodeTransformer):
         # keep track of last stmt in this qstring
         last_stmt = stmt
 
-        # add \n to qstring if it is not already there
-        if compiled_qstring.endswith("\\"):
-            compiled_qstring = compiled_qstring[:-1]
-        elif not compiled_qstring.endswith("\\n") and not type(last_stmt) is DistributionVariable:
-            compiled_qstring += "\\\\n"
-
         if len(compiled_qstring) == 0:
             return constant
 
@@ -280,7 +287,7 @@ class QueryStringTransformation(ast.NodeTransformer):
         for v in declared_template_vars:
             get_var_call = yield_call('get_var', f'"{v}"')
             result_code += f"\n{v} = " + get_var_call
-        
+
         return ast.parse(result_code)
 
     # def transform_prompt_stmt(self, stmt):
@@ -335,6 +342,14 @@ class ReturnStatementTransformer(ast.NodeTransformer):
     
     def transform(self):
         self.query.prompt = [self.visit(p) for p in self.query.prompt]
+
+    def visit_FunctionDef(self, node: FunctionDef) -> Any:
+        # do not recurse into nested functions
+        return node
+    
+    def visit_AsyncFunctionDef(self, node: AsyncFunctionDef) -> Any:
+        # do not recurse into nested functions
+        return node
 
     def visit_Return(self, node):
         return ast.parse("yield ('result', " + astunparse.unparse(node.value).strip() + ")")

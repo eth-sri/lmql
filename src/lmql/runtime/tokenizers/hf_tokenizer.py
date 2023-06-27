@@ -1,6 +1,3 @@
-import os
-from lmql.runtime.stats import Stats
-
 def unicode(v):
     r = v.decode("utf-8", "ignore")
     assert type(r) is str

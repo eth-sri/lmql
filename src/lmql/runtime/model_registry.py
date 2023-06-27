@@ -19,6 +19,13 @@ class LMQLModelRegistry:
         if model in model_name_aliases:
             model = model_name_aliases[model]
 
+        if type(model) is LMQLModel:
+            if model.model is not None:
+                return model
+            else:
+                kwargs = {**model.kwargs, **kwargs}
+                model = model.model_identifier
+
         client = LMQLModelRegistry.clients.get(model, None)
 
         if client is None:
@@ -54,6 +61,7 @@ def resolve(model_name, endpoint=None, **kwargs):
         if model_name == "random":
             kwargs["tokenizer"] = "gpt2"
             kwargs["inprocess"] = True
+            kwargs["async_transport"] = True
 
         # determine endpoint URL
         if endpoint is None:

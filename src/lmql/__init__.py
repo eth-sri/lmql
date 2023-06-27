@@ -28,6 +28,8 @@ from lmql.runtime.interpreter import LMQLResult
 from lmql.models.model import model
 from lmql.runtime.loop import main
 
+from typing import Optional
+
 model_registry = LMQLModelRegistry
 
 def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
@@ -101,6 +103,25 @@ def _query_from_string(s, input_variables=None, is_async=True, output_writer=Non
     
     return module.query
 
+def F(s: str, constraints: Optional[str] = None, **kwargs):
+    """
+    Constructs a LMQL query function from the given string.
+
+    Example:
+
+    ```python
+    lmql.F("Say 'this is a test': [RESPONSE]", "len(TOKENS(RESPONSE)) < 10")
+    ```
+
+    The second argument contains an optional `where` clause expression and can be omitted.
+
+    The resulting callable acts like a `lmql.query` function and can be called with the same arguments.
+    """
+    # escape all double quotes
+    s = s.replace('"', '\\"')
+    is_async = kwargs.pop("is_async", False)
+    return query(f'"{s}"' + (f' where {constraints}' if constraints is not None else ''), is_async=is_async, **kwargs)
+
 def query(__fct__=None, input_variables=None, is_async=True, **extra_args):
     """
     Constructs a new LMQL query function from the given function and or string of code.
@@ -144,7 +165,7 @@ def query(__fct__=None, input_variables=None, is_async=True, **extra_args):
 
     # support for lmql.query(<query string>)
     if type(fct) is str: 
-        return _query_from_string(fct, input_variables)
+        return _query_from_string(fct, input_variables, is_async=is_async)
     else:
         assert input_variables is None, "input_variables must be None when using @lmql.query as a decorator."
     

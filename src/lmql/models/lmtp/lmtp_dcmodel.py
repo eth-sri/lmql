@@ -7,6 +7,7 @@ from lmql.runtime.dclib.dclib_model import DcModel
 from lmql.runtime.tokenizer import load_tokenizer
 from .lmtp_client import LMTPWebSocketClient
 from .lmtp_multiprocessing import LMTPMultiProcessingClient
+from .lmtp_async import LMTPAsyncClient
 import lmql.runtime.dclib as dc
 import asyncio
 import numpy as np
@@ -156,7 +157,7 @@ class LMTPModel(DcModel):
         scores[int(payload["token"])] = payload["logprob"]
         scores = scores.items()
 
-        logits = np.ones(self.tokenizer.vocab_size) * self.truncation_threshold
+        logits = np.ones(self.tokenizer.vocab_range) * self.truncation_threshold
         logits[[t for t, _ in scores]] = [s for _, s in scores]
 
         return logits
@@ -358,11 +359,12 @@ class lmtp_model:
     LMTPMultiProcessingClient to share it between all uses of the resulting LMTPModelCls 
     across several queries.
     """
-    def __init__(self, model_identifier, inprocess=False, endpoint=None, **kwargs):
+    def __init__(self, model_identifier, inprocess=False, endpoint=None, async_transport=False, **kwargs):
         self.model_identifier = model_identifier
         self.tokenizer_identifier = kwargs.pop("tokenizer", self.model_identifier)
 
         self.inprocess = inprocess
+        self.async_transport = async_transport
         self.endpoint = endpoint
         self.kwargs = kwargs
 
@@ -375,6 +377,9 @@ class lmtp_model:
     def inprocess_client_constructor_factory(self, identifier, **kwargs):
         assert identifier == self.model_identifier, "Model identifier mismatch: {} vs {}".format(self.model_identifier, identifier)
         
+        if self.async_transport:
+            return LMTPAsyncClient(identifier, **kwargs)
+
         if self.lmtp_inprocess_client is None:
             # ref owned by self
             self.lmtp_inprocess_client = LMTPMultiProcessingClient(identifier, **kwargs).ref()

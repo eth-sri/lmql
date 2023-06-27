@@ -13,6 +13,20 @@ class TokenStreamer:
         raise NotImplementedError
 
 class LMTPModel:
+    """
+    Base interface for LMTP models.
+
+    Implement at least the 'generate' method to enable sampling. To enable more advanced
+    decoding strategies, implement the 'score' method as well.
+
+    To register your model implementation, make sure to set an appropriate entry in 
+    the LMTPModel.registry global dict:
+
+        LMTPModel.registry["my-model"] = MyModelImplLMTPModel
+    
+    
+
+    """
     max_batch_size: int = 1
 
     @property

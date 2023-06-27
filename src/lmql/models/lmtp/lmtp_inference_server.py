@@ -24,7 +24,7 @@ from aiohttp import web
 
 import lmql.models.lmtp.backends as backends
 import lmql.utils.nputil as nputil
-from lmql.models.lmtp.backends.basemodel import LMTPModel
+from lmql.models.lmtp.backends.lmtp_model import LMTPModel
 
 
 class LMTPCannotLoadModelByPolicy(Exception):
@@ -168,10 +168,10 @@ class Scheduler:
     """
     A scheduler that takes calls to generate and batches them together. 
 
-    Can be shared between multiple clients, make sure to call unregister(<user>) when done,
-    to allow the scheduler to shut down when no longer needed by anyone.
+    Can be shared among multiple clients, make sure to call unregister(<user>) when done,
+    to allow the scheduler to shut down when no longer needed.
     """
-    def __init__(self, model_identifier, model_args = None):
+    def __init__(self, model_identifier, model_args = None, sync=False):
         self.model_identifier = model_identifier
         if model_args is None: self.model_args = {}
         else: self.model_args = model_args
@@ -179,8 +179,13 @@ class Scheduler:
         self.queue = Queue()
         self.kill_event = threading.Event()
         
-        self.worker_thread = threading.Thread(target=self.worker, daemon=True)
-        self.worker_thread.start()
+        self.sync = sync
+
+        if not self.sync:
+            self.worker_thread = threading.Thread(target=self.worker, daemon=True, name="scheduler-worker")
+            self.worker_thread.start()
+        else:
+            pass
 
         self.users = set()
         self.last_use = time.time()
@@ -204,6 +209,51 @@ class Scheduler:
             batches_by_mode.setdefault(mode, []).append(c)
         return batches_by_mode.values()
 
+    async def async_worker(self):
+        """
+        Can be used when self.sync, in place of worker_thread.
+
+        Runs the model asynchronously on the main thread. Blocks remaining application
+        during model calls. As a consequence, tokens are only streamed when the model
+        has finished generating the current batch.
+        """
+
+        model = LMTPModel.load(self.model_identifier, **self.model_args)
+
+        while True:
+            if self.kill_event.is_set():
+                break
+
+            if self.queue.empty():
+                await asyncio.sleep(0.01)
+                continue
+
+            for batch in self.batches():
+                try:
+                    b = GenerateBatch.from_calls(batch)
+                    
+                    if b.is_score:
+                        kwargs = b.generate_args()
+                        input_ids = kwargs["input_ids"]
+                        attention_mask = kwargs["attention_mask"]
+                        
+                        scores = model.score(input_ids, attention_mask)
+                        ScoreStreamer().log_token(b, scores)
+                    else:
+                        streamer = TokenStreamer(b, model.eos_token_id)
+                        kwargs = b.generate_args()
+                        
+                        kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)
+                        kwargs["attention_mask"] = np.array(kwargs["attention_mask"], dtype=np.int32)
+
+                        result = model.generate(**kwargs, streamer=streamer)
+                        streamer.log_token(result.sequences, result.scores, last=True)
+                except Exception as e:
+                    print("[Error during generate()]", e, flush=True)
+                    for c in batch:
+                        c.error("failed to generate tokens '" + str(e) + "'")
+                    raise e
+    
     def worker(self):
         model = LMTPModel.load(self.model_identifier, **self.model_args)
 
@@ -238,13 +288,13 @@ class Scheduler:
                     raise e
 
     @staticmethod
-    def instance(model_identifier, model_args, user, only_existing=False):
+    def instance(model_identifier, model_args, user, only_existing=False, sync=False):
         identifier = (model_identifier, pickle.dumps(model_args).hex())
 
         if identifier not in Scheduler._instances:
             if only_existing:
                 raise LMTPCannotLoadModelByPolicy("Model '" + model_identifier + "' is not loaded and server is not configured to load it on demand.")
-            Scheduler._instances[identifier] = Scheduler(model_identifier, model_args)
+            Scheduler._instances[identifier] = Scheduler(model_identifier, model_args, sync=sync)
 
         s = Scheduler._instances[identifier]
         s.last_use = time.time()

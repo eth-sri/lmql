@@ -269,7 +269,6 @@ def load_tokenizer(model_identifier, type="auto"):
             import os
             os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-            import torch
             from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
 
             assert TransformersTokenizer.is_available(model_identifier), "TransformersTokenizer not available. Please make sure the 'transformers' package is installed."

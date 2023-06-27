@@ -8,4 +8,4 @@ try:
 except:
     pass
 
-from lmql.models.lmtp.backends.basemodel import LMTPModel
+from lmql.models.lmtp.backends.lmtp_model import LMTPModel

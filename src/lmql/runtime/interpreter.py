@@ -234,6 +234,8 @@ class PromptInterpreter:
         if self.model is None:
             self.model = model_name
             self.model_identifier = model_name
+        elif type(self.model_identifier) is not str:
+            self.model_identifier = self.model.model_identifier
 
         client = LMQLModelRegistry.get(self.model, **model_args)
 
@@ -241,7 +243,7 @@ class PromptInterpreter:
         VocabularyMatcher.init(client.get_tokenizer())
         
         # for OpenAI models we optimize for compact logit masks
-        if self.model.startswith("openai/"):
+        if self.model_identifier.startswith("openai/"):
             self.prefers_compact_mask = True
 
         self.model = client
@@ -254,7 +256,7 @@ class PromptInterpreter:
         constraints = state.constraints
         
         stmt_buffer = state.stmt_buffer
-        constraints_after_last_continue = None
+        constraints_after_last_continue = constraints
         program_variables_after_last_continue = None
         prompt = state.prompt
 

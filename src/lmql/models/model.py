@@ -8,6 +8,12 @@ class LMQLModel:
         # if this is a fixed reference to an existing model
         self.model = model
 
+    def __repr__(self) -> str:
+        return str(self)
+    
+    def __str__(self):
+        return "<LMQLModel: {}>".format(self.model_identifier)
+
 LMQLModel.inprocess_instances = {}
 
 def inprocess(model_name, use_existing_configuration=False, **kwargs):

@@ -1,7 +1,7 @@
 from transformers import AutoModelForCausalLM
 from typing import Tuple
 import torch
-from lmql.models.lmtp.backends.basemodel import LMTPModel, LMTPModelResult, TokenStreamer
+from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
 import random
 
 class TransformersLLM(LMTPModel):

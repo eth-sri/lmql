@@ -135,6 +135,11 @@ class LanguageFragmentParser:
     def parse(self, readline):
         for i, tok in enumerate(tokenize.generate_tokens(readline)):
             self.digest(tok)
+        
+        if self.state == "start":
+            self.query.prompt_str = self.query.prologue
+            self.query.prologue = []
+            self.state = "prompt"
 
         # print("decode_str", remove_comments(self.query.decode_str))
         # print("prompt_str", remove_comments(self.query.prompt_str))

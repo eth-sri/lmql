@@ -47,7 +47,7 @@ async def test_double_eq_int():
     async def q():
         '''lmql
         argmax
-            "Q: Hi. A:[OUTPUT]\\"
+            "Q: Hi. A:[OUTPUT]"
         FROM
             lmql.model("random", seed=123)
         WHERE
@@ -62,7 +62,7 @@ async def test_double_eq_charlen():
     async def q():
         '''lmql
         argmax
-            "Q: Hi. A:[OUTPUT]\\"
+            "Q: Hi. A:[OUTPUT]"
         from
             lmql.model("random", seed=123)
         where

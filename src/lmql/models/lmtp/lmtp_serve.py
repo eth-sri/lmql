@@ -13,6 +13,7 @@ def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, stati
         model_name (str): The model to load or 'auto' if any model should automatically be loaded on client request.
         host (str, optional): The host to serve the model on. Defaults to "localhost".
         port (int, optional): The port to serve the model on. Defaults to 8080.
+        single_thread (bool, optional): If set, the model and the inference server will run in the same thread. Defaults to False. This can lead to increased latency when processing multiple requests, but may be required depending on model implementation.
         cuda (bool, optional): If set, the model will be loaded on the GPU. Defaults to False.
         dtype (str, optional): What format to load the model weights. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes). Defaults to None.
         static (bool, optional): If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument. Defaults to False.
@@ -38,8 +39,11 @@ def lmtp_serve_main(model_args):
     host = model_args.pop("host", "localhost")
     port = model_args.pop("port", 8080)
     model = model_args.pop("model", None)
-    static = model_args.pop("static", False)
+    single_thread = model_args.pop("single_thread", False)
+    static = model_args.pop("static", False) or single_thread
     
+    assert not single_thread or model != "auto", "Cannot use --single_thread mode with model 'auto'. Please specify a specific model to load."
+
     # check 'auto' vs static
     assert not static or model != "auto", "Cannot use --static mode with model 'auto'. Please specify a specific model."
 
@@ -53,7 +57,7 @@ def lmtp_serve_main(model_args):
         await ws.prepare(request)
         await LMTPWebSocketTransport.listen(ws, model_args, static=static)
 
-    if model != "auto":
+    if model != "auto" and not single_thread:
         Scheduler.instance(model, model_args, user=None)
 
     app = web.Application()
@@ -64,13 +68,18 @@ def lmtp_serve_main(model_args):
             print(f"[Serving LMTP endpoint on ws://{host}:{port}/]")
         else:
             print(*args)
-    web.run_app(app, host=host, port=port, print=web_print)
+    
+    # r executor
+    tasks = [web._run_app(app, host=host, port=port, print=web_print)]
+    if static and single_thread:
+        tasks += [Scheduler.instance(model, model_args, user=None, sync=True).async_worker()]
+    asyncio.get_event_loop().run_until_complete(asyncio.gather(*tasks))
 
 def argparser(args):
     next_argument_name = None
     
     kwargs = {}
-    flag_args = ["cuda", "static"]
+    flag_args = ["cuda", "static", "single_thread"]
 
     help_text = """
 usage: serve-model [-h] [--port PORT] [--host HOST] [--cuda] [--dtype DTYPE] [--[*] VALUE] model

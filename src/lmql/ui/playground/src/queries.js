@@ -87,7 +87,6 @@ argmax
     A: Let's think step by step."""
     "[REASONING]\\n"
     "Therefore, among A through F, the answer is[RESULT]"
-    assert RESULT == "A"
 from
     "openai/text-davinci-003"
 where
