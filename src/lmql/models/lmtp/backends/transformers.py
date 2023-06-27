@@ -77,7 +77,7 @@ class TransformersLLM(LMTPModel):
                 nonlocal bias_tensors
 
                 if bias_tensors is None:
-                    bias_tensors = torch.tensor(make_bias_tensor(logit_biases, scores.shape[-1]))
+                    bias_tensors = torch.tensor(make_bias_tensor(logit_biases, scores.shape[-1])).to(scores.device)
 
                 return scores + bias_tensors
 
