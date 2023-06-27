@@ -235,8 +235,8 @@ def load_tokenizer_notransformers(model_identifier):
     
     return PythonBackedTokenizer(model_identifier)
 
-def load_tokenizer(model_identifier, type="auto"):
-    cache_identifier = model_identifier.replace("/", "-")
+def load_tokenizer(model_identifier, type="auto", **kwargs):
+    cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
     if type in ["auto", "tiktoken"]:
@@ -277,7 +277,7 @@ def load_tokenizer(model_identifier, type="auto"):
                 with cachefile(cache_path, "rb") as f:
                     return LMQLTokenizer(pickle.load(f), model_identifier)
             else:
-                t = TransformersTokenizer(model_identifier)
+                t = TransformersTokenizer(model_identifier, **kwargs)
 
                 with cachefile(cache_path, "wb") as f:
                     pickle.dump(t, f)

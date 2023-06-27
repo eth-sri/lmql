@@ -417,7 +417,7 @@ class lmtp_model:
 
             def get_tokenizer(self):
                 if self._tokenizer is None:
-                    self._tokenizer = load_tokenizer(this.tokenizer_identifier)
+                    self._tokenizer = load_tokenizer(this.tokenizer_identifier, **this.kwargs)
                 self.served_model = self
                 return self._tokenizer
 

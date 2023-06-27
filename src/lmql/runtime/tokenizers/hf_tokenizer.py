@@ -4,11 +4,11 @@ def unicode(v):
     return r
 
 class TransformersTokenizer:
-    def __init__(self, model_identifier):
+    def __init__(self, model_identifier, **kwargs):
         from transformers import AutoTokenizer
         
         self.model_identifier = model_identifier
-        self.tokenizer = AutoTokenizer.from_pretrained(model_identifier)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_identifier, **kwargs)
 
     @staticmethod
     def is_available(model_identifier):
@@ -40,7 +40,7 @@ class TransformersTokenizer:
         """
         if asbytes:
             return self.decode_tokens_bytes(self.tokenizer(text)["input_ids"])
-        return self.tokenizer.tokenize(text)
+        return self.tokenizer.tokenize(text, add_special_tokens=False)
 
     def decode_tokens_bytes(self, ids):
         """
