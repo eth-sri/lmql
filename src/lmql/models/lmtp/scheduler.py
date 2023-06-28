@@ -215,64 +215,52 @@ class Scheduler:
                 await asyncio.sleep(0.01)
                 continue
 
-            for batch in self.batches():
-                try:
-                    b = GenerateBatch.from_calls(batch)
-                    
-                    if b.is_score:
-                        kwargs = b.generate_args()
-                        input_ids = kwargs["input_ids"]
-                        attention_mask = kwargs["attention_mask"]
-                        
-                        scores = model.score(input_ids, attention_mask)
-                        ScoreStreamer().log_token(b, scores)
-                    else:
-                        streamer = TokenStreamer(b, model.eos_token_id)
-                        kwargs = b.generate_args()
-                        
-                        kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)
-                        kwargs["attention_mask"] = np.array(kwargs["attention_mask"], dtype=np.int32)
-
-                        result = model.generate(**kwargs, streamer=streamer)
-                        streamer.log_token(result.sequences, result.scores, last=True)
-                except Exception as e:
-                    print("[Error during generate()]", e, flush=True)
-                    for c in batch:
-                        c.error("failed to generate tokens '" + str(e) + "'")
-                    raise e
+            self.process_batch(model)
     
     def worker(self):
+        """
+        Can be used when not self.sync, in place of async_worker.
+
+        Runs the model on a separate thread. Does not block the application during model
+        calls. As a consequence, tokens are streamed as soon as they are generated.
+
+        This is the default mode and the thread is started automatically when instantiating
+        the scheduler with sync=False.
+        """
+
         model = LMTPModel.load(self.model_identifier, **self.model_args)
 
         while True:
             if self.kill_event.is_set():
                 break
+            self.process_batch(model)
 
-            for batch in self.batches():
-                try:
-                    b = GenerateBatch.from_calls(batch)
+    def process_batch(self, model):
+        for batch in self.batches():
+            try:
+                b = GenerateBatch.from_calls(batch)
+                
+                if b.is_score:
+                    kwargs = b.generate_args()
+                    input_ids = kwargs["input_ids"]
+                    attention_mask = kwargs["attention_mask"]
                     
-                    if b.is_score:
-                        kwargs = b.generate_args()
-                        input_ids = kwargs["input_ids"]
-                        attention_mask = kwargs["attention_mask"]
-                        
-                        scores = model.score(input_ids, attention_mask)
-                        ScoreStreamer().log_token(b, scores)
-                    else:
-                        streamer = TokenStreamer(b, model.eos_token_id)
-                        kwargs = b.generate_args()
-                        
-                        kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)
-                        kwargs["attention_mask"] = np.array(kwargs["attention_mask"], dtype=np.int32)
+                    scores = model.score(input_ids, attention_mask)
+                    ScoreStreamer().log_token(b, scores)
+                else:
+                    streamer = TokenStreamer(b, model.eos_token_id)
+                    kwargs = b.generate_args()
+                    
+                    kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)
+                    kwargs["attention_mask"] = np.array(kwargs["attention_mask"], dtype=np.int32)
 
-                        result = model.generate(**kwargs, streamer=streamer)
-                        streamer.log_token(result.sequences, result.scores, last=True)
-                except Exception as e:
-                    print("[Error during generate()]", e, flush=True)
-                    for c in batch:
-                        c.error("failed to generate tokens '" + str(e) + "'")
-                    raise e
+                    result = model.generate(**kwargs, streamer=streamer)
+                    streamer.log_token(result.sequences, result.scores, last=True)
+            except Exception as e:
+                print("[Error during generate()]", e, flush=True)
+                for c in batch:
+                    c.error("failed to generate tokens '" + str(e) + "'")
+                raise e
 
     @staticmethod
     def instance(model_identifier, model_args, user, only_existing=False, sync=False):
