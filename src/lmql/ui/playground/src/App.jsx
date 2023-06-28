@@ -587,7 +587,7 @@ function ModelSelection() {
   }
 
   return <ModelSelectionDiv className={(model == "automatic" ? "auto" : "") + (selectOpen ? " active" : "") }>
-    <input placeholder="automatic" value={model} onChange={e => onChange(e.target.value)} autoCorrect={false} onKeyDown={onInputEnter}/>
+    <input spellCheck={false} placeholder="automatic" value={model} onChange={e => onChange(e.target.value)} autoCorrect={false} onKeyDown={onInputEnter}/>
     <div className={'select ' + (selectOpen ? "open" : "")}>
       <span class="instructions">
         <b>Custom Model</b><br/>

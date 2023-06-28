@@ -197,7 +197,7 @@ class DecoderSequence:
 
     async def detokenized(self, name):
         async def seqtext_provider():
-            t = str([get_tokenizer().decode(self.input_ids)][0])
+            t = str(get_tokenizer().decode(self.input_ids))
             t = str(t.encode("utf-8"))[2:-1]
             return t
         async def text_provider():
@@ -392,7 +392,9 @@ class DecoderSequence:
         return f"<seq token_len={len(self.input_ids)} ids=[... {ids}]>"
 
     def is_done(self):
-        return self.input_ids[-1] == get_tokenizer().eos_token_id or self.input_ids[-1] == str(get_tokenizer().eos_token_id).encode() or self.input_ids[-1] == b"<|endoftext|>"
+        return self.input_ids[-1] == get_tokenizer().eos_token_id or \
+            self.input_ids[-1] == str(get_tokenizer().eos_token_id).encode() or \
+            self.input_ids[-1] == b"<|endoftext|>"
 
     def make_successors(self, next_tokens, next_token_scores, logits, user_data=None):
         # remove very low scoring tokens (likely they were masked and therefore score low)

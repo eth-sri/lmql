@@ -277,7 +277,7 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
                 with cachefile(cache_path, "rb") as f:
                     return LMQLTokenizer(pickle.load(f), model_identifier)
             else:
-                t = TransformersTokenizer(model_identifier, **kwargs)
+                t = TransformersTokenizer.from_pretrained(model_identifier, **kwargs)
 
                 with cachefile(cache_path, "wb") as f:
                     pickle.dump(t, f)
