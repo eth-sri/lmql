@@ -111,11 +111,11 @@ async def test_stop_should_not_postprocess_if_sc_not_satisfied():
     '''lmql
     argmax 
         "A good movie review:[REVIEW] "
-        assert REVIEW.endswith("Heather"), "Expected REVIEW to end with Heather, but was " + str([REVIEW])
+        assert REVIEW.endswith("smiles"), "Expected REVIEW to end with 'smiles', but was " + str([REVIEW])
     from 
         lmql.model("random", seed=123)
     where
-        len(TOKENS(REVIEW)) > 10 and STOPS_AT(REVIEW, "creating") and STOPS_AT(REVIEW, "Heather")
+        len(TOKENS(REVIEW)) > 10 and STOPS_AT(REVIEW, "exempted") and STOPS_AT(REVIEW, "smiles")
     '''
 
 @lmql.query
@@ -123,11 +123,11 @@ async def test_stop_before_should_not_postprocess_if_sc_not_satisfied():
     '''lmql
     argmax 
         "A good movie review:[REVIEW] "
-        assert REVIEW.endswith("Heather"), "Expected REVIEW to end with Heather, but was " + str([REVIEW])
+        assert REVIEW.endswith("smiles"), "Expected REVIEW to end with 'smiles', but was " + str([REVIEW])
     from 
         lmql.model("random", seed=123)
     where
-        len(TOKENS(REVIEW)) > 10 and STOPS_BEFORE(REVIEW, "creating") and STOPS_AT(REVIEW, "Heather")
+        len(TOKENS(REVIEW)) > 10 and STOPS_BEFORE(REVIEW, "exempted") and STOPS_AT(REVIEW, "smiles")
     '''
 
 if __name__ == "__main__":

@@ -191,6 +191,9 @@ class LMTPModel(DcModel):
             mask = {int(idx): mask_value for idx in np.nonzero(masked)[0]}
 
         ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
+        
+        if self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
+            ids = [self.tokenizer.bos_token_id] + ids
 
         return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
 
@@ -301,6 +304,9 @@ class LMTPModel(DcModel):
         
         ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
         next_tokens = self.tokenizer.convert_bytes_to_ids(next_tokens)
+
+        if self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
+            ids = [self.tokenizer.bos_token_id] + ids
 
         async for token in self.client.score(ids, next_tokens):
             t = next_tokens[i]

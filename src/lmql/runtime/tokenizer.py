@@ -7,6 +7,8 @@ See .tokenizers for concrete implementations.
 import os
 import pickle
 import numpy as np
+from typing import Optional
+
 from lmql.runtime.caching import cache_file_exists, cachefile
 
 from lmql.runtime.tokenizers.pure_python_tokenizer import PythonBackedTokenizer
@@ -61,7 +63,7 @@ class LMQLTokenizer:
         return self.vocab_range
 
     @property
-    def bos_token_id(self):
+    def bos_token_id(self) -> Optional[int]:
         return self.tokenizer_impl.bos_token_id
     
     @property
@@ -277,7 +279,7 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
                 with cachefile(cache_path, "rb") as f:
                     return LMQLTokenizer(pickle.load(f), model_identifier)
             else:
-                t = TransformersTokenizer(model_identifier, **kwargs)
+                t = TransformersTokenizer.from_pretrained(model_identifier, **kwargs)
 
                 with cachefile(cache_path, "wb") as f:
                     pickle.dump(t, f)
