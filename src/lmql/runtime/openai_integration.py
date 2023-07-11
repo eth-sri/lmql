@@ -610,7 +610,7 @@ class DclibOpenAiModel(DcModel):
     def convert(self, token):
         result = []
         for t in token:
-            if type(t) is int or (type(t) is np.ndarray and t.dtype != np.str_):
+            if type(t) is int or type(t) is np.int64 or (type(t) is np.ndarray and t.dtype != np.str_):
                 result.append(t)
             elif type(t) is bytes:
                 result.append(t)

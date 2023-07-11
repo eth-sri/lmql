@@ -15,7 +15,9 @@ class TokenDistribution:
         elif type(key) is str:
             key = [key]
             value = [value]
-        
+        elif type(key) is np.ndarray and key.dtype == np.bool_:
+            key = np.where(key)[0]
+
         key = nputil.ensure_iterable(key)
         value = nputil.ensure_iterable(value)
 
