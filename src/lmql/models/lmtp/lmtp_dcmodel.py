@@ -85,7 +85,7 @@ class LMTPModel(DcModel):
         tokens = [t for t, _ in top_entries]
         scores = [s for _, s in top_entries]
         edge_type = ["top-{}".format(i+1) for i in range(len(top_entries))]
-        
+
         # for non argmax sampling modes, add the sampled token
         if sampling_mode != "top-1":
             tokens = [payload["token"]] + tokens
@@ -93,6 +93,11 @@ class LMTPModel(DcModel):
             edge_type = [sampling_mode] + edge_type
 
         tokens = self.tokenizer.decode_bytes(tokens)
+
+        # replace top-1 with payload["token"] if sampling mode is top-1
+        if sampling_mode == "top-1":
+            edge_type[0] = "top-1"
+            tokens[0] = self.tokenizer.decode_bytes([payload["token"]])
 
         return (s, tokens, scores, edge_type, {})
 

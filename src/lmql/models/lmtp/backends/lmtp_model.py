@@ -85,7 +85,10 @@ class LMTPModel:
 
         On each new produced token, invokes streamer(input_ids, np.ndarray, scores: List[np.ndarray]) 
         where input_ids is the batch of continued sequences of 'input_ids' and scores[-1] is the current
-        token (logprob) distribution.
+        token (logprob) distribution. 
+        
+        streamer() is not invoked for the last token, which is automatically streamed by the calling 
+        code, extracting token and score from the returned LMTPModelResult.
         """
         pass
 

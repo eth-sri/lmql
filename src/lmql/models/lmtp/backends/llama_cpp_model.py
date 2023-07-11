@@ -12,14 +12,20 @@ class LlamaCppModel(LMTPModel):
         self.model_identifier = model_identifier
         self.kwargs = kwargs
 
+        self.max_batch_size = 1
+
         print("[Loading llama.cpp model from", self.model_identifier, "]", flush=True)
         self.llm = Llama(model_path=model_identifier.strip("llama.cpp:"), **kwargs)
 
     def eos_token_id(self):
         return 2
 
-    # def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-    #     return super().score(input_ids, attention_mask, **model_kwargs)
+    def score(self, input_ids, attention_mask, **model_kwargs):
+        self.llm.eval(input_ids[0])
+        scores = np.array([self.llm.scores[j][i] for j,i in enumerate(input_ids[0])])
+        scores = nputil.log_softmax(scores, axis=-1)
+        self.llm.reset()
+        return scores.reshape(1, -1)
     
     def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
@@ -38,17 +44,16 @@ class LlamaCppModel(LMTPModel):
 
         logits_processor = self.logits_processors(bias_tensor) if bias_tensor is not None else None
 
-        print(input_ids, flush=True)
-
         for i, token in zip(range(max_new_tokens), self.llm.generate(input_ids, max_new_tokens, 
                                                             temp=temperature,
                                                             stopping_criteria=llama_streamer, 
                                                             logits_processor=logits_processor)):
+            if i > 0:
+                streamer(sq_ar.reshape(1, *sq_ar.shape), ts_ar.reshape(-1, 1, *ts_ar.shape[1:]))
             sequence += [token]
             sq_ar = np.array(sequence)
             ts_ar = np.stack(token_scores, axis=0)
-            streamer(sq_ar.reshape(1, *sq_ar.shape), ts_ar.reshape(-1, 1, *ts_ar.shape[1:]))
-        
+
         ts_ar = np.stack(token_scores, axis=0)
         sq_ar = np.array(sequence)
 
