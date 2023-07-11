@@ -137,7 +137,7 @@ class TokenStreamer:
             token_score = last_scores[i][last_tokens[i]]
 
             top_logprobs = {
-                last_tokens[i]: float(token_score.item()),
+                int(last_tokens[i]): float(token_score.item()),
                 **{int(token.item()): float(logprob.item()) for logprob, token in zip(logprobs, tokens)}
             }
 

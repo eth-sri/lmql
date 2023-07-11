@@ -1,4 +1,5 @@
 from typing import Tuple
+import sys
 
 import numpy as np
 from llama_cpp import Llama, LlamaTokenizer
@@ -15,16 +16,34 @@ class LlamaCppModel(LMTPModel):
         self.max_batch_size = 1
 
         print("[Loading llama.cpp model from", self.model_identifier, "]", flush=True)
+        if not "verbose" in kwargs.keys():
+            kwargs["verbose"] = False
         self.llm = Llama(model_path=model_identifier.strip("llama.cpp:"), **kwargs)
 
     def eos_token_id(self):
         return 2
 
     def score(self, input_ids, attention_mask, **model_kwargs):
-        self.llm.eval(input_ids[0])
+        import time
+        # s = time.time()
+        tokens = input_ids[0]
+
+        if len(self.llm._input_ids) > 0:
+            longest_prefix = 0
+            for a, b in zip(self.llm._input_ids, tokens[:-1]):
+                if a == b:
+                    longest_prefix += 1
+                else:
+                    break
+            if longest_prefix > 0:
+                tokens = tokens[longest_prefix:]
+                self.llm.n_tokens = longest_prefix
+
+        self.llm.eval(tokens)
         scores = np.array([self.llm.scores[j][i] for j,i in enumerate(input_ids[0])])
         scores = nputil.log_softmax(scores, axis=-1)
-        self.llm.reset()
+        # print("llama_cpp_model: score() took", time.time() - s, "seconds", file=sys.stderr)
+
         return scores.reshape(1, -1)
     
     def generate(self, input_ids, attention_mask, 
