@@ -34,7 +34,12 @@ class LMTPModel:
         raise NotImplementedError
 
     @classmethod
-    def load(self, model_name, **kwargs):
+    def load(self, model_name, **kwargs) -> 'LMTPModel':
+        if ":" in model_name:
+            backend_name = model_name.split(":")[0]
+            if backend_name in LMTPModel.registry.keys():
+                return LMTPModel.registry[backend_name](model_name, **kwargs)
+        
         if not model_name in LMTPModel.registry.keys():
             if not "transformers" in LMTPModel.registry.keys():
                 if "LMQL_BROWSER" in os.environ:
@@ -92,5 +97,21 @@ class LMTPModel:
                 values = np.array(list(bias.values()), dtype=np.float32)
                 bias_tensors[i][indices] = values
         return np.stack(bias_tensors)
+
+    @staticmethod
+    def register(name, module_dependencies = None):
+        def wrapper(loader):
+            import importlib
+            if module_dependencies is not None:
+                for module in module_dependencies:
+                    try:
+                        importlib.import_module(module)
+                    except ImportError:
+                        def error_func(*args, **kwargs):
+                            assert False, "To use the {} backend, please install the '{}' package.".format(name, module)
+                        LMTPModel.registry[name] = error_func
+                        return
+            loader() # the module will register itself in the registry
+        return wrapper
 
 LMTPModel.registry = {}

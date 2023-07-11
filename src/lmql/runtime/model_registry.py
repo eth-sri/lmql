@@ -63,6 +63,11 @@ def resolve(model_name, endpoint=None, **kwargs):
             kwargs["inprocess"] = True
             kwargs["async_transport"] = True
 
+        if model_name.startswith("llama.cpp:"):
+            kwargs["inprocess"] = True
+            # kwargs["async_transport"] = True
+            kwargs["tokenizer"] = "huggyllama/llama-7b"
+
         # determine endpoint URL
         if endpoint is None:
             endpoint = "localhost:8080"
