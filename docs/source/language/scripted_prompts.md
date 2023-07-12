@@ -2,7 +2,7 @@
 
 In LMQL, prompts are not just static text, as they can also contain control flow (e.g. loops, conditions, function calls). This facilitates dynamic prompt construction and allows LMQL queries to respond dynamically to model output. This scripting mechanic is achieved by a combination of prompt templates, control flow and [output constraining](constraints.md).
 
-> Note: LMQL requires special escaping to use `[`, `]`, `{` and `}` in a literal way. Please see [](Escaping).
+> Note: LMQL requires special escaping to use `[`, `]`, `{` and `}` in a literal way, see [](Escaping).
 
 **Packing List** For instance, let's say we want to generate a packing list. One way to do this would be the following query:
 
