@@ -116,6 +116,15 @@ options:
                 assert next_argument_name is not None
                 if arg == "True": arg = True
                 elif arg == "False": arg = False
+                else:
+                    try:
+                        arg = int(arg)
+                    except:
+                        try:
+                            arg = float(arg)
+                        except:
+                            arg = str(arg)
+
 
                 kwargs[next_argument_name] = arg
                 next_argument_name = None
