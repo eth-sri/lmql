@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax \n    \"Say 'this is a test':[RESPONSE]\"\nfrom\n    \"local:llama.cpp:<PATH TO WEIGHTS>.bin\"\nwhere \n    len(TOKENS(RESPONSE)) < 10", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
