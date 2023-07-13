@@ -2,7 +2,10 @@
 
 LMQL also supports [llama.cpp](https://github.com/ggerganov/llama.cpp) as an inference backend, which can run efficiently on CPU-only machines. 
 
-Before using llama.cpp models, make sure you installed its Python bindings via `pip install llama-cpp-python`, in the same environment where you installed LMQL. Also make sure you first convert your model weights according to the [llama.cpp documentation](https://github.com/ggerganov/llama.cpp#prepare-data--run), to the `.bin` format.
+Before using llama.cpp models, make sure you installed its Python bindings via `pip install llama-cpp-python`, in the same environment where you installed LMQL. Currently, you also need the `transformers` package installed to load a compatible tokenizer.
+
+
+Also make sure you first convert your model weights according to the [llama.cpp documentation](https://github.com/ggerganov/llama.cpp#prepare-data--run), to the `.bin` format.
 
 [Just like Transformers models](hf.md), you can load llama.cpp models either locally or via a long-lived `lmql serve-model` inference server.
 
