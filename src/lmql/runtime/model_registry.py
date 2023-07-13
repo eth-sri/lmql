@@ -1,4 +1,4 @@
-from lmql.models.model import model, LMQLModel, inprocess
+from lmql.models.model import LMQLModel, inprocess
 import os
 
 model_name_aliases = {
@@ -63,8 +63,8 @@ def resolve(model_name, endpoint=None, **kwargs):
             kwargs["inprocess"] = True
             kwargs["async_transport"] = True
 
+        # special case for 'llama.cpp'
         if model_name.startswith("llama.cpp:"):
-            kwargs["inprocess"] = True
             # kwargs["async_transport"] = True
             kwargs["tokenizer"] = "huggyllama/llama-7b"
 
