@@ -216,7 +216,7 @@ class PromptInterpreter:
 
         if model_name.model is not None:
             model_object = model_name.model
-            # if model_object is a type reference, we can use the model_identifier
+            # if model_object is a type reference, instantiate it
             if callable(model_object):
                 model_object = model_object()
 

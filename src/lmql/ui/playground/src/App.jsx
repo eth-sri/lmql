@@ -576,6 +576,7 @@ function ModelSelection() {
       {"name": "gpt2", "note": "🤗 Tranformers", inprocess: true},
       {"name": "gpt2-medium", "note": "🤗 Tranformers", inprocess: true},
       {"name": "facebook/opt-350m", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "llama.cpp:<PATH>/llama-7b.bin", "note": "🦙 llama.cpp", inprocess: true},
     ]).concat(PREDEFINED["Other Suggestions"])
   }
 
