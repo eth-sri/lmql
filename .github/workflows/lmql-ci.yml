@@ -15,5 +15,7 @@ jobs:
               env:
                 OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
               run: python src/lmql/tests/all.py
+            - name: Install Packaging Dependencies
+              run: pip install build twine
             - name: Package
               run: bash scripts/wheel.sh latest
