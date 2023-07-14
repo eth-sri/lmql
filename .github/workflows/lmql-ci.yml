@@ -13,9 +13,12 @@ jobs:
         runs-on: lmql-ci
         steps:
             - uses: actions/checkout@v3
-            - uses: actions/setup-python@v4
-              with:
-                cache: 'pip' # caching pip dependencies
+            - name: Setup Fresh Virtual Environment
+              run: |
+                pip install --upgrade pip
+                python3.10 -m venv env
+                source env/bin/activate
+                echo "VIRTUAL ENV:" $VIRTUAL_ENV
             - name: Install Dependencies
               run: pip install -e '.[hf]' && pip install langchain
             - name: Run Tests
