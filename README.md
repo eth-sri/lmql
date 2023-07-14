@@ -49,8 +49,8 @@ Program Output:
   <br/>
 </div>
 
-This allows you to express programs that contain both, traditional algorithmic logic and LLM calls. 
-At any point during execution, you can prompt an LLM on program variables in combination with standard natural language prompting.
+LMQL allows you to express programs that contain both, traditional algorithmic logic and LLM calls. 
+At any point during execution, you can prompt an LLM on program variables in combination with standard natural language prompting, to leverage model reasoning capabilities in the context of your program.
 
 To better control LLM behavior, you can use the `where` keyword to specify constraints and data types of the generated text. This enables guidance of the model's reasoning process, and constraining of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
 
