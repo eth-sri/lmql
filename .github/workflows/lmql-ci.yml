@@ -19,4 +19,12 @@ jobs:
             - name: Install Packaging Dependencies
               run: pip install build twine
             - name: Package
-              run: bash scripts/wheel.sh 0.0.6.5
+              env:
+                VERSION: ${{ github.ref }}
+              run: bash scripts/wheel.sh $VERSION
+            - name: Publish
+              env:
+                TWINE_USERNAME: __token__
+                TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+                VERSION: ${{ github.ref }}
+              run: bash scripts/pypi-release.sh lmql-$VERSION
