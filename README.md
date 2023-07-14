@@ -26,7 +26,7 @@
 LMQL is a programming language for large language models (LLMs) based on a *superset of Python*. LMQL offers a novel way of interweaving traditional programming with the ability to call LLMs in your code. It goes beyond traditional templating languages by integrating LLM interaction natively at the level of your program code. 
 ## Explore LMQL
 
-An LMQL program reads like standard Python, but top-level strings are interpreted as query strings, i.e. they are passed to an LLM , where template variables like `[GREETINGS]` are completed by the model:
+An LMQL program reads like standard Python, but top-level strings are interpreted as query strings: They are passed to an LLM, where template variables like `[GREETINGS]` are automatically completed by the model:
 
 ```python
 "Greet LMQL:[GREETINGS]\n" where stops_at(GREETINGS, ".") and not "\n" in GREETINGS
