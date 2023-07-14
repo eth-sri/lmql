@@ -10,7 +10,7 @@ jobs:
         steps:
             - uses: actions/checkout@v3
             - name: Install Dependencies
-              run: pip install -e .
+              run: pip install -e . --use-feature=hf
             - name: Run Tests
               env:
                 OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
