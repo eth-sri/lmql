@@ -49,14 +49,14 @@ Program Output:
   <br/>
 </div>
 
-LMQL allows you to express programs that contain both, traditional algorithmic logic and LLM calls. 
+LMQL allows you to express programs that contain both, traditional algorithmic logic, and LLM calls. 
 At any point during execution, you can prompt an LLM on program variables in combination with standard natural language prompting, to leverage model reasoning capabilities in the context of your program.
 
 To better control LLM behavior, you can use the `where` keyword to specify constraints and data types of the generated text. This enables guidance of the model's reasoning process, and constraining of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
 
 Beyond this linear form of scripting, LMQL also supports a number of decoding algorithms to execute your program, such as `argmax`, `sample` or even advanced branching decoders like [beam search and `best_k`](https://docs.lmql.ai/en/stable/language/decoders.html). 
 
-Learn more about LMQL by exploring our **[Example Showcase](https://lmql.ai)** or by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)**.
+Learn more about LMQL by exploring thne **[Example Showcase](https://lmql.ai)**, by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)** or by reading the **[documentation](https://docs.lmql.ai)**.
 
 ## Feature Overview
 
