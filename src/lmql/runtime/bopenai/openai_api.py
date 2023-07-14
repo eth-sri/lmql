@@ -107,13 +107,13 @@ def get_azure_config(model, api_config):
     api_type = api_config.get("api_type", os.environ.get("OPENAI_API_TYPE", ""))
 
     if (api_type == "azure" or api_type == "azure-chat"):
-        api_base = os.environ.get("OPENAI_API_BASE", api_config.get("api_base", None))
+        api_base = api_config.get("api_base", None) or os.environ.get("OPENAI_API_BASE", None)
         assert api_base is not None, "Please specify the Azure API base URL as 'api_base' or environment variable OPENAI_API_BASE"
-        api_version = os.environ.get("OPENAI_API_VERSION", api_config.get("api_version", "2023-05-15"))
-        deployment = os.environ.get("OPENAI_DEPLOYMENT", api_config.get("api_deployment", model))
+        api_version = api_config.get("api_version", None) or os.environ.get("OPENAI_API_VERSION", "2023-05-15")
+        deployment = api_config.get("api_deployment", None) or os.environ.get("OPENAI_DEPLOYMENT", model)
         
         deployment_specific_api_key = f"OPENAI_API_KEY_{deployment.upper()}"
-        api_key = os.environ.get(deployment_specific_api_key, None) or os.environ.get("OPENAI_API_KEY", api_config.get("api_key", None))
+        api_key = api_config.get("api_key", None) or os.environ.get(deployment_specific_api_key, None) or os.environ.get("OPENAI_API_KEY", None)
         assert api_key is not None, "Please specify the Azure API key as 'api_key' or environment variable OPENAI_API_KEY or OPENAI_API_KEY_<DEPLOYMENT>"
         
         is_chat = api_type == "azure-chat"
