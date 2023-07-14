@@ -1,9 +1,9 @@
 name: Run Tests and Publish Wheel
 
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+.*'
+  # on release creation
+  release:
+    types: [created]
 
 jobs:
     test-with-hf-transformers:
