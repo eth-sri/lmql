@@ -76,5 +76,5 @@ async def main():
                 print(termcolor.colored("[FAIL]", "red"), f"({time.time() - s:.2f}s)")
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())

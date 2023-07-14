@@ -2,29 +2,37 @@ name: Run Tests and Publish Wheel
 
 on:
   # on release publish
-  release:
-    types: [released]
+  # release:
+  #   types: [released]
+  push:
+      branches: [ci]
+
 
 jobs:
     test-with-hf-transformers:
         runs-on: lmql-ci
         steps:
             - uses: actions/checkout@v3
+            - uses: actions/setup-python@v2
+            - uses: syphar/restore-virtualenv@v1
+              id: cache-virtualenv
+            - uses: syphar/restore-pip-download-cache@v1
+              if: steps.cache-virtualenv.outputs.cache-hit != 'true'
             - name: Install Dependencies
               run: pip install -e '.[hf]' && pip install langchain
             - name: Run Tests
               env:
                 OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
               run: python src/lmql/tests/all.py --failearly
-            - name: Install Packaging Dependencies
-              run: pip install build twine
-            - name: Package
-              env:
-                VERSION: ${{ github.ref }}
-              run: bash scripts/wheel.sh $(echo $VERSION | sed 's/^refs\/tags\/v//')
-            - name: Publish
-              env:
-                TWINE_USERNAME: __token__
-                TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-                VERSION: ${{ github.ref }}
-              run: bash scripts/pypi-release.sh lmql-$(echo $VERSION | sed 's/^refs\/tags\/v//')
+            # - name: Install Packaging Dependencies
+            #   run: pip install build twine
+            # - name: Package
+            #   env:
+            #     VERSION: ${{ github.ref }}
+            #   run: bash scripts/wheel.sh $(echo $VERSION | sed 's/^refs\/tags\/v//')
+            # - name: Publish
+            #   env:
+            #     TWINE_USERNAME: __token__
+            #     TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+            #     VERSION: ${{ github.ref }}
+            #   run: bash scripts/pypi-release.sh lmql-$(echo $VERSION | sed 's/^refs\/tags\/v//')
