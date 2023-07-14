@@ -60,7 +60,7 @@ Learn more about LMQL by exploring thne **[Example Showcase](https://lmql.ai)**,
 
 ## Feature Overview
 
-LMQL is designed to make working with language models like OpenAI and 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatype constraints and control flow.
+LMQL is designed to make working with language models like OpenAI and 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatypes and control flow.
 
 - [X] **Python Syntax**: Write your queries using [familiar Python syntax](https://docs.lmql.ai/en/stable/language/overview.html), fully integrated with your Python environment (classes, variable captures, etc.)
 - [X] **Rich Control-Flow**: LMQL offers full Python support, enabling powerful [control flow and logic](https://docs.lmql.ai/en/stable/language/scripted_prompts.html) in your prompting logic.
