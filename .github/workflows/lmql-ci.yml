@@ -1,9 +1,9 @@
 name: Run Tests and Publish Wheel
 
 on:
-  # on release creation
+  # on release publish
   release:
-    types: [created]
+    types: [published]
 
 jobs:
     test-with-hf-transformers:
@@ -12,10 +12,10 @@ jobs:
             - uses: actions/checkout@v3
             - name: Install Dependencies
               run: pip install -e '.[hf]' && pip install langchain
-            # - name: Run Tests
-            #   env:
-            #     OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
-            #   run: python src/lmql/tests/all.py
+            - name: Run Tests
+              env:
+                OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
+              run: python src/lmql/tests/all.py
             - name: Install Packaging Dependencies
               run: pip install build twine
             - name: Package
