@@ -5,6 +5,8 @@ metadata:authors: team
 
 Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a `llama.cpp` based inference backend, several bug fixes and other minor improvements.
 
+You can try the latest version of LMQL in your browser at [lmql.ai](https://lmql.ai/playground) or install it via `pip install lmql`.
+
 ## One Line Is All It Takes
 
 Most notably, 0.0.6.5 comes with several simplifications of the core syntax of LMQL. Of course, all changes are backwards compatible, so you can continue to use your existing query code and move to the new version without any changes.
