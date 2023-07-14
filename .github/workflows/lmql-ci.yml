@@ -8,7 +8,8 @@ jobs:
     build:
         runs-on: lmql-ci
         steps:
+            - uses: actions/checkout@v3
             - name: Install Dependencies
-              run: ls 
+              run: pip install -e .
             - name: Test
               run: bash scripts/wheel.sh $1
