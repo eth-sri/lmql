@@ -49,3 +49,5 @@ name::use-azure-model
 
 argmax "Hello [WHO]" from my_azure_model
 ```
+
+Configuration parameters specified as part of an `lmql.model(...)` object take precedence over environment variables. The latter just act as a fallback, e.g. when `api_key=` is not specified as a keyword argument.
