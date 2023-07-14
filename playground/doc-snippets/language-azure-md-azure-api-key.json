@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "import lmql\n\nargmax\n    \"Hello[WHO]\"\nfrom\n    lmql.model(\"openai/gpt-3.5-turbo\", endpoint=\"azure://<ENDPOINT>\", azure_api_key=\"<API_KEY>\")\nwhere\n    STOPS_AT(WHO, \"\\n\") and len(TOKENS(WHO)) < 10", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
