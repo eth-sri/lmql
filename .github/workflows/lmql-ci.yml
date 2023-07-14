@@ -21,10 +21,10 @@ jobs:
             - name: Package
               env:
                 VERSION: ${{ github.ref }}
-              run: bash scripts/wheel.sh $(echo $VERSION | sed 's/^refs\/tags\///')
+              run: bash scripts/wheel.sh $(echo $VERSION | sed 's/^refs\/tags\/v//')
             - name: Publish
               env:
                 TWINE_USERNAME: __token__
                 TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
                 VERSION: ${{ github.ref }}
-              run: bash scripts/pypi-release.sh lmql-$(echo $VERSION | sed 's/^refs\/tags\///')
+              run: bash scripts/pypi-release.sh lmql-$(echo $VERSION | sed 's/^refs\/tags\/v//')
