@@ -1,7 +1,7 @@
 metadata:release: 2023-07-13 18:00:00 +0000
 metadata:authors: team
 
-# LMQL becomes simpler and more powerful
+# LMQL becomes simpler and adds llama.cpp
 
 Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a `llama.cpp` based inference backend, several bug fixes and other minor improvements.
 
@@ -130,12 +130,18 @@ argmax "Say 'this is a test':[RESPONSE]" from "llama.cpp:<PATH TO WEIGHTS>.bin"
 
 We support, both, in-process loading of `llama.cpp`, as well as remote inference via `lmql serve-model`. To learn more about `llama.cpp` and how to use it with LMQL, check out the corresponding chapter in the LMQL [documentation](https://docs.lmql.ai/en/latest/language/llama.cpp.html).
 
+<br/>
+
 ## Other Changes
 
 * LMQL now includes a `random` model backend, which randomly samples tokens from the GPT-2 vocabulary. This is useful for debugging and testing purposes and can be used for data generation in the context of highly constrained query programs.
 
 * Two caching issues have been fixed, avoiding cache collisions which could lead to repeated model outputs.
 
-* More robust query string parsing, allowing for robust escaping of special characters `[`, `]`, `{` and `}`.
+* More robust query string parsing, allowing for [robust escaping](https://docs.lmql.ai/en/stable/language/scripted_prompts.html#escaping) of special characters `[`, `]`, `{` and `}`.
 
 * Added support for `transformers` based Llama models and the associated (fast) implementation of HF tokenizers.
+
+* Simplified Azure OpenAI support, see the relevant chapter in the [documentation](https://docs.lmql.ai/en/stable/language/azure.html).
+
+We thank community members [@minosvasilias](https://github.com/minosvasilias) and [@CircArgs](https://github.com/CircArgs) for their contribution to this release.
