@@ -9,6 +9,6 @@ jobs:
         runs-on: lmql-ci
         steps:
             - name: Install Dependencies
-              run: ls && pip install -e .
+              run: ls 
             - name: Test
               run: bash scripts/wheel.sh $1
