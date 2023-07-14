@@ -12,6 +12,8 @@ jobs:
             - name: Install Dependencies
               run: pip install -e .
             - name: Run Tests
+              env:
+                OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
               run: python src/lmql/tests/all.py
             - name: Package
               run: bash scripts/wheel.sh latest
