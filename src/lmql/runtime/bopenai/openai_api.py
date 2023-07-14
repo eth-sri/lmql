@@ -104,7 +104,7 @@ def tagged_segments(s):
 
 def get_azure_config(model, api_config):
     endpoint = api_config.get("endpoint", None)
-    api_type = api_config.get("api_type", os.environ.get("OPENAI_API_TYPE", "azure"))
+    api_type = api_config.get("api_type", os.environ.get("OPENAI_API_TYPE", ""))
 
     if (api_type == "azure" or api_type == "azure-chat"):
         api_base = os.environ.get("OPENAI_API_BASE", api_config.get("api_base", None))
