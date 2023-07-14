@@ -16,6 +16,8 @@ for i,f in enumerate(files):
             raise KeyboardInterrupt
         if result != 0:
             errors += 1
+            if "--failearly" in sys.argv:
+                break
 
     except KeyboardInterrupt:
         sys.exit(1)

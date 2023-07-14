@@ -15,7 +15,7 @@ jobs:
             - name: Run Tests
               env:
                 OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
-              run: python src/lmql/tests/all.py
+              run: python src/lmql/tests/all.py --failearly
             - name: Install Packaging Dependencies
               run: pip install build twine
             - name: Package
