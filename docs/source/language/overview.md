@@ -125,4 +125,3 @@ As shown here, we can use the `if` statement to dynamically react to the model's
 To learn more about the capabilities of such control-flow-guided prompts, see [Scripted Prompting](./scripted_prompts.md).
 
 As shown here, in addition to inline `where` expressions as seen earlier, you can also provide a global `where` expression at the end of your program, e.g. to specify constraints that should apply for all variables. Depending on your use case, this can be a convenient way to avoid having to repeat the same constraints multiple times, like for `FURTHER_ANALYSIS` in this example.
-
