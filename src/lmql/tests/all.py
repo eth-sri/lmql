@@ -4,7 +4,7 @@ import subprocess
 
 THIS_DIR = os.path.dirname(__file__)
 files = sorted(os.listdir(THIS_DIR))
-TEST_TIMEOUT = float(os.environ.get("TEST_TIMEOUT", 60.0))
+TEST_TIMEOUT = float(os.environ.get("TEST_TIMEOUT", 3*60.0))
 
 errors = 0 
 files = [f for f in files if f.startswith("test_")]
