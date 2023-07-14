@@ -5,12 +5,12 @@ on:
     branches: [ "ci"]
 
 jobs:
-    build:
+    test-with-hf-transformers:
         runs-on: lmql-ci
         steps:
             - uses: actions/checkout@v3
             - name: Install Dependencies
-              run: pip install -e . --use-feature=hf
+              run: pip install -e '.[hf]'
             - name: Run Tests
               env:
                 OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
