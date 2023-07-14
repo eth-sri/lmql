@@ -23,11 +23,9 @@
   </p>
 </div>
 
-LMQL is an open source programming language for large language models (LLMs) based on a *superset of Python*. LMQL goes beyond traditional templating languages by providing full Python support, yet a lightweight programming interface. 
+LMQL is a programming language for large language models (LLMs) based on a *superset of Python*. LMQL offers a novel way of interweaving traditional programming with the ability to call LLMs in your code. It goes beyond traditional templating languages by providing full Python support, yet a lightweight programming interface. 
 
-LMQL is designed to make working with language models like OpenAI, 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatype constraints and control flow.
-
-Features:
+LMQL is designed to make working with language models like OpenAI, 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatype constraints and control flow:
 
 - [X] **Python Syntax**: Write your queries using [familiar Python syntax](https://docs.lmql.ai/en/stable/language/overview.html), fully integrated with your Python environment (classes, variable captures, etc.)
 - [X] **Rich Control-Flow**: LMQL offers full Python support, enabling powerful [control flow and logic](https://docs.lmql.ai/en/stable/language/scripted_prompts.html) in your prompting logic.
@@ -43,27 +41,21 @@ Features:
 
 ## Explore LMQL
 
-A simple example program in LMQL looks like this:
+An LMQL program reads like standard Python, where top-level strings are interpreted as query strings, i.e. as model input with template variables like `[GREETINGS]`:
 
 ```python
-argmax
-   "Greet LMQL:[GREETINGS]\n"
-   
-   if "Hi there" in GREETINGS:
-      "Can you reformulate your greeting in the speech of victorian-era English: [VIC_GREETINGS]\n"
-   
-   "Analyse what part of this response makes it typically victorian:\n"
-   
-   for i in range(4):
-      "-[THOUGHT]\n"
-   
-   "To summarize:[SUMMARY]"
-from 
-   "openai/text-davinci-003" 
-where 
-   stops_at(GREETINGS, ".") and not "\n" in GREETINGS and 
-   stops_at(VIC_GREETINGS, ".") and 
-   stops_at(THOUGHT, ".")
+"Greet LMQL:[GREETINGS]\n" where stops_at(GREETINGS, ".") and not "\n" in GREETINGS
+
+if "Hi there" in GREETINGS:
+    "Can you reformulate your greeting in the speech of \
+     victorian-era English: [VIC_GREETINGS]\n" where stops_at(VIC_GREETINGS, ".")
+
+"Analyse what part of this response makes it typically victorian:\n"
+
+for i in range(4):
+    "-[THOUGHT]\n" where stops_at(THOUGHT, ".")
+
+"To summarize:[SUMMARY]"
 ```
 
 Program Output:
@@ -72,17 +64,12 @@ Program Output:
   <br/>
 </div>
 
+This allows you to express programs that contain both, traditional algorithmic logic and LLM calls. 
+At any point during execution, you can prompt an LLM on program variables in combination with standard natural language prompting.
 
+To better control LLM behavior, you can use the `where` keyword to specify constraints and data types of the generated text. This enables guidance of the model's reasoning process, and constraining of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
 
-The main body of an LMQL program reads like standard Python (with control-flow), where top-level strings are interpreted as model input with template variables like `[GREETINGS]`. 
-
-The `argmax` keyword in the beginning specifies the decoding algorithm used to generate tokens, e.g. `argmax`, `sample` or
-even advanced branching decoders like [beam search and `best_k`](https://docs.lmql.ai/en/stable/language/decoders.html).
-
-The `from` and `where` clauses specify the model and constraints that are employed during decoding. 
-
-Overall, this style of language model programming facilitates guidance of the model's reasoning process, and constraining
-of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
+Beyond this linear form of scripting, LMQL also supports a number of decoding algorithms to execute your program, such as `argmax`, `sample` or even advanced branching decoders like [beam search and `best_k`](https://docs.lmql.ai/en/stable/language/decoders.html). 
 
 Learn more about LMQL by exploring our **[Example Showcase](https://lmql.ai)** or by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)**.
 
