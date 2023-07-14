@@ -143,6 +143,137 @@ function openPlaygroundSnippet(link, snippet) {
   </div>
 
 
+<section class="section blog startpage" id="release-0.0.6.5">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column">
+          <h5 class="title is-2 has-text-left" style="margin-bottom: 2pt;">
+            <a href="blog/release-0.0.6.5.html" class="anchor">
+                LMQL becomes simpler and more powerful
+            </a>
+          </h5>
+          <div class="content has-text-justified">
+          <div class="authors">
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
+        </span>
+            </div>
+          </div>
+            <div class="date">
+                Thu, Jul 13, 2023
+            </div>
+            <section id="lmql-becomes-simpler-and-more-powerful">
+
+<p>Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> based inference backend, several bug fixes and other minor improvements.</p>
+<section id="one-line-is-all-it-takes">
+<h2>One Line Is All It Takes<a class="headerlink" href="#one-line-is-all-it-takes" title="Permalink to this heading">#</a></h2>
+<p>Most notably, 0.0.6.5 comes with several simplifications of the core syntax of LMQL. Of course, all changes are backwards compatible, so you can continue to use your existing query code and move to the new version without any changes.</p>
+<p>With this, we aim to minimize syntactic overhead, by employing sensible defaults to enable more concise query code like the following:</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-5-md-simple-syntax')">Open In Playground</button><pre><span></span><span class="s2">"One line is all it takes [CONTINUATION]"</span>
+</pre></div>
+<div class="highlight-model-output notranslate"><div class="highlight">One line is all it takes <span class="variable val1"><span class="variable-name">CONTINUATION</span> Fallin' in love with me.</span></div></div><p></p>
+<p><strong>Sensible Defaults</strong> This is possible because LMQL now automatically assumes <code class="docutils literal notranslate"><span class="pre">argmax</span></code> and <code class="docutils literal notranslate"><span class="pre">openai/text-davinci-003</span></code> as (configurable) default model. If you prefer to use
+a different model or custom decoder settings, you can still specify them explicitly, e.g. in the <code class="docutils literal notranslate"><span class="pre">@lmql.query</span></code> decorator function as demonstrated later in this post.</p>
+<p>Without any additional configuration, the simple query code above translates to a full LMQL program like this:</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-5-md-simple-syntax-default')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> <span class="s2">"One line is all it takes [CONTINUATION]"</span> <span class="kn">from</span> <span class="s2">"openai/text-davinci-003"</span>
+</pre></div>
+<p></p>
+<br>
+<section id="inline-constraints">
+<h3>Inline Constraints<a class="headerlink" href="#inline-constraints" title="Permalink to this heading">#</a></h3>
+<p>LMQL now allows you to specify several inline <code class="docutils literal notranslate"><span class="pre">where</span></code> constraints. This enables constraints that refer to local program variables, which means constraints can now be dependent on previous model outputs.</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-5-md-list-with-array')">Open In Playground</button><pre><span></span><span class="s2">"A list of awesome Dua Lipa songs:</span><span class="se">\n</span><span class="s2">"</span>
+<span class="n">songs</span> <span class="o">=</span> <span class="p">[]</span>
+
+<p><span class="s2">&quot;- New Rules</span><span class="se">\n</span><span class="s2">&quot;</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+    <span class="s2">&quot;-[SONG]</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="kp">where</span> <span class="n">STOPS_BEFORE</span><span class="p">(</span><span class="n">SONG</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">songs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">SONG</span><span class="p">)</span></p>
+<p><span class="s2">&quot;Out of these, my favorite is[FAVORITE]&quot;</span> <span class="kp">where</span> <span class="n">FAVORITE</span> <span class="ow">in</span> <span class="n">songs</span>
+</pre></div></p>
+<div class="highlight-model-output notranslate"><div class="highlight">A list of awesome Dua Lipa songs:⏎
+- New Rules
+- <span class="variable val1"><span class="variable-name">SONG</span> Don't Start Now</span>
+- <span class="variable val1"><span class="variable-name">SONG</span> IDGAF</span>
+- <span class="variable val1"><span class="variable-name">SONG</span> Be the One</span>
+- <span class="variable val1"><span class="variable-name">SONG</span> Blow Your Mind (Mwah)</span>
+Out of these, my favorite is <span class="variable val2"><span class="variable-name">FAVORITE</span> Don't Start Now</span></div></div><p></p>
+<p>Note also how in this example LMQL code now reads much more like standard Python code, without any additional level of indentation.</p>
+<br>
+</section>
+<section id="lmql-query-functions">
+<h3><code class="docutils literal notranslate"><span class="pre">@lmql.query</span></code> functions<a class="headerlink" href="#lmql-query-functions" title="Permalink to this heading">#</a></h3>
+<p>The overhauled syntax also makes LMQL much  easier on the eyes when used with the <code class="docutils literal notranslate"><span class="pre">@lmql.query</span></code> <a class="reference external" href="https://docs.lmql.ai/en/stable/python/python.html">function decorator in Python</a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">lmql</span>
+<span class="kn">import</span> <span class="nn">json</span>
+
+<p><span class="nd">@lmql</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;openai/text-curie-001&quot;</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">summarize</span><span class="p">():</span> <span class="s1">&#39;&#39;&#39;lmql</span>
+<span class="s1">    &quot;&quot;&quot;</span>
+<span class="s1">    Provide a summary of Dua Lipa, the pop icon:</span>
+<span class="s1">    {{</span>
+<span class="s1">      &quot;name&quot;: &quot;[STRING_VALUE]&quot;,</span>
+<span class="s1">      &quot;chart_position&quot;: [INT_VALUE],</span>
+<span class="s1">      &quot;top_songs&quot;: [[</span>
+<span class="s1">         &quot;[STRING_VALUE]&quot;,</span>
+<span class="s1">         &quot;[STRING_VALUE]&quot;</span>
+<span class="s1">      ]]</span>
+<span class="s1">    }}</span>
+<span class="s1">    &quot;&quot;&quot; where STOPS_BEFORE(STRING_VALUE, &#39;&quot;&#39;) and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) &lt; 3</span>
+<span class="s1">    </span>
+<span class="s1">    return json.loads(context.prompt.split(&quot;pop icon:&quot;,1)[1])&#39;&#39;&#39;</span></p>
+<p><span class="nb">print</span><span class="p">(</span><span class="n">summarize</span><span class="p">())</span> <span class="c1"># {&#39;name&#39;: &#39;Dua Lipa&#39;, &#39;chart_position&#39;: 3415, &#39;top_songs&#39;: [&#39;New Rules&#39;, &#39;Havana&#39;]}</span></p>
+<p></pre></div></p>
+</div>
+<br>
+</section>
+<section id="lmql-f-lambda-functions">
+<h3><code class="docutils literal notranslate"><span class="pre">lmql.F</span></code> Lambda Functions<a class="headerlink" href="#lmql-f-lambda-functions" title="Permalink to this heading">#</a></h3>
+<p>Based on LMQL’s new minimal syntax, we introduce a novel and concise way to write LLM-based lambda functions. This offers a lightweight entryway to get started with integrated small LLM-based utilities in your code, without having to write a full LMQL program.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">lmql</span>
+
+<p><span class="n">summarize</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">&quot;Summarize the following in a few words: </span><span class="si">{data}</span><span class="s2">: [SUMMARY]&quot;</span><span class="p">)</span>
+<span class="n">main_subject</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">&quot;What is the main subject (noun) of the following text? </span><span class="si">{data}</span><span class="s2">: [SUBJECT]&quot;</span><span class="p">,</span> 
+                      <span class="s2">&quot;len(TOKENS(SUBJECT)) &lt; 20&quot;</span><span class="p">)</span></p>
+<p><span class="n">text</span> <span class="o">=</span> <span class="s2">&quot;In LMQL, users can specify high-level, logical constraints ...&quot;</span></p>
+<p><span class="n">summarize</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># LMQL enables high-level constraints to be enforced during text </span>
+                     <span class="c1"># generation, simplifying multi-part prompting and integration.</span>
+<span class="n">main_subject</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># Language Model Query Language (LMQL)</span></p>
+<p></pre></div></p>
+</div>
+<br>
+<br>
+</section>
+</section>
+<section id="llama-cpp-inference-backend">
+<h2><code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> Inference Backend<a class="headerlink" href="#llama-cpp-inference-backend" title="Permalink to this heading">#</a></h2>
+<p>LMQL now also fully integrates with the excellent <a class="reference external" href="https://github.com/ggerganov/llama.cpp">llama.cpp</a> C++ implementation of a number of Transformer-based language models.</p>
+<p>Using <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> from LMQL is as simple as specifying it in the <code class="docutils literal notranslate"><span class="pre">from</span></code> clause of a query:</p>
+<p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-5-md-llama-cpp-blog')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> <span class="s2">"Say 'this is a test':[RESPONSE]"</span> <span class="kn">from</span> <span class="s2">"llama.cpp:&lt;PATH TO WEIGHTS&gt;.bin"</span>
+</pre></div>
+<p></p>
+<p>We support, both, in-process loading of <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code>, as well as remote inference via <code class="docutils literal notranslate"><span class="pre">lmql</span> <span class="pre">serve-model</span></code>. To learn more about <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> and how to use it with LMQL, check out the corresponding chapter in the LMQL <a class="reference external" href="https://docs.lmql.ai/en/latest/language/llama.cpp.html">documentation</a>.</p>
+</section>
+<section id="other-changes">
+<h2>Other Changes<a class="headerlink" href="#other-changes" title="Permalink to this heading">#</a></h2>
+<ul class="simple">
+<li><p>LMQL now includes a <code class="docutils literal notranslate"><span class="pre">random</span></code> model backend, which randomly samples tokens from the GPT-2 vocabulary. This is useful for debugging and testing purposes and can be used for data generation in the context of highly constrained query programs.</p></li>
+<li><p>Two caching issues have been fixed, avoiding cache collisions which could lead to repeated model outputs.</p></li>
+<li><p>More robust query string parsing, allowing for robust escaping of special characters <code class="docutils literal notranslate"><span class="pre">[</span></code>, <code class="docutils literal notranslate"><span class="pre">]</span></code>, <code class="docutils literal notranslate"><span class="pre">{</span></code> and <code class="docutils literal notranslate"><span class="pre">}</span></code>.</p></li>
+<li><p>Added support for <code class="docutils literal notranslate"><span class="pre">transformers</span></code> based Llama models and the associated (fast) implementation of HF tokenizers.</p></li>
+</ul>
+</section>
+</section>
+
+
+
+          </div>
+        </div>
+    </div>
+  </section>
+    
 <section class="section blog startpage" id="release-0.0.6.4">
     <div class="container is-max-desktop">
       <!-- Abstract. -->
@@ -509,7 +640,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Fri, Jul 14, 4:04 PM (UTC)<br/>
+        Last updated on Fri, Jul 14, 5:37 PM (UTC)<br/>
       </div>
     </div>
   </div>

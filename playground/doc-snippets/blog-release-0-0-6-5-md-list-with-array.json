@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "\"A list of awesome Dua Lipa songs:\\n\"\nsongs = []\n\n\"- New Rules\\n\"\nfor i in range(4):\n    \"-[SONG]\\n\" where STOPS_BEFORE(SONG, \"\\n\")\n    songs.append(SONG)\n\n\"Out of these, my favorite is[FAVORITE]\" where FAVORITE in songs", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

@@ -1,1 +1,1 @@
-{"lmql-editor-contents": "argmax \"Hello[WHO]\" from \"openai/text-ada-001\" where len(WHO) < 10", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
+{"lmql-editor-contents": "\"Say 'this is a test':[RESPONSE]\" where len(RESPONSE) < 25", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

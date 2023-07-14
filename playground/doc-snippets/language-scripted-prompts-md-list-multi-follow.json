@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "\"A list of things not to forget when going to the sea (not travelling): \\n\"\nbackpack = []\nfor i in range(5):\n   \"-[THING]\" where STOPS_AT(THING, \"\\n\") \n   backpack.append(THING.strip())\n\n\"The most essential of which is: [ESSENTIAL_THING]\" where ESSENTIAL_THING in backpack", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

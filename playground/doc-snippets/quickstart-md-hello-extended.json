@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "sample(temperature=1.2)\n    \"Say 'this is a test'[RESPONSE]\" where len(TOKENS(RESPONSE)) < 25\n\n    if \"test\" not in RESPONSE:\n        \"You did not say 'test', try again:[RESPONSE]\" where len(TOKENS(RESPONSE)) < 25\n    else:\n        \"Good job\"\nfrom\n    \"openai/text-ada-001\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

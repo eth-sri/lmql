@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax\n    \"This is a query with a specified decoder: [RESPONSE]\nfrom\n    \"openai/text-ada-001\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
