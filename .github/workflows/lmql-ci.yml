@@ -65,4 +65,4 @@ jobs:
               TWINE_USERNAME: __token__
               TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
               VERSION: ${{ github.ref }}
-            run: bash scripts/pypi-release.sh lmql-$(echo $VERSION | sed 's/^refs\/tags\/v//') --production
+            run: bash scripts/pypi-release.sh lmql-$(echo $VERSION | sed 's/^refs\/tags\/v//') # --production
