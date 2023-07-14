@@ -1,3 +1,6 @@
+# fail if any commands fails
+set -e
+
 COMMIT=$(git rev-parse HEAD)
 HAS_UNSTAGED=$(git diff-index --quiet HEAD -- src; echo $?)
 

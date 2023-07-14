@@ -53,8 +53,15 @@ class concurrent:
     def __exit__(self, *args):
         self.task.cancel()
 
+def is_azure_chat(kwargs):
+    if not "api_config" in kwargs: return False
+    api_config = kwargs["api_config"]
+    if not "api_type" in api_config: 
+        return os.environ.get("OPENAI_API_TYPE", "azure") == "azure-chat"
+    return ("api_type" in api_config and "azure-chat" in api_config.get("api_type", ""))
+
 async def complete(**kwargs):
-    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
+    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"] or is_azure_chat(kwargs):
         async for r in chat_api(**kwargs): yield r
     else:
         async for r in completion_api(**kwargs): yield r
@@ -97,35 +104,39 @@ def tagged_segments(s):
 
 def get_azure_config(model, api_config):
     endpoint = api_config.get("endpoint", None)
+    api_type = api_config.get("api_type", os.environ.get("OPENAI_API_TYPE", ""))
 
-    # first check endpoint configuration
-    if endpoint is not None and endpoint.startswith("azure:"):
-        endpoint = "https:" + endpoint[6:]
-        env_name = model.upper().replace(".", "_")
+    if (api_type == "azure" or api_type == "azure-chat"):
+        api_base = os.environ.get("OPENAI_API_BASE", api_config.get("api_base", None))
+        assert api_base is not None, "Please specify the Azure API base URL as 'api_base' or environment variable OPENAI_API_BASE"
+        api_version = os.environ.get("OPENAI_API_VERSION", api_config.get("api_version", "2023-05-15"))
+        deployment = os.environ.get("OPENAI_DEPLOYMENT", api_config.get("api_deployment", model))
         
-        azure_key = api_config.get("azure_api_key", None)
-        if azure_key is None:
-            assert "AZURE_OPENAI_" + env_name + "_KEY" in os.environ, f"Please set the environment variable AZURE_OPENAI_{env_name}_KEY to your Azure API key, or specify it in code as 'lmql.model(..., azure_api_key=...')"
-            azure_key = os.environ["AZURE_OPENAI_" + env_name + "_KEY"]
+        deployment_specific_api_key = f"OPENAI_API_KEY_{deployment.upper()}"
+        api_key = os.environ.get(deployment_specific_api_key, None) or os.environ.get("OPENAI_API_KEY", api_config.get("api_key", None))
+        assert api_key is not None, "Please specify the Azure API key as 'api_key' or environment variable OPENAI_API_KEY or OPENAI_API_KEY_<DEPLOYMENT>"
         
+        is_chat = api_type == "azure-chat"
+
+        if is_chat:
+            endpoint = f"{api_base}/openai/deployments/{deployment}/chat/completions"
+        else:
+            endpoint = f"{api_base}/openai/deployments/{deployment}/completions"
+        
+        if api_version is not None:
+            endpoint += f"?api-version={api_version}"
+
         headers = {
             "Content-Type": "application/json",
-            "api-key": azure_key,
+            "api-key": api_key,
         }
+
+        if "verbose" in api_config and api_config["verbose"] or os.environ.get("OPENAI_VERBOSE", "0") == "1":
+            print(f"Using Azure API endpoint: {endpoint}", is_chat)
 
         return endpoint, headers
 
-    # then check env
-    if os.environ.get("OPENAI_API_TYPE", 'openai') == 'azure':
-        model_env_name = model.upper().replace(".", "_")
-        endpoint = os.environ[f"AZURE_OPENAI_{model_env_name}_ENDPOINT"]
-        assert "AZURE_OPENAI_" + model_env_name + "_KEY" in os.environ, f"Please set the environment variable AZURE_OPENAI_{model_env_name}_KEY to your Azure API key, or specify it in code as 'lmql.model(..., azure_api_key=...')"
-        key = os.environ[f"AZURE_OPENAI_{model_env_name}_KEY"]
-        headers = {
-            "Content-Type": "application/json",
-            "api-key": key,
-        }
-        return endpoint, headers
+    return None
 
 def get_endpoint_and_headers(kwargs):
     model = kwargs["model"]
@@ -139,9 +150,9 @@ def get_endpoint_and_headers(kwargs):
     
     # otherwise use custom endpoint as plain URL without authorization
     if endpoint is not None:
-        if not endpoint.endswith("http"):
+        if not endpoint.startswith("http"):
             endpoint = f"http://{endpoint}"
-        return endpoint + "/completions", {
+        return endpoint, {
             "Content-Type": "application/json"
         }
     
@@ -221,7 +232,7 @@ async def chat_api(**kwargs):
         
         current_chunk = ""
         stream_start = time.time()
-        
+
         async with aiohttp.ClientSession() as session:
             endpoint, headers = get_endpoint_and_headers(kwargs)
             async with session.post(
