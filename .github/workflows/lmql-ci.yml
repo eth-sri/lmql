@@ -8,7 +8,7 @@ jobs:
     build:
         runs-on: lmql-ci
         steps:
+            - name: Install Dependencies
+              run: pip install -e .
             - name: Test
-              run: uname -a
-            - name: GPU Test
-              run: nvidia-smi
+              run: bash scripts/wheel.sh $1
