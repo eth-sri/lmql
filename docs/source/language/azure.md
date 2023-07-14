@@ -4,32 +4,48 @@ LMQL also supports OpenAI models hosted on Azure. To use these models, you need 
 
 ## Configuration via Environment Variables
 
-To configure an LMQL runtime as a whole to use Azure endpoints for OpenAI models, you can provide the following environment variables:
+To configure an LMQL runtime as a whole to use a specific Azure deployed model for OpenAI calls, you can provide the following environment variables:
 
 ```
-OPENAI_API_TYPE=azure
-AZURE_OPENAI_<ENV_NAME>_ENDPOINT=<endpoint>
-AZURE_OPENAI_<ENV_NAME>_KEY=<key>
+# set the API type based on whether you want to use a completion or chat endpoint
+OPENAI_API_TYPE=azure|azure-chat 
+
+# your Azure API base URL, e.g. 'https://<YOUR_BASE>.openai.azure.com/'
+OPENAI_API_BASE=<API_BASE> 
+
+# set your API key, can also be provided per deployment 
+# via OPENAI_API_KEY_{<your-deployment-name>.upper()}
+OPENAI_API_KEY=<key>
 ```
 
-where `<ENV_NAME>` is the name of the hosted OpenAI model, e.g. `gpt-3.5-turbo` but uppercase and with `-` replaced by `_`. For example, to configure the `gpt-3.5-turbo` model, you would use the `AZURE_OPENAI_GPT-3_5-TURBO_ENDPOINT` and `AZURE_OPENAI_GPT-3_5-TURBO_KEY` environment variables.
+When using your Azure models, make sure to invoke them as `openai/<DEPLOYMENT NAME>` in your query code. If you need more control, or want to use different deployments, base URLs or api versions across your application, please refer to the next section.
 
 ## Configuration via `lmql.model`
 
-If you prefer to configure Azure credentials on a per-query basis, you can also specify the endpoint and API key to use as part of a `lmql.model(...)` expression:
+If you need to configure Azure credentials on a per-query basis, you can also specify the Azure access credentials as part of an `lmql.model(...)` object:
 
-```{lmql}
-
-name::azure-api-key
-
-import lmql
-
-argmax
-    "Hello[WHO]"
-from
-    lmql.model("openai/gpt-3.5-turbo", endpoint="azure://<ENDPOINT>", azure_api_key="<API_KEY>")
-where
-    STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
+```python
+my_azure_model = lmql.model(
+    # the name of your deployed model/engine, e.g. 'my-model'
+    "openai/<DEPLOYMENT>", 
+    # set to 'azure-chat' for chat endpoints and 'azure' for completion endpoints
+    api_type="azure|azure-chat",  
+    # your Azure API base URL, e.g. 'https://<YOUR_BASE>.openai.azure.com/'
+    api_base="<API_BASE>", 
+    # your API key, can also be provided via env variable OPENAI_API_KEY 
+    # or OPENAI_API_KEY_{<your-deployment-name>.upper()}
+    [api_key="<API_KEY>"] , 
+    # API version, defaults to '2023-05-15'
+    [api_version="API_VERSION",]
+    # prints the full endpoint URL to stdout on each query (alternatively OPENAI_VERBOSE=1)
+    [verbose=False] 
+)
 ```
 
-Where `<ENDPOINT>` should not include the `https://` prefix and `<API_KEY>` is the API key for the deployed model.
+You can then use this model in your query code as follows:
+
+```{lmql}
+name::use-azure-model
+
+argmax "Hello [WHO]" from my_azure_model
+```
