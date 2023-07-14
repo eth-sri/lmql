@@ -24,7 +24,7 @@ async def test_eq_str():
             OUTPUT == "Hello you"
         '''
     result = await q()
-    assert result[0].variables["OUTPUT"] == "Hello you"
+    assert result[0].variables["OUTPUT"] == "Hello yodu"
 
 
 async def test_double_eq_str():
