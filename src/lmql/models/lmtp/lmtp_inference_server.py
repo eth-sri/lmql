@@ -13,7 +13,7 @@ import json
 import aiohttp
 from aiohttp import web
 
-from .scheduler import *
+from .lmtp_scheduler import *
 
 class LMTPWebSocketTransport:
     """

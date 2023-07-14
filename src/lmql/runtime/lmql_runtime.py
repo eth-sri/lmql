@@ -198,6 +198,10 @@ class LMQLQueryFunction:
         interpreter.print_stats()
         interpreter.dcmodel.close()
 
+        # for lmql.F we assume 'argmax' and unpack the result
+        if "is_f_function" in interpreter.extra_kwargs:
+            results = results[0]
+
         return results
 
     def aschain(self, output_keys=None):

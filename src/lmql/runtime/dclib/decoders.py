@@ -29,6 +29,36 @@ async def argmax(prompt_ids: np.ndarray, n=1, max_len=2048, **kwargs):
 
     dc.finish(done)
 
+
+@dc.decoder
+async def my_argmax(prompt_ids: np.ndarray, n=1, max_len=2048, **kwargs):
+    model = dc.model(**kwargs)
+    h = dc.seqs([dc.seq(prompt_ids)] * 1)
+    done = dc.seqs()
+    step = 0
+    
+    # provide early first result to user
+    yield h
+
+    while len(h) > 0:
+        # extend current hypothesis with top-k continuations
+        h = h.extend(await model.topk_continuations(h, k=4, **kwargs))
+        # check logprob of each continuation
+        for s in h.items():
+            print(s.logprobs[-1], flush=True)
+        # select top-1 continuation only
+        h = dc.topk(h, 1)
+        
+        print(h, flush=True)
+        h = await model.rewrite(h, noscore=True)
+        h, done = (h + done).separate_by(dc.logical_not(dc.eos), dc.lt(max_len))
+        
+        step += 1
+
+        yield (h, done)
+
+    dc.finish(done)
+
 @dc.decoder
 async def sample(prompt_ids: np.ndarray, temperature=1, n=1, max_len=2048, **kwargs):
     model = dc.model(**kwargs)

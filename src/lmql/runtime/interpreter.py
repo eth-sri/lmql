@@ -130,6 +130,14 @@ class LMQLContext:
         self.interpreter.distribution_values = values
 
     async def get_return_value(self, *args):
+        # for lmql.F functions, do not use LMQLResult and unpack single results
+        if "is_f_function" in self.interpreter.extra_kwargs:
+            result_values = await self.get_all_vars()
+            if len(result_values) == 1:
+                return list(result_values.values())[0]
+            else:
+                return result_values
+
         return LMQLResult(self.state.prompt, await self.get_all_vars(),self.interpreter.distribution_variable, self.interpreter.distribution_values)
 
 
@@ -216,7 +224,7 @@ class PromptInterpreter:
 
         if model_name.model is not None:
             model_object = model_name.model
-            # if model_object is a type reference, we can use the model_identifier
+            # if model_object is a type reference, instantiate it
             if callable(model_object):
                 model_object = model_object()
 

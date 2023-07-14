@@ -6,7 +6,7 @@ asynchronously in the same process.
 import asyncio
 import pickle
 
-from .scheduler import TokenSession, Scheduler
+from .lmtp_scheduler import TokenSession, Scheduler
 from .errors import LMTPStreamError
 
 class LMTPAsyncTransport:

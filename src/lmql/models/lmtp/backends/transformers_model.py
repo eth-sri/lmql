@@ -20,6 +20,8 @@ class TransformersLLM(LMTPModel):
         print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
 
+        self.max_batch_size = kwargs.get("batch_size", 8)
+
     @property
     def eos_token_id(self):
         return self.model.config.eos_token_id

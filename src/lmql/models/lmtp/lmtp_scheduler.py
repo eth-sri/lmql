@@ -120,7 +120,7 @@ class TokenStreamer:
         
         last_tokens = input_ids[:, -1]
         last_scores = scores[-1]
-        
+
         max_num_top_logprobs = max([c.kwargs.get("top_logprobs", 1) for c in self.batch.calls])
 
         if not nputil.is_array(last_tokens):
@@ -130,10 +130,16 @@ class TokenStreamer:
 
         # for each sample get top logprobs
         all_logprobs, all_indices  = nputil.topk(last_scores, max_num_top_logprobs, sorted=True, axis=-1)
+
         for i in range(batch_size):
             logprobs = all_logprobs[i]
             tokens = all_indices[i]
             token_score = last_scores[i][last_tokens[i]]
+
+            top_logprobs = {
+                int(last_tokens[i]): float(token_score.item()),
+                **{int(token.item()): float(logprob.item()) for logprob, token in zip(logprobs, tokens)}
+            }
 
             num_top_logprobs = self.batch.calls[i].kwargs.get("top_logprobs", 1)
             logprobs = logprobs[:num_top_logprobs]
@@ -144,11 +150,9 @@ class TokenStreamer:
                 "stream_id": self.batch.calls[i].stream_id,
                 "logprob": float(token_score.item()),
                 "finish_reason": ("stop" if last_tokens[i].item() == self.eos_token_id else "length" if last else None),
-                "top_logprobs": {
-                    int(token.item()): float(logprob.item()) for logprob, token in zip(logprobs, tokens)
-                }
+                "top_logprobs": top_logprobs
             }
-
+            
             self.batch.calls[i].put(token_payload)
 
 class Scheduler:
@@ -180,7 +184,7 @@ class Scheduler:
     def put(self, call: GenerateCall):
         self.queue.put(call)
 
-    def batches(self):
+    def batches(self, max_batch_size=8):
         start = time.time()
         calls = []
         # get as many calls from the queue as possible within 0.1 seconds
@@ -194,7 +198,17 @@ class Scheduler:
         for c in calls:
             mode = c.generation_mode()
             batches_by_mode.setdefault(mode, []).append(c)
-        return batches_by_mode.values()
+        
+        # split batches that are too large
+        fitting_batches = []
+        for mode, batches in batches_by_mode.items():
+            if len(batches) > max_batch_size:
+                for i in range(0, len(batches), max_batch_size):
+                    fitting_batches.append(batches[i:i+max_batch_size])
+            else:
+                fitting_batches.append(batches)
+
+        return fitting_batches
 
     async def async_worker(self):
         """
@@ -236,7 +250,7 @@ class Scheduler:
             self.process_batch(model)
 
     def process_batch(self, model):
-        for batch in self.batches():
+        for batch in self.batches(model.max_batch_size):
             try:
                 b = GenerateBatch.from_calls(batch)
                 
