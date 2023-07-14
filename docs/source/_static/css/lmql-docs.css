@@ -11,6 +11,10 @@ html[data-theme="dark"] .highlight.lmql {
     background-color: var(--pst-color-background);
 }
 
+.highlight.lmql pre {
+    line-height: 1.55em !important;
+}
+
 .highlight.lmql.playground {
     border: none;
 }
