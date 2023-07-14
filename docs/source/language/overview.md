@@ -75,9 +75,9 @@ P(CLS)
 
 Instead of constraining `CLS` with a `where` expression, we now constrain it in the separate `distribution` clause. In LMQL, the `distribution` clause can be used to specify whether we want to additionally obtain the distribution over the possible values for a given variable. In this case, we want to obtain the distribution over the possible values for `CLS`. 
 
-> Note, that to use the `distribution` clause, we have to make our choice of decoding algorithm explicit, by specifying `argmax` at the beginning of our code (see [Decoding Algorithms](./decoding.md) for more information). ¸
+> **Extended Syntax**: Note, that to use the `distribution` clause, we have to make our choice of decoding algorithm explicit, by specifying `argmax` at the beginning of our code (see [Decoding Algorithms](./decoding.md) for more information). ¸
 >
-> In general, indenting your program and explicitly specifying e.g. `argmax` at the beginning of your code is optional, but recommended if you want to use the `distribution` clause. Throughout the documentation we will make use of both options.
+> In general, this extended form of LMQL syntax, i.e. indenting your program and explicitly specifying e.g. `argmax` at the beginning of your code, is optional, but recommended if you want to use the `distribution` clause. Throughout the documentation we will make use of both syntax variants.
 
 In addition to using the model to perform the `ANALYSIS`, LMQL now also scores each of the individually provided values for `CLS` and normalizes the resulting sequence scores into a probability distribution `P(CLS)` (printed to the Terminal Output of the Playground or Standard Output of the CLI).
 
