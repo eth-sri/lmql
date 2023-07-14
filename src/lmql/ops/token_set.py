@@ -41,7 +41,7 @@ class VocabularyMatcher:
         # first try to load pickled matcher from cache (faster)
         import pickle
 
-        cache_identifier = tokenizer.model_identifier.replace("/", "-")
+        cache_identifier = tokenizer.model_identifier.replace("/", "-").replace(":", "__")
         cache_identifier += "-" + type(tokenizer.tokenizer_impl).__name__.replace("[^a-z0-9]", "")
         cache_path = f"token-mask-cache-{cache_identifier}.pkl"
         matcher_path = f"matcher-{cache_identifier}.pkl"

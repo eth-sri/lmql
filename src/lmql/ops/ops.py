@@ -393,7 +393,7 @@ class EqOpGeneric(Node):
             else:
                 return InOpStrInSet([]).follow(op2, [op1])
 
-        if type(op1) is str or type(op1) is str:
+        if type(op1) is str or type(op2) is str:
             op_shorter = op1 if len(strip_next_token(op1)) < len(strip_next_token(op2)) else op2
             op_longer = op1 if len(strip_next_token(op1)) > len(strip_next_token(op2)) else op2
 
@@ -513,6 +513,7 @@ class SelectOp(Node):
         if result is not None and (l == "fin" or l == "inc"):
             return "fin"
         else: return "var"
+
 class RawValueOp(Node):
     def __init__(self, args):
         super().__init__([])

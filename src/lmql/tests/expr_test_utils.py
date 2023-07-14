@@ -152,7 +152,7 @@ def run_all_tests(g):
             if k.startswith("test"): 
                 print("Running", k, "." * (40 - len(k)), end=" ")
                 
-                if type(g[k]) is LMQLQueryFunction:
+                if (type(g[k]) is LMQLQueryFunction or hasattr(g[k], "lmql_code")) and g[k].is_async:
                     loop.run_until_complete(g[k]())
                 elif inspect.iscoroutinefunction(g[k]):
                     loop.run_until_complete(g[k]())
@@ -160,9 +160,9 @@ def run_all_tests(g):
                     g[k]()
                 termcolor.cprint("OK", "green")
         except AssertionError as e:
-            print(e)
             num_errors += 1
             termcolor.cprint("FAILED", "red")
+            print(e)
 
     # wait for all tasks to finish
     try:
@@ -181,7 +181,6 @@ def run_all_tests(g):
         print(num_errors, "test(s) failed.")
         sys.exit(1)
     else: 
-        print("All tests passed.")
         sys.exit(0)
 
 def enable_show_transformed():

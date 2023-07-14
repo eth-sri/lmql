@@ -53,9 +53,10 @@ class Node:
 
 
 class Var(Node):
-    def __init__(self, name):
+    def __init__(self, name, python_variable=False):
         super().__init__([])
         self.name = name
+        self.python_variable = python_variable
 
         self.depends_on_context = True
         
@@ -66,11 +67,18 @@ class Var(Node):
         return self.name
 
     def forward(self, context, **kwargs):
+        if self.python_variable:
+            return context.python_scope.get(self.name)
+
         if self.diff_aware_read:
             return (context.get(self.name, None), context.get_diff(self.name, None))
+        
         return context.get(self.name, None)
     
     def follow(self, context, **kwargs):
+        if self.python_variable:
+            return context.python_scope.get(self.name)
+
         value = context.get(self.name, None)
         if value is None: return None
         
@@ -89,6 +97,8 @@ class Var(Node):
         )
 
     def final(self, x, context, operands=None, result=None, **kwargs):
+        if self.python_variable:
+            return "fin"
         return context.final(self.name)
 
     def __repr__(self) -> str:

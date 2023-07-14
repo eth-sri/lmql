@@ -145,17 +145,33 @@ class LanguageFragmentParser:
     def parse(self, readline):
         for i, tok in enumerate(tokenize.generate_tokens(readline)):
             self.digest(tok)
+        
+        if self.state == "start":
+            self.query.prompt_str = self.query.prologue
+            self.query.prologue = []
+            self.state = "prompt"
 
         # print("decode_str", remove_comments(self.query.decode_str))
         # print("prompt_str", remove_comments(self.query.prompt_str))
         # print("from_str", remove_comments(self.query.from_str))
 
         self.prologue_transform()
+        self.inline_where_transform()
         self.ast_parse()
         self.syntax_validation()
         self.ast_transform()
 
         return self.query
+
+    def inline_where_transform(self):
+        prompt_tokens = self.query.prompt_str
+        for i in range(len(prompt_tokens) - 1):
+            tok = prompt_tokens[i]
+            lookahead = prompt_tokens[i+1]
+            if tok.type == tokenize.STRING and lookahead.type == tokenize.NAME and lookahead.string == "where":
+                # print(prompt_tokens[i+1])
+                prompt_tokens[i+1] = tokenize.TokenInfo(type=tokenize.OP, string="and", start=lookahead.start, end=lookahead.end, line=lookahead.line)
+        
 
     def prologue_transform(self):
         # translate prologue tokens into str
@@ -168,14 +184,6 @@ class LanguageFragmentParser:
             self.query.distribution = LMQLDistributionClause(variable_name, self.query.distribution.comparators[0])
 
     def syntax_validation(self):
-        # validate decode clause
-        if len(self.query.decode_str) == 0:
-            raise FragmentParserError("A query must start with a decode clause (e.g. ARGMAX).")
-        
-        # validate from clause
-        if len(self.query.from_str) == 0:
-            raise FragmentParserError("The query is missing a FROM clause (e.g. FROM 'gpt-2').")
-
         # validation distribution clause
         if self.query.distribution is not None:
             error_msg = "The distribution clause must be formed like 'VAR in [list of values]'."
@@ -190,12 +198,20 @@ class LanguageFragmentParser:
 
     def ast_parse(self):
         # parse decode, prompt and from
-        self.query.decode = ast_parse(self.query.decode_str, loc="decode").body[0].value
+        decode_body = ast_parse(self.query.decode_str, loc="decode").body
+        if len(decode_body) > 0:
+            self.query.decode = decode_body[0].value
+        else:
+            # default decoder
+            self.query.decode = ast.parse("__dynamic__").body[0].value
+        
         self.query.prompt = ast_parse(self.query.prompt_str, unindent=True, loc="prompt").body
         
-        # if 'from' is omitted, the model is chosen dynamically based on context
-        if len(self.query.from_str) == 0: self.query.from_str = ['<dynamic>']
-        self.query.from_ast = ast_parse(self.query.from_str, unindent=True, loc="from").body[0]
+        from_body = ast_parse(self.query.from_str, unindent=True, loc="from").body
+        if len(from_body) > 0:
+            self.query.from_ast = from_body[0]
+        else:
+            self.query.from_ast = ast.Str(s="<dynamic>")
 
         where_body = ast_parse(self.query.where_str, unindent=True, oneline=True, loc="where").body
         if len(where_body) > 0:
@@ -225,6 +241,12 @@ class LanguageFragmentParser:
                     self.state = "decode"
                     return
             
+            if is_keyword(tok, "where"):
+                self.query.prompt_str = self.query.prologue + [tok]
+                self.query.prologue = []
+                self.state = "prompt"
+                return
+
             # otherwise add token to prologue tokens (e.g. imports, comments, function definitions)
             self.query.prologue.append(tok)
             return
@@ -243,11 +265,13 @@ class LanguageFragmentParser:
             if self.paren_count == 0:
                 self.state = "prompt"
         elif self.state == "prompt":
+            if is_keyword(tok, "where"):
+                if self.query.prompt_str[-1].type != tokenize.STRING:
+                    self.state = "where"
+                    return
+            
             if is_keyword(tok, "FROM"):
                 self.state = "from"
-                return
-            if is_keyword(tok, "WHERE"):
-                self.state = "where"
                 return
             if is_keyword(tok, "SCORING"):
                 self.state = "scoring"

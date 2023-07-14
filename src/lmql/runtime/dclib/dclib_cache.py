@@ -112,7 +112,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     def base_key(self, ids, *args):
         if isinstance(ids, DecoderSequence):
             return self.base_key(ids.input_ids)
-        return str(ids)
+        return "[" + ",".join([str(i) for i in ids]) + "]"
 
     async def get_mask(self, s: DecoderSequence, **kwargs):
         if s.id in self.mask_cache:
@@ -224,7 +224,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             # apply operation for non-cached
             non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
             # if len(non_cached) == 0:
-            #     print("cache hit for", cache_keys[0][0][0][-50:], "with", cached_tokens[0][0])
+            #     print("cache hit for", len(cache_keys[0][0][0]), cache_keys[0][0][0][-50:], "with", cached_tokens[0][0])
             # generator over new results
             non_cached_argmax = iter((await self.delegate.argmax(DataArray(non_cached), **kwargs)).items())                
             results = []
@@ -321,8 +321,9 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                         # print("WARNING: some cache entries are None, but some are not", len([e for e in c if e is not None]), len(r.token))
                         # print([await s.text()])
                     results.append(r)
-                    next_token_ids = ensure_iterable(r.token)
-                    next_token_scores = ensure_iterable(r.logprob)
+                    next_token_ids = ensure_iterable(r.token)[:len(key)]
+                    next_token_scores = ensure_iterable(r.logprob)[:len(key)]
+
                     # cache each continuation separately
                     assert len(next_token_ids) <= len(key)
                     for i,ck in zip(range(len(next_token_ids)), key):

@@ -10,6 +10,9 @@ class ProgramState:
         self.variable_scores = {}
         self.variable_monotonicity = {}
 
+        # python scope of local variables (also user-defined ones)
+        self.python_scope = {}
+
         self.runtime = runtime
         self.subinterpreter_results = {}
         self.prompt = prompt
@@ -54,4 +57,5 @@ class ProgramState:
         s.variable_diffs = self.variable_diffs.copy()
         s.variable_scores = self.variable_scores.copy()
         s.runtime = self.runtime
+        s.python_scope = self.python_scope
         return s

@@ -4,7 +4,9 @@ import styled from 'styled-components';
 import Editor from "@monaco-editor/react";
 import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
-import { BsSquare, BsFillExclamationSquareFill, BsBoxArrowUpRight, BsArrowRightCircle, BsFillCameraFill, BsCheckSquare, BsSendFill, BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, BsGear, BsGridFill } from 'react-icons/bs';
+import { BsSquare, BsFillExclamationSquareFill, BsBoxArrowUpRight, BsArrowRightCircle, BsFillCameraFill, BsCheckSquare, BsSendFill, 
+  BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, 
+  BsGear, BsGridFill, BsPlus } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
@@ -402,6 +404,227 @@ function TokenCountIndicator() {
 //   }
 // }
 
+const ModelSelectionDiv = styled.div`
+  flex: 1;
+  position: absolute;
+  background-color: transparent;
+  margin: 2pt;
+  text-align: right;
+  top: 0pt;
+  right: 0pt;
+  height: 18pt;
+  width: 40%;
+
+  &:hover {
+    border-bottom: 1pt solid grey;
+  }
+
+  &:active {
+    text-decoration: underline;
+  }
+
+  &.auto {
+    opacity: 0.2
+  }
+
+  &.auto:hover, &.auto:active {
+    opacity: 1.0
+  }
+
+  >input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: none;
+    outline: none;
+    background-color: #ffffff19;
+    background: none;
+    text-align: right;
+    z-index: 990;
+    display: block;
+  }
+
+  .select {
+    position: absolute;
+    flex-direction: column;
+    top: calc(100% + 5pt);
+    bottom: auto;
+    width: 100%;
+    color: black;
+    background-color: white;
+    border-radius: 4pt;
+    text-align: left;
+    max-height: 300pt;
+    max-height: calc(100vh - 100pt);
+    overflow-y: scroll;
+    display: none;
+    z-index: 999;
+    padding-bottom: 10pt;
+  }
+
+  .select.open {
+    display: flex;
+  }
+
+  .select .option:hover {
+    background-color: #f0f0f0aa;
+    cursor: pointer;
+  }
+
+  .select .option:first-child {
+    border-top: none;
+  }
+
+  .select .option {
+    text-align: left;
+    padding: 4pt;
+    font-family: monospace;
+    margin: 0pt 0pt;
+    border-radius: 2pt;
+    border-top: 0.5pt solid #d6d6d6;
+    font-size: 8pt;
+    display: flex;
+    flex-direction: row;
+  }
+
+  .option .note {
+    text-align: right;
+    display: block;
+    flex: 1;
+    font-size: 6pt;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    line-height: 10pt;
+  }
+
+  .select h2 {
+    font-size: 8pt;
+    margin: 8pt 4pt;
+    font-weight: normal;
+    padding: 0;
+  }
+
+  .select .instructions {
+    display: block;
+    font-size: 8pt;
+    padding: 5pt;
+    color: #3c3c3c;
+  }
+
+  .option:hover.selected, .option.selected {
+    background-color: #c4c4c4;
+  }
+  
+  >input {
+    z-index: 3;
+    right: 20pt;
+    font-size: 8pt;
+    color: #ffffffae;
+    padding-left: 5pt;
+    font-family: monospace;
+    z-index: 999;
+    border-radius: 2pt;
+  }
+
+  &.active input, input:focus {
+    background-color: #ffffff3c !important;
+  }
+
+  .select h2:first-of-type {
+    font-weight: bold !important;
+  }
+
+  svg {
+    position: absolute;
+    top: 3.5pt;
+    height: 10pt;
+    width: 10pt;
+    right: 7pt;
+    z-index: 1;
+    opacity: 0.4;
+  }
+
+  .overlay {
+    background-color: black;
+    width: 100vw;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    opacity: 0.3;
+    z-index: 20;
+  }
+`
+
+function ModelSelection() {
+  const [model, setModel] = useState(persistedState.getItem("playground-model"))
+  const [selectOpen, setSelectOpen] = useState(false)
+
+  const onChange = (value) => {
+    persistedState.setItem("playground-model", value)
+    setModel(value)
+  }
+
+  const PREDEFINED = {
+    "": [
+      {"name": "automatic", note: "Use model as specified by the query.", inprocess: false},
+      {"name": "random", note: "Random (uniform) token sampling.", inprocess: false}
+    ],
+    "Other Suggestions": [
+      {"name": "openai/text-ada-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-curie-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-babbage-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-davinci-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai/text-davinci-003", "note": "OpenAI", inprocess: false},
+      {"name": "chatgpt", "note": "OpenAI", inprocess: false},
+      {"name": "gpt-4", "note": "OpenAI", inprocess: false}
+    ]
+  }
+
+  if (!configuration.BROWSER_MODE) {
+    PREDEFINED["Other Suggestions"] = Array.from([
+      {"name": "gpt2", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "gpt2-medium", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "facebook/opt-350m", "note": "🤗 Tranformers", inprocess: true},
+      {"name": "llama.cpp:<PATH>/llama-7b.bin", "note": "🦙 llama.cpp", inprocess: true},
+    ]).concat(PREDEFINED["Other Suggestions"])
+  }
+
+  const onInputEnter = (e) => {
+    if (e.key == "Enter") {
+      setSelectOpen(false)
+      e.target.blur()
+    }
+  }
+
+  return <ModelSelectionDiv className={(model == "automatic" ? "auto" : "") + (selectOpen ? " active" : "") }>
+    <input spellCheck={false} placeholder="automatic" value={model} onChange={e => onChange(e.target.value)} autoCorrect={false} onKeyDown={onInputEnter}/>
+    <div className={'select ' + (selectOpen ? "open" : "")}>
+      <span class="instructions">
+        <b>Custom Model</b><br/>
+        Specify the model to execute your query with. You can also type in the text field above.
+        {configuration.BROWSER_MODE ? <><br/><a href={"https://docs.lmql.ai/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
+          Install LMQL locally </a> to use other models, e.g. from 🤗 Tranformers</>
+        : null}
+      </span>
+      {Object.keys(PREDEFINED).map(k => <>
+        {k != "" ? <h2 key={"key-"+k}>{k}</h2> : null}
+        {PREDEFINED[k].map(o => <div className={'option' + (o.name == model ? " selected" : "")} 
+          onClick={() => {onChange(o.name); setSelectOpen(false);}} key={k+o}>
+          {o.name}
+          <span class="note">
+            {o.note}
+          </span>
+        </div>)}
+        </>)
+      }
+    </div>
+    <div class="overlay" style={{display: selectOpen ? "block" : "none"}} onClick={() => setSelectOpen(false)}></div>
+    <BsPlus onClick={() => setSelectOpen(!selectOpen)}/>
+  </ModelSelectionDiv>
+}
+
 const EditorContainer = styled.div`
   flex: 1;
   overflow: hidden;
@@ -483,7 +706,7 @@ function EditorPanel(props) {
       />
       </EditorContainer>
       <ButtonGroup>
-        <FancyButton className='green' onClick={props.onRun} disabled={props.processState != "idle" && props.processState != "secret-missing"}>
+        <FancyButton className='green' onClick={() => props.onRun()} disabled={props.processState != "idle" && props.processState != "secret-missing"}>
           {props.processState == "running" ? <>Running...</> : <>&#x25B6; Run</>}
         </FancyButton>
         {/* status light for connection status */}
@@ -498,6 +721,7 @@ function EditorPanel(props) {
         {/* <Spacer></Spacer> */}
         <TokenCountIndicator />
       </ButtonGroup>
+      <ModelSelection/>
     </Panel>
   );
 }
@@ -2543,11 +2767,14 @@ class App extends React.Component {
 
   onRun() {
     const code = persistedState.getItem("lmql-editor-contents");
+    const model = persistedState.getItem("playground-model");
     const appData = {
       "name": "lmql",
       // monaco get editor content
       "app_input": code,
-      "app_arguments": {}
+      "app_arguments": [{
+        "model": model
+      }]
     };
 
     LMQLProcess.run(appData);

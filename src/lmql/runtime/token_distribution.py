@@ -15,7 +15,9 @@ class TokenDistribution:
         elif type(key) is str:
             key = [key]
             value = [value]
-        
+        elif type(key) is np.ndarray and key.dtype == np.bool_:
+            key = np.where(key)[0]
+
         key = nputil.ensure_iterable(key)
         value = nputil.ensure_iterable(value)
 
@@ -68,6 +70,6 @@ class TokenDistribution:
         
         k = min(k, len(logprobs))
         
-        scores, key_ids = nputil.topk(logprobs, k=k)
+        scores, key_ids = nputil.topk(logprobs, k=k, sorted=True)
 
         return [keys[i] for i in key_ids], scores

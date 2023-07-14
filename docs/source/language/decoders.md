@@ -6,6 +6,39 @@ LMQL also includes a library for array-based decoding `dclib`, which can be used
 
 In general, all LMQL decoding algorithms are model-agnostic and can be used with any LMQL-supported inference backend. For more information on the supported inference backends, see the [Models](./models.md) chapter.
 
+## Specifying The Decoding Algorithm
+
+Depending on the context, LMQL offers two ways to specify the decoding algorithm to use. 
+
+**Queries with Decoding Clause**: The first option is to simply specify the decoding algorithm and its parameters as part of the query itself. This can be particularly useful, if your choice of decoder is relevant and should be part of your program.
+
+```{lmql}
+
+name::specify-decoder
+beam(n=2)
+    "This is a query with a specified decoder: [RESPONSE]
+from
+    "openai/text-ada-001"
+```
+
+**Specifying the Decoding Algorithm Externally**: The second option is to specify the decoding algorithm and parameters externally, i.e. separatly from the actual program code:
+
+```python
+import lmql
+
+@lmql.query(model="openai/text-davinci-003", decoder="sample", temperature=1.8)
+def tell_a_joke():
+    '''lmql
+    """A list good dad joke. A indicates the punchline:
+    Q:[JOKE]
+    A:[PUNCHLINE]""" where STOPS_AT(JOKE, "?") and  STOPS_AT(PUNCHLINE, "\n")
+    '''
+
+tell_a_joke() # uses the decoder specified in @lmql.query(...)
+tell_a_joke(decoder="beam", n=2) # uses a beam search decoder with n=2
+```
+
+This is only possible when using LMQL from a Python program. For more information on this, also see the chapter on how to specify the [model to use for decoding](models.md).
 ## Supported Decoding Algorithms
 
 In general, the very first keyword of an LMQL query, specifies the decoding algorithm to use. For this, the following decoder keywords are available:

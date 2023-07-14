@@ -29,6 +29,8 @@ from lmql.runtime.interpreter import LMQLResult
 from lmql.models.model import model
 from lmql.runtime.loop import main
 
+from typing import Optional
+
 model_registry = LMQLModelRegistry
 
 def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
@@ -58,28 +60,11 @@ def load(filepath=None, autoconnect=False, force_model=None, output_writer=None)
 
 async def run_file(filepath, *args, output_writer=None, force_model=None, **kwargs):
     import inspect
-    module = load(filepath, autoconnect=True, output_writer=output_writer, force_model=force_model)
+    with open(filepath, "r") as f:
+        code = f.read()
     
-    if module is None: 
-        print("Failed to compile query.")
-        return
-
-    if output_writer is not None:
-        module.query.output_writer = output_writer
-
-    compiled_fct_args = module.query.args
-    query_args = []
-
-    calling_frame = inspect.stack()[1]
-    scope = LMQLInputVariableScope(module.query.fct, calling_frame)
-    for arg in compiled_fct_args:
-        if scope.resolve(arg) == None:
-            query_args.append(arg)
-
-    output_variables = module.query.output_variables
-    query_args = list(set(query_args) - set(output_variables))
-
-    return await module.query(*args, **kwargs)
+    q = _query_from_string(code, output_writer=printing)
+    return await q(*args, **kwargs)
 
 async def run(code, *args, **kwargs):
     """
@@ -99,7 +84,7 @@ def run_sync(code, *args, **kwargs):
     q = _query_from_string(code, is_async=False)
     return q(*args, **kwargs)
 
-def _query_from_string(s, input_variables=None, is_async=True, output_writer=None):
+def _query_from_string(s, input_variables=None, is_async=True, output_writer=None, **extra_args):
     if input_variables is None: input_variables = []
 
     import inspect
@@ -115,10 +100,31 @@ def _query_from_string(s, input_variables=None, is_async=True, output_writer=Non
 
     module.query.function_context = FunctionContext(fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
+    module.query.output_writer = output_writer
+    module.query.extra_args = extra_args
     
     return module.query
 
-def query(fct, input_variables=None, is_async=True):
+def F(s: str, constraints: Optional[str] = None, **kwargs):
+    """
+    Constructs a LMQL query function from the given string.
+
+    Example:
+
+    ```python
+    lmql.F("Say 'this is a test': [RESPONSE]", "len(TOKENS(RESPONSE)) < 10")
+    ```
+
+    The second argument contains an optional `where` clause expression and can be omitted.
+
+    The resulting callable acts like a `lmql.query` function and can be called with the same arguments.
+    """
+    # escape all double quotes
+    s = s.replace('"', '\\"')
+    is_async = kwargs.pop("is_async", False)
+    return query(f'"{s}"' + (f' where {constraints}' if constraints is not None else ''), is_async=is_async, is_f_function=True, **kwargs)
+
+def query(__fct__=None, input_variables=None, is_async=True, calling_frame=None, **extra_args):
     """
     Constructs a new LMQL query function from the given function and or string of code.
 
@@ -146,17 +152,28 @@ def query(fct, input_variables=None, is_async=True):
         By default the returned query function is asynchronous (has to be called as `await my_query_function(...)`).
         To construct a synchronous query function, use lmql.query(<query string>, is_async=False).
     """
+    fct = __fct__
+
+    # check for @lmql.query(<args>) def f(): ... use with additional arguments
+    if fct is None:
+        def wrapper(fct):
+            import inspect
+            calling_frame = inspect.stack()[1]
+            return query(fct, input_variables=input_variables, is_async=is_async, calling_frame=calling_frame, **extra_args)
+        return wrapper
+
+    # otherwise assume @lmql.query def f(): ...
     import inspect
 
     if type(fct) is LMQLQueryFunction: return fct
 
     # support for lmql.query(<query string>)
     if type(fct) is str: 
-        return _query_from_string(fct, input_variables)
+        return _query_from_string(fct, input_variables, is_async=is_async, **extra_args)
     else:
         assert input_variables is None, "input_variables must be None when using @lmql.query as a decorator."
     
-    calling_frame = inspect.stack()[1]
+    calling_frame = calling_frame or inspect.stack()[1]
     scope = LMQLInputVariableScope(fct, calling_frame)
     code = get_decorated_function_code(fct)
 
@@ -173,12 +190,13 @@ def query(fct, input_variables=None, is_async=True):
     # set the function context of the query based on the function context of the decorated function
     module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
+    module.query.extra_args = extra_args
 
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)
 
-    # copy all attributes of model.query to the wrapper function
-    for attr in ["aschain"]:
+    # copy some attributes of model.query to the wrapper function
+    for attr in ["aschain", "lmql_code", "is_async", "output_variables"]:
         setattr(lmql_query_wrapper, attr, getattr(module.query, attr))
     setattr(lmql_query_wrapper, "__lmql_query_function__", module.query)
 

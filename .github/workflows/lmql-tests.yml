@@ -1,0 +1,40 @@
+name: Run Tests
+
+on: workflow_dispatch  
+
+jobs:
+    test-without-hf-transformers:
+      runs-on: lmql-ci
+      steps:
+          - uses: actions/checkout@v3
+          - name: Setup Fresh Virtual Environment
+            run: |
+              pip install --upgrade pip
+              python3.10 -m venv env
+              export PATH=$PATH:/home/docker/.local/bin
+              source env/bin/activate
+              echo "VIRTUAL ENV:" $VIRTUAL_ENV
+          - name: Install Dependencies
+            run: source env/bin/activate && pip install -e . && pip install langchain
+          - name: Greet
+            env:
+              OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
+            run: source env/bin/activate && python -m lmql.cli hello openai
+    test-with-hf-transformers:
+        runs-on: lmql-ci
+        needs: [test-without-hf-transformers]
+        steps:
+            - uses: actions/checkout@v3
+            - name: Setup Fresh Virtual Environment
+              run: |
+                pip install --upgrade pip
+                python3.10 -m venv env
+                export PATH=$PATH:/home/docker/.local/bin
+                source env/bin/activate
+                echo "VIRTUAL ENV:" $VIRTUAL_ENV
+            - name: Install Dependencies
+              run: source env/bin/activate && pip install -e '.[hf]' && pip install langchain
+            - name: Run Tests
+              env:
+                OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
+              run: source env/bin/activate && python src/lmql/tests/all.py --failearly

@@ -1,4 +1,5 @@
 import lmql
+import json
 from lmql.tests.expr_test_utils import run_all_tests
 
 @lmql.query

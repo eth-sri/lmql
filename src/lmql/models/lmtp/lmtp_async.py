@@ -1,46 +1,20 @@
 """
-A client/server implementation for LMTP that runs the model in a subprocess
-and communicates with it via multiprocessing pipes (IPC).
+A client/server implementation for LMTP that runs the model 
+asynchronously in the same process.
 """
 
-import multiprocessing
-from multiprocessing.connection import Connection
+import asyncio
 import pickle
-import sys
-from .lmtp_client import *
-from .lmtp_inference_server import TokenSession
 
-async def multiprocessing_main_async(pipe: Connection, kwargs):
-    transport = LMTPMultiprocessingTransport(pipe)
-    session = TokenSession(transport, kwargs)
+from .lmtp_scheduler import TokenSession, Scheduler
+from .errors import LMTPStreamError
 
-    try:
-        while True:
-            if not multiprocessing.parent_process().is_alive():
-                print("[Parent process died, exiting]", flush=True)
-                break
-
-            if not pipe.poll():
-                await asyncio.sleep(0.01)
-                continue
-                
-            msg = pipe.recv()
-            if msg is None: continue
-            type, payload = msg
-            await session.handle(type, payload)
-    finally:
-        sys.exit(0)
-
-
-def multiprocessing_main(pipe: Connection, kwargs):
-    asyncio.run(multiprocessing_main_async(pipe, kwargs))
-
-class LMTPMultiprocessingTransport:
-    def __init__(self, pipe):
-        self.connection: Connection = pipe
+class LMTPAsyncTransport:
+    def __init__(self, queue):
+        self.queue: asyncio.Queue = queue
 
     async def send(self, type, payload):
-        self.connection.send((type, payload))
+        self.queue.put_nowait((type, payload))
 
 def ensure_picklable(kwargs, msg=""):
     try:
@@ -49,52 +23,44 @@ def ensure_picklable(kwargs, msg=""):
     except Exception as e:
         raise AssertionError(msg)
 
-class LMTPMultiProcessingClientRef:
-    def __init__(self, client):
-        self.client = client
-        self.refs = 0
+
+async def lmtp_inference_task(model_identifier, token_queue: asyncio.Queue, cmd_queue: asyncio.Queue, kwargs):
+    transport = LMTPAsyncTransport(token_queue)
     
-    # forwarda ttribute access to generate, score
-    def __getattr__(self, name):
-        if name in ["generate", "score"]:
-            return getattr(self.client, name)
-        return super().__getattr__(name)
+    scheduler = Scheduler.instance(model_identifier, kwargs, user=transport, only_existing=False, sync=True)
+    scheduler_task = scheduler.async_worker()
+    session = TokenSession(transport, kwargs, static=True)
 
-    async def close(self):
-        assert self.refs > 0, "LMTPMultiProcessingClientRef.close() called too many times"
-        
-        self.refs -= 1
-        if self.refs == 0:
-            await self.client.close()
+    async def session_task():
+        while True:
+            msg = await cmd_queue.get()
+            if msg is None: continue
+            type, payload = msg
+            await session.handle(type, payload)
+    
+    await asyncio.gather(scheduler_task, session_task())
 
-    def ref(self):
-        self.refs += 1
-        return self
-
-class LMTPMultiProcessingClient:
+class LMTPAsyncClient:
     """
-    Allows use of a LMTP TokenSession from within the same process (model runs in the same process too).
+    Allows use of a LMTP TokenSession from within the same process (model calls are async).
+
+    Note that this type of transport is only suitable for very fast, non-blocking model calls,
+    as otherwise the asyncio event loop will be blocked during each model call, which adds 
+    a lot of latency.
     """
 
     def __init__(self, model_identifier, **kwargs):
-        ensure_picklable(kwargs, "lmtp.inprocess kwargs must be pickleable as it has to be sent to a subprocess")
         self.model_identifier = model_identifier
 
-        (c2, c1) = multiprocessing.Pipe(duplex=True)
-        self.subprocess = multiprocessing.Process(target=multiprocessing_main, args=(c1,kwargs), 
-                                                  name="lmtp-model-server", daemon=True)
-        self.subprocess.start()
-        
-        self.connection = c2
+        self.cmd_queue = asyncio.Queue()
+        self.token_queue = asyncio.Queue()
+        self.inference_task = asyncio.create_task(lmtp_inference_task(self.model_identifier, self.token_queue, self.cmd_queue, kwargs))
         
         self.stream_id = 0
         self.iterators = {}
 
         self.poll_task = asyncio.create_task(self.poll_messages())
         self.poll_running = asyncio.Event()
-
-    def ref(self):
-        return LMTPMultiProcessingClientRef(self).ref()
 
     def __del__(self):
         if self.poll_task is not None and self.poll_running.is_set():
@@ -105,11 +71,11 @@ class LMTPMultiProcessingClient:
             self.poll_running.set()
 
             while True:
-                if not self.connection.poll():
+                if self.token_queue.empty():
                     await asyncio.sleep(0.001)
                     continue
                 try:
-                    msg = self.connection.recv()
+                    msg = await self.token_queue.get()
                     if msg is None: continue
                     type, d = msg
                     
@@ -128,7 +94,6 @@ class LMTPMultiProcessingClient:
         for itr_list in self.iterators.values():
             for it in itr_list:
                 it.put_nowait(None)
-        self.subprocess.terminate()
 
     async def generate(self, prompt, **kwargs):
         self.stream_id += 1
@@ -142,7 +107,7 @@ class LMTPMultiProcessingClient:
         if payload.get("logit_bias", None) is None:
             payload.pop("logit_bias", None)
 
-        self.connection.send(("GENERATE", payload))
+        self.cmd_queue.put_nowait(("GENERATE", payload))
 
         async for token in self.stream_iterator(self.stream_id):
             yield token
@@ -157,7 +122,7 @@ class LMTPMultiProcessingClient:
             "stream_id": self.stream_id
         }
 
-        self.connection.send(("SCORE", payload))
+        self.cmd_queue.put_nowait(("SCORE", payload))
 
         async for token in self.stream_iterator(self.stream_id):
             yield token

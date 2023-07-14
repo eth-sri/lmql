@@ -1,17 +1,14 @@
-import os
-from lmql.runtime.stats import Stats
-
 def unicode(v):
     r = v.decode("utf-8", "ignore")
     assert type(r) is str
     return r
 
 class TransformersTokenizer:
-    def __init__(self, model_identifier):
+    def __init__(self, model_identifier, tokenizer):
         from transformers import AutoTokenizer
         
         self.model_identifier = model_identifier
-        self.tokenizer = AutoTokenizer.from_pretrained(model_identifier)
+        self.tokenizer = tokenizer
 
     @staticmethod
     def is_available(model_identifier):
@@ -23,6 +20,18 @@ class TransformersTokenizer:
         except ImportError:
             return False
         return True
+
+    @staticmethod
+    def from_pretrained(model_identifier, **kwargs):
+        from transformers import AutoTokenizer
+
+        model_identifier = model_identifier
+        tokenizer = AutoTokenizer.from_pretrained(model_identifier, **kwargs)
+
+        if "LlamaTokenizer" in str(type(tokenizer)):
+            return LlamaTransformersTokenizer(model_identifier, tokenizer)
+        else:
+            return TransformersTokenizer(model_identifier, tokenizer)
 
     # do not picke self.enc
     def __getstate__(self):
@@ -37,13 +46,13 @@ class TransformersTokenizer:
         self.model_identifier = state["model_identifier"]
         self.tokenizer = state["tokenizer"]
 
-    def tokenize(self, text, asbytes=False):
+    def tokenize(self, text, asbytes=False, add_special_tokens=False):
         """
         Translates a string into a list of tokens (sub-strings)
         """
         if asbytes:
-            return self.decode_tokens_bytes(self.tokenizer(text)["input_ids"])
-        return self.tokenizer.tokenize(text)
+            return self.decode_tokens_bytes(self.tokenizer(text, add_special_tokens=add_special_tokens)["input_ids"])
+        return self.tokenizer.tokenize(text, add_special_tokens=add_special_tokens)
 
     def decode_tokens_bytes(self, ids):
         """
@@ -81,7 +90,7 @@ class TransformersTokenizer:
     @property
     def vocab_size(self):
         return self.tokenizer.vocab_size
-    
+
     @property
     def eos_token_id(self):
         return self.tokenizer.eos_token_id
@@ -96,3 +105,24 @@ class TransformersTokenizer:
     @property
     def name(self):
         return "hf-" + self.model_identifier
+    
+class LlamaTransformersTokenizer(TransformersTokenizer):
+    """Aligns the behavior of HF LlamaTokenizer with that of gpt tokenizers."""
+
+    space_token = "▁"
+
+    def convert_bytes_to_string(self, token_bytes):
+        token_bytes = [str(self.tokenizer.bos_token_id).encode("utf-8")] + token_bytes
+        s = super().convert_bytes_to_string(token_bytes)
+        return s[len(self.tokenizer.bos_token):]
+    
+    def tokenize(self, text, asbytes=False, add_special_tokens=False):
+        if not asbytes and text == " " and LlamaTransformersTokenizer.space_token is not None:
+            return [LlamaTransformersTokenizer.space_token]
+        return super().tokenize(text, asbytes, add_special_tokens)
+
+    def __call__(self, text_or_list, add_special_tokens=False):
+        text_or_list = self.tokenizer.bos_token + text_or_list
+        result = super().__call__(text_or_list, add_special_tokens=add_special_tokens)
+        result["input_ids"] = result["input_ids"][1:]
+        return result
