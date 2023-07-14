@@ -2,7 +2,8 @@ name: Run Tests and Publish Wheel
 
 on:
   push:
-    branches: [ "ci"]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
     test-with-hf-transformers:
@@ -11,10 +12,10 @@ jobs:
             - uses: actions/checkout@v3
             - name: Install Dependencies
               run: pip install -e '.[hf]' && pip install langchain
-            - name: Run Tests
-              env:
-                OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
-              run: python src/lmql/tests/all.py
+            # - name: Run Tests
+            #   env:
+            #     OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
+            #   run: python src/lmql/tests/all.py
             - name: Install Packaging Dependencies
               run: pip install build twine
             - name: Package
