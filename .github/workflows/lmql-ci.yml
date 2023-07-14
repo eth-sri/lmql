@@ -1,0 +1,14 @@
+name: Browser Build & Web Deploy
+
+on:
+  push:
+    branches: [ "ci"]
+
+jobs:
+    build:
+        runs-on: lmql-ci
+        steps:
+            - name: Test
+              run: uname -a
+            - name: GPU Test
+              run: nvidia-smi
