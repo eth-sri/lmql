@@ -23,7 +23,7 @@ jobs:
           - name: Greet
             env:
               OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
-            run: python -m lmql.cli hello openai
+            run: source env/bin/activate && python -m lmql.cli hello openai
     test-with-hf-transformers:
         runs-on: lmql-ci
         needs: [test-without-hf-transformers]
