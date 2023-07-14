@@ -3,7 +3,7 @@ name: Run Tests and Publish Wheel
 on:
   # on release publish
   release:
-    types: [published]
+    types: [released]
 
 jobs:
     test-with-hf-transformers:
