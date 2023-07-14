@@ -8,21 +8,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
   
   <!-- Primary Meta Tags -->
-  <title>LMQL becomes simpler and more powerful</title>
-  <meta name="title" content="LMQL becomes simpler and more powerful">
+  <title>LMQL becomes simpler and adds llama.cpp</title>
+  <meta name="title" content="LMQL becomes simpler and adds llama.cpp">
   <meta name="description" content="Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a llama.cpp based inference backend, several bug fixes and other minor improvements.">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://lmql.ai/">
-  <meta property="og:title" content="LMQL becomes simpler and more powerful">
+  <meta property="og:title" content="LMQL becomes simpler and adds llama.cpp">
   <meta property="og:description" content="Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a llama.cpp based inference backend, several bug fixes and other minor improvements.">
   <meta property="og:image" content="https://lmql.ai/static/images/lmql-social.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://lmql.ai/">
-  <meta property="twitter:title" content="LMQL becomes simpler and more powerful">
+  <meta property="twitter:title" content="LMQL becomes simpler and adds llama.cpp">
   <meta property="twitter:description" content="Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a llama.cpp based inference backend, several bug fixes and other minor improvements.">
   <meta property="twitter:image" content="https://lmql.ai/static/images/lmql-social.png"">
   
@@ -150,7 +150,7 @@ function openPlaygroundSnippet(link, snippet) {
         <div class="column">
           <h5 class="title is-2 has-text-left" style="margin-bottom: 2pt;">
             <a href="blog/release-0.0.6.5.html" class="anchor">
-                LMQL becomes simpler and more powerful
+                LMQL becomes simpler and adds llama.cpp
             </a>
           </h5>
           <div class="content has-text-justified">
@@ -164,9 +164,10 @@ function openPlaygroundSnippet(link, snippet) {
             <div class="date">
                 Thu, Jul 13, 2023
             </div>
-            <section id="lmql-becomes-simpler-and-more-powerful">
+            <section id="lmql-becomes-simpler-and-adds-llama-cpp">
 
 <p>Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> based inference backend, several bug fixes and other minor improvements.</p>
+<p>You can try the latest version of LMQL in your browser at <a class="reference external" href="https://lmql.ai/playground">lmql.ai</a> or install it via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql</span></code>.</p>
 <section id="one-line-is-all-it-takes">
 <h2>One Line Is All It Takes<a class="headerlink" href="#one-line-is-all-it-takes" title="Permalink to this heading">#</a></h2>
 <p>Most notably, 0.0.6.5 comes with several simplifications of the core syntax of LMQL. Of course, all changes are backwards compatible, so you can continue to use your existing query code and move to the new version without any changes.</p>
@@ -255,15 +256,18 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </pre></div>
 <p></p>
 <p>We support, both, in-process loading of <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code>, as well as remote inference via <code class="docutils literal notranslate"><span class="pre">lmql</span> <span class="pre">serve-model</span></code>. To learn more about <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> and how to use it with LMQL, check out the corresponding chapter in the LMQL <a class="reference external" href="https://docs.lmql.ai/en/latest/language/llama.cpp.html">documentation</a>.</p>
+<br>
 </section>
 <section id="other-changes">
 <h2>Other Changes<a class="headerlink" href="#other-changes" title="Permalink to this heading">#</a></h2>
 <ul class="simple">
 <li><p>LMQL now includes a <code class="docutils literal notranslate"><span class="pre">random</span></code> model backend, which randomly samples tokens from the GPT-2 vocabulary. This is useful for debugging and testing purposes and can be used for data generation in the context of highly constrained query programs.</p></li>
 <li><p>Two caching issues have been fixed, avoiding cache collisions which could lead to repeated model outputs.</p></li>
-<li><p>More robust query string parsing, allowing for robust escaping of special characters <code class="docutils literal notranslate"><span class="pre">[</span></code>, <code class="docutils literal notranslate"><span class="pre">]</span></code>, <code class="docutils literal notranslate"><span class="pre">{</span></code> and <code class="docutils literal notranslate"><span class="pre">}</span></code>.</p></li>
+<li><p>More robust query string parsing, allowing for <a class="reference external" href="https://docs.lmql.ai/en/stable/language/scripted_prompts.html#escaping">robust escaping</a> of special characters <code class="docutils literal notranslate"><span class="pre">[</span></code>, <code class="docutils literal notranslate"><span class="pre">]</span></code>, <code class="docutils literal notranslate"><span class="pre">{</span></code> and <code class="docutils literal notranslate"><span class="pre">}</span></code>.</p></li>
 <li><p>Added support for <code class="docutils literal notranslate"><span class="pre">transformers</span></code> based Llama models and the associated (fast) implementation of HF tokenizers.</p></li>
+<li><p>Simplified Azure OpenAI support, see the relevant chapter in the <a class="reference external" href="https://docs.lmql.ai/en/stable/language/azure.html">documentation</a>.</p></li>
 </ul>
+<p>We thank community members <a class="reference external" href="https://github.com/minosvasilias">@minosvasilias</a> and <a class="reference external" href="https://github.com/CircArgs">@CircArgs</a> for their contribution to this release.</p>
 </section>
 </section>
 
@@ -284,7 +288,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Fri, Jul 14, 5:54 PM (UTC)<br/>
+        Last updated on Fri, Jul 14, 6:03 PM (UTC)<br/>
       </div>
     </div>
   </div>
