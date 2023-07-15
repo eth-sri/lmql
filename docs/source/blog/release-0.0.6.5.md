@@ -11,7 +11,7 @@ You can try the latest version of LMQL in your browser at [lmql.ai/playground](h
 
 Most notably, 0.0.6.5 comes with several simplifications of the core syntax of LMQL. Of course, all changes are backwards compatible, so you can continue to use your existing query code and move to the new version without any changes.
 
-With this, we aim to minimize syntactic overhead, by employing sensible defaults to enable more concise query code like the following:
+With this, we aim to minimize syntactic overhead, employing sensible defaults to enable more concise programs like the following:
 
 ```{lmql}
 name::simple-syntax
