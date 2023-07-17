@@ -132,7 +132,7 @@ def get_azure_config(model, api_config):
         }
 
         if "verbose" in api_config and api_config["verbose"] or os.environ.get("OPENAI_VERBOSE", "0") == "1":
-            print(f"Using Azure API endpoint: {endpoint}", is_chat)
+            print(f"Using Azure API endpoint: {endpoint}", is_chat, flush=True)
 
         return endpoint, headers
 
