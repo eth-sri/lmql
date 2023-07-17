@@ -126,7 +126,7 @@ class LMQLQueryFunction:
 
         # bind args and kwargs to signature
         try:
-            signature = signature.bind(*args, **query_kwargs)
+            signature: inspect.BoundArguments = signature.bind(*args, **query_kwargs)
         except TypeError as e:
             if len(e.args) == 1 and e.args[0].startswith("missing "):
                 e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
@@ -134,6 +134,8 @@ class LMQLQueryFunction:
                 e.args = (e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
             raise e
         
+        signature.apply_defaults()
+
         # special case, if signature is empty (no input variables provided)
         if len(signature.arguments) == 0:
             # bind kwargs dynamically in compiled_query_args
@@ -153,7 +155,6 @@ class LMQLQueryFunction:
 
         failed_to_resolve = []
 
-
         # resolve remaining unset args from scope
         for v in captured_variables:
             if not v in compiled_query_args:
@@ -162,10 +163,11 @@ class LMQLQueryFunction:
                 except TypeError:
                     failed_to_resolve.append(v)
 
-        if len(failed_to_resolve) == 1:
-            raise TypeError("Failed to resolve variable '" + failed_to_resolve[0] + "' in LMQL query.")
-        elif len(failed_to_resolve) > 0:
-            raise TypeError("Failed to resolve variables in LMQL query: " + ", ".join(f"'{v}'" for v in sorted(failed_to_resolve)))
+        # disable this check for now, as dynamic variable resolution cannot always be checked at compile time (e.g. import * from module)
+        # if len(failed_to_resolve) == 1:
+        #     raise TypeError("Failed to resolve variable '" + failed_to_resolve[0] + "' in LMQL query.")
+        # elif len(failed_to_resolve) > 0:
+        #     raise TypeError("Failed to resolve variables in LMQL query: " + ", ".join(f"'{v}'" for v in sorted(failed_to_resolve)))
 
         return compiled_query_args, runtime_args
 

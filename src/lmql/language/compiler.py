@@ -4,7 +4,7 @@ import os
 import re
 import sys
 from _ast import (And, AsyncFunctionDef, Await, BinOp, Call, ClassDef, Compare,
-                  FunctionDef, Import, ImportFrom, Return)
+                  FunctionDef, If, Import, ImportFrom, Return)
 from io import StringIO
 from typing import Any
 
@@ -124,6 +124,8 @@ class PromptScope(ast.NodeVisitor):
     def visit_BoolOp(self, node: ast.BoolOp) -> Any:
         if is_query_string_with_constraints(node):
             self.scope_Constant(node.values[0])
+        else:
+            super().generic_visit(node)
 
     def scope_Constant(self, node):
         if type(node.value) is not str: return super().visit_Constant(node)
@@ -231,7 +233,7 @@ class FunctionCallTransformation(ast.NodeTransformer):
     def is_excluded_from_call_transformation(self, node):
         if not type(node) is ast.Name: return False
         if ast.unparse(node).startswith("lmql.runtime_support.call"): return True
-        return node.id in ["print", "eval"]
+        return node.id in ["print", "eval", "locals", "globals"]
 
     def visit_Call(self, node: Call) -> Any:
         f = self.visit(node.func)
@@ -248,7 +250,7 @@ class FunctionCallTransformation(ast.NodeTransformer):
         wrapped = ast.Await(wrapped)
 
         return wrapped
-class QueryStringTransformation(FunctionCallTransformation):
+class PromptClauseTransformation(FunctionCallTransformation):
     """
     Transformes string expressions on statement level to model queries.
     """
@@ -262,9 +264,9 @@ class QueryStringTransformation(FunctionCallTransformation):
     def visit_Expr(self, expr):
         if type(expr.value) is ast.Constant:
             expr.value = self.transform_Constant(expr.value)
+            return expr
         else:
-            self.generic_visit(expr)
-        return expr
+            return self.generic_visit(expr)
 
     # translate id access to context
     def visit_Name(self, node: ast.Name):
@@ -285,7 +287,7 @@ class QueryStringTransformation(FunctionCallTransformation):
             elif len(node.values[1:]) == 0:
                 constraints_expression = None
             return self.transform_Constant(left_most_operand, constraints = constraints_expression)
-        return node
+        return self.generic_visit(node)
 
     def transform_Constant(self, constant, constraints=None):
         if type(constant.value) is not str: return constant
@@ -478,7 +480,8 @@ class LMQLConstraintTransformation:
             if is_allowed_builtin_python_call(expr.func):
                 return self.default_transform_node(expr, snf).strip()
             
-            tfunc = self.transform_node(expr.func, snf)
+            assert type(expr.func) is ast.Name, "In LMQL constraint expressions, only function calls to direct function references are allowed: {}".format(astunparse.unparse(expr))
+            tfunc = ast.unparse(expr.func)
             targs = [self.transform_node(a, snf) for a in expr.args]
             targs_list = ", ".join(targs)
             return f"{OPS_NAMESPACE}.CallOp([{tfunc}, [{targs_list}]], locals(), globals())"
@@ -610,7 +613,7 @@ class DecodeClauseTransformation:
 class CompilerTransformations:
     def __init__(self):
         self.transformations = [
-            QueryStringTransformation,
+            PromptClauseTransformation,
             WhereClauseTransformation,
             DecodeClauseTransformation,
             ReturnStatementTransformer
