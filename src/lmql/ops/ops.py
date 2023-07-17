@@ -705,17 +705,15 @@ class StartsWithOp(Node):
             return "fin"
         
         return super().final(ops_final, **kwargs)
-
 @LMQLOp(["STOPS_AT", "stops_at"])
 class StopAtOp(Node):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._tokenized_stopping_phrase_cache = {}
 
     def execute_predecessors(self, trace, context):
         var_op: Var = self.predecessors[0]
         assert type(var_op) is Var, "The first argument of STOPS_AT must be a direct reference to a template variable."
-        assert type(self.predecessors[1]) is str, "The second argument of STOPS_AT must be a string literal."
+        assert type(self.predecessors[1]) is str or type(self.predecessors[1]) is Var, "The second argument of STOPS_AT must be a string literal, but is {}.".format(type(self.predecessors[1]))
         var_op.diff_aware_read = True
         return super().execute_predecessors(trace, context)
     
@@ -752,7 +750,8 @@ class StopAtOp(Node):
     def stopping_phrase(self, trace):
         if type(self.predecessors[1]) is Node:
             return trace[self.predecessors[1]]
-        return self.predecessors[1]
+        if type(self.predecessors[1]) is str:
+            return self.predecessors[1]
 
     def postprocess_var(self, var_name):
         return var_name == self.predecessors[0].name

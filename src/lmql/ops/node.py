@@ -53,10 +53,12 @@ class Node:
 
 
 class Var(Node):
-    def __init__(self, name, python_variable=False):
+    def __init__(self, name, python_variable=False, python_value=None):
         super().__init__([])
         self.name = name
+        
         self.python_variable = python_variable
+        self.python_value = python_value
 
         self.depends_on_context = True
         

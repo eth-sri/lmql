@@ -3,7 +3,7 @@ import importlib
 import os
 import re
 import sys
-from _ast import (And, AsyncFunctionDef, Await, BinOp, Call, ClassDef, Compare,
+from _ast import (And, AsyncFunctionDef, Await, BinOp, Call, ClassDef, Compare, ExceptHandler,
                   FunctionDef, If, Import, ImportFrom, Return)
 from io import StringIO
 from typing import Any
@@ -199,6 +199,10 @@ class PromptScope(ast.NodeVisitor):
         
         return True
     
+    def visit_ExceptHandler(self, node: ExceptHandler) -> Any:
+        self.written_vars.add(node.name)
+        self.generic_visit(node)
+    
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
         self.defined_vars.add(node.name)
     
@@ -294,7 +298,8 @@ class PromptClauseTransformation(FunctionCallTransformation):
         
         qstring = constant.value
         if len(qstring) == 0: return constant
-        
+        if qstring.strip().startswith("lmql"): return constant
+
         qstring = qstring.encode("unicode_escape").decode("utf-8").encode('unicode_escape').decode('utf-8')        
         compiled_qstring = ""
 
@@ -415,7 +420,7 @@ class LMQLConstraintTransformation:
         if node.id in self.scope.defined_vars and not keep_variables:
             return f"lmql.runtime_support.Var('{node.id}')"
         else:
-            return f"lmql.runtime_support.Var('{node.id}', python_variable=True)"
+            return f"lmql.runtime_support.Var('{node.id}', python_variable=True, python_value={node.id})"
 
         return bn or node.id
 

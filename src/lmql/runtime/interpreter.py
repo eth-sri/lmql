@@ -533,7 +533,8 @@ class PromptInterpreter:
                     trace[sc] = (sc.stopping_phrase(trace), "stopped")
             stopping_phrases = {
                 "text": [sc.stopping_phrase(trace) for sc in stopping_conditions if type(sc) is ops.StopBeforeOp],
-                "tokenized": [self.tokenizer.tokenize(sc.stopping_phrase(trace), asbytes=True) for sc in stopping_conditions if type(sc) is ops.StopBeforeOp]
+                "tokenized": [self.tokenizer.tokenize(sc.stopping_phrase(trace), asbytes=True) 
+                              for sc in stopping_conditions if type(sc) is ops.StopBeforeOp and sc.stopping_phrase(trace) is not None]
             }
 
         else:
@@ -1082,6 +1083,8 @@ class PromptInterpreter:
 
         for ic in inline_calls:
             si = ic.subinterpreter(self, calling_state.prompt)
+            if si is None: continue
+            
             subinterpreters.append(si)
             
             # prepare subinterpreter if this is the first time it is used

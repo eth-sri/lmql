@@ -164,10 +164,10 @@ class LMQLQueryFunction:
                     failed_to_resolve.append(v)
 
         # disable this check for now, as dynamic variable resolution cannot always be checked at compile time (e.g. import * from module)
-        # if len(failed_to_resolve) == 1:
-        #     raise TypeError("Failed to resolve variable '" + failed_to_resolve[0] + "' in LMQL query.")
-        # elif len(failed_to_resolve) > 0:
-        #     raise TypeError("Failed to resolve variables in LMQL query: " + ", ".join(f"'{v}'" for v in sorted(failed_to_resolve)))
+        if len(failed_to_resolve) == 1:
+            raise TypeError("Failed to resolve variable '" + failed_to_resolve[0] + "' in LMQL query.")
+        elif len(failed_to_resolve) > 0:
+            raise TypeError("Failed to resolve variables in LMQL query: " + ", ".join(f"'{v}'" for v in sorted(failed_to_resolve)))
 
         return compiled_query_args, runtime_args
 

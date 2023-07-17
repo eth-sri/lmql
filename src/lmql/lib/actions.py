@@ -130,6 +130,7 @@ async def inline_use(fcts):
         action_fcts = {str(f.__name__): make_fct(f) for f in fcts}
         first_tool_name = list(action_fcts.keys())[0] if len(action_fcts) > 0 else "tool"
 
+        # add instruction prompt if no few-shot prompt was already used
         if not INLINE_USE_PROMPT in context.prompt:
             """
             \n\n{:system} Instructions: In your reasoning, you can use the following tools:"""
@@ -142,6 +143,7 @@ async def inline_use(fcts):
         else:
             "\n\nInline Tool Use:\n\n"
         
+        # decode segment-by-segment, handling action calls along the way
         truncated = ""
         while True: 
             "[SEGMENT]"
