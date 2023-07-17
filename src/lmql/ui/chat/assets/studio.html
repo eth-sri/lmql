@@ -144,6 +144,10 @@
                     prompt = prompt.replace(/(assistant|user|system):/g, (match) => {
                         return `<span class="lmql-tag">${match}</span>`;
                     });
+                    // escape all < and >
+                    prompt = prompt.replace(/</g, '&lt;');
+                    prompt = prompt.replace(/>/g, '&gt;');
+                    
                     document.getElementById("raw-prompt").innerHTML = prompt;
 
                     addResponse(object.variables["ANSWER"].trim(), 'assistant', "response-" + id);
