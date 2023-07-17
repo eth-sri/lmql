@@ -620,7 +620,7 @@ class PromptInterpreter:
             prompt_ids = seq.input_ids.tolist()
             tail_ids = self.tokenizer.tokenize(state.tail, asbytes=True)
             tail_ids = tail_ids[:-1]
-            if len(tail_ids) > 0:
+            if len(tail_ids) > 1:
                 updated_ids = prompt_ids + tail_ids[1:]
 
                 return RewrittenInputIds(
@@ -1186,6 +1186,7 @@ class SubInterpreter(PromptInterpreter):
         self.root_state = PromptState(interpreter=self, subinterpreters=set(),
             variable=None, prompt=prompt, stmt_buffer=[],
             query_head=query_head, program_state=context.program_state,
+            constraints=None,
             recurring_variable_counter={}, variable_offset=parent_offset,
             valid=None, final=None, mask=None, 
             stopping_phrases=None, where=None,
