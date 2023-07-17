@@ -9,10 +9,8 @@ function getPlaygroundUrl(next) {
     
     if (host === "docs.lmql.ai") {
         return "https://lmql.ai/playground";
-    } else if (host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
-        return "http://localhost:3000/playground";
     } else {
-        return "https://lbeurerkellner.github.io/green-gold-dachshund-web/playground";
+        return "http://localhost:8081/playground/";
     }
 }
 

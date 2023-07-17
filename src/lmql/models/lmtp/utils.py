@@ -12,6 +12,9 @@ def rename_model_args(model_args):
 
     # parse cuda
     if cuda:
-        model_args["device_map"] = "auto"
+        if "device_map" in model_args:
+            print("Warning: device_map is set, but cuda is True. Ignoring 'cuda' which would set device_map to 'auto'.")
+        else:
+            model_args["device_map"] = "auto"
 
     return model_args
