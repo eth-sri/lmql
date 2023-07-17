@@ -14,6 +14,16 @@ def cmd_serve_model():
     os.chdir(project_root)
     os.system("python -m lmql.models.lmtp.lmtp_serve " + " ".join(sys.argv[2:]))
 
+def cmd_chat():
+    """emoji:💬 Serve a given query file as an interactive LMQL chatbot"""
+    if len(sys.argv) == 2:
+        print("Usage: 💬 lmql chat <file>")
+        return
+    file = sys.argv[2]
+    absolute_path = os.path.abspath(file)
+    os.chdir(project_root)
+    os.system("python -m lmql.ui.chat " + absolute_path)
+
 def cmd_run():
     """
     emoji:🏃 run a LMQL script (e.g. "lmql run latest/hello.lmql")

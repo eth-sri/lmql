@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatter</title>
+    <link rel="stylesheet" href="chat_assets/studio.css">
+    <!-- monaco editor from public cdn -->
+    <link rel="stylesheet" data-name="vs/editor/editor.main"
+        href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.20.0/min/vs/editor/editor.main.min.css">
+    <script>
+        function addMessage(message, type, id = null) {
+            if (message.trim() === '') {
+                return;
+            }
+
+            let wasThinking = isThinking;
+            setThinking(false)
+
+            // check if message already exists, then update it
+            if (id && document.querySelector(`.message#${id}`)) {
+                let existingMessage = document.querySelector(`.message#${id}`)
+                // content 
+                let content = existingMessage.querySelector('.message-content');
+                content.innerHTML = message;
+                return;
+            }
+
+            const chat = document.querySelector('.chat');
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.classList.add(type);
+            messageElement.id = id;
+            const messageContent = document.createElement('div');
+            messageContent.classList.add('message-content');
+            messageContent.innerText = message;
+            messageElement.appendChild(messageContent);
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+            if (wasThinking) {
+                setThinking(wasThinking);
+            }
+        }
+        function clickSend() {
+            const input = document.querySelector('.input textarea');
+            const message = input.value;
+            input.value = '';
+            addMessage(message, 'assistant');
+        }
+        function chatKeyDown() {
+            const input = document.querySelector('.input textarea');
+            if (event.keyCode === 13 && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+        let isThinking = false;
+        function setThinking(state) {
+            if (!isThinking && state) {
+                isThinking = true;
+                addThinking();
+            } else if (isThinking && !state) {
+                isThinking = false;
+                removeThinking();
+            }
+        }
+        function addThinking() {
+            // add jumping bubbles to chat
+            const chat = document.querySelector('.chat');
+            const thinking = document.createElement('div');
+            thinking.classList.add('thinking');
+            // add three bubbles
+            for (let i = 0; i < 3; i++) {
+                const bubble = document.createElement('div');
+                bubble.classList.add('bubble');
+                thinking.appendChild(bubble);
+            }
+            chat.appendChild(thinking);
+        }
+        function removeThinking() {
+            // remove jumping bubbles from chat
+            const chat = document.querySelector('.chat');
+            const thinking = document.querySelector('.thinking');
+            chat.removeChild(thinking);
+        }
+        function sendMessage() {
+            if (isThinking) {
+                return;
+            }
+            const input = document.querySelector('.input textarea');
+            if (input.value.trim() === '') {
+                return;
+            }
+            const message = input.value;
+            input.value = '';
+            addMessage(message, 'user');
+            setThinking(true);
+            document.querySelector('.input textarea').disabled = true;
+            send(message);
+
+            // window.setTimeout(() => {
+            //     addResponse('Waiting...', 'system');
+            //     let text = 'I don\'t know what you mean by "' + message + '".'
+            //     let response_id = 'response-' + Math.random().toString(36).substring(2, 15);
+            //     // add char by char over time
+            //     let i = 0;
+            //     let interval = window.setInterval(() => {
+            //         if (i >= text.length) {
+            //             window.clearInterval(interval);
+            //             addResponse(text, 'assistant', response_id);
+            //             return;
+            //         }
+            //         addResponse(text.substring(0, i), 'assistant', response_id);
+            //         i += 10;
+            //     }, 50);
+            // }, 1000);
+        }
+
+        let messageId = 0;
+        let websocket = null;
+        let editor = null;
+
+        function connect() {
+            document.getElementById('connection-status').innerText = 'Connecting...';
+            host = window.location.host;
+            websocket = new WebSocket("ws://" + host + "/chat");
+            document.getElementById('address').innerText = websocket.url;
+            websocket.onmessage = function (event) {
+                let payload = JSON.parse(event.data);
+                if (payload.type === 'response') {
+                    let id = payload.message_id;
+                    let object = payload.data;
+                    // show prompt on backside
+                    let prompt = object.prompt;
+                    // replace all <lmql:*/> tags with <span class="lmql-tag">...</span>
+                    prompt = prompt.replace(/<lmql:.*?\/>/g, (match) => {
+                        // replace angled brackets with html entities
+                        let tag_type = match.substring(6, match.length - 2);
+                        return `<span class="lmql-tag ${tag_type}">${tag_type}</span>`;
+                    });
+                    // replace "assistant:", "user:", "system:" with <span class="role">...</span>
+                    prompt = prompt.replace(/(assistant|user|system):/g, (match) => {
+                        return `<span class="lmql-tag">${match}</span>`;
+                    });
+                    document.getElementById("raw-prompt").innerHTML = prompt;
+
+                    addResponse(object.variables["ANSWER"].trim(), 'assistant', "response-" + id);
+                }
+            }
+            websocket.onopen = function (event) {
+                document.getElementById('connection-status').innerText = 'Connected';
+                websocket.send(JSON.stringify({
+                    type: 'init'
+                }));
+            }
+            websocket.onclose = function (event) {
+                document.getElementById('connection-status').innerText = 'Disconnected';
+            }
+
+            // get send and focus
+            document.querySelector('.input textarea').focus();
+        }
+
+        function addError(msg) {
+            const chat = document.querySelector('.chat');
+            const error = document.createElement('div');
+            error.classList.add('error');
+            error.innerText = msg;
+            chat.appendChild(error);
+        }
+
+        function send(question) {
+            setThinking(true);
+            let id = messageId++;
+
+            websocket.send(JSON.stringify({
+                type: 'input',
+                text: question
+            }));
+        }
+
+        function addResponse(s, role, id = null) {
+            // if (message.trim() === '') {
+            //     return;
+            // }
+
+            document.querySelector('.input textarea').disabled = false;
+            addMessage(s, role, id);
+            document.querySelector('.input textarea').focus();
+        }
+
+        function setAPISecret() {
+            const secret = document.querySelector('.secret input').value;
+            localStorage.setItem('api_secret', secret);
+            document.querySelector('.secret').classList.add('hidden');
+            document.querySelector('.input textarea').focus();
+        }
+
+        function addAPISecretEntry() {
+            const entryForm = `
+        <div class="api-key-entry">
+            <p>
+                <h1>Welcome to Chatter</h1>
+                To get started, please provide an OpenAI API key. Your key will only be stored in your browser's <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage">local storage</a>, and will not be sent to our servers.<br/><br/>
+                <input type="text" placeholder="API key"/><br/>
+                <button onclick="document.querySelector('.api-key-entry').style.display = 'none';">Let's start!</button>
+            </p>
+        </div>
+        `
+            document.querySelector('.chat').innerHTML += entryForm;
+        }
+
+        window.addEventListener("load", () => {
+            connect();
+        })
+
+        function rerun() {
+            // get source from editor
+            const source = editor.getValue();
+            document.getElementById('run').disabled = true;
+            // POST to /source as text
+            fetch('/source', {
+                method: 'POST',
+                body: source
+            }).then(response => {
+                return response.text();
+            }).then(data => {
+                document.getElementById('run').disabled = false;
+                if (data != "ok") {
+                    addError(data);
+                } else {
+                    // clear chat
+                    document.querySelector('.chat').innerHTML = '';
+                    websocket.close();
+                    websocket = null;
+                    connect();
+                }
+            }).catch(error => {
+                document.getElementById('run').disabled = false;
+                addError(error);
+            });
+        }
+    </script>
+</head>
+
+<body>
+    <div class="topbar">
+        <h1><img src="chat_assets/lmql.svg" alt="LMQL Logo" /> LMQL Chat Studio</h1>
+    </div>
+    <div class="content side-view">
+        <div class="pane editor">
+            <div class="toolbar">
+                <h1>Editor</h1>
+                <h2 id="filename"></h2>
+                <button id="run" onclick="rerun()">
+                    ▶
+                </button>
+            </div>
+            <div id="editor"></div>
+            <script>var require = { paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs' } }</script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
+            <script
+                src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/editor/editor.main.nls.js"></script>
+            <script
+                src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/editor/editor.main.js"></script>
+            <script src="chat_assets/lmql-monaco.js"></script>
+            <script>
+                window.addEventListener('load', () => {
+                    registerLmqlLanguage(monaco);
+                    editor = monaco.editor.create(document.getElementById('editor'), {
+                        value: `argmax "test"`,
+                        language: 'lmql',
+                        theme: 'vs-light',
+                        minimap: {
+                            enabled: false
+                        },
+                        automaticLayout: true,
+                        fontSize: 12,
+                        // break lines
+                        wordWrap: 'off',
+                    });
+                    window.addEventListener('resize', () => {
+                        editor.layout();
+                    });
+                    fetch("/source").then((response) => {
+                        return response.text();
+                    }).then((text) => {
+                        let filename = text.split("\n")[0];
+                        let content = text.split("\n").slice(1).join("\n");
+                        document.getElementById("filename").innerText = filename;
+                        editor.setValue(content);
+                    });
+                });
+            </script>
+        </div>
+        <div class="pane">
+            <div class="toolbar icon">
+                <img src="chat_assets/lmql.svg" />
+                <h1>LMQL Chat</h1>
+                <h2 id="connection-status"></h2>
+            </div>
+            <div class="chat"></div>
+            <div class="input">
+                <textarea placeholder="Your Message" onkeydown="chatKeyDown()"></textarea>
+                <button onclick="clickSend()">
+                    <img src="chat_assets/send.svg" />
+                </button>
+            </div>
+        </div>
+        <div class="pane">
+            <div class="toolbar">
+                <h1>Internal Trace</h1>
+                <h2 id="address"></h2>
+                <!-- <button onclick="document.querySelector('.content').classList.toggle('side-view')">
+                    <img src="chat_assets/code.svg"/>
+                </button> -->
+            </div>
+            <div id="raw-prompt"></div>
+        </div>
+    </div>
+</body>
+
+</html
