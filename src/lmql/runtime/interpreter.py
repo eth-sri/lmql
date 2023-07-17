@@ -307,7 +307,7 @@ class PromptInterpreter:
         if not ("turbo" in self.model_identifier or "gpt-4" in self.model_identifier):
             import re
             # replace all r"<lmql:(.*?)\/>"
-            qstring = re.sub(r"<lmql:(.*?)\/>", r"\n\1: ", qstring)
+            qstring = re.sub(r"<lmql:(.*?)\/>", r"\n\1:", qstring)
         return qstring
 
     def interpreter_state_user_data(self, state: PromptState):
