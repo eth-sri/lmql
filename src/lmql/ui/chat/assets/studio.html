@@ -150,7 +150,16 @@
                     
                     document.getElementById("raw-prompt").innerHTML = prompt;
 
-                    addResponse(object.variables["ANSWER"].trim(), 'assistant', "response-" + id);
+                    let value = object.variables["ANSWER"].trim();
+                    // escape all < and >
+                    value = value.replace(/</g, '&lt;');
+                    value = value.replace(/>/g, '&gt;');
+
+                    addResponse(value, 'assistant', "response-" + id);
+                } else if (payload.type == "error") {
+                    addError(payload.message);
+                } else if (payload.type == "init") {
+                    document.querySelector('.input textarea').disabled = false;
                 }
             }
             websocket.onopen = function (event) {

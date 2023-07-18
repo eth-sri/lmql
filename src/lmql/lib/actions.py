@@ -114,7 +114,7 @@ async def inline_segment(fcts):
     incontext
         "[SEGMENT]"
         if not SEGMENT.endswith(DELIMITER):
-            return SEGMENT + "END"
+            return SEGMENT
         else:
             "[CALL]"
             result = CALL.rsplit("|", 1)[-1].strip()
@@ -147,10 +147,11 @@ async def inline_use(fcts):
         truncated = ""
         while True: 
             "[SEGMENT]"
-            if SEGMENT.endswith("END"): 
-                " " # seems to be neede for now
+            if not SEGMENT.endswith(DELIMITER):
+                " " # seems to be needed for now
                 return truncated + SEGMENT[:-len("END")]
-            truncated += SEGMENT
+            truncated += SEGMENT[:-len("END")]
+        print("truncated", [truncated])
         return truncated
     where
         inline_segment(SEGMENT, fcts)

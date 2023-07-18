@@ -291,10 +291,6 @@ class PromptInterpreter:
             model_args = model_object.kwargs
 
         if self.model is None:
-            if model_name == "<dynamic>":
-                assert self.context is not None, "error: model is not explicitly specified and can also not be derived from context. Please provide a 'from' clause or set the model in the context of the query execution."
-                model_name = self.context.model_identifier
-
             self.model = model_name
             self.model_identifier = model_name
         elif type(self.model_identifier) is not str:

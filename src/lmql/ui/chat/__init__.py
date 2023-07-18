@@ -33,8 +33,21 @@ class websocket_executor(BaseOutputWriter):
     def __init__(self, query, ws):
         self.user_input_fut = None
         self.ws = ws
-        self.chatbot_task = asyncio.create_task(query(output_writer=self), name='chatbot query')
+        self.chatbot_task = asyncio.create_task(self.error_handling_query_call(query), name='chatbot query')
         self.message_id = 0
+
+    async def error_handling_query_call(self, query):
+        try:
+            await query(output_writer=self)
+        except Exception as e:
+            print("error in chatbot query", flush=True)
+            import traceback
+            traceback.print_exc()
+            await self.ws.send_str(json.dumps({
+                "type": "error",
+                "message": str(e)
+            }))
+            await self.ws.close()
 
     async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables): 
         chunk = json.dumps({
@@ -72,9 +85,10 @@ class chatter:
             try:
                 chatbot = lmql.query(source)
             except Exception as e:
+                import traceback
                 await ws.send_str(json.dumps({
                     "type": "error",
-                    "message": str(e)
+                    "message": str(e) + "\n\n" + traceback.format_exc()
                 }))
                 ws.close()
                 return ws
