@@ -88,6 +88,7 @@ class PromptScope(ast.NodeVisitor):
     def scope(self, query: LMQLQuery):
         self.distribution_vars = set([query.distribution.variable_name]) if query.distribution is not None else set()    
         self.defined_vars = set()
+        self.template_vars = set()
         self.prologue_vars = set()
 
         # collect set of global query template variables
@@ -138,6 +139,7 @@ class PromptScope(ast.NodeVisitor):
         for v in declared_template_vars: 
             self.defined_vars.add(v)
             self.written_vars.add(v)
+            self.template_vars.add(v)
             if v in self.free_vars: self.free_vars.remove(v)
 
         used_fstring_expr = [s.expr for s in stmts if type(s) is FExpression]
@@ -417,7 +419,7 @@ class LMQLConstraintTransformation:
             raise LMQLValidationError("Distribution variable {} cannot be used in where clause.".format(node.id))
 
         # check for template variables
-        if node.id in self.scope.defined_vars and not keep_variables:
+        if node.id in self.scope.template_vars and not keep_variables:
             return f"lmql.runtime_support.Var('{node.id}')"
         else:
             return f"lmql.runtime_support.Var('{node.id}', python_variable=True, python_value={node.id})"
@@ -501,7 +503,7 @@ class LMQLConstraintTransformation:
         names = set()
         def collect_name(node):
             name = node.id
-            if name in self.scope.defined_vars:
+            if name in self.scope.template_vars:
                 names.add(name)
         NameVisitor(collect_name).visit(node)
         names = sorted(list(names))

@@ -6,7 +6,6 @@ import inspect
 class InlineCallOp(Node):
     def __init__(self, predecessors, lcls, glbs):
         super().__init__(predecessors)
-        
         fct, args = predecessors
         fct = fct.__lmql_query_function__
 

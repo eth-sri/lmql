@@ -1075,7 +1075,8 @@ class PromptInterpreter:
             return subinterpreter
         
     async def subinterpreter_results(self, s: dc.DecoderSequence, variable, text, diff_text, calling_state, is_before, **kwargs):
-        inline_calls: List[ops.InlineCallOp] = [ic for ic in ops.InlineCallOp.collect(self.where) if ic.variable.name == variable]
+        where = calling_state.full_where_condition(self)
+        inline_calls: List[ops.InlineCallOp] = [ic for ic in ops.InlineCallOp.collect(where) if ic.variable.name == variable]
         
         subfollow = {}
         subvalid = {}
