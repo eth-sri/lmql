@@ -18,7 +18,7 @@ class LlamaCppModel(LMTPModel):
         print("[Loading llama.cpp model from", self.model_identifier, "]", flush=True)
         if not "verbose" in kwargs.keys():
             kwargs["verbose"] = False
-        self.llm = Llama(model_path=model_identifier.strip("llama.cpp:"), **kwargs)
+        self.llm = Llama(model_path=model_identifier[len("llama.cpp:"):], **kwargs)
 
     def eos_token_id(self):
         return 2
