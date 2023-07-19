@@ -1,4 +1,3 @@
-from transformers import AutoModelForCausalLM
 from typing import Tuple
 import torch
 from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
@@ -9,9 +8,14 @@ class TransformersLLM(LMTPModel):
         self.model_identifier = model_identifier
         self.model_args = kwargs
 
-        print("[Loading", self.model_identifier, "with", f"AutoModelForCausalLM.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
-        
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **kwargs)
+        if self.model_args.pop("loader", None) == "auto-gptq":
+            from auto_gptq import AutoGPTQForCausalLM
+            print("[Loading", self.model_identifier, "with", f"AutoGPTQForCausalLM.from_quantized({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+            self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
+        else:
+            from transformers import AutoModelForCausalLM
+            print("[Loading", self.model_identifier, "with", f"AutoModelForCausalLM.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
         
         print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
