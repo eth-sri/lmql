@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatter</title>
+    <title>LMQL Chat</title>
     <link rel="stylesheet" href="chat_assets/index.css">
     <script>
     function addMessage(message, type, id=null) {
@@ -119,6 +119,7 @@
     
 
     window.onload = function() {
+        setThinking(true);
         document.getElementById('connection-status').innerText = 'Connecting...';
         host = window.location.host;
         websocket = new WebSocket("ws://" + host + "/chat");
@@ -136,6 +137,9 @@
                     let tag_type = match.substring(6, match.length - 2);
                     return `<span class="lmql-tag ${tag_type}">${tag_type}</span>`;
                 });
+                // escape all << and >>
+                prompt = prompt.replace(/<</g, '&lt;&lt;');
+                prompt = prompt.replace(/>>/g, '&gt;&gt;');
                 document.getElementById("raw-prompt").innerHTML = prompt;
 
                 addResponse(object.variables["ANSWER"].trim(), 'assistant', "response-" + id);
@@ -146,6 +150,7 @@
             websocket.send(JSON.stringify({
                 type: 'init'
             }));
+            setThinking(false);
         }
         websocket.onclose = function(event) {
             document.getElementById('connection-status').innerText = 'Disconnected';
@@ -186,7 +191,7 @@
         const entryForm = `
         <div class="api-key-entry">
             <p>
-                <h1>Welcome to Chatter</h1>
+                <h1>Welcome to LMQL Chat</h1>
                 To get started, please provide an OpenAI API key. Your key will only be stored in your browser's <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage">local storage</a>, and will not be sent to our servers.<br/><br/>
                 <input type="text" placeholder="API key"/><br/>
                 <button onclick="document.querySelector('.api-key-entry').style.display = 'none';">Let's start!</button>

@@ -144,16 +144,16 @@
                     prompt = prompt.replace(/(assistant|user|system):/g, (match) => {
                         return `<span class="lmql-tag">${match}</span>`;
                     });
-                    // escape all < and >
-                    prompt = prompt.replace(/</g, '&lt;');
-                    prompt = prompt.replace(/>/g, '&gt;');
+                    // escape all << and >>
+                    prompt = prompt.replace(/<</g, '&lt;&lt;');
+                    prompt = prompt.replace(/>>/g, '&gt;&gt;');
                     
                     document.getElementById("raw-prompt").innerHTML = prompt;
 
                     let value = object.variables["ANSWER"].trim();
-                    // escape all < and >
-                    value = value.replace(/</g, '&lt;');
-                    value = value.replace(/>/g, '&gt;');
+                    // escape all << and >>
+                    value = value.replace(/<</g, '&lt;&lt;');
+                    value = value.replace(/>>/g, '&gt;&gt;');
 
                     addResponse(value, 'assistant', "response-" + id);
                 } else if (payload.type == "error") {
