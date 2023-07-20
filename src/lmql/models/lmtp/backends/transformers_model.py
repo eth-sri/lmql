@@ -1,4 +1,3 @@
-from transformers import AutoModelForCausalLM, T5ForConditionalGeneration
 from typing import Tuple
 import torch
 from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
@@ -7,15 +6,21 @@ class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
         self.model_args = kwargs
-        
-        if "google/flan-t5" in self.model_identifier:
+
+
+        if self.model_args.pop("loader", None) == "auto-gptq":
+            from auto_gptq import AutoGPTQForCausalLM
+            print("[Loading", self.model_identifier, "with", f"AutoGPTQForCausalLM.from_quantized({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+            self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
+        elif "google/flan-t5" in self.model_identifier or self.model_args.pop("loader", None) == "t5":
+            from transformers import T5ForConditionalGeneration
             print("[Loading", self.model_identifier, "with", f"T5ForConditionalGeneration.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
 
-            self.model = T5ForConditionalGeneration.from_pretrained(self.model_identifier, **kwargs)
+            self.model = T5ForConditionalGeneration.from_pretrained(self.model_identifier, **self.model_args)
         else:
+            from transformers import AutoModelForCausalLM
             print("[Loading", self.model_identifier, "with", f"AutoModelForCausalLM.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
-
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **kwargs)
+            self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
         
         print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")

@@ -5,7 +5,7 @@ Command Line Interface for lmtp_inference_server.py.
 from .lmtp_inference_server import *
 from .utils import rename_model_args
 
-def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, **kwargs):
+def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, loader=None, **kwargs):
     """
     Serves the provided model as an LMTP/LMQL inference endpoint.
 
@@ -17,6 +17,7 @@ def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, stati
         cuda (bool, optional): If set, the model will be loaded on the GPU. Defaults to False.
         dtype (str, optional): What format to load the model weights. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes). Defaults to None.
         static (bool, optional): If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument. Defaults to False.
+        loader (str, optional): If set, the model will be loaded using a library other than transformers. This is useful when loading quantized models in formats that are not yet supported by Transformers (like GTPQ). Defaults to None.
         **kwargs: Any other argument will be passed as a keyword argument to the AutoModelForCausalLM.from_pretrained function.
 
     """
@@ -27,6 +28,7 @@ def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, stati
         "cuda": cuda,
         "dtype": dtype,
         "static": static,
+        "loader": loader,
         **kwargs
     })
 
@@ -95,6 +97,10 @@ options:
   --static      If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument.
   --dtype DTYPE  What format to load the model weights. Options: 'float16'
                  (not available on all models), '8bit' (requires bitsandbytes)
+  --loader OPT  If set, the model will be loaded using the corresponding option. Useful for loading quantized modules in formats not
+                supported by the transformers library, like GPTQ. Available options:
+                * auto-gptq (loads GPTQ based quantized models with auto-gptq. Consider adding `--use_safetensors true` if the model is
+                             distributed in the safetensor format)
   --[*] VALUE   Any other argument will be passed as a keyword argument to the AutoModelForCausalLM.from_pretrained function.
     """
 

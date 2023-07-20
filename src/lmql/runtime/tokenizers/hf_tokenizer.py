@@ -30,6 +30,9 @@ class TransformersTokenizer:
 
         if "LlamaTokenizer" in str(type(tokenizer)):
             return LlamaTransformersTokenizer(model_identifier, tokenizer)
+        elif "T5Tokenizer" in str(type(tokenizer)):
+            print("info: LMQL currently only has limited support for T5 tokenizers, which means that some constraining features may not work as expected. Please consider using a different model.")
+            return TransformersTokenizer(model_identifier, tokenizer)
         else:
             return TransformersTokenizer(model_identifier, tokenizer)
 
