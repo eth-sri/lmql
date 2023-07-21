@@ -150,10 +150,12 @@ def _simplify(seq):
 
 class Regex:
 
-    def __init__(self, pattern):
+    def __init__(self, pattern, cache=True):
         self.pattern = pattern
         self._complied = None
         self._seq = None
+        self._trie = {} # hand-rolled dict-base trie; might be good to replace with library
+        self.use_cache = cache
 
     @property 
     def compiled_pattern(self):
@@ -167,12 +169,34 @@ class Regex:
             self._seq = _parse(self.pattern)
         return copy(self._seq)
     
+    def _check_cache(self, chars):
+        if not self.use_cache: return False
+        t = self._trie
+        for i, c in enumerate(chars):
+            if c in t: t = t[c]
+            else:
+                if '__hit__' in t: return True
+                break
+        return False
+    
+    def _cache_add(self, chars):
+        if self.use_cache:
+            t = self._trie
+            for c in chars:
+                if c not in t: t[c] = dict()
+                t = t[c]
+            t['__hit__'] = True
+            
+    
     def _consume(self, text, verbose=False):
-        seq = self.seq
         chars = [ord(c) for c in text]
-        for char in chars:
+        if self._check_cache(chars): return None
+        seq = self.seq
+        for i, char in enumerate(chars):
             seq = _consume_char(char, seq, verbose=verbose)
-            if seq is None: return None
+            if seq is None:
+                self._cache_add(chars[:(i+1)])
+                return None
         return seq
 
     def is_empty(self):
