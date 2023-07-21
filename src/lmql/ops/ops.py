@@ -676,6 +676,11 @@ class RegexOp(Node):
         ex = args[1]
         assert isinstance(ex, str)
         
+        if x == strip_next_token(x):
+            return fmap(
+                ("*", Regex(ex).fullmatch(x))
+            )
+
         r = Regex(ex)
         rd = r.d(strip_next_token(x)) # take derivative
         print(f"r={r.pattern} x={strip_next_token(x)} --> {rd.pattern if rd is not None else '[no drivative]'}")
@@ -692,7 +697,7 @@ class RegexOp(Node):
             )
 
     def final(self, ops_final, result=None, operands=None, **kwargs):
-        if ops_final[0] == "fin": return "f"
+        if ops_final[0] == "fin": return "fin"
         else: return "var"
 
 @LMQLOp("STARTS_WITH")
