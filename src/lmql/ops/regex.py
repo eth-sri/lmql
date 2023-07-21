@@ -3,6 +3,7 @@ import re
 import sre_parse
 import sre_constants as c
 import sys
+from copy import copy
 
 REGEX_DERIVATIVE_FAILED = -1
 
@@ -147,13 +148,6 @@ def _simplify(seq):
             seq_out.append((op, arg))
     return seq_out
 
-def _consume(text, seq, verbose=False):
-    chars = [ord(c) for c in text]
-    for char in chars:
-        seq = _consume_char(char, seq, verbose=verbose)
-        if seq is None: return None
-    return seq
-
 class Regex:
 
     def __init__(self, pattern):
@@ -172,18 +166,24 @@ class Regex:
         if self._seq is None:
             self._seq = _parse(self.pattern)
         return copy(self._seq)
+    
+    def _consume(self, text, verbose=False):
+        seq = self.seq
+        chars = [ord(c) for c in text]
+        for char in chars:
+            seq = _consume_char(char, seq, verbose=verbose)
+            if seq is None: return None
+        return seq
 
     def is_empty(self):
         return self.pattern == ''
 
     def is_prefix(self, text):
-        seq = _parse(self.pattern)
-        seq = _consume(text, seq)
+        seq = self._consume(text)
         return (seq is not None)
 
     def d(self, text, verbose=False):
-        seq = _parse(self.pattern)
-        seq = _consume(text, seq, verbose=verbose)
+        seq = self._consume(text, verbose=verbose)
         if seq is None: return None
         seq = _simplify(seq)
         return Regex(_deparse(seq))
