@@ -2,7 +2,6 @@ from typing import Iterable, Tuple, List
 import re
 import sre_parse
 import sre_constants as c
-
 import sys
 
 REGEX_DERIVATIVE_FAILED = -1
@@ -11,7 +10,9 @@ def _deparse(seq):
     if seq is None: return seq
     pattern = ""
     for op, arg in seq:
-        if op == c.LITERAL:
+        if op == c.ANY:
+            pattern += '.'
+        elif op == c.LITERAL:
             pattern += chr(arg)
         elif op == c.MAX_REPEAT:
             min, max, item = arg
@@ -51,7 +52,9 @@ def _consume_char(char, seq, verbose=False, indent=0):
     if len(seq) == 0: return None
     op, arg = seq[0]
     if verbose: print(' '*indent + f"{seq} -> {op}") 
-    if op == c.LITERAL:
+    if op == c.ANY:
+        return seq[1:]
+    elif op == c.LITERAL:
         if arg == char: return seq[1:]
         else: return None
     elif op == c.IN:
@@ -143,32 +146,6 @@ def _simplify(seq):
             op, arg = out
             seq_out.append((op, arg))
     return seq_out
-    
-
-    return seq
-    #seq_out = []
-    #for i, s in enumerate(seq):
-    #    if len(s) == 0:
-    #        seq[i] = None
-    #        continue
-    #    op, arg = s
-    #    if op == c.MAX_REPEAT:
-    #        min_occr, max_occr, sseq = arg
-    #        if min_occr == max_occr == 0: pass
-    #        elif min_occr == max_occr == 1:
-    #            seq_out.extend(_canonicalize(sseq))
-    #        else: seq_out.append(s)
-    #    elif op == c.SUBPATTERN and arg[3][0][0] == c.BRANCH:
-    #        branches = arg[3][0][1][1]
-    #        branches = map(_canonicalize, branches)
-    #        #branches = map(lambda x: list(filter(lambda y: len(y) > 0, x)), branches)
-    #        branches = list(filter(lambda x: len(x) > 0, branches))
-    #        if len(branches) == 1:
-    #            seq_out.extend(branches[0])
-    #        elif len(branches) >= 0:
-    #            seq_out.append((op, (arg[0], arg[1], arg[2], [(c.BRANCH, (None, branches))] )))
-    #    else: seq_out.append(s)
-    #return seq_out
 
 def _consume(text, seq, verbose=False):
     chars = [ord(c) for c in text]
@@ -182,16 +159,28 @@ class Regex:
     def __init__(self, pattern):
         self.pattern = pattern
         self._complied = None
+        self._seq = None
 
     @property 
     def compiled_pattern(self):
         if self._complied is None:
             self._complied = re.compile(self.pattern, re.UNICODE)
         return self._complied
-    
+
+    @property 
+    def seq(self):
+        if self._seq is None:
+            self._seq = _parse(self.pattern)
+        return copy(self._seq)
+
     def is_empty(self):
         return self.pattern == ''
-        
+
+    def is_prefix(self, text):
+        seq = _parse(self.pattern)
+        seq = _consume(text, seq)
+        return (seq is not None)
+
     def d(self, text, verbose=False):
         seq = _parse(self.pattern)
         seq = _consume(text, seq, verbose=verbose)
@@ -220,8 +209,6 @@ if __name__ == "__main__":
     assert Regex(r"ab").d("ab").compare_pattern(r"")
     assert Regex(r"a+bc").d("a").compare_pattern(r"a*bc")
     assert Regex(r"a?bc").d("b").compare_pattern(r"c")
-
     assert Regex(r"(a|bb)c").d("b").pattern == "bc"
-    print(Regex(r"(b|bb)c").d("b").pattern)
-    print(Regex(r"(b|bbb)c").d("b").pattern)
-    #assert Regex(r"(b|bb)c").d("b").compare_pattern(r"(|b)c")
+    assert Regex(r"(b|bb)c").d("b").compare_pattern(r"b?c")
+    assert Regex(r".+c").d("b").pattern == ".*c"

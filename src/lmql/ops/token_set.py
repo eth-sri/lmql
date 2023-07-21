@@ -153,7 +153,7 @@ class VocabularyMatcher:
         if prefix:
             r = Regex(regex)
             for id, subtoken in self.vocab.items():
-                if r.d(subtoken) is not None:
+                if r.is_prefix(subtoken):
                     mask[id] = True
         else:
             pattern = re.compile(regex, re.UNICODE)
