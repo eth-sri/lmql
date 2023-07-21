@@ -8,6 +8,7 @@ from lmql.ops.node import *
 
 from lmql.ops.inline_call import InlineCallOp
 from lmql.ops.booleans import *
+from lmql.ops.regex import Regex
 
 lmql_operation_registry = {}
 
@@ -660,6 +661,40 @@ def remainder(seq: str, phrase: str):
     if overlap == 0: return None
     else: return phrase[i:]
 
+@LMQLOp("REGEX")
+class RegexOp(Node):
+    def forward(self, *args, **kwargs):
+        if any([a is None for a in args]): return None
+        x = args[0]
+        ex = args[1]
+        assert isinstance(ex, str)
+        return Regex(ex).fullmatch(x)
+    
+    def follow(self, *args, **kwargs):
+        if any([a is None for a in args]): return None
+        x = args[0]
+        ex = args[1]
+        assert isinstance(ex, str)
+        
+        r = Regex(ex)
+        rd = r.d(strip_next_token(x)) # take derivative
+        print(f"r={r.pattern} x={strip_next_token(x)} --> {rd.pattern if rd is not None else '[no drivative]'}")
+        if rd is None:
+            return False 
+        elif rd.is_empty(): # derivative is empty -> full match; therefore we must end
+            return fmap(
+                ("eos", True)
+            )
+        else: # only permit tokens form the regex derivative
+            return fmap(
+                (tset(rd.pattern, regex=True, prefix=True), True),
+                #('*', False)
+            )
+
+    def final(self, ops_final, result=None, operands=None, **kwargs):
+        if ops_final[0] == "fin": return "f"
+        else: return "var"
+
 @LMQLOp("STARTS_WITH")
 class StartsWithOp(Node):
     def forward(self, *args, **kwargs):
@@ -667,6 +702,7 @@ class StartsWithOp(Node):
         
         x = args[0]
         allowed_phrases = args[1]
+        if isinstance(args[1], str): allowed_phrases = [allowed_phrases]
 
         for phrase in allowed_phrases:
             if x.startswith(phrase):
@@ -679,6 +715,7 @@ class StartsWithOp(Node):
 
         x = args[0]
         allowed_phrases = args[1]
+        if isinstance(args[1], str): allowed_phrases = [allowed_phrases]
 
         # if there is any full match, then the result is True
         if any(strip_next_token(x).startswith(phrase) for phrase in allowed_phrases):
