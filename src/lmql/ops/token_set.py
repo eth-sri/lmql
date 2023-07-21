@@ -136,11 +136,7 @@ class VocabularyMatcher:
                     mask = self._make_mask_from_char_length(charlen)
                 else:
                     assert regex is not None, "TokenSetConcrete: either tokens or regex must be set."
-                    #assert not prefix, "TokenSetConcrete: prefix is not supported for regex."
-                    if prefix:
-                        mask = self._make_mask_from_regex_derivative(regex)
-                    else:
-                        mask = self._make_mask_from_regex(regex)
+                    mask = self._make_mask_from_regex(regex, prefix)
 
                 if minus: mask = np.logical_not(mask)
 
@@ -148,33 +144,22 @@ class VocabularyMatcher:
             
             return VocabularyMatcher.with_cache(cache_keys, do_make_mask)
 
-    def _make_mask_from_regex(self, regex):
+    def _make_mask_from_regex(self, regex, prefix=False):
         regex = regex.replace(" ", self.space_repr)
         regex = regex.replace("\n", self.nl_repr)
-
         regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
 
         mask = np.zeros([self.vocab_size], dtype=np.bool_)
-
-        pattern = re.compile(regex, re.UNICODE)
-        for id, subtoken in self.vocab.items():
-            if pattern.match(subtoken) is not None:
-                mask[id] = True
-
-        return mask
-
-    def _make_mask_from_regex_derivative(self, regex):
-        regex = regex.replace(" ", self.space_repr)
-        regex = regex.replace("\n", self.nl_repr)
-
-        regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
-
-        mask = np.zeros([self.vocab_size], dtype=np.bool_)
-        
-        r = Regex(regex)
-        for id, subtoken in self.vocab.items():
-            if r.d(subtoken) is not None:
-                mask[id] = True
+        if prefix:
+            r = Regex(regex)
+            for id, subtoken in self.vocab.items():
+                if r.d(subtoken) is not None:
+                    mask[id] = True
+        else:
+            pattern = re.compile(regex, re.UNICODE)
+            for id, subtoken in self.vocab.items():
+                if pattern.match(subtoken) is not None:
+                    mask[id] = True
 
         return mask
 
