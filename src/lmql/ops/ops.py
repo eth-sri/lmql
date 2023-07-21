@@ -667,6 +667,7 @@ class StartsWithOp(Node):
         
         x = args[0]
         allowed_phrases = args[1]
+        if isinstance(args[1], str): allowed_phrases = [allowed_phrases]
 
         for phrase in allowed_phrases:
             if x.startswith(phrase):
@@ -679,6 +680,7 @@ class StartsWithOp(Node):
 
         x = args[0]
         allowed_phrases = args[1]
+        if isinstance(args[1], str): allowed_phrases = [allowed_phrases]
 
         # if there is any full match, then the result is True
         if any(strip_next_token(x).startswith(phrase) for phrase in allowed_phrases):
