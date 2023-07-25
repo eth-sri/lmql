@@ -89,8 +89,8 @@ export const Dialog = styled.div`
 const ExploreDialog = styled(Dialog)`
   width: 800pt;
   height: 700pt;
-  max-height: 100vh;
-  max-width: 100vh;
+  max-height: calc(100vh - 40pt);
+  max-width: 100vw;
   overflow-y: auto;
 
   /* invisible scroll bar */
@@ -103,7 +103,16 @@ const ExploreDialog = styled(Dialog)`
   padding: 0pt;
   
 
-  @media (max-width: 550pt) {
+  @media (max-width: 800pt) {
+    border-radius: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    max-width: 100vw !important;
+  }
+  
+
+  @media (max-width: 450pt) {
     width: calc(100vw - 20pt);
     height: calc(100vh - 20pt);
     max-height: 100vh;
@@ -114,7 +123,6 @@ const ExploreDialog = styled(Dialog)`
     padding-bottom: 80pt;
     padding-left: 0;
     margin: 0;
-    border-radius: 0;
 
     div.tile {
       display: block !important;
@@ -257,7 +265,7 @@ const Tile = styled.div.attrs({
 `
 
 export const ExploreState = {
-    visible: false,
+    visible: window.location.hash === "#explore",
     setVisibility: (s) => {
         ExploreState.visible = s;
         ExploreState.listeners.forEach((l) => l(s));
@@ -338,6 +346,34 @@ const Description = styled.p`
   color: #696969;
   padding: 0pt 20pt;
   font-weight: 500;
+  margin-top: 0pt;
+`
+
+const LinkBox = styled.div`
+  display: flex;
+  flex-direction: row;
+
+  a.button {
+    display: block;
+    border: 1pt solid #6b77ff;
+    padding: 5pt;
+    margin-top: 15pt;
+    margin-right: 5pt;
+    border-radius: 2pt;
+    color: #6b77ff;
+
+    font-size: 10pt;
+  }
+
+  a.button:first-child {
+    color: white;
+    background-color: #6b77ff;
+
+    &:hover {
+      background-color: #8e98ea;
+      text-decoration: none;
+    }
+  }
 `
 
 const CiteBox = styled.code`
@@ -450,7 +486,11 @@ export function Explore() {
     if (!visible) return null;
 
     let description = <>
-    This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below.
+    LMQL is a query language for large language models. Explore the examples below to get started.
+    <LinkBox>
+      <a className="button" target="_blank" rel="noreferrer" href="https://docs.lmql.ai">Documentation</a>
+      <a className="button" target="_blank" rel="noreferrer" href="https://lmql.ai">Overview</a>
+    </LinkBox>
     </>
 
     if (configuration.NEXT_MODE) {
@@ -472,7 +512,7 @@ export function Explore() {
             <div className={c.highlight ? "highlight" : ""} key={c.category + "-container"}>
             <h2 key={c.category}>{c.category}</h2>
             {c.highlight && <span class="sidenote">
-              <a href="https://github.com/eth-sri/lmql/issues" target="_blank" rel="noreferrer"> Report Issues</a>
+              <a href="https://github.com/eth-sri/lmql/issues" target="_blank" rel="noreferrer" title="Please report any issue you find with Preview features to help us improve LMQL."> Report Issues</a>
             </span>}
             <div key={c.category + "-div"}>
             {c.queries.map((q,i) => <Tile key={c.category + "-" + i} onClick={() => onClickTile(q)}>
@@ -486,7 +526,7 @@ export function Explore() {
           )}
           {!configuration.NEXT_MODE && <>
           <div>
-          <h2 key="read-paper">Read the Paper</h2>
+          <h2 key="read-paper">Read More</h2>
           <CiteBox key="cite">
           Beurer-Kellner, Luca, Marc Fischer, and Martin Vechev. "Prompting Is Programming: A Query Language For Large Language Models." 
           <a target="_blank" rel="noreferrer" href="https://arxiv.org/pdf/2212.06094">arXiv preprint arXiv:2212.06094</a> (2022).

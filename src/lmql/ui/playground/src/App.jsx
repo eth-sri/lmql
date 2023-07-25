@@ -6,7 +6,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { registerLmqlLanguage } from "./editor/lmql-monaco-language";
 import { BsSquare, BsFillExclamationSquareFill, BsBoxArrowUpRight, BsArrowRightCircle, BsFillCameraFill, BsCheckSquare, BsSendFill, 
   BsFileArrowDownFill, BsKeyFill, BsTerminal, BsFileCode, BsGithub, BsCardList, BsFullscreen, BsXCircle, BsFillChatLeftTextFill, 
-  BsGear, BsGridFill, BsPlus } from 'react-icons/bs';
+  BsGear, BsGridFill, BsPlus, BsBook } from 'react-icons/bs';
 import { DecoderGraph } from './DecoderGraph';
 import { BUILD_INFO } from './build_info';
 import exploreIcon from "./explore.svg"
@@ -2874,6 +2874,9 @@ class App extends React.Component {
               {configuration.DEV_MODE && <li onClick={() => this.onCodeScreenshot()}><BsFillCameraFill/> Code Screenshot</li>}
               <li>
                 <a href="https://github.com/eth-sri/lmql" disabled target="_blank" rel="noreferrer"><BsGithub/>LMQL on Github</a>
+              </li>
+              <li>
+                <a href="https://docs.lmql.ai" disabled target="_blank" rel="noreferrer"><BsBook/>Documentation</a>
               </li>
               <span>
                 LMQL {this.state.buildInfo.commit} 
