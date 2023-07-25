@@ -15,7 +15,7 @@ class LlamaCppModel(LMTPModel):
 
         self.max_batch_size = 1
 
-        print("[Loading llama.cpp model from", self.model_identifier, "]", flush=True)
+        print("[Loading llama.cpp model from", self.model_identifier, " with ", kwargs, "]", flush=True)
         if not "verbose" in kwargs.keys():
             kwargs["verbose"] = False
         self.llm = Llama(model_path=model_identifier.strip("llama.cpp:"), **kwargs)
@@ -67,6 +67,8 @@ class LlamaCppModel(LMTPModel):
                                                             temp=temperature,
                                                             stopping_criteria=llama_streamer, 
                                                             logits_processor=logits_processor)):
+            assert i + len(input_ids) < self.llm.n_ctx(), "The requested number of tokens exceeds the llama.cpp model's context size. Please specify a higher n_ctx value."
+            
             if i > 0:
                 streamer(sq_ar.reshape(1, *sq_ar.shape), ts_ar.reshape(-1, 1, *ts_ar.shape[1:]))
             sequence += [token]

@@ -274,7 +274,6 @@ class Scheduler:
                 print("[Error during generate()]", e, flush=True)
                 for c in batch:
                     c.error("failed to generate tokens '" + str(e) + "'")
-                raise e
 
     @staticmethod
     def instance(model_identifier, model_args, user, only_existing=False, sync=False):

@@ -21,7 +21,7 @@ class LMQLModelRegistry:
 
         if type(model) is LMQLModel:
             if model.model is not None:
-                return model
+                return model.model
             else:
                 kwargs = {**model.kwargs, **kwargs}
                 model = model.model_identifier

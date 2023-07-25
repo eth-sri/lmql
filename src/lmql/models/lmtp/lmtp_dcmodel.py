@@ -447,7 +447,8 @@ class lmtp_model:
                 else:
                     lmtp_server_kwargs = None
 
-                return LMTPModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, inprocess_client_constructor=inprocess_client_constructor, **self.decoder_args)
+                return LMTPModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, 
+                                 inprocess_client_constructor=inprocess_client_constructor, **self.decoder_args)
 
             async def tokenize(self, text):
                 return self.get_tokenizer().tokenize(text, asbytes=True)
