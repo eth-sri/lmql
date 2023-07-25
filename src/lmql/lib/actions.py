@@ -21,7 +21,7 @@ async def wiki(q: str, lookup = None):
         extract = list(pages.values())[0]["extract"][:280]
         return extract
     except:
-        return "No results"
+        return "No results (try differently)"
 
 async def calc(expr: str):
     """
@@ -117,8 +117,8 @@ async def inline_segment(fcts):
             return SEGMENT
         else:
             "[CALL]"
-            result = CALL.rsplit("|", 1)[-1].strip()
-            return SEGMENT[:-len(DELIMITER)] + CALL + DELIMITER_END + " " + result
+            result = CALL.split("|", 1)[1]
+            return SEGMENT[:-len(DELIMITER)] + CALL + DELIMITER_END
     where
         STOPS_AT(SEGMENT, DELIMITER) and fct_call(CALL, fcts)
     '''
@@ -147,11 +147,10 @@ async def inline_use(fcts):
         truncated = ""
         while True: 
             "[SEGMENT]"
-            if not SEGMENT.endswith(DELIMITER):
+            if not SEGMENT.endswith(DELIMITER_END):
                 " " # seems to be needed for now
-                return truncated + SEGMENT[:-len("END")]
-            truncated += SEGMENT[:-len("END")]
-        print("truncated", [truncated])
+                return truncated + SEGMENT
+            truncated += SEGMENT
         return truncated
     where
         inline_segment(SEGMENT, fcts)

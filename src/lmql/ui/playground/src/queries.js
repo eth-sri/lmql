@@ -136,40 +136,37 @@ where
           // hello world
           name: "❤️ Sentiment Constraints",
           description: "Affect sentiment with in-context prompting.",
-          code: `@lmql.query
+          code: `@lmql.query(cache="mood.tokens", model="chatgpt")
 async def mood_description(m: str):
-  '''lmql
-  argmax(cache="mood.tokens")
-      print("Generating mood for", m)
-      """Provide a one sentence instruction that prompts a model to write text that 
-      is written in a {m} tone, addressing some previously provided question.\\n"""
-      "[SUMMARY]\\n"
-      return SUMMARY.strip();
-  from
-      "chatgpt"
-  '''
+    '''lmql
+    print("Generating mood for", m)
+    """Provide a one sentence instruction that prompts a model to write text that 
+    is written in a {m} tone, addressing some previously provided question.\\n"""
+    "[SUMMARY]\\n"
+    return SUMMARY.strip();
+    '''
 
 @lmql.query
 async def mood(m: str):
-  '''lmql
-  incontext
-      """
-      Instruction: {mood_description(m)}
-      Answer: [RESPONSE]
-      """
-      return RESPONSE.strip(); 
-  where
-      stops_at(RESPONSE, ".") and stops_at(RESPONSE, "\\n")
-  '''
+    '''lmql
+    """
+    Instruction: {await mood_description(m)}
+    Answer: [RESPONSE]
+    """ where stops_at(RESPONSE, ".") and stops_at(RESPONSE, "\\n")
 
+    return RESPONSE.strip(); 
+    '''
+
+# main query
 argmax
-  for q in ["Hi", "Who are you", "How is your day going?"]:
-      "Q: {q}\\n"
-      "A: [RESPONSE]\\n"
+    for q in ["Hi", "Who are you", "How is your day going?"]:
+        "Q: {q}\\n"
+        "A: [RESPONSE]\\n"
 from 
-  "chatgpt" 
+    "chatgpt" 
 where 
-  mood(RESPONSE, "loving like a partner")
+    mood(RESPONSE, "loving like a partner")
+          
 `,
           state: ''
        },
@@ -179,38 +176,32 @@ where
           description: "Insert dynamic instructions with incontext.",
           code: `@lmql.query
 async def rhyme():
- '''
- incontext
+    '''
     """
     Above is the beginning of the poem. Generate the next verse that rhymes with the last line and has the same number of syllables.
     [VERSE]
-    """
+    """ where stops_before(VERSE, "\\n")
     return VERSE
- where
-    stops_before(VERSE, "\\n")
- '''
+    '''
 
 @lmql.query
 async def first_verse():
- '''
- incontext
+    '''
     """
     Generate a verse that would be perfect for the start of a beautiful rhyme. 
     [VERSE]
-    """
+    """ where stops_before(VERSE, "\\n")
     return VERSE
- where
-    stops_before(VERSE, "\\n")
- '''
+    '''
 
 argmax
-  "[FIRST_VERSE]\\n"
-  for i in range(5):
-     "[VERSE]\\n"
+    "[FIRST_VERSE]\\n"
+    for i in range(5):
+        "[VERSE]\\n"
 from 
-  "chatgpt" 
+    "chatgpt" 
 where 
-  rhyme(VERSE) and first_verse(FIRST_VERSE)
+    rhyme(VERSE) and first_verse(FIRST_VERSE)
 `,
           state: ''
        }

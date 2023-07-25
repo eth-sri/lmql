@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="LMQL: A query language for programming (large) language models.">
+  <meta name="keywords" content="GPT-3, language models, LMQL, programming language, query language, ChatGPT">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"/>
+  
+  <!-- Primary Meta Tags -->
+  <title>LMQL: Programming Large Language Models</title>
+  <meta name="title" content="LMQL: Programming Large Language Models">
+  <meta name="description" content="LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python.">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lmql.ai/">
+  <meta property="og:title" content="LMQL: Programming Large Language Models">
+  <meta property="og:description" content="LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python.">
+  <meta property="og:image" content="https://lmql.ai/static/images/lmql-social.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://lmql.ai/">
+  <meta property="twitter:title" content="LMQL: Programming Large Language Models">
+  <meta property="twitter:description" content="LMQL is a query language for large language models (LLMs). It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness of Python.">
+  <meta property="twitter:image" content="https://lmql.ai/static/images/lmql-social.png"">
+  
+  
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="/static/css/index.css">
+  <link rel="icon" href="/static/images/favicon.svg">
+  <link rel="stylesheet" href="/static/css/val.gen.css">
+  <link rel="stylesheet" href="/static/css/lmql.css">
+  <link rel="stylesheet" href="./chat.css">
+  <link rel="stylesheet" href="/static/css/highlight.min.css">
+  <script src="https://kit.fontawesome.com/06bb68d804.js" crossorigin="anonymous"></script>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="/static/js/highlight.min.js"></script>
+  <script src="/static/js/lmql.js"></script>
+
+  <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "f7d2a6b1a0624c51ae4dab9a4239b77d"}'></script><!-- End Cloudflare Web Analytics -->
+</head>
+<body>
+  <div class="topnav">
+    <a href="/">
+      <img src="/static/images/lmql-text.png" alt="LMQL logo" class="logo">
+    </a>
+    <a href="https://discord.gg/7eJP4fcyNT" class="hide-on-small">
+      💬
+      Discord
+    </a>
+    <a href="blog">
+      📝
+      Blog
+    </a>
+    <a href="https://docs.lmql.ai">
+      📖
+      Docs
+    </a>
+    <a href="https://github.com/eth-sri/lmql">
+      📦
+      GitHub</a>
+  </div>
+
+  <section class="hero hero-big">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns">
+        <div class="column column-big">
+          <span class="big" style="font-size: 28pt">💬 LMQL Chat: Scripted Chatbot Development
+          </span><br/>
+          <span class="big-sub">
+          Deploy custom chatbots with just a few lines of <img src="/static/images/lmql.svg" style="height:15pt;"/> LMQL.
+          </span>
+          <!-- <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/luca">Luca Beurer-Kellner</a>,</span>
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/marc">Marc Fischer</a>,</span>
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/martin">Martin Vechev</a>,
+            </span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><a href="https://www.sri.inf.ethz.ch"><b>SRI</b>lab</a> @   ETH Zürich, Switzerland</span>
+          </div> -->
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <h2 class="subtitle has-text-centered">
+        <!-- <i>LMQL</i> is a programming language for language model interaction. -->
+      </h2>
+      <div class="example-selector">
+        <div class="example-badges">
+          <%SAMPLES_LIST%>
+        </div>
+        <div class="select-bar">
+          <!-- <div class="select examples"> -->
+            <!-- <select id="select-example"> -->
+            <!-- </select> -->
+          <!-- </div> -->
+        </div>
+          <%SAMPLES%>
+    </div>
+    <div class="container is-max-desktop">
+      <span class="learn-more">
+        <i>Learn more about LMQL by hovering over <anchor>underlined</anchor> parts of the code.</i>
+      </span>
+      <p class="uni-branding">
+        LMQL is a project by the <a href="https://www.sri.inf.ethz.ch/">SRI Lab</a> at <a href="https://ethz.ch/en">ETH Zürich</a>.
+        <img src="static/images/institution-logos.svg"/>
+      </p>
+    </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="hero teaser">
+  <div class="container is-centered">
+    <div class="hero-body has-text-centered" style="margin-top: 30pt;">
+      <h2 class="subtitle has-text-centered">
+        Getting Started with LMQL
+      </h2>
+      <p style="margin: auto;">
+      LMQL is available in a web-based Playground IDE or can be installed via the Python package manager:
+      </p>
+
+      <div class="columns is-getting-started">
+        <div class="column getting-started">
+          <h2>Explore LMQL</h2>
+          <a class="primary" href="https://lmql.ai/playground">
+            <i class="fa fa-play"></i>
+            Playground IDE
+          </a>
+          <a href="https://github.com/eth-sri/lmql">
+            <i class="fa fa-github"></i>
+            GitHub Repo
+          </a>
+          <a href="https://docs.lmql.ai">
+            <i class="fa fa-book"></i>
+            Read the Documentation
+          </a>
+        </div>
+
+        <div class="column getting-started">
+          <h2>Run Locally</h2>
+          <div class="cmd">
+              pip install lmql
+          </div>
+          To run LMQL locally, read the <span><a href="https://docs.lmql.ai/en/latest/quickstart.html">Getting Started</a></span> section of the documentation.
+        </div>
+      </div>
+      <p style="margin: auto; margin-top: -10pt; text-align: center; font-size: 0.9em;">
+        This is an early relase of LMQL and we welcome your feedback and contributions.<br/> Reach out via our <a href="https://discord.gg/7eJP4fcyNT">Community Discord</a>, <a href="https://github.com/eth-sri/lmql/issues">GitHub Issues</a>, or <a href="https://twitter.com/lmqllang">Twitter</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section is-dark">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <!-- Scripted Prompting -->
+      <div class="column">
+        <!-- <div class="content">
+          <figure class="image">
+            <img src="static/images/scripted-prompting.png" style="margin-top: 35pt"/> 
+          </figure>
+          <h2 class="title is-3">Scripted Prompting</h2>
+          <p>
+            LMQL allows control flow as part of the prompt clause, which can be used to implement scripted and interactive prompting mechanics (e.g. action-based interaction, tool augmentation, etc.).
+          </p>
+          <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video>
+        </div> -->
+        <div class="content" style="text-align: left;">
+          <h2 class="title is-3">Scripted Prompts</h2>
+          <p>
+            LMQL generalizes natural language prompting, making it more expressive while remaining accessible. For this, LMQL builds on top of Python, allowing users to express <b>natural language prompts that also contain code</b>. The resulting queries can be directly executed on language models like OpenAI's GPT models. <b>Fixed answer templates and intermediate instructions</b> allow the user to steer the LLM's reasoning process.
+          </p>
+          <p>
+            <a href="https://docs.lmql.ai/en/latest/language/scripted_prompts.html">
+              Learn more about Scripting <i style="margin-left: 2pt;" class="fa fa-arrow-right"></i>
+            </a>
+          </p>
+          <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video> -->
+        </div>
+      </div>
+      <!--/ Visual Effects. -->
+
+      <!-- Eager, partial validation -->
+      <div class="column">
+        <div class="content is-vertically-centered">
+          <!-- <figure class="image">
+            <img src="static/images/decoder.png" style="width: 185pt; margin: auto;"/> 
+          </figure> -->
+<div class="code"><span class="lmql-kw">for</span> i <span class="lmql-kw">in</span> <span class="lmql-fct">range</span>(n):
+ <span class="lmql-str">"[THOUGHT]"</span>
+ <span class="lmql-kw">if</span> THOUGHT.endswith("<<"):
+   <span class="lmql-str">" [EXPR]"</span>
+   <span class="lmql-str">" {calc(EXPR)}>>"</span>
+ <span class="lmql-kw">elif</span> THOUGHT.endswith(<span class="lmql-str">"So the answer"</span>):
+   <span class="lmql-kw">break</span>
+<span class="lmql-str">"is[RESULT]"</span>
+</div>
+            </code>
+          </pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-6">
+        <div class="content decoding">
+          <!-- <figure class="image">
+            <img src="static/images/decoder.png" style="width: 185pt; margin: auto;"/> 
+          </figure> -->
+          <object type="image/svg+xml" data="static/images/constrained-decoding.svg" id="decoding-animation"></object>
+          <a onclick="replay(this)" class="replay">
+            <i class="fa fa-repeat"></i> Replay
+          </a>
+        </div>
+      </div>
+      <div class="column">
+        <!-- <div class="content">
+          <figure class="image">
+            <img src="static/images/scripted-prompting.png" style="margin-top: 35pt"/> 
+          </figure>
+          <h2 class="title is-3">Scripted Prompting</h2>
+          <p>
+            LMQL allows control flow as part of the prompt clause, which can be used to implement scripted and interactive prompting mechanics (e.g. action-based interaction, tool augmentation, etc.).
+          </p>
+          <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video>
+        </div> -->
+        <div class="content" style="text-align: left;">
+          <h2 class="title is-3">Output Constraints</h2>
+          <p>
+            In LMQL, users can specify <b>high-level, logical constraints</b> over the language model output. These constraints are then <b>automatically converted into token-level prediction masks</b>, which can be enforced eagearly during text generation. This allows to <b>enforce many constraints strictly</b>, making it impossible for the model to generate content that does not satisfy the requirements. This <b>simplifies multi-part prompting and integration</b>, as it provides better guarantees about the output format.
+          </p>
+          <p>
+          <a href="https://docs.lmql.ai/en/latest/language/constraints.html">
+              Learn more about Constraints <i style="margin-left: 2pt;" class="fa fa-arrow-right"></i>
+          </a>
+          </p>
+          <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video> -->
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+
+      <!-- Scripted Prompting -->
+      <div class="column">
+        <!-- <div class="content">
+          <figure class="image">
+            <img src="static/images/scripted-prompting.png" style="margin-top: 35pt"/> 
+          </figure>
+          <h2 class="title is-3">Scripted Prompting</h2>
+          <p>
+            LMQL allows control flow as part of the prompt clause, which can be used to implement scripted and interactive prompting mechanics (e.g. action-based interaction, tool augmentation, etc.).
+          </p>
+          <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video>
+        </div> -->
+        <div class="content">
+          <figure class="image">
+            <img src="static/images/decoder.png" style="height: 10em; width: auto;"/> 
+          </figure>
+          <h2 class="title is-3">Playground and Debugger</h2>
+          <p>
+            LMQL includes a <a href="playground">Playground IDE</a> for query development. This enables users to <b>inspect the interpreter state, validation result and model results at any point during generation</b>, e.g. to inspect the different <a href="playground#translation">hypotheses explored during beam search.</a>
+          </p>
+          <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video> -->
+        </div>
+      </div>
+      <!--/ Visual Effects. -->
+
+      <!-- Eager, partial validation -->
+      <div class="column">
+        <div class="content">
+          <figure class="image"s>
+            <img src="static/images/eval-semantics.png" style="height: 10em; width: auto;"/> 
+          </figure>
+          <h2 class="title is-3">Efficiency</h2>
+          <p class="is-left-aligned">
+            Using novel, partial evaluation semantics, <b>LMQL evalutes and controls the LM decoding process on a token level</b>, leading to significant efficiency gains over existing approaches. Compared with 🤗&nbsp;Transformers' <tt>generate()</tt>, LMQL can <b>save up to 80% in consumed tokens</b> by optimizing multi-part prompts end-to-end, while maintaining a <b>high-level, declarative syntax</b>.
+          </p>
+          <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
+            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
+                    type="video/mp4">
+          </video> -->
+        </div>
+      </div>
+      
+      <!-- Frontend/Backend. -->
+      <div class="column">
+        <div class="content">
+          <figure class="image">
+            <img src="static/images/backend.png" style="height: 10em; width: auto;"/> 
+          </figure>
+          <h2 class="title is-3">Frontend/Backend Separation</h2>
+          <p>
+            LMQL provides a high-level frontend to interact with language models, making <b>query code portable and model-agnostic</b>. This is achieved by abstracting over model-specific implementation details like batching, decoding and tokenization.
+          </p>
+          <p>
+            The actual language <b>model runs out-of-process or even remotely</b>, allowing for easy development and quick prototyping.
+          </p>
+        </div>
+      </div>
+      <!--/ Visual Effects. -->
+    </div>
+  </div>
+</section>
+
+<section class="section is-dark">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column" style="font-size: 10pt;">
+        <b class="title is-5 has-text-left" style="font-size: 12pt; text-align: left;display: block; margin: 0; color: rgb(85, 83, 83); margin-bottom: 4pt;">Read The Research Paper</b>
+        <h5 class="title is-4 has-text-left" style="margin-bottom: 2pt;">Prompting Is Programming: A Query Language For Large Language Models
+        </h5>
+        <i style="text-align: left; display: block;">
+          Accepted at <a href="http://pldi23.sigplan.org/">ACM SIGPLAN PLDI'23</a><br/>
+        </i>
+        <div class="content has-text-justified">
+        <div class="authors">
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/luca">Luca Beurer-Kellner</a>,</span>
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/marc">Marc Fischer</a>,</span>
+            <span class="author-block">
+              <a href="https://www.sri.inf.ethz.ch/people/martin">Martin Vechev</a>
+            </span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><a href="https://www.sri.inf.ethz.ch"><b>SRI</b>lab</a> @   ETH Zürich, Switzerland</span>
+          </div>
+        </div>
+        <p>
+        <!-- <b style="display: block; text-align: center;">Abstract</b><br/> -->
+        Large language models have demonstrated outstanding performance on a wide range of tasks such as question answering and code generation.
+        On a high level, given an input, a language model can be used to automatically complete the sequence in a statistically-likely way. Based on this, users prompt these models with language instructions or examples, to implement a variety of downstream tasks. Advanced prompting methods can even imply interaction between the language model, a user, and external tools such as calculators. However, to obtain state-of-the-art performance or adapt language models for specific tasks, complex task- and model-specific programs have to be implemented, which may still require ad-hoc interaction.
+        </p>
+        <p>
+        Based on this, we present the novel idea of Language Model Programming (LMP). LMP generalizes language model prompting from pure text prompts to an intuitive combination of text prompting and scripting. Additionally, LMP allows constraints to be specified over the language model output. This enables easy adaption to many tasks, while abstracting language model internals and providing high-level semantics.
+        </p>
+        <p>
+        To enable LMP, we implement LMQL (short for Language Model Query Language), which leverages the constraints and control flow from an LMP prompt to generate an efficient inference procedure that minimizes the number of expensive calls to the underlying language model.
+        </p>
+        <p>
+        We show that LMQL can capture a wide range of state-of-the-art prompting methods in an intuitive way, especially facilitating interactive flows that are challenging to implement with existing high-level APIs. Our evaluation shows that we retain or increase the accuracy on several downstream tasks, while also significantly reducing the required amount of computation or cost in the case of pay-to-use APIs (26-85% cost savings).
+        </p>
+        <span class="link-block">
+          <a href="https://arxiv.org/pdf/2212.06094"
+             class="external-link button is-normal is-rounded is-dark">
+            <span class="icon">
+              <i class="fa-solid fa-file-pdf"></i>
+            </span>
+            <span>Read Full Paper</span>
+          </a>
+        </span>
+        </div>
+      </div>
+      <div class="column is-experimental-results">
+        <br/>
+        <p class="has-text-left">
+          <b>Experimental Results</b><br/>
+          Compared to standard decoding using <a href="https://huggingface.co/docs/transformers/v4.18.0/en/main_classes/text_generation#transformers.generation_utils.GenerationMixin.generate" target="_blank">🤗&nbsp;Transformers' <tt>generate()</tt></a> function, LMQL allows for high-level control and requires less tokens to be processed.
+        </p>
+
+        <figure class="image">
+            <img src="static/images/cot.svg"/>
+            Chain-Of-Thought reasoning with LMQL vs. standard decoding.<br/>
+        </figure>
+
+        <figure class="image" >
+          <img src="static/images/interactive.svg"/>
+          Query statistics of using LMQL for interactive language model querying vs. standard decoding.<br/>
+      </figure>
+      <span class="footnote">
+        *We estimate cost savings based on the current token price of $0.02/1K tokens of the <a href="https://openai.com/api/pricing" target="_blank">GPT-3 <tt>davinci</tt> model</a>.
+      </span>
+    </div>
+    <!--/ Abstract. -->
+  </div>
+</section>
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h4 class="title">BibTeX</h4>
+    <pre><code>
+@article{beurer2022prompting,
+  title={Prompting Is Programming: A Query Language For Large Language Models},
+  author={Beurer-Kellner, Luca and Fischer, Marc and Vechev, Martin},
+  journal={{PLDI} '23},
+  year={2022}
+}
+    </code></pre>
+  </div>
+</section>
+
+
+<section class="section custom-footer">
+  <div class="container is-max-desktop content">
+    <div class="columns">
+      <div class="column" style="text-align: left;">
+        LMQL is a project by the <a href="https://www.sri.inf.ethz.ch/">Secure, Reliable, and Intelligent Systems Lab</a> at ETH Zürich.<br/>
+        <img src="static/images/institution-logos.svg"/>
+      </div>
+      <div class="column" style="text-align: left;">
+        Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
+        Last updated on <%LAST_UPDATED%>.<br/>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

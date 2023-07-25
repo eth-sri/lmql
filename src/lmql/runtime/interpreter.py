@@ -1063,7 +1063,7 @@ class PromptInterpreter:
         if key in self.subinterpreters.keys():
             return self.subinterpreters[key]
         else:
-            subinterpreter = SubInterpreter(fct, self, captures)
+            subinterpreter = SubInterpreter(fct, self, captures, model=self.model, model_identifier=self.model_identifier)
             
             # inherits interpreter attributes from parent
             subinterpreter.tokenizer = self.tokenizer
@@ -1165,7 +1165,7 @@ class UserDataLayer:
 PromptInterpreter.main = None
 
 class SubInterpreter(PromptInterpreter):
-    def __init__(self, fct, parent_interpreter: PromptInterpreter, captures: Dict[str, Any]):
+    def __init__(self, fct, parent_interpreter: PromptInterpreter, captures: Dict[str, Any], model: str = None, model_identifier: str = None):
         super().__init__(context=parent_interpreter)
         self.query_fct = fct
         self.fct = fct.fct
@@ -1177,6 +1177,13 @@ class SubInterpreter(PromptInterpreter):
         self.user_data_key = "head[sub-" + str(id(self)) + "]"
 
         self.initial_subprompt_ids = None
+        
+        self.model = model
+        self.model_identifier = model_identifier
+
+    def set_model(self, model):
+        # ignore set_model for subinterpreters
+        pass
 
     def user_data_layer(self, *sqs):
         return UserDataLayer(sqs, self.user_data_mappings)

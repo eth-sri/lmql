@@ -85,7 +85,7 @@ export const Dialog = styled.div`
 
 const ExploreDialog = styled(Dialog)`
   width: 800pt;
-  height: 550pt;
+  height: 700pt;
   max-height: 100vh;
   max-width: 100vh;
   overflow-y: auto;
@@ -142,12 +142,10 @@ const ExploreDialog = styled(Dialog)`
     top: 15pt;
     right: 15pt;
     font-size: 8pt;
-    /* italic */
-    font-style: italic;
   }
 
   div.highlight {
-    background-color: #d4d3d3;
+    background-color: #dedef8;
   }
 
   >div>div {
@@ -175,7 +173,6 @@ const ExploreDialog = styled(Dialog)`
 
   h2 {
     font-size: 12pt;
-    color: #373737;
   }
 
   h3 {
@@ -387,7 +384,7 @@ function BasicHighlighted(props) {
 }
 
 const Description = styled.p`
-  font-size: 12pt;
+  font-size: 14pt;
   color: #696969;
   padding: 0pt 20pt;
 `
@@ -486,7 +483,7 @@ export function Explore() {
     if (!visible) return null;
 
     let description = <>
-    LMQL is a programming language for interacting with large language models. This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below, demonstrating <i>constrained model use</i>, <i>control-flow guided generation</i>, and tool-augmented LLMs.
+    This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below.
     </>
 
     if (configuration.NEXT_MODE) {
@@ -508,7 +505,7 @@ export function Explore() {
             <div className={c.highlight ? "highlight" : ""} key={c.category + "-container"}>
             <h2 key={c.category}>{c.category}</h2>
             {c.highlight && <span class="sidenote">
-              <a href="https://github.com/eth-sri/lmql/issues" target="_blank" rel="noreferrer"> Please report any issues you find.</a>
+              <a href="https://github.com/eth-sri/lmql/issues" target="_blank" rel="noreferrer"> Report Issues</a>
             </span>}
             <div key={c.category + "-div"}>
             {c.queries.map((q,i) => <Tile key={c.category + "-" + i} onClick={() => onClickTile(q)}>
