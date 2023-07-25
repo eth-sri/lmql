@@ -135,7 +135,7 @@ where
        {
           // hello world
           name: "❤️ Sentiment Constraints",
-          description: "Affect sentiment with in-context prompting.",
+          description: "Affect sentiment with in-context instructions.",
           code: `@lmql.query(cache="mood.tokens", model="chatgpt")
 async def mood_description(m: str):
     '''lmql
@@ -173,7 +173,7 @@ where
        {
           // hello world
           name: "📝 Write A Poem",
-          description: "Insert dynamic instructions with incontext.",
+          description: "Insert dynamic instructions during generation.",
           code: `@lmql.query
 async def rhyme():
     '''

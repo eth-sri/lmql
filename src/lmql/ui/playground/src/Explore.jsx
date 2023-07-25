@@ -4,6 +4,9 @@ import {queries} from "./queries";
 import { displayState, persistedState, trackingState } from "./State";
 import {configuration} from "./Configuration"
 
+import { BUILD_INFO } from './build_info';
+import { isLocalMode} from './Configuration';
+
 export const PromptPopup = styled.div`
   position: absolute;
   top: 0;
@@ -115,8 +118,8 @@ const ExploreDialog = styled(Dialog)`
 
     div.tile {
       display: block !important;
+      height: 40pt;
       width: 100% !important;
-      border: 1pt solid transparent;
 
       &:hover {
         transform: none !important;
@@ -124,9 +127,6 @@ const ExploreDialog = styled(Dialog)`
       }
     }
   }
-
-  /* very light white to grey grdient */
-  background: linear-gradient(180deg, #ffffff 0%, #e4e2e2 100%);
 
   >div {
     padding: 5pt 20pt;
@@ -145,7 +145,9 @@ const ExploreDialog = styled(Dialog)`
   }
 
   div.highlight {
-    background-color: #dedef8;
+    background-color: #e5e5e5;
+    margin: 5pt;
+    border-radius: 4pt;
   }
 
   >div>div {
@@ -199,17 +201,17 @@ const ExploreDialog = styled(Dialog)`
 const Tile = styled.div.attrs({
   className: "tile"
 })`
-  background-color: #f5f5f5;
+  background-color: white;
   border-radius: 4pt;
   padding: 10pt;
   margin: 10pt;
   margin-left: 0pt;
   margin-top: 0pt;
   cursor: pointer;
-  transition: 0.1s;
+  transition: 0.05s ease-in-out transform;
   height: 80pt;
   width: 100pt;
-  border: 0.5pt solid #ababab;
+  border: 1pt solid #d4d4d4;
   opacity: 0.9;
   position: relative;
   display: flex;
@@ -221,6 +223,7 @@ const Tile = styled.div.attrs({
   :hover {
     transform: scale(1.05);
     opacity: 1.0;
+    border: 1pt solid #9b9a9a;
   }
 
   h3 {
@@ -396,6 +399,22 @@ const CiteBox = styled.code`
   border-radius: 4pt;
 `
 
+const PoweredBy = styled.div`
+  font-size: 8pt;
+  color: #696969;
+  text-align: center;
+  margin: auto;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10pt;
+
+  >div:nth-child(2) {
+    margin-left: 5pt;
+  }
+`
+
 let didLoadAnchor = false;
 
 const PreviewQueries = {
@@ -525,6 +544,16 @@ export function Explore() {
           <a target="_blank" rel="noreferrer" href="https://arxiv.org/pdf/2212.06094">arXiv preprint arXiv:2212.06094</a> (2022).
           </CiteBox>
           <br/>
+          <PoweredBy>
+            <div>LMQL {BUILD_INFO.info().commit}</div>
+            <div>
+            {(configuration.BROWSER_MODE && !isLocalMode()) && <span> In-Browser, Made with ❤️ + <a href="https://pyodide.org" target="_blank" rel="noreferrer">Pyodide</a> + <a href="https://webassembly.org/" target="_blank" rel="noreferrer">WebAssembly</a></span>}
+              {BUILD_INFO.info().date != "-" ? <>
+                <br/>
+                Build on {BUILD_INFO.info().date}
+              </> : null}
+            </div>
+          </PoweredBy>
           </div>
           </>}
         </ExploreDialog>
