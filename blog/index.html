@@ -143,6 +143,59 @@ function openPlaygroundSnippet(link, snippet) {
   </div>
 
 
+<section class="section blog startpage" id="release-0.0.6.6">
+    <div class="container is-max-desktop">
+      <!-- Abstract. -->
+      <div class="columns is-centered has-text-centered">
+        <div class="column">
+          <h5 class="title is-2 has-text-left" style="margin-bottom: 2pt;">
+            <a href="blog/release-0.0.6.6.html" class="anchor">
+                LMQL 0.0.6.6 Released
+            </a>
+          </h5>
+          <div class="content has-text-justified">
+          <div class="authors">
+            <div class="is-size-5 publication-authors">
+              <span class="author-block">
+            <a href="mailto:hello@lmql.ai">LMQL Team</a>
+        </span>
+            </div>
+          </div>
+            <div class="date">
+                Tue, Jul 25, 2023
+            </div>
+            <section id="lmql-0-0-6-6-released">
+
+<p>We just released LMQL <em>0.0.6.6</em>. This is a minor update with a couple of smaller fixes and improvements.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">lmql.F</span></code> now supports positional arguments:</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">greet</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">"Greet </span><span class="si">{a}</span><span class="s2"> and </span><span class="si">{b}</span><span class="s2">: [GREETING]"</span><span class="p">)</span>
+
+<p><span class="c1"># call with positional arguments</span>
+<span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="s2">&quot;Bob&quot;</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
+<span class="c1"># call with keyword arguments</span>
+<span class="n">greet</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="s2">&quot;Bob&quot;</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
+</pre></div></p>
+</div>
+<ul class="simple">
+<li><p>We improved the error handling of the <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> backend and fixed a bug with model identifier parsing.</p></li>
+<li><p>We also fixed a bug with the LMTP scheduler, where CPU load was high even when no tasks were present. Thanks to community member <a class="reference external" href="https://github.com/4onen">@4onen</a> for reporting and fixing this!</p></li>
+<li><p>Added backend support for <code class="docutils literal notranslate"><span class="pre">auto_gptq</span></code> quantized models, contributed by community member <a class="reference external" href="https://github.com/meditans">@meditans</a>.</p></li>
+<li><p>We fixed an issue where for Azure OpenAI models, a dummy configuration <code class="docutils literal notranslate"><span class="pre">api.env</span></code> was needed. See <a class="reference internal" href="#"><span class="xref myst">this issue</span></a> and our <a class="reference external" href="https://docs.lmql.ai/en/stable/language/azure.html">documentation</a> for details. Thanks to community members Missing and <a class="reference external" href="https://github.com/hooman-bayer">@hooman-bayer</a> for their feedback and contributions to this.</p></li>
+</ul>
+<blockquote>
+<div><p><strong>Versioning Note</strong>: 0.0.6.6 is the last release with two leading zeros. Starting with the next release, LMQL will adopt semantic versioning and use a single leading zero, i.e. 0.6.7.</p>
+</div></blockquote>
+</section>
+
+
+
+          </div>
+        </div>
+    </div>
+  </section>
+    
 <section class="section blog startpage" id="release-0.0.6.5">
     <div class="container is-max-desktop">
       <!-- Abstract. -->
@@ -644,7 +697,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Tue, Jul 25, 12:18 PM (UTC)<br/>
+        Last updated on Tue, Jul 25, 1:04 PM (UTC)<br/>
       </div>
     </div>
   </div>
