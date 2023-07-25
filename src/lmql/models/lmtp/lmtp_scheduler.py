@@ -188,9 +188,11 @@ class Scheduler:
         start = time.time()
         calls = []
         # get as many calls from the queue as possible within 0.1 seconds
+        first = True
         while time.time() - start < 0.1:
             try:
-                calls.append(self.queue.get_nowait())
+                calls.append(self.queue.get(block=first, timeout=0.1))
+                first = False
             except QueueEmpty:
                 break
         # group calls into batches
