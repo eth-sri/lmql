@@ -10,11 +10,18 @@ lmql_operation_registry = {}
 # @LMQLOp('function_name') decorator
 def LMQLOp(name):
     def class_transformer(cls):
+        # get full import path of cls
+        cls_name = cls.__name__
+        
+        # if not in lmql.ops.ops, then use direct cls reference
+        if cls.__module__ != "lmql.ops.ops":
+            cls_name = cls
+
         if type(name) is list:
             for n in name:
-                lmql_operation_registry[n] = f"{cls.__name__}"
+                lmql_operation_registry[n] = cls_name
             return cls
-        lmql_operation_registry[name] = f"{cls.__name__}"
+        lmql_operation_registry[name] = cls_name
         return cls
     return class_transformer
 
