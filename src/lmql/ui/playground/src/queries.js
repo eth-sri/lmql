@@ -129,12 +129,7 @@ where
        {
           name: "🔤 Regex Constraints",
           description: "Specify constraints using regex.",
-          code: `argmax 
-    "Today's date is [RESPONSE]" 
-from 
-    "openai/text-ada-001" 
-where 
-    REGEX(RESPONSE, r"[0-9]{2}/[0-9]{2}")`,
+          code: `"It's the last day of June so today is [RESPONSE]" where REGEX(RESPONSE, r"[0-9]{2}/[0-9]{2}")`,
             state: 'precomputed/date-regex.json'
        },
        {
