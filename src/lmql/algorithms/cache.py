@@ -3,8 +3,8 @@ import os
 import inspect
 
 from lmql.runtime.lmql_runtime import LMQLQueryFunction
-from lmql import LMQLResult
 import lmql
+from lmql import LMQLResult, F
 
 # cache query results by query code and arguments
 global cache_file
@@ -47,15 +47,15 @@ def persist_cache():
         with open(cache_file, "wb") as f:
             pickle.dump(cache, f)
 
-async def apply(q, *args, parameter=None):
+
+async def apply(q, *args, **kwargs):
     global cache
 
     if type(q) is str:
-        lmql_code = q
-        q = lmql.query(q)
-    else:
-        lmql_code = q.lmql_code
+        where = kwargs.pop("where", None)
+        q = F(q, constraints=where, is_async=True)
 
+    lmql_code = q.lmql_code
 
     # handle non-LMQL queries
     if type(q) is not LMQLQueryFunction:
@@ -83,11 +83,6 @@ async def apply(q, *args, parameter=None):
     else:
         kwargs = {}
         try:
-            if parameter is not None:
-                assert len(args) == 1
-                kwargs = {parameter: args[0]}
-                args = []
-            # get positional arguments
             result = await q(*args, **kwargs)
             if len(result) == 1:
                 result = result[0]

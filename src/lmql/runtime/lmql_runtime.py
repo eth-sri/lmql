@@ -102,6 +102,23 @@ class LMQLQueryFunction:
     def force_model(self, model):
         self.model = model
 
+    def try_bind_positional_to_kwargs(self, signature, *args, **query_kwargs):
+        """
+        Best-effort attempt to bind positional arguments to keyword arguments in order of self.args. 
+
+        Only enabled for lmql.F for now, may have unexpected effects depending on the order query
+        arguments as determined by the compiler.
+        """
+        # only bind if kwargs are empty and no signature is provided (lmql.F or lmql.run)
+        if len(signature.parameters) != 0 or len(self.args) != len(args):
+            return
+        kwargs = {**{k:v for k,v in zip(self.args, args)}, **query_kwargs}
+
+        return inspect.BoundArguments(
+            signature=inspect.Signature(parameters=[inspect.Parameter(name=k, kind=inspect.Parameter.POSITIONAL_OR_KEYWORD) for k in self.args]),
+            arguments=kwargs
+        )
+
     def make_kwargs(self, *args, **kwargs):
         """
         Binds args and kwargs to the function signature and returns a dict of all user-defined kwargs.
@@ -128,11 +145,19 @@ class LMQLQueryFunction:
         try:
             signature: inspect.BoundArguments = signature.bind(*args, **query_kwargs)
         except TypeError as e:
-            if len(e.args) == 1 and e.args[0].startswith("missing "):
-                e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
-            elif len(e.args) == 1:
-                e.args = (e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
-            raise e
+            if "too many positional arguments" in str(e):
+                # this is different from Python behavior, but we allow it for lmql.F and lmql.run
+                pos_as_kw = self.try_bind_positional_to_kwargs(signature, *args, **kwargs)
+                if pos_as_kw is not None:
+                    signature = pos_as_kw
+                else:
+                    raise e
+            else:    
+                if len(e.args) == 1 and e.args[0].startswith("missing "):
+                    e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
+                elif len(e.args) == 1:
+                    e.args = (e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
+                raise e
         
         signature.apply_defaults()
 

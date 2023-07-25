@@ -298,6 +298,9 @@ class PromptInterpreter:
 
         client = LMQLModelRegistry.get(self.model, **model_args)
 
+        if callable(client):
+            client = client()
+
         # setup the VocabularyMatcher to use the concrete vocabulary of the model
         VocabularyMatcher.init(client.get_tokenizer())
         

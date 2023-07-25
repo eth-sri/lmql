@@ -697,6 +697,8 @@ class AsyncOpenAIAPI:
                         self.stats.errors += 1
                         retries -= 1            
                         print("OpenAI:", str(e), '"' + str(type(e)) + '"', flush=True)
+                        # do not retry if the error is definitive (API configuration error)
+                        if "api.env" in str(e): raise e
                         if kwargs.get("api_config", {}).get("errors", None) == "raise":
                             raise e
                         await asyncio.sleep(0.5)

@@ -48,29 +48,41 @@ class FreeVarCollector(ast.NodeVisitor):
             self.free_vars.add(node.id)
 
 class DefinedVarsCollector(ast.NodeVisitor):
-    def __init__(self, defined_vars):
+    def __init__(self, defined_vars, defined_constraints):
         self.defined_vars = defined_vars
+        self.defined_constraints = defined_constraints
 
     def visit_Name(self, node):
         if type(node.ctx) is ast.Store:
             self.defined_vars.add(node.id)
+        super().generic_visit(node)
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
         self.defined_vars.add(node.name)
+        super().generic_visit(node)
 
     def visit_ClassDef(self, node: ClassDef) -> Any:
         self.defined_vars.add(node.name)
+        visit_potential_constraint_def(node, self)
+        super().generic_visit(node)
 
     def visit_Import(self, node: Import) -> Any:
         for alias in node.names:
             self.defined_vars.add(alias.asname or alias.name)
+        super().generic_visit(node)
 
     def visit_ImportFrom(self, node: ImportFrom) -> Any:
         for alias in node.names:
             self.defined_vars.add(alias.asname or alias.name)
+        super().generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: AsyncFunctionDef) -> Any:
         self.defined_vars.add(node.name)
+        super().generic_visit(node)
+
+    # visit LMQLOp decorator to collect defined variables
+    def visit_Call(self, node: ast.Call) -> Any:
+        return super().generic_visit(node)
 
 class PromptScope(ast.NodeVisitor):
     def __init__(self):
@@ -80,10 +92,12 @@ class PromptScope(ast.NodeVisitor):
         self.free_vars = set()
         self.written_vars = set()
 
+        self.defined_constraints = set()
+
     def scope_prologue(self, query: LMQLQuery):
         if query.prologue is None: return
         
-        DefinedVarsCollector(self.prologue_vars).visit(ast.parse(query.prologue))
+        DefinedVarsCollector(self.prologue_vars, self.defined_constraints).visit(ast.parse(query.prologue))
 
     def scope(self, query: LMQLQuery):
         self.distribution_vars = set([query.distribution.variable_name]) if query.distribution is not None else set()    
@@ -99,7 +113,8 @@ class PromptScope(ast.NodeVisitor):
         self.scope_prologue(query)
 
         # collect defined vars in prompt
-        for p in query.prompt: self.visit(p)
+        for p in query.prompt: 
+            self.visit(p)
 
         # also collect variable reads from where clause
         if query.where is not None:
@@ -112,7 +127,7 @@ class PromptScope(ast.NodeVisitor):
             FreeVarCollector(self.free_vars, exclude_criteria=[self.exclude_identifier]).visit(query.distribution.values)
 
         # remove all defined and prologue vars from free vars
-        self.free_vars = self.free_vars - self.defined_vars - self.prologue_vars
+        self.free_vars = self.free_vars - self.defined_vars - self.prologue_vars - self.defined_constraints
 
         query.scope = self
 
@@ -213,10 +228,24 @@ class PromptScope(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ClassDef) -> Any:
         self.defined_vars.add(node.name)
+        visit_potential_constraint_def(node, self)
 
     def visit_ImportFrom(self, node: ImportFrom) -> Any:
         for alias in node.names:
             self.defined_vars.add(alias.asname or alias.name)
+
+def visit_potential_constraint_def(node: ClassDef, scope: PromptScope):
+    for d in node.decorator_list:
+        # detect LMQLOp calls
+        if type(d) is ast.Call:
+            if type(d.func) is ast.Name:
+                if d.func.id == "LMQLOp" and len(d.args) == 1:
+                    if type(d.args[0]) is ast.Constant:
+                        scope.defined_constraints.add(d.args[0].value)
+                    elif type(d.args[0]) is ast.List:
+                        for e in d.args[0].elts:
+                            if type(e) is ast.Constant:
+                                scope.defined_constraints.add(e.value)
 
 def is_query_string_with_constraints(node: ast.BoolOp):
     if len(node.values) < 1:
@@ -479,11 +508,11 @@ class LMQLConstraintTransformation:
         elif type(expr) is ast.ListComp:
             return self.default_transform_node(expr, snf).strip()
         elif type(expr) is ast.Call:
-            bn = get_builtin_name(expr.func)
-            if bn is not None:
+            constraint_ref = get_builtin_name(expr.func) or get_inner_constraint_ref(expr.func, self.scope)
+            if constraint_ref is not None:
                 args = [self.transform_node(a, snf) for a in expr.args]
                 args_list = ", ".join(args)
-                return f"{bn}([{args_list}])"
+                return f"{constraint_ref}([{args_list}])"
             if is_allowed_builtin_python_call(expr.func):
                 return self.default_transform_node(expr, snf).strip()
             
@@ -564,6 +593,19 @@ def is_allowed_builtin_python_call(node):
     allowed_builtin_functions = set(["set", "all"])
     return node.id in allowed_builtin_functions
 
+def get_inner_constraint_ref(node, scope: PromptScope):
+    if type(node) is str:
+        n = node
+    else:
+        if type(node) is not ast.Name:
+            return None
+        n = node.id
+    
+    if n in scope.defined_constraints:
+        return OPS_NAMESPACE + ".lmql_operation_registry['" + n + "']"
+    
+    return None
+
 def get_builtin_name(node, plain_python=False):
     if type(node) is str:
         n = node
@@ -573,8 +615,12 @@ def get_builtin_name(node, plain_python=False):
         n = node.id
     
     if n in lmql_operation_registry.keys():
-        return OPS_NAMESPACE + "." + lmql_operation_registry[n]
-    
+        name = lmql_operation_registry[n]
+        if type(name) is type:
+            return OPS_NAMESPACE + ".lmql_operation_registry['" + n + "']"
+        else:
+            return OPS_NAMESPACE + "." + name
+
     return None
 
 def is_type_constraint(expr: ast.Expr):

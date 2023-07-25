@@ -987,8 +987,6 @@ class HFModelStatsAdapter:
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
 def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
-    # make sure openai org and secret are available
-    if not mock: from lmql.runtime.openai_secret import openai_secret, openai_org
     class OpenAIModel:
         def __init__(self) -> None:
             self.model_identifier = model_identifier

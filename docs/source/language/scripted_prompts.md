@@ -1,6 +1,6 @@
 # Scripted Prompting
 
-In LMQL, programs are not just static tempaltes of text, as they also contain control flow (e.g. loops, conditions, function calls). This facilitates dynamic prompt construction and allows LMQL programs to respond dynamically to model output. This scripting mechanic is achieved by a combination of prompt templates, control flow and [output constraining](constraints.md).
+In LMQL, programs are not just static templates of text, as they also contain control flow (e.g. loops, conditions, function calls). This facilitates dynamic prompt construction and allows LMQL programs to respond dynamically to model output. This scripting mechanic is achieved by a combination of prompt templates, control flow and [output constraining](constraints.md).
 
 > Note: LMQL requires special escaping to use `[`, `]`, `{` and `}` in a literal way, see [](Escaping).
 

@@ -44,5 +44,12 @@ def test_model_reference_cuda():
         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
     '''
 
+@lmql.query(model=m2)
+def test_model_reference_cuda_decorator():
+    '''lmql
+    "Hello[WHO]" where STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
+    '''
+
+
 if __name__ == "__main__":
     run_all_tests(locals())
