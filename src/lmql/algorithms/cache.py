@@ -3,7 +3,7 @@ import os
 import inspect
 
 from lmql.runtime.lmql_runtime import LMQLQueryFunction
-from lmql import LMQLResult
+from lmql import LMQLResult, F
 
 # cache query results by query code and arguments
 global cache_file
@@ -46,8 +46,12 @@ def persist_cache():
         with open(cache_file, "wb") as f:
             pickle.dump(cache, f)
 
-async def apply(q, *args):
+async def apply(q, *args, **kwargs):
     global cache
+
+    if type(q) is str:
+        where = kwargs.pop("where", None)
+        q = F(q, constraints=where, is_async=True)
 
     # handle non-LMQL queries
     if type(q) is not LMQLQueryFunction:
@@ -74,7 +78,7 @@ async def apply(q, *args):
         return cache[key]
     else:
         try:
-            result = await q(*args)
+            result = await q(*args, **kwargs)
             if len(result) == 1:
                 result = result[0]
             if type(result) is LMQLResult:
