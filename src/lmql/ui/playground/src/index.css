@@ -97,6 +97,15 @@ span.subtitle a, span.subtitle .link {
   }
 }
 
+a {
+  color: rgb(94, 131, 216);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
 /* 
 #root {
   margin: 100pt;

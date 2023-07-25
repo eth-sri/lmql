@@ -145,7 +145,7 @@ const ExploreDialog = styled(Dialog)`
   }
 
   div.highlight {
-    background-color: #e5e5e5;
+    background-color: #f5f5f5;
     margin: 5pt;
     border-radius: 4pt;
   }
@@ -163,6 +163,8 @@ const ExploreDialog = styled(Dialog)`
   h1 {
     margin: 0;
     padding: 20pt;
+    font-weight: bold;
+    padding-bottom: 10pt;
   }
 
   h1 img {
@@ -182,7 +184,7 @@ const ExploreDialog = styled(Dialog)`
     color: #373737;
     margin: 0;
     z-index: 999;
-    font-weight: 500;
+    font-weight: 700;
   }
 
   .close {
@@ -390,11 +392,12 @@ const Description = styled.p`
   font-size: 14pt;
   color: #696969;
   padding: 0pt 20pt;
+  font-weight: 500;
 `
 
 const CiteBox = styled.code`
   display: block;
-  background-color: #dbdbdb;
+  background-color: #f5f5f5;
   padding: 4pt;
   border-radius: 4pt;
 `
