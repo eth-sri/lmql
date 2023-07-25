@@ -10,6 +10,7 @@ import numpy as np
 from lmql.runtime.stats import Stats
 from lmql.runtime.caching import cachefile, cache_file_exists
 from lmql.runtime.tokenizer import get_vocab
+from lmql.ops.regex import Regex
 
 class VocabularyMatcher:
     """
@@ -135,8 +136,7 @@ class VocabularyMatcher:
                     mask = self._make_mask_from_char_length(charlen)
                 else:
                     assert regex is not None, "TokenSetConcrete: either tokens or regex must be set."
-                    assert not prefix, "TokenSetConcrete: prefix is not supported for regex."
-                    mask = self._make_mask_from_regex(regex)
+                    mask = self._make_mask_from_regex(regex, prefix)
 
                 if minus: mask = np.logical_not(mask)
 
@@ -144,18 +144,22 @@ class VocabularyMatcher:
             
             return VocabularyMatcher.with_cache(cache_keys, do_make_mask)
 
-    def _make_mask_from_regex(self, regex):
+    def _make_mask_from_regex(self, regex, prefix=False):
         regex = regex.replace(" ", self.space_repr)
         regex = regex.replace("\n", self.nl_repr)
-
         regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
 
         mask = np.zeros([self.vocab_size], dtype=np.bool_)
-
-        pattern = re.compile(regex, re.UNICODE)
-        for id, subtoken in self.vocab.items():
-            if pattern.match(subtoken) is not None:
-                mask[id] = True
+        if prefix:
+            r = Regex(regex)
+            for id, subtoken in self.vocab.items():
+                if r.is_prefix(subtoken):
+                    mask[id] = True
+        else:
+            pattern = re.compile(regex, re.UNICODE)
+            for id, subtoken in self.vocab.items():
+                if pattern.match(subtoken) is not None:
+                    mask[id] = True
 
         return mask
 
@@ -533,7 +537,7 @@ def tset(*tokens, regex=False, prefix=False, exact=False, charlen=None, name=Non
         return TokenSet(charlen=charlen, name=name)
     if regex:
         assert len(tokens) == 1, "cannot create a TokenSet from multiple regexes."
-        return TokenSet(regex=tokens[0], name=name)
+        return TokenSet(regex=tokens[0], prefix=prefix, name=name)
     if len(tokens) == 1 and type(tokens[0]) is set:
         return TokenSet(set(list(tokens[0])), minus=False, name=name)
     return TokenSet(set(tokens), minus=False, prefix=prefix, exact=exact, name=name)
