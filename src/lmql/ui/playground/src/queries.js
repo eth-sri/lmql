@@ -127,6 +127,17 @@ where
             state: ''
        },
        {
+          name: "🔤 Regex Constraints",
+          description: "Specify constraints using regex.",
+          code: `argmax 
+    "Today's date is [RESPONSE]" 
+from 
+    "openai/text-ada-001" 
+where 
+    REGEX(RESPONSE, r"[0-9]{2}/[0-9]{2}")`,
+            state: 'precomputed/date-regex.json'
+       },
+       {
           // hello world
           name: "❤️ Sentiment Constraints",
           description: "Affect sentiment with in-context prompting.",

@@ -43,7 +43,7 @@ export const Dialog = styled.div`
   overflow: hidden;
   padding: 10pt;
   margin: auto;
-  max-width: 800pt;
+  max-width: 1100pt;
   max-height: 500pt;
   color: black;
 
@@ -84,7 +84,7 @@ export const Dialog = styled.div`
 `
 
 const ExploreDialog = styled(Dialog)`
-  width: 600pt;
+  width: 800pt;
   height: 550pt;
   max-height: 100vh;
   max-width: 100vh;
@@ -104,11 +104,25 @@ const ExploreDialog = styled(Dialog)`
     width: calc(100vw - 20pt);
     height: calc(100vh - 20pt);
     max-height: 100vh;
-    max-width: 100vh;
+    max-width: 100vw;
     overflow-y: auto;
     position: relative;
     padding: 10pt;
     padding-bottom: 80pt;
+    padding-left: 0;
+    margin: 0;
+    border-radius: 0;
+
+    div.tile {
+      display: block !important;
+      width: 100% !important;
+      border: 1pt solid transparent;
+
+      &:hover {
+        transform: none !important;
+        border: 1pt solid #ababab;
+      }
+    }
   }
 
   /* very light white to grey grdient */
