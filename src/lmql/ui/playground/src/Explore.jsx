@@ -316,61 +316,6 @@ const CodeContainer = styled.div.attrs({
   }
 `
 
-const TypingContainer = styled.span`
-  .cursor {
-    animation: blink 2s linear infinite;
-    transform: scale(2.2);
-    transform-origin: top middle;
-    font-size: 25pt;
-    height: 15pt;
-    background-color: #313131;
-    width: 1pt;
-    position: relative;
-    left: 6pt;
-    content: " ";
-    overflow: hidden;
-    display: inline-block;
-  }
-
-  @keyframes blink {
-    0% {
-      opacity: 0;
-    }
-    50% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-`
-
-
-function TypedText(props) {
-  const text = props.text;
-  const speed = 50;
-  let [index, setIndex] = useState(window.textWasTyped ? text.length : 0);
-  let [isTyping, setIsTyping] = useState(!window.textWasTyped);
-
-  useEffect(() => {
-    if (!isTyping) return;
-    
-    if (index < text.length) {
-      setTimeout(() => {
-        setIndex(index + 1);
-      }, speed);
-    } else {
-      setIsTyping(false);
-      window.textWasTyped = true;
-    }
-  })
-
-  return <TypingContainer>
-    {text.substring(0, index)}
-    <span className="cursor"></span>
-  </TypingContainer>
-}
-
 function BasicHighlighted(props) {
   const s = props.code;
 
@@ -517,7 +462,7 @@ export function Explore() {
         <ExploreDialog>
           <h1 key="welcome">
             <img src="/lmql.svg" alt="LMQL Logo"/>  
-            <TypedText text="Welcome To LMQL" speed={20}/>
+            Welcome To LMQL
           </h1>
           <Description>{description}</Description>
           <span className="close" onClick={() => ExploreState.setVisibility(false)}>
