@@ -17,6 +17,22 @@ cp static/images/lmql.svg ../web-deploy/lmql.svg
 cp -r static ../web-deploy/
 cp -r try ../web-deploy/
 
+# build actions/
+pushd actions
+node generate.js
+popd
+mkdir -p ../web-deploy/actions
+cp -r actions/index.html ../web-deploy/actions/index.html
+cp -r actions/*.css ../web-deploy/actions/
+
+# # build chat/
+# pushd chat
+# node generate.js
+# popd
+# mkdir -p ../web-deploy/chat
+# cp -r chat/index.html ../web-deploy/chat/index.html
+# cp -r chat/*.css ../web-deploy/chat/
+
 # build blog
 pushd blog
 node generate.js

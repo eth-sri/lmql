@@ -121,14 +121,6 @@ class GraphNode {
 }
 
 function Query(q, showcase_info, id, i) {
-    // read and parse q.state json file
-    const result = fs.readFileSync("../../src/lmql/ui/playground/public/" + q.state)
-    const state = JSON.parse(result)
-    const decoder = JSON.parse(state["decoder-graph"])
-    const nodes = decoder.nodes.map(n => new GraphNode(n, decoder.edges))
-    const nodesMap = new Map(nodes.map(n => [n.id, n]))
-    nodes.forEach(n => n.nodesMap = nodesMap)
-
     const variable_indices = new Map()
     let code = q.code.trim()
     // replace < and > with &lt; and &gt;
@@ -138,8 +130,10 @@ function Query(q, showcase_info, id, i) {
     let keywords = ["argmax", "from", "and", "where", "sample", "beam", "async", "def", "import", "for", "in", "await", "return", "try", "except", "assert", "if", "else", "el", "distribution"]
     for (let k of keywords) {
         parsed = parsed.map(s => {
+            console.log(s.content)
             if (s.type === "code") {
-                return {"type": "code", "content": s.content.replaceAll(k, `<span class="lmql-kw">${k}</span>`)}
+                // replace all full kw matches (follow by space or newline or end of string) ("<keyword>(\n| |$)")
+                return {"type": "code", "content": s.content.replaceAll(new RegExp(`(${k})(\n| |$)`, "g"), `<span class="lmql-kw">${k}</span>$2`)}
             } else {
                 return s
             }
@@ -150,7 +144,7 @@ function Query(q, showcase_info, id, i) {
         if (s.type === "str") {
             const max_column_width = 40
             // console.log("string with indent", [s.indent])
-            let lines = [""]
+            let lines = [""]  
             // split by maximum column width
             for (let c of s.content) {
                 if (c === '\n') {
@@ -210,80 +204,30 @@ function Query(q, showcase_info, id, i) {
     // replace ➥ with grey styled ➥
     code_formatted = code_formatted.replaceAll("➥", `<span style="color: grey">➥</span>`)
 
-    // find node with highest nN value and highest seqlogprob
-    let max = 0
-    let maxNode = null
-    for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i]
-        const n = parseInt(node.id.substring(1))
-        if (n > max) {
-            max = n
-            maxNode = node
-        }
-    }
-
-    let taggedResult = reconstructTaggedModelResult([maxNode])[0]
-    let segments = taggedResult.tokens
-    // console.log(q.code)
-
-    let model_output = ""
-    const prompt = (v) => `<span class="variable-value prompt sync valp">\n${v.replaceAll("\n", "<br/>").replaceAll("\\n", "<br/>")}</span>`
-    const varv = (v, name, i) => `<span class="variable-value sync val${i}">
-    <span class="badge">${name}</span>
-    ${v.replaceAll("\n", "<br/>").replaceAll("\\n", "<br/>")}
-</span>`
-
-    for (let s of segments) {
-        s.content = s.content.replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-    }
-
-    if (showcase_info.truncate_output) {
-        segments[0] = {variable: "__prompt__", content: "<span class='lmql-truncated'>...</span>" + segments[0].content.substring(showcase_info.truncate_output)}
-    }
-
-    for (let s of segments) {
-        if (s.variable == "<eos>") {
-            continue
-        }
-        if (s.variable == "__prompt__") {
-            model_output += prompt(s.content) + "\n"
-        } else {
-            // get s.variable before the [idx]
-            let vname = s.variable.split("[")[0]
-            if (showcase_info.variables.includes(vname)) {
-                model_output += varv(s.content, vname, variable_indices.get(vname)) + "\n"
-            } else {
-                model_output += prompt(s.content) + "\n"
-            }
-        }
-    }
+    let model_output = "" 
 
     if (showcase_info["extra-output"]) {
-        if (showcase_info["extra-output"].startsWith("<clear/>")) {
-            model_output = ""
-            showcase_info["extra-output"] = showcase_info["extra-output"].substring("<clear/>".length)
-        }
-        model_output += showcase_info["extra-output"]
+        // load as .pd file 
+        const promptdown = fs.readFileSync(`${showcase_info["extra-output"]}`)
+        model_output = `<pre id="container" class="promptdown" animate="false" animate-speed="260">${promptdown}</pre>`
     }
 
-    const compactClass = showcase_info["compact"] ? " compact" : ""
+    let playgroundLink = showcase_info["playground-link"] ? `<a href="/playground?snippet=${showcase_info["playground-link"]}" target="_blank">Open In Playground</a>` : "" 
 
+    const compactClass = showcase_info["compact"] ? " compact" : ""
+ 
     const template = `
 <div id="${id}" class="side-by-side${compactClass} ${i == 0 ? 'first' : ''}">
     <div class="query">
-        <h3>
+        <h3> 
             LMQL
-            <a href="playground?snippet=${id.replaceAll("precomputed-", "").replaceAll("-json", "")}" target="_blank">
-            Open In Playground
-            </a>
+            ${playgroundLink}
         </h3>
-        <pre>
+        <pre>  
 ${code_formatted}
         </pre>
     </div>
-    <div class="output" ${showcase_info["output-style"] ? `style="${showcase_info["output-style"]}"` : ""}>
-        <h3>Chat</h3>
-    </div>
+    ${model_output} 
 </div>`
     return template
 }
