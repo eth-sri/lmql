@@ -191,7 +191,7 @@ Now, let's use the calc tool to add the two populations together. The population
                 </label><div class="dot"></div></anchor> <span class="lmql-kw">import</span> reAct, calc, wiki
 
 <span class="lmql-str">"Q: What is two times the birth year of
- <span style="color: grey">➥</span> Michele Obama?"</span>
+ <span style="color: grey">➥</span> Michelle Obama?"</span>
 <span class="lmql-str">"A: Let's think step by step\n"</span>
 
 <span class="lmql-str">"[REASONING]\n"</span> <span class="lmql-kw">where</span> <anchor class="anchor-2">reAct(REASONING, [wiki, calc])<label><div class="multiline">Adhering to the same interface, tool use protocols like <t>reAct</t> can swapped out in a flexible manner, allowing for experimentation with different paradigms.</div><div class="bridge"></div>
@@ -203,16 +203,16 @@ Now, let's use the calc tool to add the two populations together. The population
     </div>
     <pre id="container" class="promptdown" animate="true" animate-speed="260">### Agent Trace
 
-![bubble:user| What is two times the birth year of Michele Obama?
+![bubble:user| What is two times the birth year of Michelle Obama?
 Let's think step by step] [@begin|incontext] ![bubble:system| Instructions: In your reasoning adhere to the following structure: Thought: <your conclusions>
 If required you can also use the following actions: Action: tool(<ARG>), Observation: <TOOL OUTPUT>
 Available Tools: wiki: ..., calc: ... . Now you can start reasoning.] [@end|incontext]
-[bubble:assistant|Thought: [THOUGHT| To answer this question, I need to know the birth year of Michele Obama.]
-[@wait|400] Action: [ACTION| wiki("Michele Obama")]
+[bubble:assistant|Thought: [THOUGHT| To answer this question, I need to know the birth year of Michelle Obama.]
+[@wait|400] Action: [ACTION| wiki("Michelle Obama")]
 [@wait|400] Observation: [TOOL| Michelle LaVaughn Robinson Obama (born January 17, 1964) is an American attorney and author who served as the first lady of the United States from 2009 to 2017, being married to former president Barack Obama.  
 Raised on the South Side of Chicago, Obama is a graduate of Princeton]
 
-[@wait|400] Thought: [THOUGHT| Michele Obama was born in 1964.]
+[@wait|400] Thought: [THOUGHT| Michelle Obama was born in 1964.]
 [@wait|400] Action: [ACTION| calc("2*1964")]
 [@wait|400] Observation: [TOOL| 3928]
 ]
@@ -380,7 +380,7 @@ Raised on the South Side of Chicago, Obama is a graduate of Princeton]
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Wed, Jul 26, 4:16 PM (UTC)<br/>
+        Last updated on Wed, Jul 26, 4:17 PM (UTC)<br/>
       </div>
     </div>
   </div>
