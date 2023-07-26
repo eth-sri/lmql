@@ -9,10 +9,6 @@
 
     line-height: 1.5;
     position: relative;
-
-    word-break: keep-all;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
     
     opacity: 0.0;
 
@@ -28,9 +24,6 @@
     color: black;
     padding-right: 4pt;
 
-    word-break: keep-all;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
     font-weight: 400;
     margin-left: 2pt;
     padding-left: 4pt;
@@ -92,7 +85,6 @@
     color: black;
     max-width: 90%;
 
-    word-break: break-all;
     white-space: pre-wrap;
 }
 
