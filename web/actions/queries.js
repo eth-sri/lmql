@@ -56,7 +56,7 @@ def chatbot_query():
                     description: "Code Interpreter",
                     code: `from lmql.lib.actions import exec_code
 
-"Q: What the square root of 123123 - 19?"
+"Q: Compute the square root of (123123 - 19) * 12."
 "A: Let's think step by step"
 
 "[REASONING]" where exec_code(REASONING)

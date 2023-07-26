@@ -255,7 +255,7 @@ for (let category of saved_queries) {
 const index_html = fs.readFileSync("index.template.html")
 let index_html_output = index_html.toString().replace("<%SAMPLES%>", q_text)
 let query_options = queries.map((q,i) => `<span class="option ${i==0?'active':''}" value="${q.id}">${q.name}</span>`).join("\n")
-index_html_output = index_html_output.replace("<%SAMPLES_LIST%>", query_options)
+index_html_output = index_html_output.replace("<%SAMPLES_LIST%>", query_options + "<a class='option' href='/'> More LMQL →</a>")
 // last update date and hour+minute Zurich time
 const now = new Date()
 const formatted = new Date().toLocaleString('en-US', { timeZone: 'Europe/Zurich', weekday: 'short', month: 'short', day: 'numeric' , hour: 'numeric', minute: 'numeric' })

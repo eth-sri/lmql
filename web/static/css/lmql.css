@@ -649,6 +649,11 @@ span.option {
     border: 1pt solid rgba(0, 0, 0, 0.199);
 }
 
+a.option {
+    margin-left: 8pt;
+    font-size: 12pt !important;
+}
+
 .example-badges {
     margin-bottom: 10pt;
 }
