@@ -151,6 +151,7 @@
                     document.getElementById("raw-prompt").innerHTML = prompt;
 
                     let value = object.variables["ANSWER"].trim();
+                    
                     // escape all << and >>
                     value = value.replace(/<</g, '&lt;&lt;');
                     value = value.replace(/>>/g, '&gt;&gt;');
