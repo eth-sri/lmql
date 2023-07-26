@@ -27,7 +27,6 @@ cp -r actions/*.css ../web-deploy/actions/
 
 # build chat/
 mkdir -p ../web-deploy/chat
-pushd chat
 cp -r chat/index.html ../web-deploy/chat/index.html
 cp -r chat/send.svg ../web-deploy/chat/send.svg
 cp -r chat/studio-screenshot.png ../web-deploy/chat/studio-screenshot.png
