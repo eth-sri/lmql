@@ -644,6 +644,7 @@ function pd(el, config = null) {
 
         play();
         el.addEventListener('click', play)
+        el.play = play;
     } else {
         let state = new ScrollState(config);
         let cursor = new Cursor(1e9, config, state);
