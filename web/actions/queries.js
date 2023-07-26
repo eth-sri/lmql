@@ -42,7 +42,7 @@ def chatbot_query():
                     description: "ReAct Reasoning",
                     code: `from lmql.lib.actions import reAct, calc, wiki
 
-"Q: What is two times the birth year of Michele Obama?"
+"Q: What is two times the birth year of Michelle Obama?"
 "A: Let's think step by step\\n"
 
 "[REASONING]\\n" where reAct(REASONING, [wiki, calc])
