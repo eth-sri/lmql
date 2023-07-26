@@ -162,7 +162,7 @@
                 </label><div class="dot"></div></anchor>
         </pre>
     </div>
-    <pre id="container" class="promptdown" animate="false" animate-speed="260">### Chat
+    <pre id="container" class="promptdown" animate="true" animate-speed="260">### Chat
 ![bubble:user|Q: What is the population of Germany and the US combined? 
 Let's think step by step.][@wait|800]
 
@@ -201,7 +201,7 @@ Now, let's use the calc tool to add the two populations together. The population
 </span><span class="lmql-str">"Therefore the answer is[ANSWER]"</span> <span class="lmql-kw">where</span> INT(ANSWER)
         </pre>
     </div>
-    <pre id="container" class="promptdown" animate="false" animate-speed="260">### Agent Trace
+    <pre id="container" class="promptdown" animate="true" animate-speed="260">### Agent Trace
 
 ![bubble:user| What is two times the birth year of Michele Obama?
 Let's think step by step] [@begin|incontext] ![bubble:system| Instructions: In your reasoning adhere to the following structure: Thought: <your conclusions>
@@ -235,12 +235,13 @@ Raised on the South Side of Chicago, Obama is a graduate of Princeton]
 <span class="lmql-str">"Q: What the square root of 123123 - 19?"</span>
 <span class="lmql-str">"A: Let's think step by step"</span>
 
-<span class="lmql-str">"[REASONING]"</span> <span class="lmql-kw">where</span> exec_code(REASONING)
+<span class="lmql-str">"[REASONING]"</span> <span class="lmql-kw">where</span> <anchor class="anchor-1">exec_code(REASONING)<label><div class="multiline">Using <t><b>exec_code</b></t>, the LLM is instructed to generate code. The generated code is then executed, and the line-wise output is fed back into the LLM, to enable a feedback loop.</div><div class="bridge"></div>
+                </label><div class="dot"></div></anchor>
 
 <span class="lmql-str">"Therefore the answer is[ANSWER]"</span>
         </pre>
     </div>
-    <pre id="container" class="promptdown" animate="false" animate-speed="260">[bubble:user|Q: Compute the square root of (123123 - 19) * 12?]
+    <pre id="container" class="promptdown" animate="true" animate-speed="260">![bubble:user|Q: Compute the square root of (123123 - 19) * 12?]
 ![bubble:system| (LLM can use inline code execution during reasoning)]
 [_instr("code=1")|# step by step solution in Python (a solution() 
  # function that returns the result)
@@ -375,11 +376,11 @@ Raised on the South Side of Chicago, Obama is a graduate of Princeton]
     <div class="columns">
       <div class="column" style="text-align: left;">
         LMQL is a project by the <a href="https://www.sri.inf.ethz.ch/">Secure, Reliable, and Intelligent Systems Lab</a> at ETH Zürich.<br/>
-        <img src="static/images/institution-logos.svg"/>
+        <img src="/static/images/institution-logos.svg"/>
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Wed, Jul 26, 3:42 PM (GMT+2)<br/>
+        Last updated on Wed, Jul 26, 4:14 PM (GMT+2)<br/>
       </div>
     </div>
   </div>

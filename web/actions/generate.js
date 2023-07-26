@@ -209,7 +209,7 @@ function Query(q, showcase_info, id, i) {
     if (showcase_info["extra-output"]) {
         // load as .pd file 
         const promptdown = fs.readFileSync(`${showcase_info["extra-output"]}`)
-        model_output = `<pre id="container" class="promptdown" animate="false" animate-speed="260">${promptdown}</pre>`
+        model_output = `<pre id="container" class="promptdown" animate="true" animate-speed="260">${promptdown}</pre>`
     }
 
     let playgroundLink = showcase_info["playground-link"] ? `<a href="/playground?snippet=${showcase_info["playground-link"]}" target="_blank">Open In Playground</a>` : "" 

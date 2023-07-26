@@ -33,7 +33,9 @@
     "precomputed/code-interpreter.json": {
         "name": "Code Interpreter",
         "variables": [],
-        "anchors": {},
+        "anchors": {
+            "exec_code(REASONING)": "Using <t><b>exec_code</b></t>, the LLM is instructed to generate code. The generated code is then executed, and the line-wise output is fed back into the LLM, to enable a feedback loop."
+        },
         "extra-output": "./logs/code-interpreter.pd"
     }
 }
