@@ -414,7 +414,7 @@ class PromptInterpreter:
     def process_query_string(self, s: str):
         if not ("turbo" in self.model_identifier or "gpt-4" in self.model_identifier):
             # replace all r"<lmql:(.*?)\/>" tags with ((\1))
-            s = re.sub(r"<lmql:(.*?)\/>", "", s)
+            s = re.sub(r"<lmql:(.*?)\/>", r"((\1)):", s)
         s = unescape_qstring(s)
         return s
 
