@@ -109,7 +109,7 @@
         <div class="example-badges">
           <span class="option active" value="precomputed-simple-chat-json">🛠️ Inline Tool Use</span>
 <span class="option " value="precomputed-react-reasoning-json">📃 ReAct Reasoning</span>
-<span class="option " value="precomputed-code-interpreter-json">💻 Code Interpreter</span>
+<span class="option " value="precomputed-code-interpreter-json">💻 Code Interpreter</span><a class='option' href='/'> More LMQL →</a>
         </div>
         <div class="select-bar">
           <!-- <div class="select examples"> -->
@@ -232,7 +232,8 @@ Raised on the South Side of Chicago, Obama is a graduate of Princeton]
         <pre>  
 <span class="lmql-kw">from</span> lmql.lib.actions <span class="lmql-kw">import</span> exec_code
 
-<span class="lmql-str">"Q: What the square root of 123123 - 19?"</span>
+<span class="lmql-str">"Q: Compute the square root of (123123 -
+ <span style="color: grey">➥</span> 19) * 12."</span>
 <span class="lmql-str">"A: Let's think step by step"</span>
 
 <span class="lmql-str">"[REASONING]"</span> <span class="lmql-kw">where</span> <anchor class="anchor-1">exec_code(REASONING)<label><div class="multiline">Using <t><b>exec_code</b></t>, the LLM is instructed to generate code. The generated code is then executed, and the line-wise output is fed back into the LLM, to enable a feedback loop.</div><div class="bridge"></div>
@@ -241,7 +242,8 @@ Raised on the South Side of Chicago, Obama is a graduate of Princeton]
 <span class="lmql-str">"Therefore the answer is[ANSWER]"</span>
         </pre>
     </div>
-    <pre id="container" class="promptdown" animate="true" animate-speed="260">![bubble:user|Q: Compute the square root of (123123 - 19) * 12?]
+    <pre id="container" class="promptdown" animate="true" animate-speed="260">### Code Generation
+![bubble:user|Q: Compute the square root of (123123 - 19) * 12.]
 ![bubble:system| (LLM can use inline code execution during reasoning)]
 [_instr("code=1")|# step by step solution in Python (a solution() 
  # function that returns the result)
@@ -305,70 +307,12 @@ Raised on the South Side of Chicago, Obama is a graduate of Princeton]
         </div>
       </div>
       <p style="margin: auto; margin-top: -10pt; text-align: center; font-size: 0.9em;">
-        This is an early relase of LMQL and we welcome your feedback and contributions.<br/> Reach out via our <a href="https://discord.gg/7eJP4fcyNT">Community Discord</a>, <a href="https://github.com/eth-sri/lmql/issues">GitHub Issues</a>, or <a href="https://twitter.com/lmqllang">Twitter</a>.
+        We welcome your feedback and contributions. Join the conversation about LMQL via our <a href="https://discord.gg/7eJP4fcyNT">Community Discord</a>, <a href="https://github.com/eth-sri/lmql/issues">GitHub Issues</a>, or <a href="https://twitter.com/lmqllang">Twitter</a>.
       </p>
     </div>
   </div>
 </section>
 
-<section class="section is-dark">
-  <div class="container is-max-desktop">
-    <div class="columns is-centered">
-      <!-- Scripted Prompting -->
-      <div class="column">
-        <!-- <div class="content">
-          <figure class="image">
-            <img src="static/images/scripted-prompting.png" style="margin-top: 35pt"/> 
-          </figure>
-          <h2 class="title is-3">Scripted Prompting</h2>
-          <p>
-            LMQL allows control flow as part of the prompt clause, which can be used to implement scripted and interactive prompting mechanics (e.g. action-based interaction, tool augmentation, etc.).
-          </p>
-          <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
-            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
-                    type="video/mp4">
-          </video>
-        </div> -->
-        <div class="content" style="text-align: left;">
-          <h2 class="title is-3">Scripted Prompts</h2>
-          <p>
-            LMQL generalizes natural language prompting, making it more expressive while remaining accessible. For this, LMQL builds on top of Python, allowing users to express <b>natural language prompts that also contain code</b>. The resulting queries can be directly executed on language models like OpenAI's GPT models. <b>Fixed answer templates and intermediate instructions</b> allow the user to steer the LLM's reasoning process.
-          </p>
-          <p>
-            <a href="https://docs.lmql.ai/en/latest/language/scripted_prompts.html">
-              Learn more about Scripting <i style="margin-left: 2pt;" class="fa fa-arrow-right"></i>
-            </a>
-          </p>
-          <!-- <video id="dollyzoom" autoplay controls muted loop playsinline height="100%">
-            <source src="https://homes.cs.washington.edu/~kpar/nerfies/videos/dollyzoom-stacked.mp4"
-                    type="video/mp4">
-          </video> -->
-        </div>
-      </div>
-      <!--/ Visual Effects. -->
-
-      <!-- Eager, partial validation -->
-      <div class="column">
-        <div class="content is-vertically-centered">
-          <!-- <figure class="image">
-            <img src="static/images/decoder.png" style="width: 185pt; margin: auto;"/> 
-          </figure> -->
-<div class="code"><span class="lmql-kw">for</span> i <span class="lmql-kw">in</span> <span class="lmql-fct">range</span>(n):
- <span class="lmql-str">"[THOUGHT]"</span>
- <span class="lmql-kw">if</span> THOUGHT.endswith("<<"):
-   <span class="lmql-str">" [EXPR]"</span>
-   <span class="lmql-str">" {calc(EXPR)}>>"</span>
- <span class="lmql-kw">elif</span> THOUGHT.endswith(<span class="lmql-str">"So the answer"</span>):
-   <span class="lmql-kw">break</span>
-<span class="lmql-str">"is[RESULT]"</span>
-</div>
-            </code>
-          </pre>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
 
 
 <section class="section custom-footer">
@@ -380,7 +324,7 @@ Raised on the South Side of Chicago, Obama is a graduate of Princeton]
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Wed, Jul 26, 4:17 PM (UTC)<br/>
+        Last updated on Wed, Jul 26, 4:36 PM (UTC)<br/>
       </div>
     </div>
   </div>
