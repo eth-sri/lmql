@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath('_ext'))
 
 # -- Project information
 
-project = 'LMQL'
+project = 'LMQL Documentation'
 copyright = '2023, LMQL Language Team'
 
 release = '0.1'
@@ -45,13 +45,10 @@ templates_path = ['_templates']
 
 # -- Options for HTML output
 
-html_theme = 'sphinx_book_theme'
+html_theme = 'shibuya'
 
 html_favicon = "_static/images/lmql.svg"
-html_title = ""
-html_theme_options = {
-    "home_page_in_toc": True,
-}
+html_title = "LMQL Docs"
 
 # -- Options for EPUB output
 epub_show_urls = 'footnote'
@@ -59,3 +56,26 @@ epub_show_urls = 'footnote'
 html_static_path = ['_static']
 html_logo = "logo.png"
 html_favicon = "lmql.svg"
+
+html_theme_options = {
+    "light_logo": "_static/logo-light.svg",
+    "dark_logo": "_static/logo.svg",
+    "twitter_url": "https://twitter.com/lmqllang",
+    "github_url": "https://github.com/eth-sri/lmql",
+    "nav_links": [
+        {
+            "title": "Examples",
+            "url": "https://lmql.ai/"
+        },
+        {
+            "title": "Playground",
+            "url": "https://lmql.ai/playground"
+        },
+        {
+            "title": "Community",
+            "url": "https://discord.gg/7eJP4fcyNT"
+        }
+    ],
+    "home_page_in_toc": True,
+    "show_navbar_depth": 3,
+}

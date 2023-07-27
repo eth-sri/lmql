@@ -63,17 +63,16 @@ Contents
 
   quickstart
   installation
-  ⚡️ Playground IDE <https://lmql.ai/playground>
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: 📖 LMQL Language 
    
    language/overview.md
    language/scripted_prompts.md
    language/constraints.md
    language/decoders.md
-   language/models.md
+   language/models.rst
    language/functions.md
 
 .. toctree::
