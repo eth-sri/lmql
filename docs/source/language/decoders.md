@@ -4,7 +4,7 @@ LMQL support various decoding algorithms, which are used to generate text from t
 
 LMQL also includes a library for array-based decoding `dclib`, which can be used to implement custom decoders. More information on this, will be provided in the future. The implementation of the available decoding procedures is located in `src/lmql/runtime/dclib/decoders.py` of the LMQL repository.
 
-In general, all LMQL decoding algorithms are model-agnostic and can be used with any LMQL-supported inference backend. For more information on the supported inference backends, see the [Models](./models.md) chapter.
+In general, all LMQL decoding algorithms are model-agnostic and can be used with any LMQL-supported inference backend. For more information on the supported inference backends, see the [Models](./models.rst) chapter.
 
 ## Specifying The Decoding Algorithm
 
@@ -38,7 +38,7 @@ tell_a_joke() # uses the decoder specified in @lmql.query(...)
 tell_a_joke(decoder="beam", n=2) # uses a beam search decoder with n=2
 ```
 
-This is only possible when using LMQL from a Python program. For more information on this, also see the chapter on how to specify the [model to use for decoding](models.md).
+This is only possible when using LMQL from a Python program. For more information on this, also see the chapter on how to specify the [model to use for decoding](models.rst).
 ## Supported Decoding Algorithms
 
 In general, the very first keyword of an LMQL query, specifies the decoding algorithm to use. For this, the following decoder keywords are available:
@@ -82,4 +82,4 @@ Among other things, this view allows you to track the decoding process, active h
 
 * `max_len: int` - The maximum length of the generated sequence. If not specified, the default value of `max_len` is `512`. Note if the maximum length is reached, the LMQL runtime will throw an error if the query has not yet come to a valid result, according to the provided `where` clause.
 
-* `openai_chunksize: int` - The chunksize parameter for OpenAI's `Completion` API. If not specified, the default value of `openai_chunksize` is `32`. See also the description of this parameter in the [Models](./models.md#configuring-speculative-openai-api-use) chapter.
+* `openai_chunksize: int` - The chunksize parameter for OpenAI's `Completion` API. If not specified, the default value of `openai_chunksize` is `32`. See also the description of this parameter in the [Models](./models.rst#configuring-speculative-openai-api-use) chapter.
