@@ -302,6 +302,7 @@ html.dark .highlight-model-output .highlight {
     margin-bottom: 1pt;
     transition: background-color 0.1s ease-in-out;
     padding-left: 6pt;
+    padding-right: 6pt;
 }
 
 .globaltoc li.toctree-l2, .globaltoc>ul>li>ul {
