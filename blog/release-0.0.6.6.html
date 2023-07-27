@@ -170,13 +170,13 @@ function openPlaygroundSnippet(link, snippet) {
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">lmql.F</span></code> now supports positional arguments:</p></li>
 </ul>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">greet</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">"Greet </span><span class="si">{a}</span><span class="s2"> and </span><span class="si">{b}</span><span class="s2">: [GREETING]"</span><span class="p">)</span>
-
-<p><span class="c1"># call with positional arguments</span>
-<span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="s2">&quot;Bob&quot;</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
-<span class="c1"># call with keyword arguments</span>
-<span class="n">greet</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="s2">&quot;Bob&quot;</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
-</pre></div></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span id="1-1"><span class="n">greet</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">"Greet </span><span class="si">{a}</span><span class="s2"> and </span><span class="si">{b}</span><span class="s2">: [GREETING]"</span><span class="p">)</span>
+</span><span id="1-2">
+</span><span id="1-3"><span class="c1"># call with positional arguments</span>
+</span><span id="1-4"><span class="n">greet</span><span class="p">(</span><span class="s2">"Alice"</span><span class="p">,</span> <span class="s2">"Bob"</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
+</span><span id="1-5"><span class="c1"># call with keyword arguments</span>
+</span><span id="1-6"><span class="n">greet</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s2">"Alice"</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="s2">"Bob"</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
+</span></pre></div>
 </div>
 <ul class="simple">
 <li><p>We improved the error handling of the <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> backend and fixed a bug with model identifier parsing.</p></li>
@@ -188,7 +188,6 @@ function openPlaygroundSnippet(link, snippet) {
 <div><p><strong>Versioning Note</strong>: 0.0.6.6 is the last release with two leading zeros. Starting with the next release, LMQL will adopt semantic versioning and use a single leading zero, i.e. 0.6.7.</p>
 </div></blockquote>
 </section>
-
 
 
           </div>
@@ -206,7 +205,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Wed, Jul 26, 7:33 PM (UTC)<br/>
+        Last updated on Thu, Jul 27, 9:38 AM (UTC)<br/>
       </div>
     </div>
   </div>

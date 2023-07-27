@@ -170,13 +170,13 @@ function openPlaygroundSnippet(link, snippet) {
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">lmql.F</span></code> now supports positional arguments:</p></li>
 </ul>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">greet</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">"Greet </span><span class="si">{a}</span><span class="s2"> and </span><span class="si">{b}</span><span class="s2">: [GREETING]"</span><span class="p">)</span>
-
-<p><span class="c1"># call with positional arguments</span>
-<span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="s2">&quot;Bob&quot;</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
-<span class="c1"># call with keyword arguments</span>
-<span class="n">greet</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="s2">&quot;Bob&quot;</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
-</pre></div></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span id="1-1"><span class="n">greet</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">"Greet </span><span class="si">{a}</span><span class="s2"> and </span><span class="si">{b}</span><span class="s2">: [GREETING]"</span><span class="p">)</span>
+</span><span id="1-2">
+</span><span id="1-3"><span class="c1"># call with positional arguments</span>
+</span><span id="1-4"><span class="n">greet</span><span class="p">(</span><span class="s2">"Alice"</span><span class="p">,</span> <span class="s2">"Bob"</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
+</span><span id="1-5"><span class="c1"># call with keyword arguments</span>
+</span><span id="1-6"><span class="n">greet</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s2">"Alice"</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="s2">"Bob"</span><span class="p">)</span> <span class="c1"># Greet Alice and Bob: Hello!</span>
+</span></pre></div>
 </div>
 <ul class="simple">
 <li><p>We improved the error handling of the <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> backend and fixed a bug with model identifier parsing.</p></li>
@@ -188,7 +188,6 @@ function openPlaygroundSnippet(link, snippet) {
 <div><p><strong>Versioning Note</strong>: 0.0.6.6 is the last release with two leading zeros. Starting with the next release, LMQL will adopt semantic versioning and use a single leading zero, i.e. 0.6.7.</p>
 </div></blockquote>
 </section>
-
 
 
           </div>
@@ -222,7 +221,7 @@ function openPlaygroundSnippet(link, snippet) {
 <p>Today we are releasing LMQL 0.0.6.5. This update contains a major simplification of the LMQL syntax, moving it much closer to standard Python. It also includes a <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> based inference backend, several bug fixes and other minor improvements.</p>
 <p>You can try the latest version of LMQL in your browser at <a class="reference external" href="https://lmql.ai/playground">lmql.ai/playground</a> or install it via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql</span></code>.</p>
 <section id="one-line-is-all-it-takes">
-<h2>One Line Is All It Takes<a class="headerlink" href="#one-line-is-all-it-takes" title="Permalink to this heading">#</a></h2>
+<h2>One Line Is All It Takes<a class="headerlink" href="#one-line-is-all-it-takes" title="Permalink to this heading">¶</a></h2>
 <p>Most notably, 0.0.6.5 comes with several simplifications of the core syntax of LMQL. Of course, all changes are backwards compatible, so you can continue to use your existing query code and move to the new version without any changes.</p>
 <p>With this, we aim to minimize syntactic overhead, employing sensible defaults to enable more concise programs like the following:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-5-md-simple-syntax')">Open In Playground</button><pre><span></span><span class="s2">"One line is all it takes [CONTINUATION]"</span>
@@ -236,7 +235,7 @@ a different model or custom decoder settings, you can still specify them explici
 <p></p>
 <br>
 <section id="inline-constraints">
-<h3>Inline Constraints<a class="headerlink" href="#inline-constraints" title="Permalink to this heading">#</a></h3>
+<h3>Inline Constraints<a class="headerlink" href="#inline-constraints" title="Permalink to this heading">¶</a></h3>
 <p>LMQL now allows you to specify several inline <code class="docutils literal notranslate"><span class="pre">where</span></code> constraints. This enables constraints that refer to local program variables, which means constraints can now be dependent on previous model outputs.</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-5-md-list-with-array')">Open In Playground</button><pre><span></span><span class="s2">"A list of awesome Dua Lipa songs:</span><span class="se">\n</span><span class="s2">"</span>
 <span class="n">songs</span> <span class="o">=</span> <span class="p">[]</span>
@@ -258,51 +257,56 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <br>
 </section>
 <section id="lmql-query-functions">
-<h3><code class="docutils literal notranslate"><span class="pre">@lmql.query</span></code> functions<a class="headerlink" href="#lmql-query-functions" title="Permalink to this heading">#</a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">@lmql.query</span></code> functions<a class="headerlink" href="#lmql-query-functions" title="Permalink to this heading">¶</a></h3>
 <p>The overhauled syntax also makes LMQL much  easier on the eyes when used with the <code class="docutils literal notranslate"><span class="pre">@lmql.query</span></code> <a class="reference external" href="https://docs.lmql.ai/en/stable/python/python.html">function decorator in Python</a>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">lmql</span>
-<span class="kn">import</span> <span class="nn">json</span>
-
-<p><span class="nd">@lmql</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;openai/text-curie-001&quot;</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">summarize</span><span class="p">():</span> <span class="s1">&#39;&#39;&#39;lmql</span>
-<span class="s1">    &quot;&quot;&quot;</span>
-<span class="s1">    Provide a summary of Dua Lipa, the pop icon:</span>
-<span class="s1">    {{</span>
-<span class="s1">      &quot;name&quot;: &quot;[STRING_VALUE]&quot;,</span>
-<span class="s1">      &quot;chart_position&quot;: [INT_VALUE],</span>
-<span class="s1">      &quot;top_songs&quot;: [[</span>
-<span class="s1">         &quot;[STRING_VALUE]&quot;,</span>
-<span class="s1">         &quot;[STRING_VALUE]&quot;</span>
-<span class="s1">      ]]</span>
-<span class="s1">    }}</span>
-<span class="s1">    &quot;&quot;&quot; where STOPS_BEFORE(STRING_VALUE, &#39;&quot;&#39;) and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) &lt; 3</span>
-<span class="s1">    </span>
-<span class="s1">    return json.loads(context.prompt.split(&quot;pop icon:&quot;,1)[1])&#39;&#39;&#39;</span></p>
-<p><span class="nb">print</span><span class="p">(</span><span class="n">summarize</span><span class="p">())</span> <span class="c1"># {&#39;name&#39;: &#39;Dua Lipa&#39;, &#39;chart_position&#39;: 3415, &#39;top_songs&#39;: [&#39;New Rules&#39;, &#39;Havana&#39;]}</span></p>
-<p></pre></div></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span id="1-1"><span class="kn">import</span> <span class="nn">lmql</span>
+</span><span id="1-2"><span class="kn">import</span> <span class="nn">json</span>
+</span><span id="1-3">
+</span><span id="1-4"><span class="nd">@lmql</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"openai/text-curie-001"</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span>
+</span><span id="1-5"><span class="k">def</span> <span class="nf">summarize</span><span class="p">():</span> <span class="s1">'''lmql</span>
+</span><span id="1-6"><span class="s1">    """</span>
+</span><span id="1-7"><span class="s1">    Provide a summary of Dua Lipa, the pop icon:</span>
+</span><span id="1-8"><span class="s1">    {{</span>
+</span><span id="1-9"><span class="s1">      "name": "[STRING_VALUE]",</span>
+</span><span id="1-10"><span class="s1">      "chart_position": [INT_VALUE],</span>
+</span><span id="1-11"><span class="s1">      "top_songs": [[</span>
+</span><span id="1-12"><span class="s1">         "[STRING_VALUE]",</span>
+</span><span id="1-13"><span class="s1">         "[STRING_VALUE]"</span>
+</span><span id="1-14"><span class="s1">      ]]</span>
+</span><span id="1-15"><span class="s1">    }}</span>
+</span><span id="1-16"><span class="s1">    """ where STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) &lt; 3</span>
+</span><span id="1-17"><span class="s1">    </span>
+</span><span id="1-18"><span class="s1">    return json.loads(context.prompt.split("pop icon:",1)[1])'''</span>
+</span><span id="1-19">
+</span><span id="1-20"><span class="nb">print</span><span class="p">(</span><span class="n">summarize</span><span class="p">())</span> <span class="c1"># {'name': 'Dua Lipa', 'chart_position': 3415, 'top_songs': ['New Rules', 'Havana']}</span>
+</span><span id="1-21">
+</span></pre></div>
 </div>
 <br>
 </section>
 <section id="lmql-f-lambda-functions">
-<h3><code class="docutils literal notranslate"><span class="pre">lmql.F</span></code> Lambda Functions<a class="headerlink" href="#lmql-f-lambda-functions" title="Permalink to this heading">#</a></h3>
+<h3><code class="docutils literal notranslate"><span class="pre">lmql.F</span></code> Lambda Functions<a class="headerlink" href="#lmql-f-lambda-functions" title="Permalink to this heading">¶</a></h3>
 <p>Based on LMQL’s new minimal syntax, we introduce a novel and concise way to write LLM-based lambda functions. This offers a lightweight entryway to get started with integrated small LLM-based utilities in your code, without having to write a full LMQL program.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">lmql</span>
-
-<p><span class="n">summarize</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">&quot;Summarize the following in a few words: </span><span class="si">{data}</span><span class="s2">: [SUMMARY]&quot;</span><span class="p">)</span>
-<span class="n">main_subject</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">&quot;What is the main subject (noun) of the following text? </span><span class="si">{data}</span><span class="s2">: [SUBJECT]&quot;</span><span class="p">,</span> 
-                      <span class="s2">&quot;len(TOKENS(SUBJECT)) &lt; 20&quot;</span><span class="p">)</span></p>
-<p><span class="n">text</span> <span class="o">=</span> <span class="s2">&quot;In LMQL, users can specify high-level, logical constraints ...&quot;</span></p>
-<p><span class="n">summarize</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># LMQL enables high-level constraints to be enforced during text </span>
-                     <span class="c1"># generation, simplifying multi-part prompting and integration.</span>
-<span class="n">main_subject</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># Language Model Query Language (LMQL)</span></p>
-<p></pre></div></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span id="1-1"><span class="kn">import</span> <span class="nn">lmql</span>
+</span><span id="1-2">
+</span><span id="1-3"><span class="n">summarize</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">"Summarize the following in a few words: </span><span class="si">{data}</span><span class="s2">: [SUMMARY]"</span><span class="p">)</span>
+</span><span id="1-4"><span class="n">main_subject</span> <span class="o">=</span> <span class="n">lmql</span><span class="o">.</span><span class="n">F</span><span class="p">(</span><span class="s2">"What is the main subject (noun) of the following text? </span><span class="si">{data}</span><span class="s2">: [SUBJECT]"</span><span class="p">,</span> 
+</span><span id="1-5">                      <span class="s2">"len(TOKENS(SUBJECT)) &lt; 20"</span><span class="p">)</span>
+</span><span id="1-6">
+</span><span id="1-7"><span class="n">text</span> <span class="o">=</span> <span class="s2">"In LMQL, users can specify high-level, logical constraints ..."</span>
+</span><span id="1-8">
+</span><span id="1-9"><span class="n">summarize</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># LMQL enables high-level constraints to be enforced during text </span>
+</span><span id="1-10">                     <span class="c1"># generation, simplifying multi-part prompting and integration.</span>
+</span><span id="1-11"><span class="n">main_subject</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># Language Model Query Language (LMQL)</span>
+</span><span id="1-12">
+</span></pre></div>
 </div>
 <br>
 <br>
 </section>
 </section>
 <section id="llama-cpp-inference-backend">
-<h2><code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> Inference Backend<a class="headerlink" href="#llama-cpp-inference-backend" title="Permalink to this heading">#</a></h2>
+<h2><code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> Inference Backend<a class="headerlink" href="#llama-cpp-inference-backend" title="Permalink to this heading">¶</a></h2>
 <p>LMQL now also fully integrates with the excellent <a class="reference external" href="https://github.com/ggerganov/llama.cpp">llama.cpp</a> C++ implementation of a number of Transformer-based language models.</p>
 <p>Using <code class="docutils literal notranslate"><span class="pre">llama.cpp</span></code> from LMQL is as simple as specifying it in the <code class="docutils literal notranslate"><span class="pre">from</span></code> clause of a query:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-5-md-llama-cpp-blog')">Open In Playground</button><pre><span></span><span class="kp">argmax</span> <span class="s2">"Say 'this is a test':[RESPONSE]"</span> <span class="kn">from</span> <span class="s2">"llama.cpp:&lt;PATH TO WEIGHTS&gt;.bin"</span>
@@ -312,7 +316,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <br>
 </section>
 <section id="other-changes">
-<h2>Other Changes<a class="headerlink" href="#other-changes" title="Permalink to this heading">#</a></h2>
+<h2>Other Changes<a class="headerlink" href="#other-changes" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>LMQL now includes a <code class="docutils literal notranslate"><span class="pre">random</span></code> model backend, which randomly samples tokens from the GPT-2 vocabulary. This is useful for debugging and testing purposes and can be used for data generation in the context of highly constrained query programs.</p></li>
 <li><p>Two caching issues have been fixed, avoiding cache collisions which could lead to repeated model outputs.</p></li>
@@ -323,7 +327,6 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <p>We thank community members <a class="reference external" href="https://github.com/minosvasilias">@minosvasilias</a> and <a class="reference external" href="https://github.com/CircArgs">@CircArgs</a> for their contribution to this release.</p>
 </section>
 </section>
-
 
 
           </div>
@@ -367,19 +370,20 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </li>
 <li><p><strong>Synchronous Python API</strong> Next to an <code class="docutils literal notranslate"><span class="pre">async/await</span></code> based API, LMQL now also provides a synchronous API. This means you no longer need to use <code class="docutils literal notranslate"><span class="pre">asyncio</span></code> to use LMQL from Python.</p>
 <p>To use the synchronous API, simply declare <code class="docutils literal notranslate"><span class="pre">@lmql.query</span></code> function without the <code class="docutils literal notranslate"><span class="pre">async</span></code> keyword, e.g.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">lmql</span>
-
-<p><span class="nd">@lmql</span><span class="o">.</span><span class="n">query</span>
-<span class="k">def</span> <span class="nf">hello</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&#39;&#39;&#39;lmql</span>
-<span class="sd">    argmax </span>
-<span class="sd">        &quot;Hello {s} [RESPONSE]&quot; </span>
-<span class="sd">        return RESPONSE</span>
-<span class="sd">    from </span>
-<span class="sd">        &quot;chatgpt&quot;</span>
-<span class="sd">    &#39;&#39;&#39;</span></p>
-<p><span class="nb">print</span><span class="p">(</span><span class="n">hello</span><span class="p">(</span><span class="s2">&quot;world&quot;</span><span class="p">))</span> <span class="c1"># [&#39;Hello! How can I assist you today?&#39;]</span>
-</pre></div></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span id="1-1"><span class="kn">import</span> <span class="nn">lmql</span>
+</span><span id="1-2">
+</span><span id="1-3"><span class="nd">@lmql</span><span class="o">.</span><span class="n">query</span>
+</span><span id="1-4"><span class="k">def</span> <span class="nf">hello</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+</span><span id="1-5"><span class="w">    </span><span class="sd">'''lmql</span>
+</span><span id="1-6"><span class="sd">    argmax </span>
+</span><span id="1-7"><span class="sd">        "Hello {s} [RESPONSE]" </span>
+</span><span id="1-8"><span class="sd">        return RESPONSE</span>
+</span><span id="1-9"><span class="sd">    from </span>
+</span><span id="1-10"><span class="sd">        "chatgpt"</span>
+</span><span id="1-11"><span class="sd">    '''</span>
+</span><span id="1-12">
+</span><span id="1-13"><span class="nb">print</span><span class="p">(</span><span class="n">hello</span><span class="p">(</span><span class="s2">"world"</span><span class="p">))</span> <span class="c1"># ['Hello! How can I assist you today?']</span>
+</span></pre></div>
 </div>
 <p>If you instead want to use <code class="docutils literal notranslate"><span class="pre">lmql.run</span></code> in a synchronous context, you can now use <code class="docutils literal notranslate"><span class="pre">lmql.run_sync</span></code> instead. To learn more about how LMQL can be used from Python, check out our <a class="reference external" href="https://docs.lmql.ai/en/stable/python/python.html">documentation</a>.</p>
 </li>
@@ -388,7 +392,6 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <li><p><strong>Faster Startup Time</strong> We optimized LMQL’s import hierarchy, which results in faster module loading time.</p></li>
 </ul>
 </section>
-
 
 
           </div>
@@ -452,7 +455,6 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </section>
 
 
-
           </div>
         </div>
     </div>
@@ -491,7 +493,6 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </section>
 
 
-
           </div>
         </div>
     </div>
@@ -523,11 +524,11 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <p>Today we are releasing LMQL 0.0.6, the first version of LMQL that integrates the <em>LMQL Caching Layer</em>. The caching layer can drastically reduce token use of LLM interaction, lowering both the cost and latency of running queries. In this blog post, we provide a quick overview of the caching layer and demonstrate how it can reduce token use, latency and the number of requests needed to run queries by up to 80%. We observe improvements across a wide range of different scenarios, including <strong>template-based queries, long-form constraints and tool augmentation.</strong></p>
 <p>You can experiment with LMQL in the browser-based <a class="reference external" href="http://lmql.ai/playground">Playground IDE</a> or install the latest version locally, via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql</span></code>.</p>
 <section id="caching-layer">
-<h2>Caching Layer<a class="headerlink" href="#caching-layer" title="Permalink to this heading">#</a></h2>
+<h2>Caching Layer<a class="headerlink" href="#caching-layer" title="Permalink to this heading">¶</a></h2>
 <p>The caching layer is implemented as a <strong>tree-based data structure</strong> that caches all model output including logits, tokens, and metadata, allowing the runtime to more efficiently explore the token space of an LLM, even in the presence of multiple variables, constraints and tool augmentation. The cache can be considered an append-only tree, that is explored during query execution, expanding branches according to query code, constraints and speculative execution.</p>
 <p>To illustrate the effect of a caching layer, we consider the following example scenarios, all of which now run in a fraction of the time and with a fraction of the tokens needed with traditional querying methods.</p>
 <section id="template-based-queries">
-<h3>Template-Based Queries<a class="headerlink" href="#template-based-queries" title="Permalink to this heading">#</a></h3>
+<h3>Template-Based Queries<a class="headerlink" href="#template-based-queries" title="Permalink to this heading">¶</a></h3>
 <p>When specifying a prompt template with multiple variables to fill in, an LLM typically needs to be invoked once per variable. For instance, consider the following template that guides an LLM in generating a list of things:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-list-of-things-speculative')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
     <span class="s2">"A list of things not to forget when going to the sea (not travelling): </span><span class="se">\n</span><span class="s2">"</span>
@@ -547,7 +548,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <p>With the caching layer, LMQL can now invoke the LLM only once, and fill in all variables with the resulting tokens, as long as the LLM output already aligns naturally with your template. In case the LLM result of the initial invocation at some point no longer aligns with the template, LMQL will automatically re-invoke the LLM from this point on, guaranteeing an overall consistent result that is already parsed into separate <code class="docutils literal notranslate"><span class="pre">[THING]</span></code> variables.</p>
 </section>
 <section id="short-circuiting-long-constraints">
-<h3>Short-Circuiting Long Constraints<a class="headerlink" href="#short-circuiting-long-constraints" title="Permalink to this heading">#</a></h3>
+<h3>Short-Circuiting Long Constraints<a class="headerlink" href="#short-circuiting-long-constraints" title="Permalink to this heading">¶</a></h3>
 <p>When you specify long constraints like <code class="docutils literal notranslate"><span class="pre">A</span> <span class="pre">in</span> <span class="pre">["ABCDE",</span> <span class="pre">"FGHIJK"]</span></code>, the LMQL runtime guides the LLM to choose one of the provided options and then continues enforcing the sequence until the chosen values is fully decoded. To illustrate, consider the following query:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-long-form-constraints-speculative')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
     <span class="s2">"If we have the choice we choose[OPTION]"</span>
@@ -564,7 +565,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <p>Here, after the LLM has produced <code class="docutils literal notranslate"><span class="pre">"Option"</span></code> and then <code class="docutils literal notranslate"><span class="pre">"</span> <span class="pre">A"</span></code>, LMQL short-circuits further model calls and automatically completes the resulting sequence to <code class="docutils literal notranslate"><span class="pre">"Option</span> <span class="pre">A</span> <span class="pre">with</span> <span class="pre">a</span> <span class="pre">whole</span> <span class="pre">lot</span> <span class="pre">of</span> <span class="pre">extra</span> <span class="pre">context"</span></code>. This is possible because once <code class="docutils literal notranslate"><span class="pre">Option</span> <span class="pre">A</span></code> has been predicted, the remaining tokens are fully determined by the constraints.</p>
 </section>
 <section id="tool-augmented-queries">
-<h3>Tool-Augmented Queries<a class="headerlink" href="#tool-augmented-queries" title="Permalink to this heading">#</a></h3>
+<h3>Tool-Augmented Queries<a class="headerlink" href="#tool-augmented-queries" title="Permalink to this heading">¶</a></h3>
 <p>Lastly, we consider tool augmented queries. LLM agents and tool augmentation are very powerful paradigms, that allow LLMs to incorporate external knowledge and reasoning into their predictions. However, this comes at a cost: On each tool invocation, the LLM needs to be re-invoked to continue decoding after the tool output has been inserted. This impacts both the token cost and latency of running queries, as many requests have to be send forth and back between the LLM and the tool.</p>
 <p>As an example, consider the following query that augments an LLM with the ability to use a key-value storage, <a class="reference external" href="http://lmql.ai/playground?snippet=kv">also runnable in the browser-based LMQL Playground</a>.</p>
 <center>
@@ -579,7 +580,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </section>
 </section>
 <section id="persisting-the-cache">
-<h2>Persisting the Cache<a class="headerlink" href="#persisting-the-cache" title="Permalink to this heading">#</a></h2>
+<h2>Persisting the Cache<a class="headerlink" href="#persisting-the-cache" title="Permalink to this heading">¶</a></h2>
 <p>Of course, the in-memory cache of the LMQL runtime can also be persisted to disk, allowing you to reuse the cache tree across multiple queries, automatically reducing token cost and latency. In some cases this can even be used to reduce the number of requests to the LLM to 0, e.g. if the cache already contains the desired result.</p>
 <p>To do so, you can simply specify a <code class="docutils literal notranslate"><span class="pre">cache="file.tokens"</span></code> parameter in your query code:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-joke-with-cache')">Open In Playground</button><pre><span></span><span class="kp">argmax</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="s2">"joke.tokens"</span><span class="p">)</span>
@@ -599,17 +600,16 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <p><strong>Caching During Query Development</strong>: Persisting the cache can be particularly useful during query development, as it allows you to reuse the cache across multiple runs of the same query. A persistent cache will reduce token cost and latency of your query, even if you slightly change the query between runs.</p>
 </section>
 <section id="caveats-and-disabling-the-cache">
-<h2>Caveats and Disabling the Cache<a class="headerlink" href="#caveats-and-disabling-the-cache" title="Permalink to this heading">#</a></h2>
+<h2>Caveats and Disabling the Cache<a class="headerlink" href="#caveats-and-disabling-the-cache" title="Permalink to this heading">¶</a></h2>
 <p>You can disable the caching layer by specifying <code class="docutils literal notranslate"><span class="pre">cache=False</span></code> in your query code. This will cause the LMQL runtime to always invoke the LLM, and never use the cache. This is useful for debugging purposes, or if you want to ensure that the LLM is always invoked.</p>
 <p>Further, as the cache currently is implemented as an append-only data structure, it will grow indefinitely. This may be problematic for long-running applications, as the cache will eventually grow to relatively large sizes. In the future, we plan to implement simple strategies to limit the cache size, such as a least-recently-used eviction policy.</p>
 </section>
 <section id="conclusion">
-<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this heading">#</a></h2>
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this heading">¶</a></h2>
 <p>In this post, we introduced the new caching layer of the LMQL runtime, which allows you to reduce the token cost and latency of your queries by reusing previously generated LLM outputs. We demonstrated how the caching layer can be used to reduce the number of LLM invocations in a variety of scenarios, including long constraints, short-circuiting, and tool-augmented queries. We also showed how the cache can be persisted to disk, allowing you to reuse the cache across multiple queries.</p>
 <p>To learn more about LMQL please also check out our <a class="reference external" href="https://docs.lmql.ai">documentation</a>, or join our <a class="reference external" href="https://discord.gg/2Y3Wz2Q">Discord</a> to chat with us directly. We are looking forward to hearing from you!</p>
 </section>
 </section>
-
 
 
           </div>
@@ -643,7 +643,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 <p>Today we are releasing version 0.0.5 of LMQL. This release focuses on stability and performance improvements. For a detailed list of changes, please see below. We are particularly excited about the first community contributions that have been merged as part of this release, with many more in the works.</p>
 <p><code class="docutils literal notranslate"><span class="pre">lmql==0.0.5</span></code> has been published on <a class="reference external" href="https://pypi.org/project/lmql/">PyPI</a>, based the current <code class="docutils literal notranslate"><span class="pre">main</span></code> branch of the <a class="reference external" href="https://github.com/eth-sri/lmql">GitHub repository</a>. The updated version has also been deployed to the browser-based <a class="reference external" href="http://lmql.ai/playground">lmql.ai/playground</a>.</p>
 <section id="changelog">
-<h2>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">#</a></h2>
+<h2>Changelog<a class="headerlink" href="#changelog" title="Permalink to this heading">¶</a></h2>
 <ul>
 <li><p><strong>Decoder Performance</strong> The <code class="docutils literal notranslate"><span class="pre">argmax</span></code> and <code class="docutils literal notranslate"><span class="pre">sample</span></code> decoders have undergone some optimizations, allowing them to run faster. This results in a <em>20-30% speed-up</em> on common query workloads. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p></li>
 <li><p><strong>Postprocessing Semantics</strong> Internally, LMQL now allows constraints to implement postprocessing semantics. This is used to convert variable values after they have been completed, to a more normalized form in the prompt, and to a semantically meaningful data type in the context of the query code. <a class="reference external" href="https://github.com/eth-sri/lmql/pull/24">#24</a>.</p>
@@ -669,7 +669,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </ul>
 </section>
 <section id="preview">
-<h2>Preview<a class="headerlink" href="#preview" title="Permalink to this heading">#</a></h2>
+<h2>Preview<a class="headerlink" href="#preview" title="Permalink to this heading">¶</a></h2>
 <p>Apart from the changes above, we are also working on a number of other features, including:</p>
 <ul class="simple">
 <li><p><strong>llama.cpp support</strong> as started in <a class="reference external" href="https://github.com/eth-sri/lmql/pull/18">this PR</a>, thanks to <a class="reference external" href="https://github.com/CircArgs">@CircArgs</a>.</p></li>
@@ -679,7 +679,6 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </ul>
 </section>
 </section>
-
 
 
           </div>
@@ -697,7 +696,7 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Wed, Jul 26, 7:33 PM (UTC)<br/>
+        Last updated on Thu, Jul 27, 9:38 AM (UTC)<br/>
       </div>
     </div>
   </div>

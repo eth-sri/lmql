@@ -169,11 +169,11 @@ function openPlaygroundSnippet(link, snippet) {
 <p>Today we are releasing LMQL 0.0.6, the first version of LMQL that integrates the <em>LMQL Caching Layer</em>. The caching layer can drastically reduce token use of LLM interaction, lowering both the cost and latency of running queries. In this blog post, we provide a quick overview of the caching layer and demonstrate how it can reduce token use, latency and the number of requests needed to run queries by up to 80%. We observe improvements across a wide range of different scenarios, including <strong>template-based queries, long-form constraints and tool augmentation.</strong></p>
 <p>You can experiment with LMQL in the browser-based <a class="reference external" href="http://lmql.ai/playground">Playground IDE</a> or install the latest version locally, via <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">lmql</span></code>.</p>
 <section id="caching-layer">
-<h2>Caching Layer<a class="headerlink" href="#caching-layer" title="Permalink to this heading">#</a></h2>
+<h2>Caching Layer<a class="headerlink" href="#caching-layer" title="Permalink to this heading">¶</a></h2>
 <p>The caching layer is implemented as a <strong>tree-based data structure</strong> that caches all model output including logits, tokens, and metadata, allowing the runtime to more efficiently explore the token space of an LLM, even in the presence of multiple variables, constraints and tool augmentation. The cache can be considered an append-only tree, that is explored during query execution, expanding branches according to query code, constraints and speculative execution.</p>
 <p>To illustrate the effect of a caching layer, we consider the following example scenarios, all of which now run in a fraction of the time and with a fraction of the tokens needed with traditional querying methods.</p>
 <section id="template-based-queries">
-<h3>Template-Based Queries<a class="headerlink" href="#template-based-queries" title="Permalink to this heading">#</a></h3>
+<h3>Template-Based Queries<a class="headerlink" href="#template-based-queries" title="Permalink to this heading">¶</a></h3>
 <p>When specifying a prompt template with multiple variables to fill in, an LLM typically needs to be invoked once per variable. For instance, consider the following template that guides an LLM in generating a list of things:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-list-of-things-speculative')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
     <span class="s2">"A list of things not to forget when going to the sea (not travelling): </span><span class="se">\n</span><span class="s2">"</span>
@@ -193,7 +193,7 @@ function openPlaygroundSnippet(link, snippet) {
 <p>With the caching layer, LMQL can now invoke the LLM only once, and fill in all variables with the resulting tokens, as long as the LLM output already aligns naturally with your template. In case the LLM result of the initial invocation at some point no longer aligns with the template, LMQL will automatically re-invoke the LLM from this point on, guaranteeing an overall consistent result that is already parsed into separate <code class="docutils literal notranslate"><span class="pre">[THING]</span></code> variables.</p>
 </section>
 <section id="short-circuiting-long-constraints">
-<h3>Short-Circuiting Long Constraints<a class="headerlink" href="#short-circuiting-long-constraints" title="Permalink to this heading">#</a></h3>
+<h3>Short-Circuiting Long Constraints<a class="headerlink" href="#short-circuiting-long-constraints" title="Permalink to this heading">¶</a></h3>
 <p>When you specify long constraints like <code class="docutils literal notranslate"><span class="pre">A</span> <span class="pre">in</span> <span class="pre">["ABCDE",</span> <span class="pre">"FGHIJK"]</span></code>, the LMQL runtime guides the LLM to choose one of the provided options and then continues enforcing the sequence until the chosen values is fully decoded. To illustrate, consider the following query:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-long-form-constraints-speculative')">Open In Playground</button><pre><span></span><span class="kp">argmax</span>
     <span class="s2">"If we have the choice we choose[OPTION]"</span>
@@ -210,7 +210,7 @@ function openPlaygroundSnippet(link, snippet) {
 <p>Here, after the LLM has produced <code class="docutils literal notranslate"><span class="pre">"Option"</span></code> and then <code class="docutils literal notranslate"><span class="pre">"</span> <span class="pre">A"</span></code>, LMQL short-circuits further model calls and automatically completes the resulting sequence to <code class="docutils literal notranslate"><span class="pre">"Option</span> <span class="pre">A</span> <span class="pre">with</span> <span class="pre">a</span> <span class="pre">whole</span> <span class="pre">lot</span> <span class="pre">of</span> <span class="pre">extra</span> <span class="pre">context"</span></code>. This is possible because once <code class="docutils literal notranslate"><span class="pre">Option</span> <span class="pre">A</span></code> has been predicted, the remaining tokens are fully determined by the constraints.</p>
 </section>
 <section id="tool-augmented-queries">
-<h3>Tool-Augmented Queries<a class="headerlink" href="#tool-augmented-queries" title="Permalink to this heading">#</a></h3>
+<h3>Tool-Augmented Queries<a class="headerlink" href="#tool-augmented-queries" title="Permalink to this heading">¶</a></h3>
 <p>Lastly, we consider tool augmented queries. LLM agents and tool augmentation are very powerful paradigms, that allow LLMs to incorporate external knowledge and reasoning into their predictions. However, this comes at a cost: On each tool invocation, the LLM needs to be re-invoked to continue decoding after the tool output has been inserted. This impacts both the token cost and latency of running queries, as many requests have to be send forth and back between the LLM and the tool.</p>
 <p>As an example, consider the following query that augments an LLM with the ability to use a key-value storage, <a class="reference external" href="http://lmql.ai/playground?snippet=kv">also runnable in the browser-based LMQL Playground</a>.</p>
 <center>
@@ -225,7 +225,7 @@ function openPlaygroundSnippet(link, snippet) {
 </section>
 </section>
 <section id="persisting-the-cache">
-<h2>Persisting the Cache<a class="headerlink" href="#persisting-the-cache" title="Permalink to this heading">#</a></h2>
+<h2>Persisting the Cache<a class="headerlink" href="#persisting-the-cache" title="Permalink to this heading">¶</a></h2>
 <p>Of course, the in-memory cache of the LMQL runtime can also be persisted to disk, allowing you to reuse the cache tree across multiple queries, automatically reducing token cost and latency. In some cases this can even be used to reduce the number of requests to the LLM to 0, e.g. if the cache already contains the desired result.</p>
 <p>To do so, you can simply specify a <code class="docutils literal notranslate"><span class="pre">cache="file.tokens"</span></code> parameter in your query code:</p>
 <p></p><div class="highlight lmql"><button href="" onclick="openPlaygroundSnippet(this, 'doc-snippets/blog-release-0-0-6-md-joke-with-cache')">Open In Playground</button><pre><span></span><span class="kp">argmax</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="s2">"joke.tokens"</span><span class="p">)</span>
@@ -245,17 +245,16 @@ function openPlaygroundSnippet(link, snippet) {
 <p><strong>Caching During Query Development</strong>: Persisting the cache can be particularly useful during query development, as it allows you to reuse the cache across multiple runs of the same query. A persistent cache will reduce token cost and latency of your query, even if you slightly change the query between runs.</p>
 </section>
 <section id="caveats-and-disabling-the-cache">
-<h2>Caveats and Disabling the Cache<a class="headerlink" href="#caveats-and-disabling-the-cache" title="Permalink to this heading">#</a></h2>
+<h2>Caveats and Disabling the Cache<a class="headerlink" href="#caveats-and-disabling-the-cache" title="Permalink to this heading">¶</a></h2>
 <p>You can disable the caching layer by specifying <code class="docutils literal notranslate"><span class="pre">cache=False</span></code> in your query code. This will cause the LMQL runtime to always invoke the LLM, and never use the cache. This is useful for debugging purposes, or if you want to ensure that the LLM is always invoked.</p>
 <p>Further, as the cache currently is implemented as an append-only data structure, it will grow indefinitely. This may be problematic for long-running applications, as the cache will eventually grow to relatively large sizes. In the future, we plan to implement simple strategies to limit the cache size, such as a least-recently-used eviction policy.</p>
 </section>
 <section id="conclusion">
-<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this heading">#</a></h2>
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this heading">¶</a></h2>
 <p>In this post, we introduced the new caching layer of the LMQL runtime, which allows you to reduce the token cost and latency of your queries by reusing previously generated LLM outputs. We demonstrated how the caching layer can be used to reduce the number of LLM invocations in a variety of scenarios, including long constraints, short-circuiting, and tool-augmented queries. We also showed how the cache can be persisted to disk, allowing you to reuse the cache across multiple queries.</p>
 <p>To learn more about LMQL please also check out our <a class="reference external" href="https://docs.lmql.ai">documentation</a>, or join our <a class="reference external" href="https://discord.gg/2Y3Wz2Q">Discord</a> to chat with us directly. We are looking forward to hearing from you!</p>
 </section>
 </section>
-
 
 
           </div>
@@ -273,7 +272,7 @@ function openPlaygroundSnippet(link, snippet) {
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Wed, Jul 26, 7:33 PM (UTC)<br/>
+        Last updated on Thu, Jul 27, 9:38 AM (UTC)<br/>
       </div>
     </div>
   </div>
