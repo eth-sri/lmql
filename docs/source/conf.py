@@ -24,8 +24,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     "myst_parser",
     "lmql_snippets",
-    "nbsphinx",
-    "sphinx_design"
+    "nbsphinx"
 ]
 
 source_suffix = {
