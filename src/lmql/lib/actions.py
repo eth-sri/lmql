@@ -306,9 +306,9 @@ async def eval_or_acc(last_line, code_env, acc):
         return "", None
 
 @lmql.query
-async def reAct(fcts):
+async def reAct(fcts, instruct=True):
     '''lmql
-    incontext
+    if instruct:
         """
         Instructions: In your reasoning adhere to the following structure:
 
@@ -324,41 +324,39 @@ async def reAct(fcts):
         
         for fct in action_fcts.values():
             "   - {fct.name}: {fct.description}. Usage: {fct.example}. Observation: {fct.example_result}\n"
-        
+    
         "Now you can start reasoning.\n"
-            
-        offset = len(context.prompt)
         
-        while True:
-            "[SEGMENT]"
+    offset = len(context.prompt)
+    
+    while True:
+        "[SEGMENT]" where STOPS_AT(SEGMENT, "Action:")
 
-            if not SEGMENT.endswith("Action:"):
-                break
+        if not SEGMENT.endswith("Action:"):
+            break
+        else:
+            "[CALL]" where STOPS_AT(CALL, "\n")
+            
+            if not CALL.endswith("\n") or not "(" in CALL:
+                continue
             else:
-                "[CALL]"
-                
-                if not CALL.endswith("\n") or not "(" in CALL:
-                    continue
+                "Observation:"
+                action, args = CALL.split("(", 1)
+                action = action.strip()
+                if action not in action_fcts.keys():
+                    print("unknown action", [action], list(action_fcts.keys()))
+                    " Unknown action: {action}\n"
+                    result = ""
                 else:
-                    "Observation:"
-                    action, args = CALL.split("(", 1)
-                    action = action.strip()
-                    if action not in action_fcts.keys():
-                        print("unknown action", [action], list(action_fcts.keys()))
-                        " Unknown action: {action}\n"
-                        result = ""
-                    else:
-                        try:
-                            result = await action_fcts[action].call("(" + args)
-                            if type(result) is float:
-                                result = round(result, 2)
-                            " {result}\n"
-                        except Exception:
-                            " Error. Try differently.\n"
-        
-        return "\n" + context.prompt[offset:]
-    where
-        STOPS_AT(SEGMENT, "Action:") and STOPS_AT(CALL, "\n")
+                    try:
+                        result = await action_fcts[action].call("(" + args)
+                        if type(result) is float:
+                            result = round(result, 2)
+                        " {result}\n"
+                    except Exception:
+                        " Error. Try differently.\n"
+    
+    return "\n" + context.prompt[offset:]
     '''
 
 
