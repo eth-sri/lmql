@@ -113,7 +113,8 @@ def cmd_playground():
         commit = commit[:7]
         has_uncomitted_files = len(subprocess.check_output("git status --porcelain", shell=True, cwd=project_root).decode("utf-8").strip()) > 0
         if has_uncomitted_files:
-            commit += '" (dirty)"'
+            commit += ' (dirty)'
+            commit = f'"{commit}"'
     else:        
         commit = version_info.commit
 
