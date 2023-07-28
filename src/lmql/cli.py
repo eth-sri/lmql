@@ -113,16 +113,16 @@ def cmd_playground():
         commit = commit[:7]
         has_uncomitted_files = len(subprocess.check_output("git status --porcelain", shell=True, cwd=project_root).decode("utf-8").strip()) > 0
         if has_uncomitted_files:
-            commit += " (dirty)"
+            commit += '" (dirty)"'
     else:        
         commit = version_info.commit
 
     # live server that executes LMQL queries and returns results and debugger data
-    live_process = subprocess.Popen("yarn && PORT=" + str(args.live_port) + " node live.js", 
+    live_process = subprocess.Popen("yarn && yarn cross-env PORT=" + str(args.live_port) + " node live.js", 
         shell=True, cwd=os.path.join(project_root, "lmql/ui/live"))
 
     # UI that displays the debugger (uses live server API for data and remote execution)
-    ui_modern_process = subprocess.Popen(f"yarn && REACT_APP_BUILD_COMMIT='{commit}' REACT_APP_SOCKET_PORT={args.live_port} yarn run start", 
+    ui_modern_process = subprocess.Popen(f"yarn && yarn cross-env REACT_APP_BUILD_COMMIT='{commit}' REACT_APP_SOCKET_PORT={args.live_port} yarn run start", 
         shell=True, cwd=os.path.join(project_root, "lmql/ui/playground"))
 
     try:
