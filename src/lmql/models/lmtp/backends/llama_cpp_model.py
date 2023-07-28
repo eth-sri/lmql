@@ -40,9 +40,9 @@ class LlamaCppModel(LMTPModel):
                 self.llm.n_tokens = longest_prefix
 
         self.llm.eval(tokens)
-        scores = np.array([self.llm.scores[j][i] for j,i in enumerate(input_ids[0])])
-        scores = nputil.log_softmax(scores, axis=-1)
-        # print("llama_cpp_model: score() took", time.time() - s, "seconds", file=sys.stderr)
+        logits = np.array(self.llm.scores)
+        logits = nputil.log_softmax(logits, axis=-1)
+        scores = np.array([logits[j][i] for j,i in enumerate(input_ids[0])])
 
         return scores.reshape(1, -1)
     
