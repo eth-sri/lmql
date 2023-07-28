@@ -57,7 +57,13 @@ class InlineCallOp(Node):
     def subinterpreter(self, runtime, prompt, args = None):
         query_kwargs = None
         if args is not None:
-            query_kwargs, _ = self.query_fct.make_kwargs(*args[1:])
+            args = args[1:]
+            def is_kwarg(a):
+                return type(a) is tuple and len(a) == 2 and type(a[0]) is str and a[0].startswith("__kw:")
+            kwargs = {k[0][len("__kw:"):]: k[1] for k in args if is_kwarg(k)}
+            args = [a for a in args if not is_kwarg(a)]
+
+            query_kwargs, _ = self.query_fct.make_kwargs(*args, **kwargs)
             self.query_kwargs = query_kwargs
         else:
             if self.query_kwargs is None:
@@ -89,7 +95,7 @@ class InlineCallOp(Node):
         return si
     
     def postprocess_order(self, other, operands, other_inputs, **kwargs):
-        return 0 # other constraints cannot be compared
+        return "before" # other constraints cannot be compared
 
     @staticmethod
     def collect(op: Node):

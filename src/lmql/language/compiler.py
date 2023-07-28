@@ -118,7 +118,7 @@ class PromptScope(ast.NodeVisitor):
 
         # also collect variable reads from where clause
         if query.where is not None:
-            FreeVarCollector(self.free_vars, exclude_criteria=[self.exclude_identifier]).visit(query.where)
+            self.visit_where(query.where)
         if query.from_ast is not None:
             FreeVarCollector(self.free_vars, exclude_criteria=[self.exclude_identifier]).visit(query.from_ast)
         if query.decode is not None:
@@ -131,6 +131,9 @@ class PromptScope(ast.NodeVisitor):
 
         query.scope = self
 
+    def visit_where(self, node):
+        FreeVarCollector(self.free_vars, exclude_criteria=[self.exclude_identifier]).visit(node)
+
     def visit_Expr(self, expr):
         if type(expr.value) is ast.Constant:
             self.scope_Constant(expr.value)
@@ -140,6 +143,8 @@ class PromptScope(ast.NodeVisitor):
     def visit_BoolOp(self, node: ast.BoolOp) -> Any:
         if is_query_string_with_constraints(node):
             self.scope_Constant(node.values[0])
+            for constraint in node.values[1:]:
+                self.visit_where(constraint)
         else:
             super().generic_visit(node)
 
@@ -519,7 +524,9 @@ class LMQLConstraintTransformation:
             assert type(expr.func) is ast.Name, "In LMQL constraint expressions, only function calls to direct function references are allowed: {}".format(astunparse.unparse(expr))
             tfunc = ast.unparse(expr.func)
             targs = [self.transform_node(a, snf) for a in expr.args]
-            targs_list = ", ".join(targs)
+            kwargs = [f"('__kw:{e.arg}', {self.transform_node(e.value, snf)})" for e in expr.keywords]
+            targs_list = ", ".join(targs + kwargs)
+
             return f"{OPS_NAMESPACE}.CallOp([{tfunc}, [{targs_list}]], locals(), globals())"
         elif type(expr) is ast.List:
             return self.default_transform_node(expr, snf).strip()

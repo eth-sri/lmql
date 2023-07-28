@@ -74,86 +74,76 @@ DELIMITER_END = ">>"
 @lmql.query
 async def fct_call(fcts):
     '''lmql
-    incontext
-        action_fcts = {str(f.__name__): make_fct(f) for f in fcts}
-        "[CALL]"
-        truncated = CALL
-        if not CALL.endswith("|") and not CALL.endswith(DELIMITER_END):
+    action_fcts = {str(f.__name__): make_fct(f) for f in fcts}
+    "[CALL]" where STOPS_AT(CALL, "|") and STOPS_AT(CALL, DELIMITER_END)
+
+    truncated = CALL
+    if not CALL.endswith("|") and not CALL.endswith(DELIMITER_END):
+        return CALL
+    else:    
+        if CALL.endswith(DELIMITER_END):
+            CALL = CALL[:-len(DELIMITER_END)]
+        else:
+            CALL = CALL[:-len("|")]
+        
+        if "(" not in CALL:
             return CALL
-        else:    
-            if CALL.endswith(DELIMITER_END):
-                CALL = CALL[:-len(DELIMITER_END)]
-            else:
-                CALL = CALL[:-len("|")]
-            
-            if "(" not in CALL:
-                return CALL
-            
-            action, args = CALL.split("(", 1)
-            action = action.strip()
-            if action not in action_fcts.keys():
-                print("unknown action", [action], list(action_fcts.keys()))
-                " Unknown action: {action} {DELIMITER_END}"
-                result = ""
+        
+        action, args = CALL.split("(", 1)
+        action = action.strip()
+        if action not in action_fcts.keys():
+            print("unknown action", [action], list(action_fcts.keys()))
+            " Unknown action: {action} {DELIMITER_END}"
+            result = ""
+            return "(error)"
+        else:
+            try:
+                result = await action_fcts[action].call("(" + args.strip())
+                return DELIMITER + str(CALL) + "| " + str(result)
+            except Exception:
+                result = "Error."
                 return "(error)"
-            else:
-                try:
-                    result = await action_fcts[action].call("(" + args.strip())
-                    return DELIMITER + str(CALL) + "| " + str(result)
-                except Exception:
-                    result = "Error."
-                    return "(error)"
-    where
-        STOPS_AT(CALL, "|") and STOPS_AT(CALL, DELIMITER_END)
     '''
 
 
 @lmql.query
 async def inline_segment(fcts):
     '''lmql
-    incontext
-        "[SEGMENT]"
-        if not SEGMENT.endswith(DELIMITER):
-            return SEGMENT
-        else:
-            "[CALL]"
-            result = CALL.split("|", 1)[1]
-            return SEGMENT[:-len(DELIMITER)] + CALL + DELIMITER_END
-    where
-        STOPS_AT(SEGMENT, DELIMITER) and fct_call(CALL, fcts)
+    "[SEGMENT]" where STOPS_AT(SEGMENT, DELIMITER)
+    if not SEGMENT.endswith(DELIMITER):
+        return SEGMENT
+    else:
+        "[CALL]" where fct_call(CALL, fcts) and len(TOKENS(CALL)) > 0
+        result = CALL.split("|", 1)[1]
+        return SEGMENT[:-len(DELIMITER)] + CALL + DELIMITER_END
     '''
 
 @lmql.query
-async def inline_use(fcts):
+async def inline_use(fcts, instruct=True):
     '''lmql
-    incontext
-        action_fcts = {str(f.__name__): make_fct(f) for f in fcts}
-        first_tool_name = list(action_fcts.keys())[0] if len(action_fcts) > 0 else "tool"
+    action_fcts = {str(f.__name__): make_fct(f) for f in fcts}
+    first_tool_name = list(action_fcts.keys())[0] if len(action_fcts) > 0 else "tool"
 
-        # add instruction prompt if no few-shot prompt was already used
-        if not INLINE_USE_PROMPT in context.prompt:
-            """
-            \n\n{:system} Instructions: In your reasoning, you can use the following tools:"""
-            
-            for fct in action_fcts.values():
-                "\n   - {fct.name}: {fct.description} Usage: {DELIMITER}{fct.example} | {fct.example_result}{DELIMITER_END}"
-            '   Example Use: ... this means they had <<calc("5-2") | 3 >> 3 apples left...\n'
-            "   You can also use the tools multiple times in one reasoning step.\n\n"
-            "Reasoning with Tools: {:assistant}"
-        else:
-            "\n\nInline Tool Use:\n\n"
+    # add instruction prompt if no few-shot prompt was already used
+    if instruct and not INLINE_USE_PROMPT in context.prompt:
+        """
+        \n\nInstructions: In your reasoning, you can use the following tools:"""
         
-        # decode segment-by-segment, handling action calls along the way
-        truncated = ""
-        while True: 
-            "[SEGMENT]"
-            if not SEGMENT.endswith(DELIMITER_END):
-                " " # seems to be needed for now
-                return truncated + SEGMENT
-            truncated += SEGMENT
-        return truncated
-    where
-        inline_segment(SEGMENT, fcts)
+        for fct in action_fcts.values():
+            "\n   - {fct.name}: {fct.description} Usage: {DELIMITER}{fct.example} | {fct.example_result}{DELIMITER_END}"
+        '   Example Use: ... this means they had <<calc("5-2") | 3 >> 3 apples left...\n'
+        "   You can also use the tools multiple times in one reasoning step.\n\n"
+        "Reasoning with Tools:\n\n"
+    
+    # decode segment-by-segment, handling action calls along the way
+    truncated = ""
+    while True: 
+        "[SEGMENT]" where inline_segment(SEGMENT, fcts)
+        if not SEGMENT.endswith(DELIMITER_END):
+            " " # seems to be needed for now
+            return truncated + SEGMENT
+        truncated += SEGMENT
+    return truncated
     '''
 inline_use.demonstrations = INLINE_USE_PROMPT
 
