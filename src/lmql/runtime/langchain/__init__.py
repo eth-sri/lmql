@@ -2,7 +2,7 @@ from typing import List, Dict, Any
 
 global lmql_chain_loop
 lmql_chain_loop = None
-from .loop import call_sync
+from ..loop import call_sync
 
 def chain(lmql_query_function, output_keys=None):
     from langchain.chains.base import Chain
