@@ -131,6 +131,8 @@ def _simplify(seq):
         elif op == c.SUBPATTERN:
             arg0, arg1, arg2, sseq = arg
             sseq = _simplify(sseq)
+            if len(sseq) == 0:
+                return None
             if len(sseq) == 1 and sseq[0][0] != sre_parse.BRANCH:
                 return sseq[0]
             arg = arg0, arg1, arg2, sseq
@@ -233,10 +235,13 @@ if __name__ == "__main__":
     assert Regex(r"ab").d("ab").compare_pattern(r"")
     assert Regex(r"a+bc").d("a").compare_pattern(r"a*bc")
     assert Regex(r"a?bc").d("b").compare_pattern(r"c")
-    assert Regex(r"(a|bb)c").d("b").pattern == "bc"
-    assert Regex(r"(b|bb)c").d("b").compare_pattern(r"b?c")
     assert Regex(r".+c").d("b").pattern == ".*c"
     
     # escape
     assert Regex(r"\.a").d(".").pattern == "a"
     assert Regex(r"\.a").d("a") is None
+    
+    # branches 
+    assert Regex(r"(a|bb)c").d("b").pattern == "bc"
+    assert Regex(r"(b|bb)c").d("b").compare_pattern(r"b?c")
+    assert Regex(r" (a|b)").d(" a").pattern == ""
