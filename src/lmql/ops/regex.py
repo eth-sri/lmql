@@ -5,8 +5,6 @@ import sre_constants as c
 import sys
 from copy import copy
 
-REGEX_DERIVATIVE_FAILED = -1
-
 def _deparse(seq):
     if seq is None: return seq
     pattern = ""
@@ -14,6 +12,8 @@ def _deparse(seq):
         if op == c.ANY:
             pattern += '.'
         elif op == c.LITERAL:
+            if chr(arg) in sre_parse.SPECIAL_CHARS:
+                pattern += '\\'
             pattern += chr(arg)
         elif op == c.MAX_REPEAT:
             min, max, item = arg
@@ -236,3 +236,7 @@ if __name__ == "__main__":
     assert Regex(r"(a|bb)c").d("b").pattern == "bc"
     assert Regex(r"(b|bb)c").d("b").compare_pattern(r"b?c")
     assert Regex(r".+c").d("b").pattern == ".*c"
+    
+    # escape
+    assert Regex(r"\.a").d(".").pattern == "a"
+    assert Regex(r"\.a").d("a") is None
