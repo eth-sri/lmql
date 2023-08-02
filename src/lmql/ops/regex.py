@@ -52,12 +52,18 @@ def _consume_char(char, seq, verbose=False, indent=0):
     assert isinstance(seq, list)
     if len(seq) == 0: return None
     op, arg = seq[0]
-    if verbose: print(' '*indent + f"{seq} -> {op}") 
+
+    def _ret(out):
+        if verbose: print('->', out)
+        return out
+
+    if verbose: print(' '*indent + f"{seq} -{char}-> Operator {op}", end='') 
     if op == c.ANY:
-        return seq[1:]
+        return _ret(seq[1:])
     elif op == c.LITERAL:
         if arg == char: return seq[1:]
-        else: return None
+        else:
+            return _ret(None)
     elif op == c.IN:
         match_found = False
         for a in arg:
@@ -65,13 +71,15 @@ def _consume_char(char, seq, verbose=False, indent=0):
                 match_found = (a[1] == char)
             elif a[0] == c.RANGE:
                 match_found = (a[1][0] <= char <= a[1][1])
-            else: return None
+            else:
+                return _ret(None)
             if match_found: break
-        if match_found: return seq[1:]
-        else: return None
+        if match_found:
+            return _ret(seq[1:])
+        else: return _ret(None)
         low, high = arg[0][1]
-        if low <= char <= high: return seq[1:]
-        else: return None
+        if low <= char <= high: return _ret(seq[1:])
+        else: return _ret(None)
     elif op == c.BRANCH:
         must_be_none, branches = arg
         assert must_be_none is None
@@ -79,18 +87,23 @@ def _consume_char(char, seq, verbose=False, indent=0):
         for i, branch in enumerate(branches):
             dbranch = _consume_char(char, list(branch), verbose=verbose, indent=indent+2)
             if dbranch is not None: branches_out.append(dbranch)
-        if len(branches_out) == 0: return None
-        seq[0] = (op, (must_be_none, branches_out))
-        return seq
+        if len(branches_out) == 0: return _ret(None)
+        out = _simplify([(op, (must_be_none, branches_out))])
+        out.extend(seq[1:])
+        return _ret(out)
     elif op == c.SUBPATTERN:
         arg0, arg1, arg2, sseq = arg
-        assert arg0==1 and arg1==0 and arg2==0
+        assert arg1==0 and arg2==0
         assert isinstance(sseq, (sre_parse.SubPattern, list))
         sseq = list(sseq)
         dsseq = _consume_char(char, sseq, verbose=verbose, indent=indent+2)
-        if dsseq is None: return None
-        seq[0] = (op, (arg0, arg1, arg2, dsseq))
-        return seq
+        if dsseq is None:
+            return _ret(None)
+        if len(dsseq) == 0:
+            return _ret(seq[1:])
+        out = _simplify([(op, (arg0, arg1, arg2, dsseq))])
+        out.extend(seq[1:])
+        return _ret(out)
     elif op == c.MAX_REPEAT:
         min_occr, max_occr, sseq = arg
         sseq = list(sseq)
@@ -99,15 +112,15 @@ def _consume_char(char, seq, verbose=False, indent=0):
             if min_occr == 0:
                 # could not consume optional character
                 # but could recover with next
-                return _consume_char(char, seq[1:], verbose=verbose, indent=indent) 
-            else: return None
+                return _ret(_consume_char(char, seq[1:], verbose=verbose, indent=indent))
+            else: return _ret(None)
         min_occr = max(min_occr - 1, 0)
         if max_occr != c.MAXREPEAT:
             max_occr = max(max_occr - 1, min_occr)
         out = dsseq
         if max_occr > 0:
             out += [(op, (min_occr, max_occr, sseq))]
-        return out + seq[1:]
+        return _ret(out + seq[1:])
     else:
         raise NotImplementedError(f"unsupported regex pattern {op}")
 
@@ -245,3 +258,6 @@ if __name__ == "__main__":
     assert Regex(r"(a|bb)c").d("b").pattern == "bc"
     assert Regex(r"(b|bb)c").d("b").compare_pattern(r"b?c")
     assert Regex(r" (a|b)").d(" a").pattern == ""
+    assert Regex(r" (a|b) ").d(" a").pattern == " "
+    assert Regex(r" (a|b) ").d(" a ").pattern == ""
+    assert Regex(r" (a|bb|ab) ").d(" a ").pattern == "" 
