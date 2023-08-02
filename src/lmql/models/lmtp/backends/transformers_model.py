@@ -27,7 +27,7 @@ class TransformersLLM(LMTPModel):
         return self.model.config.eos_token_id
 
     def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-        input_ids = torch.tensor(input_ids)
+        input_ids = torch.tensor(input_ids).to(self.model.device)
         attention_mask = torch.tensor(attention_mask)
         
         # prepare model inputs
