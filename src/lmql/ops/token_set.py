@@ -184,7 +184,7 @@ class VocabularyMatcher:
         elif len(tokens) > 0:
             if prefix:
                 # instead of using the tokens themselves, use subtoken prefixes of the tokens
-                tokens = [self.tokenizer(t)["input_ids"][0] for t in tokens]
+                tokens = [self.tokenizer(t, with_prefix=True)["input_ids"][0] for t in tokens]
                 for t in tokens: 
                     mask[t] = True
             else:

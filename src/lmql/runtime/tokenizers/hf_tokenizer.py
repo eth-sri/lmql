@@ -84,8 +84,8 @@ class TransformersTokenizer:
         """
         return [int(t.decode("utf-8")) for t in tokens]
 
-    def __call__(self, text_or_list, add_special_tokens=False):
-        return self.tokenizer(text_or_list, add_special_tokens=add_special_tokens)
+    def __call__(self, text, add_special_tokens=False):
+        return self.tokenizer(text, add_special_tokens=add_special_tokens)
 
     @property
     def vocab_size(self):
