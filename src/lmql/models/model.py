@@ -44,7 +44,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
     # special case for 'llama.cpp'
     if model_name.startswith("llama.cpp:"):
         # kwargs["async_transport"] = True
-        kwargs["tokenizer"] = "huggyllama/llama-7b"
+        kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
 
     if "endpoint" in kwargs:
         print("info: 'endpoint' argument is ignored for inprocess=True/local: models.")
