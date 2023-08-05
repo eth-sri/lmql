@@ -28,10 +28,10 @@ class TransformersLLM(LMTPModel):
 
     def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
         input_ids = torch.tensor(input_ids).to(self.model.device)
-        attention_mask = torch.tensor(attention_mask)
+        attention_mask = torch.tensor(attention_mask).to(self.model.device)
         
         # prepare model inputs
-        model_inputs = self.model.prepare_inputs_for_generation(input_ids, **model_kwargs, eos_token_id=self.eos_token_id)
+        model_inputs = self.model.prepare_inputs_for_generation(input_ids, **model_kwargs, attention_mask=attention_mask, eos_token_id=self.eos_token_id)
         model_inputs["attention_mask"] = attention_mask
 
         token_scores = []
@@ -52,13 +52,13 @@ class TransformersLLM(LMTPModel):
     def generate(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor: torch.FloatTensor, streamer: TokenStreamer) -> LMTPModelResult:
-        input_ids = torch.tensor(input_ids)
-        attention_mask = torch.tensor(attention_mask)
+        input_ids = torch.tensor(input_ids).to(self.model.device)
+        attention_mask = torch.tensor(attention_mask).to(self.model.device)
         
         kwargs = {
-            "input_ids": input_ids.to(self.model.device),
+            "input_ids": input_ids,
             "do_sample": temperature > 0.0,
-            "attention_mask": attention_mask.to(self.model.device),
+            "attention_mask": attention_mask,
             "temperature": temperature,
             "max_new_tokens": max_new_tokens,
             "logits_processor": self.logits_processors(bias_tensor),
