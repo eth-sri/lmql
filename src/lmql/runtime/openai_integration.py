@@ -209,9 +209,7 @@ class DclibOpenAiModel(DcModel):
         if noscore: return np.zeros(len(next_tokens), dtype=np.float32)
         
         prompt_str = self.tokenizer.convert_bytes_to_string(s.input_ids)
-        tokenized_input_ids = await self.tokenize(prompt_str)
-
-        res = await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(tokenized_input_ids))
+        res = await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids))
 
         server_side_swallowed_tokens = 0
         while len(res) < len(next_tokens):
