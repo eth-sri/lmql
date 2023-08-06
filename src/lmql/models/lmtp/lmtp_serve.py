@@ -146,6 +146,10 @@ options:
 
     return kwargs
 
-if __name__ == "__main__":
-    args = argparser(sys.argv[1:])
+def cli(args=None):
+    args = args or sys.argv[1:]
+    args = argparser(args)
     lmtp_serve_main(args)
+
+if __name__ == "__main__":
+    cli()
