@@ -440,9 +440,9 @@ class PromptInterpreter:
             if has_tail(mask):
                 tail_text = await s.text() + mask.tail
                 tail_ids = self.tokenizer.tokenize(tail_text, asbytes=True)[len(s.input_ids):]
-                print(len(tail_ids))
-                # tail_tokenized = self.tokenizer.tokenize(mask.tail, asbytes=True)
-                await self.dcmodel.prescore_tokens(s, tail_ids, noscore=kwargs.get("noscore", False))
+                if len(tail_ids) > 0:
+                    # tail_tokenized = self.tokenizer.tokenize(mask.tail, asbytes=True)
+                    await self.dcmodel.prescore_tokens(s, tail_ids, noscore=kwargs.get("noscore", False))
 
         return logit_mask, state
 
