@@ -1,3 +1,7 @@
+api.env
+**/node_modules/*
+*.tokens
+
 dist
 *__pycache__*
 **/*_compiled.py
@@ -174,4 +178,5 @@ wip-snippets
 .lmql-algorithms-cache
 
 *.tokens
+scripts/Dockerfile*
 transformers-cache
