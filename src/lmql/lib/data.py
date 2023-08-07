@@ -104,7 +104,6 @@ def trackingshuffledobjects(n: int, variant="five_objects"):
     with open(path, "r") as f:
         data = json.load(f)
 
-    # print(data.keys())
     s = data["examples"][n]
 
     choices = list(s["target_scores"].items())
@@ -131,7 +130,6 @@ def fever(n: int):
     with open(path, "r") as f:
         data = json.load(f)
 
-    # print(data.keys())
     s = data["examples"][n]
 
     choices = list(s["target_scores"].items())
@@ -158,7 +156,6 @@ def wikidata(n: int):
     with open(path, "r") as f:
         data = json.load(f)
 
-    # print(data.keys())
     s = data["examples"][n]
     target = s["target"]
     

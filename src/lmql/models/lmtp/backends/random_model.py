@@ -13,7 +13,7 @@ class UniformRandomSamplingLLM(LMTPModel):
         if vocab is not None:
             from transformers import AutoTokenizer
             tokenizer = AutoTokenizer.from_pretrained(vocab)
-            print("Random model using tokenizer", tokenizer)
+            print("['random' model using tokenizer {}]".format(tokenizer))
             self._eos_token_id = tokenizer.eos_token_id
             self._vocab_size = tokenizer.vocab_size
         else:

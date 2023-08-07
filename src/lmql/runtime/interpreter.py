@@ -4,6 +4,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple, Set
 import numpy as np
+import warnings
 
 import re
 import lmql.ops.ops as ops
@@ -511,7 +512,6 @@ class PromptInterpreter:
 
             # obtain where follow map
             follow_map = follow_trace[where] if where is not None else None
-            # print(id(self), self.variable, [text], "mask", follow_map)
             mask = ops.create_mask(follow_map, valid, is_final)
 
             if mask == "*": 
@@ -650,7 +650,6 @@ class PromptInterpreter:
                 continue
 
             result: RewrittenInputIds = await si.rewrite_for_sequence(seq, needs_rewrite, assert_no_advance=assert_no_advance)
-            # print("sub rewrite result", result)
             user_data = dc.deepmerge(user_data, result.user_data)
 
             if result.appended_input_ids is not None or result.strip_eos != False:
@@ -867,9 +866,6 @@ class PromptInterpreter:
 
         assert issubclass(type(self.dcmodel), dc.DcModel), "The provided dcmodel must be a subclass of DcModel"
 
-        if "no_repeat_ngram_size" in decoder_args:
-            print("warning: no_repeat_ngram_size is known to cause issues when used with constrained decoding, including non-termination.")
-
         # alternative mode where we only extract the prompt string
         return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)
         if return_prompt_string:
@@ -933,7 +929,7 @@ class PromptInterpreter:
             cache_value = decoder_args.pop("cache")
             if type(cache_value) is bool:
                 if cache_value == False:
-                    print("info: disabling model output caching")
+                    warnings.warn("info: disabling model output caching")
                 self.caching = cache_value
             elif type(cache_value) is str:
                 self.caching = True
@@ -973,7 +969,7 @@ class PromptInterpreter:
                 self.decoder_step += 1
 
                 if step_budget is not None and self.decoder_step >= step_budget:
-                    print("warning: step budget exceeded")
+                    warnings.warn("warning: step budget exceeded")
                     break
 
                 if interrupt.check():

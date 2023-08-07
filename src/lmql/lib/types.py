@@ -2,6 +2,7 @@ import lmql
 import json
 from dataclasses import dataclass, fields, is_dataclass
 from typing import List
+import warnings
 
 global is_oneshot
 is_oneshot = True
@@ -99,9 +100,9 @@ async def is_type(ty, description=False):
         # first run a simple one-shot query to get an initial result
         simple_json_result = single_shot_as_type(context.prompt, ty, model=context.interpreter.model_identifier)
         try:
-            already_parsed = json.loads(simple_json_result)
+            already_parsed = json.loads("a" + simple_json_result)
         except Exception as e:
-            print("Failed to parse JSON result from one-shot query: ", e, [simple_json_result])
+            warnings.warn("Failed to parse JSON result from one-shot query: " + str(e) + str([simple_json_result]))
             already_parsed = {}
     else:
         already_parsed = {}

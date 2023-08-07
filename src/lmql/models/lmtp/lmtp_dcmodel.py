@@ -434,7 +434,6 @@ class lmtp_model:
                 pass
             else:
                 asyncio.ensure_future(self.lmtp_inprocess_client.close())
-            # print("closing shared LMTPMultiProcessingClient instance for model {}".format(self.model_identifier), self.lmtp_inprocess_client.refs, flush=True)
 
     def __call__(self):
         # reference to factory instance

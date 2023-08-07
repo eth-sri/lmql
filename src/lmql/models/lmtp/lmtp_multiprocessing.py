@@ -4,11 +4,14 @@ and communicates with it via multiprocessing pipes (IPC).
 """
 
 import multiprocessing
-from multiprocessing.connection import Connection
 import pickle
 import sys
+import warnings
+from multiprocessing.connection import Connection
+
 from .lmtp_client import *
 from .lmtp_inference_server import TokenSession
+
 
 async def multiprocessing_main_async(pipe: Connection, kwargs):
     transport = LMTPMultiprocessingTransport(pipe)
@@ -118,7 +121,7 @@ class LMTPMultiProcessingClient:
                         consumers = self.iterators.get(stream_id, [])
                         for q in consumers: q.put_nowait(d)
                 except Exception as e:
-                    print("failed to handle msg", e, flush=True)
+                    warnings.warn("failed to handle msg {}: {}".format(msg, e))
         except asyncio.CancelledError:
             return
 

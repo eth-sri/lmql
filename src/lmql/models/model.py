@@ -1,4 +1,5 @@
 from lmql.models.lmtp.utils import rename_model_args
+import warnings
 
 class LMQLModel:
     def __init__(self, model_identifier, model=None, **kwargs):
@@ -47,7 +48,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
         kwargs["tokenizer"] = "huggyllama/llama-7b"
 
     if "endpoint" in kwargs:
-        print("info: 'endpoint' argument is ignored for inprocess=True/local: models.")
+        warnings.warn("info: 'endpoint' argument is ignored for inprocess=True/local: models.")
 
     cmdline_args = f"{model_name} "
     for k,v in kwargs.items():
@@ -57,7 +58,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
             cmdline_args += f"--{k} {v} "
 
     if cmdline_args in LMQLModel.inprocess_instances.keys():
-        print("info: reusing existing in-process model.", flush=True)
+        warnings.warn("info: reusing existing in-process model.")
         model = LMQLModel.inprocess_instances[cmdline_args]
         return LMQLModel(model_name, model=model)
 

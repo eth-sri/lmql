@@ -8,6 +8,7 @@ import aiohttp
 import asyncio
 import json
 import sys
+import warnings
 from .errors import LMTPStreamError
 
 class LMTPWebSocketClient:
@@ -76,7 +77,7 @@ class LMTPWebSocketClient:
                     try:
                         self.handle(msg)
                     except Exception as e:
-                        print("failed to handle msg", e, flush=True)
+                        warnings.warn("failed to handle msg {}: {}".format(msg, e))
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
         self.handler = asyncio.create_task(msg_handler())
@@ -91,30 +92,7 @@ class LMTPWebSocketClient:
                 consumers = self.iterators.get(stream_id, [])
                 for q in consumers: q.put_nowait(d)
         else:
-            print("Unknown command: {}".format(cmd), flush=True)
-
-async def main():
-    async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('http://localhost:8080') as ws:
-            import tiktoken
-
-            model = sys.argv[1]
-            tokenizer = tiktoken.encoding_for_model("text-ada-001")
-
-            client = LMTPWebSocketClient(model, ws)
-            client.connect()
-
-            async def generate_call(i):
-                prompt = tokenizer.encode("French: Sonde V18, Ø18 x 85mm, 33kHz, 8m, raccord ressort & taraudé M12, livré avec 2 piles 3.6V LS14250\nFrench:")
-                ids = [*prompt]
-
-                async for t in client.generate(prompt, max_tokens=32, logit_bias={0: -100, 12: -100}, temperature=0.0):
-                    ids.append(t["token"])
-                    print(i, [tokenizer.decode(ids)], flush=True)
-            
-            await asyncio.gather(*[generate_call(i) for i in range(1)])
-            
-            print("[LMTP connection closed]", flush=True)
+            warnings.warn("Unknown command: {}".format(cmd))
 
 def parse_kwargs(line):
     kwargs = {}
@@ -132,11 +110,11 @@ async def interactive_client():
     import termcolor
 
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('http://localhost:8080') as ws:
-            import tiktoken
+        async with session.ws_connect('http://workstation:8888') as ws:
+            from lmql.runtime.tokenizer import load_tokenizer
 
             model = sys.argv[1]
-            tokenizer = tiktoken.encoding_for_model("text-ada-001")
+            tokenizer = load_tokenizer(model)
 
             client = LMTPWebSocketClient(model, ws)
             client.connect()
@@ -148,7 +126,7 @@ async def interactive_client():
                 prompt, kwargs = parse_kwargs(prompt)
                 if prompt == "quit":
                     break
-                prompt = tokenizer.encode(prompt)
+                prompt = tokenizer(prompt)["input_ids"]
                 ids = [*prompt]
 
                 async def consume():

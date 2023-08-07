@@ -19,7 +19,7 @@ from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
-
+import warnings
 
 def is_allowed(m): 
     """
@@ -41,11 +41,10 @@ class CompleteTask:
             if type(e) is not openai.error.APIError and type(e) is not openai.error.ServiceUnavailableError:
                 raise e
             if retries > 0:
-                print("OpenAI API error: ", e, ". Retrying...", flush=True)
-                print("Retrying operation due to OpenAI API error", e)
+                warnings.warn("OpenAI API error: {} Retrying...".format(e))
                 return await self.run(retries - 1)
             else:
-                print("Exceeded ", retries, " retries. Giving up.", flush=True)
+                warnings.warn("Exceeded {} retries. Giving up.".format(retries))
                 raise e
 
 @dataclass
@@ -216,7 +215,7 @@ class DclibOpenAiModel(DcModel):
             res = np.append(res, 0.0)
             server_side_swallowed_tokens += 1
         if server_side_swallowed_tokens > 0:
-            print("warning: The OpenAI API has merged {} token(s) server-side, which will reflect in inaccurate 0.0 scores in the decoding tree".format(server_side_swallowed_tokens))
+            warnings.warn("warning: The OpenAI API has merged {} token(s) server-side, which will reflect in inaccurate 0.0 scores in the decoding tree".format(server_side_swallowed_tokens))
 
         return res
     
@@ -319,7 +318,7 @@ class DclibOpenAiModel(DcModel):
         if len(completion_call.stopping_phrases) > 0:
             if len(completion_call.stopping_phrases) > 4:
                 # same but blaming it more on OpenAI
-                print("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
+                warnings.warn("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
             # skip stopping phrases for more speculative execution
             if not self.model.nostop:
                 kwargs.update({"stop": completion_call.stopping_phrases[:4]})
@@ -351,9 +350,6 @@ class DclibOpenAiModel(DcModel):
             return [[t[0]] for t in await self.model.tokenize(tokens)]
         return tokens
     
-    async def openai_cache_delegate(self, kwargs, tokens, scores):
-        print(tokens, scores, self.cache_delegate)
-
     def count_billed_tokens(self, n, model):
         if model not in self.num_billed_tokens.keys():
             self.num_billed_tokens[model] = 0
