@@ -94,23 +94,39 @@ def argparser(args):
 usage: serve-model [-h] [--port PORT] [--host HOST] [--cuda] [--dtype DTYPE] [--[*] VALUE] model
 
 positional arguments:
-  model          The model to load or 'auto' if the model should be automatically loaded on client request.
+
+  model            The model to load or 'auto' if the model should be automatically loaded on client request.
+                   
+                   Can also be 'balance', in which case this serve-model instance will act as a load balancing
+                   reverse proxy for multiple endpoints, e.g. lmql serve-model balance localhost:8081 localhost:8082 localhost:8083
 
 options:
-  -h, --help     show this help message and exit
+
+  -h, --help       show this help message and exit
   --port PORT
   --host HOST
   --cuda
-  --static      If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument.
-  --single_thread Run the model on the main thread. This can lead to increased latency when processing multiple requests, but is necessary for some models that 
-                 cannot be run in the background.
-  --dtype DTYPE  What format to load the model weights. Options: 'float16'
-                 (not available on all models), '8bit' (requires bitsandbytes)
-  --loader OPT  If set, the model will be loaded using the corresponding option. Useful for loading quantized modules in formats not
-                supported by the transformers library, like GPTQ. Available options:
-                * auto-gptq (loads GPTQ based quantized models with auto-gptq. Consider adding `--use_safetensors true` if the model is
-                             distributed in the safetensor format)
-  --[*] VALUE   Any other argument will be passed as a keyword argument to the AutoModelForCausalLM.from_pretrained function.
+  --static         If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument.
+  
+  --single_thread  Run the model on the main thread. This can lead to increased latency when processing multiple requests, but is necessary 
+                   for some models that cannot be run in the background (e.g. falcon).
+  
+  --dtype DTYPE    What format to load the model weights in. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes), 
+                   '4bit' (requires bitsandbytes).
+  
+  --loader OPT     If set, the model will be loaded using the corresponding option. Useful for loading quantized modules in formats not
+                   supported by the transformers library, like GPTQ. Available options:
+                    
+                   * auto-gptq (loads GPTQ based quantized models with auto-gptq. Consider adding `--use_safetensors true` if the model is
+                     distributed in the safetensor format)
+  
+  --layout [GROUPS]x[DEVICES]   If set, a fleet of worker processes will be started to run multiple models in parallel. The layout specifies
+                                how many instances are served, and how many GPUs to use per instance. For example, `--layout 2x2` will start 2
+                                instances, each using 2 GPUs (devices 0,1 and 2,3). The provided --port argument will be used as the base port
+                                that load balances between the instances. For more information and more advanced setups see lmtp_layout.py.
+                            
+  --[*] VALUE      Any other argument will be passed as a keyword argument to the relevant backend implementation, e.g. the 
+                   AutoModelForCausalLM.from_pretrained function.
     """
 
     for arg in args:
@@ -159,6 +175,8 @@ def cli(args=None):
     args = args or sys.argv[1:]
 
     if len(args) > 0 and args[0] == "balance":
+        # when running as a balancer we do not serve ourselves, but instead
+        # route all traffice to worker nodes
         args = args[1:]
         balance_main(args)
         return

@@ -1,12 +1,14 @@
 """
 Launcher script to run multiple 'serve-model' processes with a
 provided GPU-to-process layout.
+
+Only supports NVIDIA GPUs for now.
 """
 import sys
 import subprocess
 
 def layout_main(args):
-    # extract --layout <STR> from args
+    # extract and remove --layout <STR> from args
     serve_args = []
     layout = None
     balancer_port = 8080
