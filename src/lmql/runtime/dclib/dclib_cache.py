@@ -525,10 +525,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             #     if tk in self.cache and type(self.cache[tk][0]) is not asyncio.Future:
                             #         print("token_consumer: token for {} from stream already in cache ({} streams): {}".format(tk, len(self.token_streams), self.cache[tk]))
 
-                            if "sample-id" in edge_type:
+                            if edge_type is not None and "sample-id" in edge_type:
                                 # keep track of sample id based edge types as user data
                                 user_data = user_data.copy()
                                 user_data["dc-edge-type"] = edge_type
+                            
                             self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data, verbose=False)
 
                             if self.show_speculative:
