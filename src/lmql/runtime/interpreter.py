@@ -1025,6 +1025,11 @@ class PromptInterpreter:
             self.decoder_step += 1
 
             return results
+        
+    EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
+                          "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
+                          "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
+                          "openai_nonstop", "chunksize"]
 
     def derive_decoder_args(self, extra_kwargs):
         # default is argmax
@@ -1042,20 +1047,19 @@ class PromptInterpreter:
         for a in decoder_arg_names + decoder_kwarg_names:
             if a in extra_kwargs.keys():
                 decoder_args[a] = extra_kwargs[a]
-        
+
+        for eda in PromptInterpreter.EXTRA_DECODER_ARGS:
+            if eda in extra_kwargs.keys():
+                decoder_args[eda] = extra_kwargs[eda]
+
         return decoder, decoder_args
     
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
-                         "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
-                         "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
-                         "openai_nonstop", "chunksize"]
-
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args
         decoder_kwarg_names = inspect.getfullargspec(decoder_fct).kwonlyargs
         for k in decoder_args.keys():
-            if k not in decoder_arg_names and k not in decoder_kwarg_names and k not in INTERNAL_ARGS:
+            if k not in decoder_arg_names and k not in decoder_kwarg_names and k not in PromptInterpreter.EXTRA_DECODER_ARGS:
                 raise ValueError("Unknown decoder argument: {}".format(k))
 
     def print_stats(self):
