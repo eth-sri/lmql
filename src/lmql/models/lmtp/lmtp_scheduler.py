@@ -58,6 +58,7 @@ class GenerateBatch:
     def from_calls(cls, calls):
         input_ids = [c.prompt for c in calls]
         max_len = max(len(ids) for ids in input_ids)
+        
         attention_mask = [[0] * (max_len - len(ids)) + [1] * len(ids) for ids in input_ids]
         input_ids = [[0] * (max_len - len(ids)) + ids for ids in input_ids]
         
