@@ -230,13 +230,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
             # apply operation for non-cached
             non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
-            # if len(non_cached) == 0:
-            #     print("cache hit for", len(cache_keys[0][0][0]), cache_keys[0][0][0][-50:], "with", cached_tokens[0][0])
             # generator over new results
             non_cached_argmax = iter((await self.delegate.argmax(DataArray(non_cached), **kwargs)).items())                
-            
-            if len(non_cached) > 0:
-                print("cache miss for", len(cache_keys[0][0][0]), cache_keys[0][0][0][-50:])
             
             results = []
             # put new results in cache
