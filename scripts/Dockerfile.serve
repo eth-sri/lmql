@@ -1,9 +1,8 @@
 FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
 
 ENV PYTHONUNBUFFERED=1 
-ENV PORT=8899
 
-# SYSTEM
+# NVIDIA GPU support
 RUN apt-get update --yes --quiet && DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet --no-install-recommends \
     software-properties-common \
     build-essential apt-utils \
@@ -27,6 +26,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 9
 
 RUN pip install --upgrade pip
 
+# install lmql
 WORKDIR lmql
 VOLUME ~/.lmql/
 ARG GPU_ENABLED
@@ -35,13 +35,35 @@ HEALTHCHECK CMD curl --fail http://localhost:$PORT/ || exit 1
 
 RUN apt-get update
 
+# install release version of lmql (for dependencies)
+RUN pip install "lmql[hf]"
+
 COPY . /lmql
-# install lmql from source
+# re-install lmql from source 
 WORKDIR /lmql
 RUN pip install -e ".[hf]"
 
-EXPOSE $PORT
-
+VOLUME /transformers
 RUN ls /transformers
 
-ENTRYPOINT ["lmql", "serve-model", "--port", "$PORT", "--host", "0.0.0.0"]
+ENV LMQL_VERSION="latest"
+
+# checkout LMQL version
+RUN if [ "$LMQL_VERSION" != "latest" ]; then git checkout tags/$LMQL_VERSION; fi
+
+# if ENV EXTRA_PIP_PACKAGES is set, install them at runtime (e.g. bitsandbytes or auto_gptq), not at build time
+ENV EXTRA_PIP_PACKAGES=""
+
+# create run.sh 
+RUN echo "#!/bin/bash \n\
+    set -x \n\
+    # install extra pip packages \n\
+    if [ \"\$EXTRA_PIP_PACKAGES\" != \"\" ]; then \n\
+        pip install \$EXTRA_PIP_PACKAGES \n\
+    fi \n\
+    # start lmql \n\
+    lmql serve-model --port 8899 --host 0.0.0.0 --docker_hide_port \$@" > run.sh
+
+RUN chmod +x run.sh
+
+ENTRYPOINT ["./run.sh"]

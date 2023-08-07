@@ -1,5 +1,6 @@
 api.env
 **/node_modules/*
+
 *.tokens
 
 dist
@@ -178,5 +179,9 @@ wip-snippets
 .lmql-algorithms-cache
 
 *.tokens
+
 scripts/Dockerfile*
+scripts/Dockerfile.serve
+scripts/lmql-serve-docker.py
 transformers-cache
+web/

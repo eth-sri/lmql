@@ -5,6 +5,7 @@ Command Line Interface for lmtp_inference_server.py.
 from .lmtp_inference_server import *
 from .utils import rename_model_args
 from .lmtp_balance import balance_main
+from .lmtp_layout import layout_main
 
 def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, loader=None, **kwargs):
     """
@@ -40,10 +41,12 @@ def lmtp_serve_main(model_args):
 
     # extract explicit arguments
     host = model_args.pop("host", "localhost")
-    port = model_args.pop("port", 8080)
+    port = int(model_args.pop("port", 8080))
     model = model_args.pop("model", None)
     single_thread = model_args.pop("single_thread", False)
     static = model_args.pop("static", False) or single_thread
+    # in Docker, don't show the port (it's not accessible from outside the container anyway)
+    docker_hide_port = model_args.pop("docker_hide_port", False)
     
     assert not single_thread or model != "auto", "Cannot use --single_thread mode with model 'auto'. Please specify a specific model to load."
 
@@ -68,7 +71,10 @@ def lmtp_serve_main(model_args):
     
     def web_print(*args):
         if len(args) == 1 and args[0].startswith("======== Running on"):
-            print(f"[Serving LMTP endpoint on ws://{host}:{port}/]")
+            if docker_hide_port:
+                print(f"[Serving LMTP endpoint on Docker container port]")
+            else:
+                print(f"[Serving LMTP endpoint on ws://{host}:{port}/]")
         else:
             print(*args)
     
@@ -82,7 +88,7 @@ def argparser(args):
     next_argument_name = None
     
     kwargs = {}
-    flag_args = ["cuda", "static", "single_thread"]
+    flag_args = ["cuda", "static", "single_thread", "docker_hide_port"]
 
     help_text = """
 usage: serve-model [-h] [--port PORT] [--host HOST] [--cuda] [--dtype DTYPE] [--[*] VALUE] model
@@ -96,6 +102,8 @@ options:
   --host HOST
   --cuda
   --static      If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument.
+  --single_thread Run the model on the main thread. This can lead to increased latency when processing multiple requests, but is necessary for some models that 
+                 cannot be run in the background.
   --dtype DTYPE  What format to load the model weights. Options: 'float16'
                  (not available on all models), '8bit' (requires bitsandbytes)
   --loader OPT  If set, the model will be loaded using the corresponding option. Useful for loading quantized modules in formats not
@@ -154,6 +162,10 @@ def cli(args=None):
         args = args[1:]
         balance_main(args)
         return
+    elif "--layout" in args:
+        # instead of running directly, with a layout we are launching the
+        # relevant worker subprocesses, which in turn call lmtp_serve_main
+        layout_main(args)
     else:
         args = argparser(args)
         lmtp_serve_main(args)
