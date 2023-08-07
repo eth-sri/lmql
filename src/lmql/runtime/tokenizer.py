@@ -160,7 +160,7 @@ class LMQLTokenizer:
 
         return s
 
-    def __call__(self, s: str, add_special_tokens=False, with_prefix=True):
+    def __call__(self, s: str, add_special_tokens=False):
         input_ids = []
         unpack = False
         if type(s) is not list:
@@ -173,12 +173,8 @@ class LMQLTokenizer:
                 if type(chunk) is int:
                     chunk_input_ids.append(chunk)
                 else:
-                    if with_prefix:
-                        result = self.tokenizer_impl("@" + chunk, add_special_tokens=add_special_tokens)["input_ids"]
-                        chunk_input_ids += result[1:]
-                    else:
-                        result = self.tokenizer_impl(chunk, add_special_tokens=add_special_tokens)["input_ids"]
-                        chunk_input_ids += result
+                    result = self.tokenizer_impl(chunk, add_special_tokens=add_special_tokens)["input_ids"]
+                    chunk_input_ids += result
             input_ids.append(chunk_input_ids)
         
         if unpack:

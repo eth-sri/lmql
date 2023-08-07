@@ -621,9 +621,8 @@ class PromptInterpreter:
         if state.tail is not None:
             rewritten_state = state.updated(tail=None)
             prompt_ids = seq.input_ids.tolist()
-            tail_text = await seq.text() + state.tail
-            tail_ids = self.tokenizer.tokenize(tail_text, asbytes=True)[len(seq.input_ids):]
-            # tail_ids = self.tokenizer.tokenize(state.tail, asbytes=True)
+            tail_text = await seq.text(limit=-1) + state.tail
+            tail_ids = self.tokenizer.tokenize(tail_text, asbytes=True)[len(seq.input_ids) - 1:]
             tail_ids = tail_ids[:-1]
             if len(tail_ids) > 1:
                 updated_ids = prompt_ids + tail_ids[1:]
