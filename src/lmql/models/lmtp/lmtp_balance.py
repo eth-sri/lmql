@@ -1,5 +1,5 @@
 """
-Command Line Interface for lmtp_inference_server.py.
+Simple reverse proxying load balancer for multiple LMTP endpoints.
 """
 
 from .lmtp_inference_server import *
@@ -27,12 +27,13 @@ class LMTPWorkerHandle:
         self.endpoint = endpoint
         self.balancer = balancer
 
-    def __enter__(self):
+    async def __aenter__(self):
         self.balancer.active_connections[self.endpoint] += 1
         print(f"Worker {self.endpoint} has {self.balancer.active_connections[self.endpoint]} active connections.")
         return self
     
-    def __exit__(self, exc_type, exc_value, traceback):
+    async def __aexit__(self, exc_type, exc, tb):
+        print(f"Worker {self.endpoint} has now {self.balancer.active_connections[self.endpoint]} active connections (one less).", flush=True)
         self.balancer.active_connections[self.endpoint] = max(0, self.balancer.active_connections[self.endpoint] - 1)
 
 def lmtp_balance(workers, host, port):
@@ -50,7 +51,7 @@ def lmtp_balance(workers, host, port):
         worker_ws_connection = None
 
         # select worker
-        with balancer.worker() as worker:
+        async with balancer.worker() as worker:
             # proxy connection client <-> worker
             try:
                 async with aiohttp.ClientSession() as session:
@@ -73,7 +74,9 @@ def lmtp_balance(workers, host, port):
                                     worker_ws.close()
                                     break
                         
-                        await asyncio.gather(worker_to_client(), client_to_worker())
+                        done, pending = await asyncio.wait([worker_to_client(), client_to_worker()], return_when=asyncio.FIRST_COMPLETED)
+                        for task in pending:
+                            task.cancel()
             # handle ConnectionResetError
             except ConnectionResetError:
                 pass
