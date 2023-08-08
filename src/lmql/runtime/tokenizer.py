@@ -29,6 +29,7 @@ class LMQLTokenizer:
     def __init__(self, model_identifier, tokenizer_impl=None, loader=None):
         self._tokenizer_impl = None
         self.loader_thread = None
+        self.loader_failed = False
 
         self.model_identifier = model_identifier
 
@@ -68,6 +69,8 @@ class LMQLTokenizer:
     def tokenizer_impl(self):
         if self._tokenizer_impl is None:
             self.loader_thread.join()
+        if self._tokenizer_impl is None:
+            raise TokenizerNotAvailableError("Failed to load suitable tokenizer for model '{}'".format(self.model_identifier))
         return self._tokenizer_impl
     
     @property
