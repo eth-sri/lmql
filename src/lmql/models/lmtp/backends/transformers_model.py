@@ -68,7 +68,8 @@ class TransformersLLM(LMTPModel):
         result = self.model.generate(**kwargs, stopping_criteria=[TokenStreamerDisguisedAsStoppingCriterion(streamer)], 
                                      eos_token_id=self.eos_token_id, pad_token_id=self.eos_token_id)
 
-        return LMTPModelResult(sequences=result.sequences, scores=result.scores)
+        scores = [torch.log_softmax(s, dim=-1) for s in result.scores]
+        return LMTPModelResult(sequences=result.sequences, scores=scores)
     
     def logits_processors(self, logit_biases):
         bias_tensors = None
@@ -93,6 +94,7 @@ class TokenStreamerDisguisedAsStoppingCriterion:
         self.token_streamer = token_streamer
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
+        scores = [torch.log_softmax(s, dim=-1) for s in scores]
         self.token_streamer(input_ids, scores, **kwargs)
         return False
 
