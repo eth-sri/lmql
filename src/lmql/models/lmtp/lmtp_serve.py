@@ -5,6 +5,7 @@ Command Line Interface for lmtp_inference_server.py.
 from .lmtp_inference_server import *
 from .utils import rename_model_args
 from .lmtp_balance import balance_main
+from .lmtp_layout import layout_main
 
 def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, loader=None, **kwargs):
     """
@@ -154,6 +155,10 @@ def cli(args=None):
         args = args[1:]
         balance_main(args)
         return
+    elif "--layout" in args:
+        # instead of running directly, with a layout we are launching the
+        # relevant worker subprocesses, which in turn call lmtp_serve_main
+        layout_main(args)
     else:
         args = argparser(args)
         lmtp_serve_main(args)
