@@ -1,5 +1,6 @@
 import re
 import atexit
+import warnings
 
 from tokenize import Token
 from typing import Iterable, Tuple
@@ -8,7 +9,7 @@ from itertools import product
 from lmql.utils import nputil
 import numpy as np
 from lmql.runtime.stats import Stats
-from lmql.runtime.caching import cachefile, cache_file_exists
+from lmql.runtime.caching import cachefile
 from lmql.runtime.tokenizer import get_vocab
 from lmql.ops.regex import Regex
 
@@ -54,16 +55,18 @@ class VocabularyMatcher:
         except:
             VocabularyMatcher._instance = VocabularyMatcher(tokenizer, tokenizer.model_identifier)
 
-        if cache_file_exists(cache_path) and False:
+        try:
             with cachefile(cache_path, "rb") as f:
                 try:
                     import time
                     s = time.time()
                     VocabularyMatcher.cache = pickle.load(f)
                     VocabularyMatcher._instance.disk_cached = len(VocabularyMatcher.cache)
-                    # print("Matcher cache loaded in {}s".format(time.time() - s))
                 except:
-                    print("Failed to load token mask cache from {}. If the cache is corrupted, please delete it.".format(cache_path))
+                    warnings.warn("Failed to load token mask cache from {}. If the cache is corrupted, please delete it.".format(cache_path))
+        except:
+            # no cache file
+            pass
 
         atexit.register(lambda: VocabularyMatcher._instance.save())
 

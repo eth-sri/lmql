@@ -59,7 +59,7 @@ def resolve(model_name, endpoint=None, **kwargs):
 
         # special case for 'random' model (see random_model.py)
         if model_name == "random":
-            kwargs["tokenizer"] = "gpt2"
+            kwargs["tokenizer"] = "gpt2" if "vocab" not in kwargs else kwargs["vocab"]
             kwargs["inprocess"] = True
             kwargs["async_transport"] = True
 

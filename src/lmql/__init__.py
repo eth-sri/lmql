@@ -33,9 +33,6 @@ from typing import Optional
 
 model_registry = LMQLModelRegistry
 
-def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
-    print("warning: connect() is deprecated. Use set_backend() instead.")
-
 def autoconnect():
     model_registry.autoconnect = True
 

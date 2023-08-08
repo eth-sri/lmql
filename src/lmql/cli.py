@@ -11,8 +11,9 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def cmd_serve_model():
     """emoji:🏄 Serve a 🤗 Transformers model via the LMQL inference API"""
+    from lmql.models.lmtp.lmtp_serve import cli
     os.chdir(project_root)
-    os.system("python -m lmql.models.lmtp.lmtp_serve " + " ".join(sys.argv[2:]))
+    cli(sys.argv[2:])
 
 def cmd_chat():
     """emoji:💬 Serve a given query file as an interactive LMQL chatbot"""

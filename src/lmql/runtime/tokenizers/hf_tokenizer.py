@@ -84,8 +84,8 @@ class TransformersTokenizer:
         """
         return [int(t.decode("utf-8")) for t in tokens]
 
-    def __call__(self, text_or_list, add_special_tokens=False):
-        return self.tokenizer(text_or_list, add_special_tokens=add_special_tokens)
+    def __call__(self, text, add_special_tokens=False):
+        return self.tokenizer(text, add_special_tokens=add_special_tokens)
 
     @property
     def vocab_size(self):
@@ -110,6 +110,7 @@ class LlamaTransformersTokenizer(TransformersTokenizer):
     """Aligns the behavior of HF LlamaTokenizer with that of gpt tokenizers."""
 
     space_token = "▁"
+    nl_token = "<0x0A>"
 
     def convert_bytes_to_string(self, token_bytes):
         token_bytes = [str(self.tokenizer.bos_token_id).encode("utf-8")] + token_bytes
@@ -117,12 +118,18 @@ class LlamaTransformersTokenizer(TransformersTokenizer):
         return s[len(self.tokenizer.bos_token):]
     
     def tokenize(self, text, asbytes=False, add_special_tokens=False):
-        if not asbytes and text == " " and LlamaTransformersTokenizer.space_token is not None:
-            return [LlamaTransformersTokenizer.space_token]
+        if not asbytes:
+            if text == " " and LlamaTransformersTokenizer.space_token is not None:
+                return [LlamaTransformersTokenizer.space_token]
+            if text == "\n" and LlamaTransformersTokenizer.nl_token is not None:
+                return [LlamaTransformersTokenizer.nl_token]
         return super().tokenize(text, asbytes, add_special_tokens)
 
-    def __call__(self, text_or_list, add_special_tokens=False):
-        text_or_list = self.tokenizer.bos_token + text_or_list
-        result = super().__call__(text_or_list, add_special_tokens=add_special_tokens)
-        result["input_ids"] = result["input_ids"][1:]
+    def __call__(self, text, add_special_tokens=False):
+        text = "@" + text
+        
+        text = self.tokenizer.bos_token + text
+        result = super().__call__(text, add_special_tokens=add_special_tokens)
+        result["input_ids"] = result["input_ids"][2:]
+        
         return result

@@ -14,6 +14,7 @@ import lmql.runtime.masks as masks
 from lmql.runtime.token_distribution import TokenDistribution
 
 from typing import Any, List, Union
+import random
 
 class LMTPModel(DcModel):
     def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, **kwargs):
@@ -181,6 +182,13 @@ class LMTPModel(DcModel):
 
         mask = logits_mask_result.logits_mask[0]
 
+        assert kwargs.get("num_samples", 1) == 1, "LMTP does not support num_samples > 1 right now. Please, duplicate your dc.seq to obtain multiple sampled continuations."
+
+        if s.user_data is None:
+            s.user_data = {}
+        s.user_data = dc.deepmerge(dc.deepcopy(s.user_data), logits_mask_result.user_data[0])
+        s.user_data["set_by"] = "where"
+
         if mask is not None:
             num_allowed = masks.mask_num_allowed(mask)
             if num_allowed == 1:
@@ -223,7 +231,20 @@ class LMTPModel(DcModel):
                 return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=None) for i,s in enumerate(seqs)]
             
             self.model.num_queries += len(seqs)
-            tokens = await asyncio.gather(*[self.stream_and_return_first(s, await self.generate(s, temperature=temperature, **kwargs), sampling_mode) for s in seqs])
+
+            # by default we do not need to store any user data in continuations
+            user_data = [None for _ in seqs]
+
+            # if sampling freshly, generate a new sample id to identify the full sampled sequence in the cache
+            if temperature > 0.0:
+                unique_sampling_mode = [f"{sampling_mode}-sample-id-{random.randint(0, 2**32-1)}" for _ in seqs]
+                # store sample-unique id per continuation
+                user_data = [[{"dc-edge-type": mode}] for mode in unique_sampling_mode]
+            else:
+                # no sample-id needed for (deterministic) top-1
+                unique_sampling_mode = [sampling_mode for _ in seqs]
+
+            tokens = await asyncio.gather(*[self.stream_and_return_first(s, await self.generate(s, temperature=temperature, **kwargs), mode) for s,mode in zip(seqs, unique_sampling_mode)])
 
             next_token_ids = np.array([t['token'] for t in tokens], dtype=np.int64)
             next_token_scores = np.array([t['logprob'] for t in tokens], dtype=np.float32)
@@ -231,7 +252,7 @@ class LMTPModel(DcModel):
 
             next_tokens = np.array([self.tokenizer.decode_bytes([t])[0] for t in next_token_ids])
 
-            return [s.make_successors(next_tokens[i].reshape(1), next_token_scores[i], logits=next_logits[i]) for i,s in enumerate(seqs)]
+            return [s.make_successors(next_tokens[i].reshape(1), next_token_scores[i], logits=next_logits[i], user_data=user_data[i]) for i,s in enumerate(seqs)]
         
         return await sequences.aelement_wise(op_sample)
 
@@ -413,7 +434,6 @@ class lmtp_model:
                 pass
             else:
                 asyncio.ensure_future(self.lmtp_inprocess_client.close())
-            # print("closing shared LMTPMultiProcessingClient instance for model {}".format(self.model_identifier), self.lmtp_inprocess_client.refs, flush=True)
 
     def __call__(self):
         # reference to factory instance

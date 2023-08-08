@@ -61,7 +61,6 @@ def is_keyword(tok, kw):
     return tok.type == tokenize.NAME and tok.string.lower() == kw.lower()
 
 def remove_indentation(s, oneline=False):
-    # print([s])
     lines = []
 
     min_indent = " " * len(s)
@@ -71,15 +70,6 @@ def remove_indentation(s, oneline=False):
         unindented_line = line.lstrip()
         line_indent = len(line) - len(unindented_line)
         min_indent = min_indent if len(min_indent) < line_indent else line[:line_indent]
-        # print(unindented_line, [line[:line_indent], line], line_indent)
-        
-        # buf = StringIO(line)
-        # toks = [t for t in tokenize.generate_tokens(buf.readline)]
-        # print(tokenize.tok_name[toks[-4].type])
-        
-        # lines.append(line.lstrip())
-
-    # print("min_indent is", len(min_indent), [min_indent])
 
     for line in s.split("\n"):
         if line.strip() == "" or line == "\\": continue
@@ -151,10 +141,6 @@ class LanguageFragmentParser:
             self.query.prologue = []
             self.state = "prompt"
 
-        # print("decode_str", remove_comments(self.query.decode_str))
-        # print("prompt_str", remove_comments(self.query.prompt_str))
-        # print("from_str", remove_comments(self.query.from_str))
-
         self.prologue_transform()
         self.inline_where_transform()
         self.ast_parse()
@@ -169,7 +155,6 @@ class LanguageFragmentParser:
             tok = prompt_tokens[i]
             lookahead = prompt_tokens[i+1]
             if tok.type == tokenize.STRING and lookahead.type == tokenize.NAME and lookahead.string == "where":
-                # print(prompt_tokens[i+1])
                 prompt_tokens[i+1] = tokenize.TokenInfo(type=tokenize.OP, string="and", start=lookahead.start, end=lookahead.end, line=lookahead.line)
         
 
@@ -287,7 +272,6 @@ class LanguageFragmentParser:
                 try:
                     untokenized = tokenize.untokenize([last_tok, tok]).split(last_tok.string)[1]
                     if not untokenized.startswith(" "):
-                        # print("merge name and tok", last_tok, tok)
                         self.query.prompt_str.pop(-1)
                 except:
                     pass

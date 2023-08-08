@@ -8,6 +8,8 @@ class TransformersLLM(LMTPModel):
         self.model_identifier = model_identifier
         self.model_args = kwargs
 
+        self.max_batch_size = kwargs.pop("batch_size", 32)
+
         if self.model_args.pop("loader", None) == "auto-gptq":
             from auto_gptq import AutoGPTQForCausalLM
             print("[Loading", self.model_identifier, "with", f"AutoGPTQForCausalLM.from_quantized({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
@@ -19,8 +21,6 @@ class TransformersLLM(LMTPModel):
         
         print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
-
-        self.max_batch_size = kwargs.get("batch_size", 8)
 
     @property
     def eos_token_id(self):

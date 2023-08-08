@@ -6,13 +6,27 @@ import numpy as np
 import lmql.utils.nputil as nputil
 
 class UniformRandomSamplingLLM(LMTPModel):
-    def __init__(self, seed=None, **kwargs):
+    def __init__(self, seed=None, vocab=None, **kwargs):
         self.seed = seed
         self.kwargs = kwargs
 
+        if vocab is not None:
+            from transformers import AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained(vocab)
+            print("['random' model using tokenizer {}]".format(tokenizer))
+            self._eos_token_id = tokenizer.eos_token_id
+            self._vocab_size = tokenizer.vocab_size
+        else:
+            self._eos_token_id = 50256
+            self._vocab_size = 50257
+
     @property
     def eos_token_id(self):
-        return 50256
+        return self._eos_token_id
+    
+    @property
+    def vocab_size(self):
+        return self._vocab_size
 
     # def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
     #     return super().score(input_ids, attention_mask, **model_kwargs)
@@ -29,10 +43,10 @@ class UniformRandomSamplingLLM(LMTPModel):
         scores = []
         
         if bias_tensor is not None:
-            bias_tensor = self.make_bias_tensor(bias_tensor, self.eos_token_id + 1)
+            bias_tensor = self.make_bias_tensor(bias_tensor, self.vocab_size)
 
         for i in range(max_new_tokens):
-            logits = np.zeros([len(input_ids), 50257])
+            logits = np.zeros([len(input_ids), self.vocab_size])
             
             if bias_tensor is not None:
                 logits += bias_tensor

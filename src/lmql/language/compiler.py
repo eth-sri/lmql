@@ -376,16 +376,6 @@ class PromptClauseTransformation(FunctionCallTransformation):
 
         return ast.parse(result_code)
 
-    # def transform_prompt_stmt(self, stmt):
-    #     if type(stmt) is ast.Expr:
-    #         if type(stmt.value) is ast.Constant and type(stmt.value.value) is str:
-    #             # print(stmt.value.value)
-    #             stmt.value = self.transform_query_string(stmt.value.value)
-    #             # print(dir(stmt.value))
-    #     else:
-    #         print(type(stmt))
-    #     return stmt
-
 class SNFList:
     def __init__(self):
         self.stmts = []

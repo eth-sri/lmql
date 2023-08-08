@@ -4,6 +4,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple, Set
 import numpy as np
+import warnings
 
 import re
 import lmql.ops.ops as ops
@@ -438,8 +439,11 @@ class PromptInterpreter:
         # check for tail and prescore
         if hasattr(self.dcmodel, "prescore_tokens") and (not type(s) is dc.DeterministicDecoderSequence or len(s.next_ids) == 0):
             if has_tail(mask):
-                tail_tokenized = self.tokenizer.tokenize(mask.tail, asbytes=True)
-                await self.dcmodel.prescore_tokens(s, tail_tokenized, noscore=kwargs.get("noscore", False))
+                tail_text = await s.text() + mask.tail
+                tail_ids = self.tokenizer.tokenize(tail_text, asbytes=True)[len(s.input_ids):]
+                if len(tail_ids) > 0:
+                    # tail_tokenized = self.tokenizer.tokenize(mask.tail, asbytes=True)
+                    await self.dcmodel.prescore_tokens(s, tail_ids, noscore=kwargs.get("noscore", False))
 
         return logit_mask, state
 
@@ -508,7 +512,6 @@ class PromptInterpreter:
 
             # obtain where follow map
             follow_map = follow_trace[where] if where is not None else None
-            # print(id(self), self.variable, [text], "mask", follow_map)
             mask = ops.create_mask(follow_map, valid, is_final)
 
             if mask == "*": 
@@ -618,7 +621,8 @@ class PromptInterpreter:
         if state.tail is not None:
             rewritten_state = state.updated(tail=None)
             prompt_ids = seq.input_ids.tolist()
-            tail_ids = self.tokenizer.tokenize(state.tail, asbytes=True)
+            tail_text = await seq.text(limit=-1) + state.tail
+            tail_ids = self.tokenizer.tokenize(tail_text, asbytes=True)[len(seq.input_ids) - 1:]
             tail_ids = tail_ids[:-1]
             if len(tail_ids) > 1:
                 updated_ids = prompt_ids + tail_ids[1:]
@@ -646,7 +650,6 @@ class PromptInterpreter:
                 continue
 
             result: RewrittenInputIds = await si.rewrite_for_sequence(seq, needs_rewrite, assert_no_advance=assert_no_advance)
-            # print("sub rewrite result", result)
             user_data = dc.deepmerge(user_data, result.user_data)
 
             if result.appended_input_ids is not None or result.strip_eos != False:
@@ -863,9 +866,6 @@ class PromptInterpreter:
 
         assert issubclass(type(self.dcmodel), dc.DcModel), "The provided dcmodel must be a subclass of DcModel"
 
-        if "no_repeat_ngram_size" in decoder_args:
-            print("warning: no_repeat_ngram_size is known to cause issues when used with constrained decoding, including non-termination.")
-
         # alternative mode where we only extract the prompt string
         return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)
         if return_prompt_string:
@@ -875,7 +875,7 @@ class PromptInterpreter:
         prompt_ids = await self.tokenize(self.root_state.prompt)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
-        
+
         prompt = self.tokenizer.tokenize(self.root_state.prompt, asbytes=True)
         n = len(prompt)
         
@@ -929,7 +929,7 @@ class PromptInterpreter:
             cache_value = decoder_args.pop("cache")
             if type(cache_value) is bool:
                 if cache_value == False:
-                    print("info: disabling model output caching")
+                    warnings.warn("info: disabling model output caching")
                 self.caching = cache_value
             elif type(cache_value) is str:
                 self.caching = True
@@ -969,7 +969,7 @@ class PromptInterpreter:
                 self.decoder_step += 1
 
                 if step_budget is not None and self.decoder_step >= step_budget:
-                    print("warning: step budget exceeded")
+                    warnings.warn("warning: step budget exceeded")
                     break
 
                 if interrupt.check():
@@ -1021,6 +1021,11 @@ class PromptInterpreter:
             self.decoder_step += 1
 
             return results
+        
+    EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
+                          "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
+                          "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
+                          "openai_nonstop", "chunksize", "alpha"]
 
     def derive_decoder_args(self, extra_kwargs):
         # default is argmax
@@ -1038,20 +1043,19 @@ class PromptInterpreter:
         for a in decoder_arg_names + decoder_kwarg_names:
             if a in extra_kwargs.keys():
                 decoder_args[a] = extra_kwargs[a]
-        
+
+        for eda in PromptInterpreter.EXTRA_DECODER_ARGS:
+            if eda in extra_kwargs.keys():
+                decoder_args[eda] = extra_kwargs[eda]
+
         return decoder, decoder_args
     
     def validate_args(self, decoder_args, decoder_fct):
-        INTERNAL_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
-                         "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
-                         "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
-                         "openai_nonstop", "chunksize", "alpha"]
-
         # get all arg names and kwarg names of decoder function
         decoder_arg_names = inspect.getfullargspec(decoder_fct).args
         decoder_kwarg_names = inspect.getfullargspec(decoder_fct).kwonlyargs
         for k in decoder_args.keys():
-            if k not in decoder_arg_names and k not in decoder_kwarg_names and k not in INTERNAL_ARGS:
+            if k not in decoder_arg_names and k not in decoder_kwarg_names and k not in PromptInterpreter.EXTRA_DECODER_ARGS:
                 raise ValueError("Unknown decoder argument: {}".format(k))
 
     def print_stats(self):
