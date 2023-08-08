@@ -29,11 +29,9 @@ class LMTPWorkerHandle:
 
     async def __aenter__(self):
         self.balancer.active_connections[self.endpoint] += 1
-        print(f"Worker {self.endpoint} has {self.balancer.active_connections[self.endpoint]} active connections.")
         return self
     
     async def __aexit__(self, exc_type, exc, tb):
-        print(f"Worker {self.endpoint} has now {self.balancer.active_connections[self.endpoint]} active connections (one less).", flush=True)
         self.balancer.active_connections[self.endpoint] = max(0, self.balancer.active_connections[self.endpoint] - 1)
 
 def lmtp_balance(workers, host, port):

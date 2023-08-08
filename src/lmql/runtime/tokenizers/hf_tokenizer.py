@@ -125,8 +125,11 @@ class LlamaTransformersTokenizer(TransformersTokenizer):
                 return [LlamaTransformersTokenizer.nl_token]
         return super().tokenize(text, asbytes, add_special_tokens)
 
-    def __call__(self, text_or_list, add_special_tokens=False):
-        text_or_list = self.tokenizer.bos_token + text_or_list
-        result = super().__call__(text_or_list, add_special_tokens=add_special_tokens)
-        result["input_ids"] = result["input_ids"][1:]
+    def __call__(self, text, add_special_tokens=False):
+        text = "@" + text
+        
+        text = self.tokenizer.bos_token + text
+        result = super().__call__(text, add_special_tokens=add_special_tokens)
+        result["input_ids"] = result["input_ids"][2:]
+        
         return result

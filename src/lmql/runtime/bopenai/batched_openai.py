@@ -119,7 +119,6 @@ def make_request_args(tasks):
 
 @dataclass
 class Stats:
-    prompt_tokens: int = 0
     tokens: int = 0
     requests: int = 0
     errors: int = 0
@@ -663,9 +662,6 @@ class AsyncOpenAIAPI:
             yield first
             async for x in aiter:
                 yield x
-
-        num_prompt_tokens = sum([len(p) for p in kwargs["prompt"]])
-        self.stats.prompt_tokens += num_prompt_tokens
 
         res = complete(**kwargs)
         first = await anext(res)

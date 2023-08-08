@@ -2,14 +2,14 @@ import argparse
 import os
 
 def has_docker_image():
-    cmd = """sudo docker image ls | grep lmql-serve"""
+    cmd = """docker image ls | grep lmql-serve"""
     print(">", cmd)
     return os.system(cmd) == 0
 
 def build_docker_image():
     ADDITIONAL_EXCLUDES = [
     ]
-    cmd = """sudo docker build -t lmql-serve -f scripts/Dockerfile.serve ."""
+    cmd = """docker build -t lmql-serve -f scripts/Dockerfile.serve ."""
     print(">", cmd)
     os.system(cmd)
 
@@ -40,7 +40,7 @@ if not has_docker_image() or args.rebuild:
 PORT=2223
 GPUS=all
 
-cmd = """sudo docker run \\
+cmd = """docker run \\
     -p $PORT:8899 \\
     -e TRANSFORMERS_CACHE=/transformers $EXTRAS \\
     -it --gpus $GPUS \\
