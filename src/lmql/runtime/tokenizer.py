@@ -7,6 +7,7 @@ See .tokenizers for concrete implementations.
 import os
 import pickle
 import numpy as np
+import warnings
 from typing import Optional
 
 from lmql.runtime.caching import cache_file_exists, cachefile
@@ -18,6 +19,9 @@ global special_token_mappings
 special_token_mappings = {}
 global reverse_special_token_mappings
 reverse_special_token_mappings = {}
+
+class TokenizerNotAvailableError(Exception):
+    pass
 
 class LMQLTokenizer:
     INVALID_CHARACTER = "\uFFFD"
@@ -255,17 +259,11 @@ class LMQLTokenizer:
         return segments
             
 
-def load_tokenizer_notransformers(model_identifier):
-    if not "SLOW_TOKENIZER_OK" in os.environ.keys():
-        print("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
-    assert PythonBackedTokenizer.is_available(), "PythonBackedTokenizer not available. Please make sure the 'gpt3_tokenizer' package is installed."
-    
-    return PythonBackedTokenizer(model_identifier)
-
 def load_tokenizer(model_identifier, type="auto", **kwargs):
     cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
+    # check for tiktoken
     if type in ["auto", "tiktoken"]:
         tiktoken_available = False
         # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
@@ -289,32 +287,33 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             
             return LMQLTokenizer(model_identifier, loader=loader)
 
-    try:
-        assert type in ["auto", "hf"]
+    # check for huggingface tokenizers
+    from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
+    import os
+    os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-        def loader():
-            import os
-            os.environ["TOKENIZERS_PARALLELISM"] = "true"
+    if type in ["auto", "hf"]:
+        if TransformersTokenizer.is_available(model_identifier):
+            def loader():
+                if cache_file_exists(cache_path):
+                    with cachefile(cache_path, "rb") as f:
+                        return LMQLTokenizer(pickle.load(f), model_identifier)
+                else:
+                    t = TransformersTokenizer.from_pretrained(model_identifier, **kwargs)
 
-            from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
-
-            assert TransformersTokenizer.is_available(model_identifier), "TransformersTokenizer not available. Please make sure the 'transformers' package is installed."
-
-            if cache_file_exists(cache_path):
-                with cachefile(cache_path, "rb") as f:
-                    return LMQLTokenizer(pickle.load(f), model_identifier)
-            else:
-                t = TransformersTokenizer.from_pretrained(model_identifier, **kwargs)
-
-                with cachefile(cache_path, "wb") as f:
-                    pickle.dump(t, f)
-            return t
-        return LMQLTokenizer(model_identifier, loader=loader)
-    except Exception as e:
-        # fallback to non-transformers tokenizer
-        t = load_tokenizer_notransformers(model_identifier)
-
-        return LMQLTokenizer(model_identifier, t)
+                    with cachefile(cache_path, "wb") as f:
+                        pickle.dump(t, f)
+                return t
+            return LMQLTokenizer(model_identifier, loader=loader)
+    
+    # slow GPT-only tokenizer (python-backed)
+    if PythonBackedTokenizer.is_available(model_identifier):
+        if not "SLOW_TOKENIZER_OK" in os.environ.keys():
+            warnings.warn("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
+        
+        return LMQLTokenizer(model_identifier, tokenizer_impl=PythonBackedTokenizer(model_identifier))
+    
+    raise TokenizerNotAvailableError("Failed to locate a suitable tokenizer implementation for '{}' (if you are not using GPT models, please install the 'transformers' package)".format(model_identifier))
 
 def get_vocab(tokenizer):
     if hasattr(tokenizer, "vocab"):
