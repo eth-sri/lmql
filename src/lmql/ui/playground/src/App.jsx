@@ -608,7 +608,7 @@ function ModelSelection(props) {
     <div className={'select ' + (selectOpen ? "open" : "")}>
       <span className="instructions">
         <b>Custom Model</b><br/>
-        Specify the model to execute your query with. You can also type in the text field above. <i>This setting will override the model specified in the query.</i>
+        Specify the model to execute your query with. You can also type in the text field above. <i>This setting will override any model specified by the query.</i>
         {configuration.BROWSER_MODE ? <><br/><a href={"https://docs.lmql.ai/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
           Install LMQL locally </a> to use other models, e.g. from 🤗 Tranformers</>
         : null}
