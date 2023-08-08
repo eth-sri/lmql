@@ -202,7 +202,7 @@ async def beam_search(prompt_ids: np.ndarray, n=4, max_len=None, **kwargs):
 
         yield (h, done)
     
-    dc.finish(done)
+    dc.finish(dc.array_sorted(done.flatten(), key=lambda s: -s.logprobs.sum()))
 
     yield (h, done)
 

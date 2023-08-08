@@ -59,7 +59,7 @@ async def apply(q, *args, **kwargs):
     lmql_code = q.lmql_code
 
     # handle non-LMQL queries
-    if type(q) is not LMQLQueryFunction:
+    if type(q) is not LMQLQueryFunction and not hasattr(q, "__lmql_query_function__"):
         if inspect.iscoroutinefunction(q):
             return await q(*args)
         return q(*args)
