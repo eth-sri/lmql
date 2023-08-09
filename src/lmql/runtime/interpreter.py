@@ -695,13 +695,14 @@ class PromptInterpreter:
             # - postprocessed_prompt is the string in the prompt that corresponds to the variable value
             variable_value, postprocessed_prompt = ops.execute_postprocess(where, variable, variable_value, context=program_state)
 
+            # check for subinterprter completion
             if type(variable_value) is SubInterpreter:
                 si = variable_value
                 result_state = si.interpreter_state_from_user_data(seq)
                 if result_state.query_head.result is not None:
                     variable_value = result_state.query_head.result
                     if type(variable_value) is LMQLResult:
-                        postprocessed_prompt = variable_value.prompt
+                        postprocessed_prompt = variable_value.prompt[len(state.prompt):]
                     else:
                         postprocessed_prompt = str(result_state.query_head.result)
 
