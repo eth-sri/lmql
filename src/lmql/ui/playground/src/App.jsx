@@ -50,6 +50,12 @@ const ContentContainer = styled.div`
   width: calc(100% - 4pt);
   height: calc(100% - 2pt);
   margin: 2pt;
+
+  @media (max-width: 40em) {
+    margin: 0pt;
+    height: 100%;
+    width: 100%;
+  }
 `;
 
 const Panel = styled.div.attrs(props => ({ className: "panel" }))`
@@ -413,7 +419,7 @@ const ModelSelectionDiv = styled.div`
   top: 0pt;
   right: 0pt;
   height: 18pt;
-  width: 40%;
+  width: 60%;
 
   &:hover {
     border-bottom: 1pt solid grey;
@@ -457,7 +463,7 @@ const ModelSelectionDiv = styled.div`
     border-radius: 4pt;
     text-align: left;
     max-height: 300pt;
-    max-height: calc(100vh - 100pt);
+    max-height: calc(50vh - 100pt);
     overflow-y: scroll;
     display: none;
     z-index: 999;
@@ -796,11 +802,14 @@ const Row = styled.div`
 
   /* if screen < 320pt */
   @media (max-width: 40em) {
+
     &.simple-mode {
       flex-direction: column;
       height: calc(100%);
       padding: 0;
       margin-right: 4pt;
+
+      margin-bottom: 0pt;
     }
 
     &.simple-mode.simple .panel {
