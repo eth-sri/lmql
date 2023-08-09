@@ -7,12 +7,13 @@ class PythonBackedTokenizer:
         self.bos_token_id = 50256
         self.eos_token_id = 50256
         self._vocab = None
+        self.model_identifier = model_identifier
 
     @staticmethod
-    def is_available():
+    def is_available(model_identifier):
         try:
             import gpt3_tokenizer
-            return True
+            return "gpt" in model_identifier
         except:
             return False
 
