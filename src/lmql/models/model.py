@@ -1,4 +1,5 @@
 from lmql.models.lmtp.utils import rename_model_args
+import warnings
 
 class LMQLModel:
     def __init__(self, model_identifier, model=None, **kwargs):
@@ -45,6 +46,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
     if model_name.startswith("llama.cpp:"):
         # kwargs["async_transport"] = True
         kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
+        warnings.warn("Running llama.cpp with '{}' tokenizer. To change, set the 'tokenizer' argument of your lmql.model(...)".format(kwargs["tokenizer"]), UserWarning)
 
     if "endpoint" in kwargs:
         print("info: 'endpoint' argument is ignored for inprocess=True/local: models.")
