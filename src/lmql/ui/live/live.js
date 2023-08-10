@@ -15,7 +15,7 @@ const io = require('socket.io')(server, {
     origin: '*',
   }
 })
-const exec = require('child_process').exec;
+const execFile = require('child_process').execFile;
 const spawn = require('child_process').spawn
 
 let outputs = {};
@@ -30,7 +30,7 @@ io.on('connection', s => {
     const app_arguments = request.app_arguments;
     
     // run "python live.py endpoints" and get output lines as array
-    exec(`python live.py endpoints ${app_name}`, (err, stdout, stderr) => {
+    execFile(`python`, [`live.py`, `endpoints`, app_name], (err, stdout, stderr) => {
         if (err) {
             console.log(err);
             s.emit("app-error", stdout + stderr)
@@ -121,7 +121,7 @@ app.get('/app/:app_name', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   let html = fs.readFileSync(path.join(__dirname, 'base/index.html'), {encoding: 'utf8'})
   
-  exec(`python live.py client-html ${app_name}`, (err, stdout, stderr) => {
+  execFile(`python`, [`live.py`, `client-html`, app_name], (err, stdout, stderr) => {
     if (err) {
         console.log(err);
         res.send(html.replace("<<<CLIENT_HTML>>>", "Failed to load app html for app."))
@@ -135,7 +135,7 @@ app.get('/app/:app_name', (req, res) => {
 app.get('/app/:app_name/app-client.js', (req, res) => {
   const app_name = req.params.app_name;
   // run "python live.py endpoints" and get output lines as array
-  exec(`python live.py client-script ${app_name}`, (err, stdout, stderr) => {
+  execFile(`python`, [`live.py`, `client-script`, app_name], (err, stdout, stderr) => {
     if (err) {
         console.log(err);
         res.send("")
