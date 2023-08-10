@@ -27,13 +27,13 @@ def get_openai_secret():
             os.path.join(os.getenv("HOME"), ".lmql", "api.env")
         ]
         
-        if not any(os.path.exists(p) for p in search_paths):
+        if not any(os.path.exists(p) for p in search_paths if p is not None):
             m = """To use openai/<models> you have to set environment variable OPENAI_API_KEY or provide an api.env file in one of the following locations:\n\n{}\n\n To use OpenAI models you need to create an api.env file with the following contents:
         openai-secret: <your openai secret>
         openai-org: <your openai org>
         
 Alternatively, you may just define the environment variable OPENAI_API_KEY=sk-...
-        """.format("\n".join(" - " + p for p in search_paths))
+        """.format("\n".join(" - " + p for p in search_paths if p is not None))
             raise FileNotFoundError(m)
 
         valid_paths = [p for p in search_paths if os.path.exists(p)]
