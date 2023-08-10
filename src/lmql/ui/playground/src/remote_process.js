@@ -2,9 +2,13 @@ import io from "socket.io-client"
 
 export class RemoteProcessConnection {
     constructor() {
-        const PORT = process.env.REACT_APP_SOCKET_PORT || 3004
+        const PORT = process.env.REACT_APP_SOCKET_PORT || null
 
-        this.socket = io.connect(':' + PORT);
+        if (PORT == null) {
+            this.socket = io.connect()
+        } else {
+            this.socket = io.connect(':' + PORT)
+        }
         this.socket.on('connect', () => {
             this.socket.on('app-result', data => {
                 this.onAppResult(data)
