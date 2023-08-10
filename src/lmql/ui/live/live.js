@@ -39,7 +39,8 @@ io.on('connection', s => {
             return;
         }
         // get endpoints from output lines
-        const endpoints = stdout.split('\n');
+        // trimEnd in case we are on windows
+        const endpoints = stdout.split('\n').map(line => line.trimEnd());
         // remove empty lines
         endpoints.splice(endpoints.length - 1, 1);
         // find endpoint name in endpoints
