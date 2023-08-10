@@ -192,7 +192,11 @@ export class RemoteProcessConnection {
     }
 }
 
-RemoteProcessConnection.registry = window.RemoteProcessConnectionRegistry = {};
+if (window.RemoteProcessConnectionRegistry) {
+    RemoteProcessConnection.registry = window.RemoteProcessConnectionRegistry;
+} else {
+    RemoteProcessConnection.registry = window.RemoteProcessConnectionRegistry = {};
+}
 
 RemoteProcessConnection.get = function(identifier) {
     if (!RemoteProcessConnection.registry[identifier]) {
