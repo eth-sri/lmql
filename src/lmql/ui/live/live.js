@@ -1,14 +1,17 @@
 const port = process.env.PORT || 3000;
+const content_dir = process.env.content_dir || path.join(__dirname, 'base')
 
 var readline = require('readline');
 const stream = require('stream')
 
 const cors = require('cors')
+const crypto = require('crypto')
 const fs = require("fs")
 const express = require("express")
 const path = require('path');
 const app = require('express')();
 const http = require('http');
+const onHeaders = require('on-headers')
 const server = http.createServer(app);
 const io = require('socket.io')(server, {
   cors: {
@@ -17,6 +20,10 @@ const io = require('socket.io')(server, {
 })
 const exec = require('child_process').exec;
 const spawn = require('child_process').spawn
+
+const hashString = function(s) {
+  return crypto.createHash('sha1').update(s).digest('hex')
+}
 
 let outputs = {};
 
@@ -144,6 +151,26 @@ app.get('/app/:app_name/app-client.js', (req, res) => {
     }
   });
 })
+
+function unsetLastModified() {
+  this.removeHeader('Last-Modified')
+}
+
+// see "digits" as defined in page 89 of Eelco Dolstra's PhD thesis; note some characters removed to reduce likelihood
+// of hashes forming offensive words.
+let nixStoreRegex = /^\/nix\/store\/([0123456789abcdfghijklmnpqrsvwxyz]{32})-/
+app.use('/',
+  express.static(content_dir, {
+    setHeaders: (res, path, stat) => {
+      if (nixStoreRegex.test(path)) {
+        // For Nix store contents, timestamp is set to 1 second past epoch and must be ignored.
+        // However, we can use a hash of the path as an ETag, since the path itself includes a hash.
+        res.set('ETag', hashString(path))
+        onHeaders(res, unsetLastModified)
+      }
+    }
+  })
+)
 
 let running_processes = {}
 
