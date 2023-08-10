@@ -1,5 +1,6 @@
 from lmql.models.model import LMQLModel, inprocess
 import os
+import warnings
 
 model_name_aliases = {
     "chatgpt": "openai/gpt-3.5-turbo",
@@ -65,8 +66,8 @@ def resolve(model_name, endpoint=None, **kwargs):
 
         # special case for 'llama.cpp'
         if model_name.startswith("llama.cpp:"):
-            # kwargs["async_transport"] = True
-            kwargs["tokenizer"] = "huggyllama/llama-7b"
+            kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
+            warnings.warn("Running llama.cpp with '{}' tokenizer. To change, set the 'tokenizer' argument of your lmql.model(...)".format(kwargs["tokenizer"]), UserWarning)
 
         # determine endpoint URL
         if endpoint is None:
