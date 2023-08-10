@@ -9,6 +9,7 @@
     "cross-env": "^7.0.3",
     "express": "^4.18.1",
     "monaco-editor": "^0.33.0",
+    "on-headers": "~1.0.2",
     "socket.io": "^4.5.1",
     "ws": "^8.10.0",
     "yarn": "^1.22.19"
