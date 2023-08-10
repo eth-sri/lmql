@@ -306,7 +306,7 @@ class PromptInterpreter:
         VocabularyMatcher.init(client.get_tokenizer())
         
         # for OpenAI models we optimize for compact logit masks
-        if self.model_identifier.startswith("openai/"):
+        if self.model_identifier.startswith("openai:") or self.model_identifier.startswith("openai/"):
             self.prefers_compact_mask = True
 
         self.model = client

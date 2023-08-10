@@ -23,7 +23,7 @@ test_hello_string_query = lmql.query("'Say \"this is a test\":[RESPONSE]' where 
 
 test_hello_oneline = lmql.F("Say 'this is a test': [RESPONSE]", "len(TOKENS(RESPONSE)) < 10", model="random")
 
-# test_davinci_says_it = lmql.F("Say 'this is a test': [RESPONSE]", model="openai/text-davinci-003")
+# test_davinci_says_it = lmql.F("Say 'this is a test': [RESPONSE]", model="openai:text-davinci-003")
 
 
 @lmql.query(decoder="sample", temperature=1.2, model=lmql.model("random", seed=123))

@@ -8,7 +8,7 @@ async def test_stopping_overlap_before():
         sample(temperature=0.8, max_len=64)
             "The movie review in positive sentiment is: [OUTPUT]"
         FROM
-            "openai/text-ada-001"
+            "openai:text-ada-001"
         WHERE
             STOPS_BEFORE(OUTPUT, "\n") and STOPS_BEFORE(OUTPUT, "n") and len(TOKENS(OUTPUT)) < 10
         '''
@@ -21,7 +21,7 @@ async def test_stopping_double_match():
         argmax 
             '{{"1","2","3",[COMPL]}}'
         from 
-            "openai/text-ada-001" 
+            "openai:text-ada-001"
         where 
             len(TOKENS(COMPL)) < 10 and STOPS_AT(COMPL, '"')
         '''
@@ -34,7 +34,7 @@ async def test_stopping_double_match_before():
         argmax 
             '{{"1","2","3",[COMPL]"}}'
         from 
-            "openai/text-ada-001" 
+            "openai:text-ada-001"
         where 
             len(TOKENS(COMPL)) < 10 and STOPS_BEFORE(COMPL, '"')
         '''
@@ -52,7 +52,7 @@ async def test_stopping_single_match():
             }}
             """
         from 
-            "openai/text-ada-001" 
+            "openai:text-ada-001"
         where 
             STOPS_AT(COMPL, '"')
         '''
@@ -65,7 +65,7 @@ async def test_conditional_stopping():
         "The movie review in positive sentiment is: [OUTPUT]"
         assert OUTPUT.count("The") == 2
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     where 
         len(TOKENS(OUTPUT)) > 18 and STOPS_AT(OUTPUT, "The")
     '''
@@ -77,7 +77,7 @@ async def test_conditional_or_stopping():
         "The movie review in positive sentiment is: [OUTPUT]"
         assert OUTPUT.count("The") == 1
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     where 
         len(TOKENS(OUTPUT)) > 20 or STOPS_AT(OUTPUT, "The")
     '''
@@ -89,7 +89,7 @@ async def test_double_stop_rewrite():
         "The movie review in positive sentiment is: [OUTPUT] Here"
         assert OUTPUT.endswith("The")
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     where 
         STOPS_BEFORE(OUTPUT, " ") and STOPS_AT(OUTPUT, "re")
     '''
@@ -101,7 +101,7 @@ async def test_double_stop_rewrite_space():
         "The movie review in positive sentiment is: [OUTPUT] Here"
         assert OUTPUT.endswith(" ")
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     where 
         STOPS_AT(OUTPUT, " ") and STOPS_AT(OUTPUT, "re")
     '''

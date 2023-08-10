@@ -4,13 +4,13 @@ In general, LMQL supports all models available via the OpenAI Completions or Ope
 
 Specifically, we have tested the following models, with the corresponding model identifier to be used in the LMQL `from` clause:
 
-* `openai/text-ada-001`
-* `openai/text-curie-001`
-* `openai/text-babbage-001`
-* `openai/text-davinci-00[1-3]`
+* `openai:text-ada-001`
+* `openai:text-curie-001`
+* `openai:text-babbage-001`
+* `openai:text-davinci-00[1-3]`
 
-* `openai/gpt-3.5-turbo` also available as `chatgpt`
-* `openai/gpt-4` also available as `gpt-4`
+* `openai:gpt-3.5-turbo` also available as `chatgpt`
+* `openai:gpt-4` also available as `gpt-4`
 
 
 Additionally, LMQL supports Azure OpenAI models. To learn more, please refer to the [Azure API Models](azure.md) section.
@@ -56,7 +56,7 @@ Additionally, you may be interested in seeing the actual API requests that are m
 
 ```{lmql}
 name::chatty_openai
-argmax(chatty_openai=True) "Hello[WHO]" from "openai/text-ada-001" where STOPS_AT(WHO, "\n")
+argmax(chatty_openai=True) "Hello[WHO]" from "openai:text-ada-001" where STOPS_AT(WHO, "\n")
 
 model-output::
 Completion with {'model': 'text-ada-001', 'prompt': \[550256, 15496], 'max_tokens': 64, 'temperature': 0, 'logprobs': 5, 'user': 'lmql', 'stream': True, 'echo': True}
@@ -74,7 +74,7 @@ name::chunksize
 argmax(openai_chunksize=128)
     "The quick brown fox jumps over the[COMPLETION]"
 from
-    "openai/text-ada-001"
+    "openai:text-ada-001"
 where
     STOPS_AT(COMPLETION, ".")
 ```

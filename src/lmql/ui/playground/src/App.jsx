@@ -580,11 +580,11 @@ function ModelSelection(props) {
       {"name": "random", note: "Random (uniform) token sampling.", inprocess: false}
     ],
     "Other Suggestions": [
-      {"name": "openai/text-ada-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-curie-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-babbage-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-davinci-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-davinci-003", "note": "OpenAI", inprocess: false},
+      {"name": "openai:text-ada-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai:text-curie-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai:text-babbage-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai:text-davinci-001", "note": "OpenAI", inprocess: false},
+      {"name": "openai:text-davinci-003", "note": "OpenAI", inprocess: false},
       {"name": "chatgpt", "note": "OpenAI", inprocess: false},
       {"name": "gpt-4", "note": "OpenAI", inprocess: false}
     ]

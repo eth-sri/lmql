@@ -2,8 +2,8 @@ from lmql.models.model import LMQLModel, inprocess
 import os
 
 model_name_aliases = {
-    "chatgpt": "openai/gpt-3.5-turbo",
-    "gpt-4": "openai/gpt-4",
+    "chatgpt": "openai:gpt-3.5-turbo",
+    "gpt-4": "openai:gpt-4",
 }
 class LMQLModelRegistry: 
     """
@@ -47,7 +47,11 @@ def resolve(model_name, endpoint=None, **kwargs):
     Automatically registers a model backend implementation for the provided
     model name, deriving the implementation from the model name.
     """
-    if model_name.startswith("openai/"):
+    if model_name.startswith('openai/'):
+        # a DeprecationWarning is wrong here because they're only displayed in development mode
+        warnings.warn("openai models should use 'openai:' rather than 'openai/' going forward")
+        model_name = 'openai:' + model_name.removeprefix('openai/')
+    if model_name.startswith("openai:"):
         from lmql.runtime.openai_integration import openai_model
 
         # hard-code openai/ namespace to be openai-API-based
@@ -93,4 +97,4 @@ LMQLModelRegistry.autoconnect = None
 LMQLModelRegistry.registry = {}
 # instance of model clients in this process
 LMQLModelRegistry.clients = {}
-LMQLModelRegistry.default_model = "openai/text-davinci-003"
+LMQLModelRegistry.default_model = "openai:text-davinci-003"

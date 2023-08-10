@@ -10,7 +10,7 @@ module.exports = { queries: [
             code: `argmax 
     "Say 'this is a test':[RESPONSE]" 
 from 
-    "openai/text-ada-001" 
+    "openai:text-ada-001"
 where 
     len(TOKENS(RESPONSE)) < 10`,
             state: 'precomputed/hello.json'
@@ -27,7 +27,7 @@ where
     Q:[JOKE]
     A:[PUNCHLINE]"""
 from
-    "openai/text-davinci-003"
+    "openai:text-davinci-003"
 where
     len(JOKE) < 120 and 
     STOPS_AT(JOKE, "?") and 
@@ -44,7 +44,7 @@ where
     for i in range(4):
         "- [THING] \\n"
 from
-    'openai/text-ada-001'
+    'openai:text-ada-001'
 where
     THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])`,
             state: 'precomputed/list.json'
@@ -65,7 +65,7 @@ where
     }}
     """
 from
-    "openai/text-davinci-003" 
+    "openai:text-davinci-003"
 where
     STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) < 2
          
@@ -102,7 +102,7 @@ argmax
     "Structured: [PERSON_DATA]\\n"
     "Their name is {PERSON_DATA.name} and she works in {PERSON_DATA.employer.location}."
 from 
-    "openai/text-davinci-003" 
+    "openai:text-davinci-003"
 where 
     type(PERSON_DATA) is Person
           
@@ -120,7 +120,7 @@ argmax
     "[REASONING]\\n"
     "Therefore the answer is[ANSWER]"
 from 
-    'openai/text-davinci-003'
+    'openai:text-davinci-003'
 where
     inline_use(REASONING, [wiki, calc]) and INT(ANSWER)
           `,
@@ -221,7 +221,7 @@ argmax
     "[REASONING]\\n"
     "Therefore, among A through F, the answer is[RESULT]"
 from
-    "openai/text-davinci-003"
+    "openai:text-davinci-003"
 where
     RESULT in ["A", "B", "C", "D", "E", "F"]`,
             state: 'precomputed/cot.json'
@@ -236,7 +236,7 @@ beam(n=2)
     expert_name = EXPERT.rstrip(".\\n")
     "For instance,{expert_name} would answer[ANSWER]"
 from 
-    "openai/text-davinci-001"
+    "openai:text-davinci-001"
 where
     STOPS_AT(EXPERT, ".") and STOPS_AT(EXPERT, "\\n") and STOPS_AT(ANSWER, ".")`,
             state: 'precomputed/meta.json'
@@ -272,7 +272,7 @@ argmax(openai_chunksize=64, max_len=2048)
             break
     "is[RESULT]"
 from 
-    'openai/text-davinci-003'
+    'openai:text-davinci-003'
 where
     STOPS_AT(REASON_OR_CALC, "<<") and
     STOPS_AT(EXPR, "=") and
@@ -298,7 +298,7 @@ argmax
     "Result: {result}\\n"
     "Final Answer:[ANSWER]"
 from 
-    "openai/text-davinci-003"
+    "openai:text-davinci-003"
 where
     STOPS_AT(TERM, "'")`,
             state: 'precomputed/wiki.json'
@@ -334,7 +334,7 @@ argmax(n=1, openai_chunksize=128, max_len=2048, step_budget=4*2048)
     """Therefore at the end of the game, Alice has the[OBJECT]"""
     assert "blue ball." in OBJECT
 from 
-    "openai/text-davinci-003"
+    "openai:text-davinci-003"
 where
     STOPS_AT(REASONING, "# result") and STOPS_BEFORE(REASONING, "Therefore") and
     STOPS_AT(OBJECT, ".") and STOPS_AT(OBJECT, ",")            
@@ -355,7 +355,7 @@ where
     French: [TRANSLATION]
     """
 from 
-    "openai/text-davinci-001"
+    "openai:text-davinci-001"
 where
     STOPS_AT(TRANSLATION, "\\n")`,
             state: 'precomputed/translation.json'
@@ -369,7 +369,7 @@ where
     A:[ANALYSIS]\\n
     Based on this, the overall sentiment of the message can be considered to be[CLASSIFICATION]"""
 from 
-    "openai/text-davinci-003"
+    "openai:text-davinci-003"
 distribution
     CLASSIFICATION in [" positive", " neutral", " negative"]`,
             state: 'precomputed/distribution.json'

@@ -10,7 +10,7 @@ argmax
     "A simple math problem for addition (without solution, without words): [MATH]"
     "{eval(MATH[:-1])}"
 from 
-    'openai/text-davinci-003'
+    'openai:text-davinci-003'
 where
     STOPS_AT(MATH, "=")
 
@@ -56,7 +56,7 @@ argmax(openai_chunksize=128, max_len=2048)
             break
       "is[RESULT]"
 from 
-      'openai/text-davinci-003'
+      'openai:text-davinci-003'
 where
       STOPS_AT(REASON_OR_CALC, "<<") and
       STOPS_AT(EXPR, "=") and
@@ -92,7 +92,7 @@ argmax
    "Result: {result}\n"
    "Final Answer:[ANSWER]"
 from 
-   "openai/text-davinci-003"
+   "openai:text-davinci-003"
 where
    STOPS_AT(TERM, "'")
 
@@ -137,7 +137,7 @@ argmax(n=1, openai_chunksize=128, max_len=2048, step_budget=4*2048)
    """Therefore at the end of the game, Alice has the[OBJECT]"""
    assert "blue ball." in OBJECT
 from 
-   "openai/text-davinci-003"
+   "openai:text-davinci-003"
 where
    STOPS_AT(REASONING, "# result") and STOPS_AT(REASONING, "Therefore, ") and
    STOPS_AT(OBJECT, ".") and STOPS_AT(OBJECT, ",")            

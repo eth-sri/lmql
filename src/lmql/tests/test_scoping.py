@@ -18,7 +18,7 @@ async def test_q(actual_input: str = None):
         assert "actual_input" in locals().keys(), f"Input variable actual_input not in local scope. locals: {locals()}"
         assert "actual_input" not in globals().keys(), f"Input variable actual_input not in global scope. locals: {locals()}"
     from 
-        "openai/text-ada-001"
+        "openai:text-ada-001"
     '''
 
 async def test_decode_clause_scoping():
@@ -27,7 +27,7 @@ async def test_decode_clause_scoping():
         "Q: Hi {n}. A: [WHO]"
         assert "n" in locals().keys(), f"Input variable n not captured by scope"
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     where
         len(TOKENS(WHO)) < 10
     '''
@@ -38,7 +38,7 @@ async def test_output_vars():
     @lmql.query
     async def q():
         '''lmql
-        argmax "Q: Hi {n}. A: [WHO]" from "openai/text-ada-001" where len(TOKENS(WHO)) < 10
+        argmax "Q: Hi {n}. A: [WHO]" from "openai:text-ada-001" where len(TOKENS(WHO)) < 10
         '''
     assert q.output_variables == ['WHO'], f"Expected output variables to be ['WHO'], got {q.output_variables}"
 
@@ -52,7 +52,7 @@ async def test_python_capture():
             "Q: Hi {f(1)}. A: [WHO]" 
             assert context.prompt.startswith("Q: Hi 13")
         from 
-            "openai/text-ada-001" 
+            "openai:text-ada-001"
         where 
             len(TOKENS(WHO)) < 10
         '''

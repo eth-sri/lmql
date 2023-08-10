@@ -101,7 +101,7 @@ class DclibOpenAiModel(DcModel):
         if "output_writer" in kwargs:
             self.output_writer = kwargs["output_writer"]
         
-        self.model_identifier = "openai/" + self.model.model_identifier
+        self.model_identifier = "openai:" + self.model.model_identifier
 
         self.model.chunk_size = kwargs.get("openai_chunksize", 64 if not self.mock else 8)
         self.model.nostop = kwargs.get("openai_nonstop", False)
@@ -916,7 +916,10 @@ class SequenceResult:
 
 class OptimisticChunkBasedOpenAIModel:
     def __init__(self, model_identifier, tokenizer):
-        self.model_identifier = model_identifier.split("openai/",1)[1]
+        if model_identifier.startswith('openai/'):
+            warnings.warn("openai models should use 'openai:' rather than 'openai/' going forward")
+            model_identifier = 'openai:' + model_identifier.removeprefix('openai/')
+        self.model_identifier = model_identifier.split("openai:",1)[1]
         self.chunk_size = 32
         self.nostop = False
         self.tokenizer = tokenizer

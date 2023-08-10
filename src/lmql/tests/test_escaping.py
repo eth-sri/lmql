@@ -10,7 +10,7 @@ def test_curly_braces():
         "{{ Say {value} 'this is a test':[RESPONSE] }}"
         assert context.prompt == "{ Say [abc] 'this is a test':\n\nThis is a test. }"
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     where 
         len(TOKENS(RESPONSE)) < 10
     '''
@@ -22,7 +22,7 @@ def test_curly_only():
         "{{ Say }}"
         assert context.prompt == "{ Say }"
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     '''
 
 
@@ -33,7 +33,7 @@ def test_square_only():
         "[[Say]]"
         assert context.prompt == "[Say]"
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     '''
 
 @lmql.query
@@ -43,7 +43,7 @@ def test_square_with_var_only():
         "[[[Say]]]"
         assert context.prompt == "[Hello]"
     from 
-        "openai/text-ada-001" 
+        "openai:text-ada-001"
     where
         Say == "Hello"
     '''
@@ -55,7 +55,7 @@ def test_square_in_constraint():
         person = "test"
         "Hello {person}, my name is [NAME]. Nice to meet you!"
     from
-        "openai/text-ada-001"
+        "openai:text-ada-001"
     where
         NAME in ["["]
     '''
@@ -78,7 +78,7 @@ def test_json_decoding():
         import json
         json.loads(context.prompt.split(":",1)[1])
     from
-        "openai/text-davinci-003" 
+        "openai:text-davinci-003"
     where
         STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) < 2
     '''

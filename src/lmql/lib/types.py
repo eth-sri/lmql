@@ -95,8 +95,8 @@ async def single_shot_as_type(s, ty, model="chatgpt"):
 @lmql.query
 async def is_type(ty, description=False):
     '''lmql
-    if is_oneshot and "openai/" in context.interpreter.model_identifier:
-        # "oneshot type prediction is only needed with openai/ models"
+    if is_oneshot and "openai:" in context.interpreter.model_identifier:
+        # "oneshot type prediction is only needed with openai: models"
         # first run a simple one-shot query to get an initial result
         simple_json_result = single_shot_as_type(context.prompt, ty, model=context.interpreter.model_identifier)
         try:

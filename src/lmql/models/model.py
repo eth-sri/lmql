@@ -37,7 +37,11 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
         InProcessServer: An object representing the loaded model, can be passed in the 'from' clause of a query.
     """
     from .lmtp.lmtp_dcmodel import lmtp_model
-    assert not model_name.startswith("openai/"), "openai/ models cannot be loaded with inprocess=True, they always use the remote API."
+    if model_name.startswith('openai/'):
+        # a DeprecationWarning is wrong here because they're only displayed in development mode
+        warnings.warn("openai models should use 'openai:' rather than 'openai/' going forward")
+        model_name = 'openai:' + model_name.removeprefix('openai/')
+    assert not model_name.startswith("openai:"), "openai: models cannot be loaded with inprocess=True, they always use the remote API."
 
     # extract/reassign renamed like 'cuda'
     kwargs = rename_model_args(kwargs)

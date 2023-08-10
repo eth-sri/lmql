@@ -126,7 +126,7 @@ argmax
     }}
     """
 from
-    "openai/text-davinci-003" 
+    "openai:text-davinci-003"
 where
     STOPS_BEFORE(STRING_VALUE, '"') and INT(INT_VALUE) and len(TOKENS(INT_VALUE)) < 2
          

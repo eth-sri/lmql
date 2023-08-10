@@ -104,6 +104,9 @@ def get_tokenizer(model_identifier):
     import tiktoken
 
     if model_identifier.startswith("openai/"):
-        model_identifier = model_identifier[len("openai/"):]
+        warnings.warn('deprecated prefix openai/ used')
+        model_identifier = model_identifier.removeprefix("openai/")
+    if model_identifier.startswith("openai:"):
+        model_identifier = model_identifier.removeprefix("openai:")
     
     return TiktokenTokenizer(model_identifier)

@@ -23,7 +23,7 @@ argmax
  "Q:[JOKE] \\n"
  "A:[PUNCHLINE] \\n"
 FROM
-   'openai/text-ada-001'
+   'openai:text-ada-001'
 """
     await lmql.run(query, output_writer=TestOutputWriter())
 
@@ -39,7 +39,7 @@ argmax
  "Q:[JOKE] \\n"
  "A:[PUNCHLINE] \\n"
 FROM
-   'openai/text-ada-001'
+   'openai:text-ada-001'
 WHERE
    len(JOKE) < 120 and STOPS_AT(JOKE, "?") and 
    STOPS_AT(PUNCHLINE, "END") and len(PUNCHLINE) > 12
@@ -57,7 +57,7 @@ argmax
  "Q:[JOKE] \\n"
  "A:[PUNCHLINE] another[ENDING] \\n"
 FROM
- 'openai/text-ada-001'
+ 'openai:text-ada-001'
 WHERE
  len(JOKE) < 120 and STOPS_AT(JOKE, "?") and 
  STOPS_AT(PUNCHLINE, "END") and 
@@ -77,7 +77,7 @@ beam_var
    "Q:[JOKE] \\n"
    "A:[PUNCHLINE] another[ENDING] \\n"
 FROM
-   'openai/text-ada-001'
+   'openai:text-ada-001'
 WHERE
    len(JOKE) < 120 and STOPS_AT(JOKE, "?") and 
    STOPS_AT(PUNCHLINE, "END") and 

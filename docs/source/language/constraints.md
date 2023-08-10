@@ -20,7 +20,7 @@ sample(temperature=0.8)
    for i in range(5):
       "-[THING]"
 from
-   'openai/text-ada-001'
+   'openai:text-ada-001'
 where
    STOPS_AT(THING, "\n")
 ```
@@ -32,7 +32,7 @@ name::number
 argmax
    "A number: [N]"
 from
-   'openai/text-ada-001'
+   'openai:text-ada-001'
 where
     INT(N)
 
@@ -53,7 +53,7 @@ sample(temperature=0.8)
    for i in range(4):
       "- [THING] \n"
 from
-   'openai/text-ada-001'
+   'openai:text-ada-001'
 where
    THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])
 
@@ -74,7 +74,7 @@ name::length
 argmax
    "Hello [NAME]"
 from
-   'openai/text-3a-001'
+   'openai:text-3a-001'
 where
     len(NAME) < 10
 

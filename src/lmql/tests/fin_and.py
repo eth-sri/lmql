@@ -5,7 +5,7 @@ from lmql.ops.ops import digest, NextToken
 # enable_show_transformed()
 
 def compile_condition(c):
-    q = lmql.query(f"argmax(__get_where__=True) 'Hello[TEST]' from 'openai/text-ada-001' where {c}")
+    q = lmql.query(f"argmax(__get_where__=True) 'Hello[TEST]' from 'openai:text-ada-001' where {c}")
     condition = lmql.main(q)[0]
     return condition
 

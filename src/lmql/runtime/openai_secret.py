@@ -28,7 +28,7 @@ def get_openai_secret():
         ]
         
         if not any(os.path.exists(p) for p in search_paths):
-            m = """To use openai/<models> you have to set environment variable OPENAI_API_KEY or provide an api.env file in one of the following locations:\n\n{}\n\n To use OpenAI models you need to create an api.env file with the following contents:
+            m = """To use openai:<models> you have to set environment variable OPENAI_API_KEY or provide an api.env file in one of the following locations:\n\n{}\n\n To use OpenAI models you need to create an api.env file with the following contents:
         openai-secret: <your openai secret>
         openai-org: <your openai org>
         

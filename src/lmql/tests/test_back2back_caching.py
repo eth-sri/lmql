@@ -14,7 +14,7 @@ async def q():
         "3. Thought This is good\n"
         "[NUM][MODE][CONTENT]" 
     from 
-        "openai/text-davinci-003" 
+        "openai:text-davinci-003"
     where 
         MODE in [" Action", " Thought"] and STOPS_AT(CONTENT, "\n") and STOPS_AT(NUM, ".")
     '''

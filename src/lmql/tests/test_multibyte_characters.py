@@ -11,7 +11,7 @@ async def test_special_characters1():
         assert REPEAT.count("Ø") == 1, "REPEAT should contain Ø once"
         assert context.prompt.count("Ø") >= 3, "Ø should occur at least 3 times in full prompt"
     from
-        'openai/text-ada-001'
+        'openai:text-ada-001'
     where
         len(TOKENS(REPEAT)) < 10 and len(TOKENS(REP2)) < 10
     '''
@@ -25,7 +25,7 @@ async def test_special_characters_pi():
         """
         assert "π" in formula, "π must occur in the formula"
     from
-        "openai/text-ada-001"
+        "openai:text-ada-001"
     where
         len(TOKENS(formula)) < 20
     '''

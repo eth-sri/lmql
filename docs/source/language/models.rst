@@ -17,7 +17,7 @@ LMQL offers two ways to specify the model that is used as underlying LLM:
     argmax
         "This is a query with a specified decoder: [RESPONSE]
     from
-        "openai/text-ada-001"
+        "openai:text-ada-001"
 
 **Specifying the Model Externally**: The second option is to specify the model and its parameters externally, i.e. separately from the actual program code:
 
@@ -41,7 +41,7 @@ LMQL offers two ways to specify the model that is used as underlying LLM:
 
     tell_a_joke() # uses chatgpt
 
-    tell_a_joke(model="openai/text-davinci-003") # uses text-davinci-003
+    tell_a_joke(model="openai:text-davinci-003") # uses text-davinci-003
 
 This is only possible when using LMQL from a Python program. When running in the playground, you can alternatively use the model dropdown available in the top right of the program editor:
 

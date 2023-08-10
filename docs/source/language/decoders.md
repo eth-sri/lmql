@@ -18,7 +18,7 @@ name::specify-decoder
 beam(n=2)
     "This is a query with a specified decoder: [RESPONSE]
 from
-    "openai/text-ada-001"
+    "openai:text-ada-001"
 ```
 
 **Specifying the Decoding Algorithm Externally**: The second option is to specify the decoding algorithm and parameters externally, i.e. separatly from the actual program code:
@@ -26,7 +26,7 @@ from
 ```python
 import lmql
 
-@lmql.query(model="openai/text-davinci-003", decoder="sample", temperature=1.8)
+@lmql.query(model="openai:text-davinci-003", decoder="sample", temperature=1.8)
 def tell_a_joke():
     '''lmql
     """A list good dad joke. A indicates the punchline:
