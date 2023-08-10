@@ -16,7 +16,7 @@ from lmql.runtime.token_distribution import TokenDistribution
 from typing import Any, List, Union
 import random
 
-class LMTPModel(DcModel):
+class LMTPDcModel(DcModel):
     def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, **kwargs):
         super().__init__(model, tokenizer, truncation_threshold, init_workers, **kwargs)
 
@@ -218,7 +218,7 @@ class LMTPModel(DcModel):
         
         sampling_mode = "top-1" if temperature == 0.0 else "sample-{}".format(temperature)
 
-        assert kwargs.get("num_samples", 1) == 1, "LMTPModel does not support num_samples != 1"
+        assert kwargs.get("num_samples", 1) == 1, "LMTPDcModel does not support num_samples != 1"
 
         async def op_sample(seqs):
             if len(seqs) == 0:
@@ -388,10 +388,10 @@ class LMTPModel(DcModel):
 
 class lmtp_model:
     """
-    Factory class for LMTPModelCls client instances.
+    Factory class for LMTPDcModelCls client instances.
 
     In case of inprocess=True, lmtp_model keeps a reference to the internally instantiated 
-    LMTPMultiProcessingClient to share it between all uses of the resulting LMTPModelCls 
+    LMTPMultiProcessingClient to share it between all uses of the resulting LMTPDcModelCls 
     across several queries.
     """
     def __init__(self, model_identifier, inprocess=False, endpoint=None, async_transport=False, **kwargs):
@@ -408,7 +408,7 @@ class lmtp_model:
     # ensures that all inprocess lmtp models instantiated via this class 
     # share the same underlying LMTPMultiProcessingClient instance
     # (uses reference counting to ensure that the client is only shut down 
-    # once all LMTPModel instances have closed)
+    # once all LMTPDcModel instances have closed)
     def inprocess_client_constructor_factory(self, identifier, **kwargs):
         assert identifier == self.model_identifier, "Model identifier mismatch: {} vs {}".format(self.model_identifier, identifier)
         
@@ -439,7 +439,7 @@ class lmtp_model:
         # reference to factory instance
         this = self
 
-        class LMTPModelCls:
+        class LMTPDcModelCls:
             def __init__(self) -> None:
                 self.model_identifier = this.model_identifier
                 self.served_model = None
@@ -469,7 +469,7 @@ class lmtp_model:
                 else:
                     lmtp_server_kwargs = None
 
-                return LMTPModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, 
+                return LMTPDcModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, 
                                  inprocess_client_constructor=inprocess_client_constructor, **self.decoder_args)
 
             async def tokenize(self, text):
@@ -484,4 +484,4 @@ class lmtp_model:
             def report_metrics(self, metrics):
                 pass
 
-        return LMTPModelCls()
+        return LMTPDcModelCls()
