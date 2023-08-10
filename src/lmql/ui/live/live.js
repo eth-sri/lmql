@@ -18,6 +18,8 @@ const io = require('socket.io')(server, {
 const execFile = require('child_process').execFile;
 const spawn = require('child_process').spawn
 
+const content_dir = process.env.content_dir || path.join(__dirname, 'base')
+
 let outputs = {};
 
 // disable cors for app
@@ -79,47 +81,12 @@ io.on('connection', s => {
   })
 });
 
-app.get('/', (req, res) => {
-  // disable all caching
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, 'base/index.html'));
-});
-
-// serve client.js
-app.get('/client.js', (req, res) => {
-  let client_script = fs.readFileSync(path.join(__dirname, 'base/client.js'), {encoding: 'utf8'})
-  client_script = client_script.replace("<<<PORT>>>", port)
-  res.send(client_script)
-})
-
-// serve base/base.css
-app.get('/base.css', (req, res) => {
-    res.sendFile(path.join(__dirname, 'base/base.css'));
-});
-
-// serve all files in node_modules/monaco-editor/min as /monaco
-app.use('/vs', express.static(path.join(__dirname, 'node_modules/monaco-editor/min/vs')));
-app.use('/js/vs', express.static(path.join(__dirname, 'node_modules/monaco-editor/min/vs')));
-app.use('/app/vs', express.static(path.join(__dirname, 'node_modules/monaco-editor/min/vs')));
-
-// Expose the node_modules folder as static resources (to access socket.io.js in the browser)
-app.use('/static', express.static('node_modules'));
-
-app.get('/socket.io.min.js', (req, res) => {
-    // send client js for socket io
-    res.sendFile(path.join(__dirname, 'node_modules/socket.io/client-dist/socket.io.min.js'));
-});
-
-app.get('/socket.io.min.js.map', (req, res) => {
-    res.sendFile(path.join(__dirname, 'node_modules/socket.io/client-dist/socket.io.min.js.map'));
-});
-
 // serve /app/<app_name>
 app.get('/app/:app_name', (req, res) => {
   const app_name = req.params.app_name;
   // disable all caching
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  let html = fs.readFileSync(path.join(__dirname, 'base/index.html'), {encoding: 'utf8'})
+  let html = fs.readFileSync(path.join(content_dir, 'index.html'), {encoding: 'utf8'})
   
   execFile(`python`, [`live.py`, `client-html`, app_name], (err, stdout, stderr) => {
     if (err) {
