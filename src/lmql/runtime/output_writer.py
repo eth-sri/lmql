@@ -1,5 +1,4 @@
-import os
-import termcolor
+import sys
 
 class BaseOutputWriter:
     def __init__(self, allows_input=True):
@@ -58,7 +57,7 @@ class PrintingOutputWriter:
     async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
         if head == 0:
             if self.clear:
-                os.system("clear")
+                sys.stderr.write('\033c', flush=True)
             if self.print_output:
                 print(f"{prompt}\n\n valid={is_valid}, final={is_final}")
     
@@ -81,7 +80,6 @@ class StreamingOutputWriter:
                 
                 value = "\n".join(program_variables.variable_values.get(v, "").strip() for v in vars)
                     
-                # os.system("clear")
                 if self.last_value is None:
                     self.last_value = value
                     print(value, end="", flush=True)
@@ -90,7 +88,7 @@ class StreamingOutputWriter:
                     self.last_value = value
                 return
             
-            os.system("clear")
+            sys.stderr.write('\033c', flush=True) # clear screen
             print(f"{prompt}\n", end="\r")
             
     def add_compiler_output(self, code): pass
