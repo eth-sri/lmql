@@ -1,5 +1,4 @@
 const port = process.env.PORT || 3000;
-const content_dir = process.env.content_dir || path.join(__dirname, 'base')
 
 var readline = require('readline');
 const stream = require('stream')
@@ -24,6 +23,8 @@ const spawn = require('child_process').spawn
 const hashString = function(s) {
   return crypto.createHash('sha1').update(s).digest('hex')
 }
+
+const content_dir = process.env.content_dir || path.join(__dirname, 'base')
 
 let outputs = {};
 
