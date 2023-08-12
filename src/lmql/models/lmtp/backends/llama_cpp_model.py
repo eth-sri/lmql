@@ -46,10 +46,10 @@ class LlamaCppModel(LMTPModel):
         def llama_streamer(tokens, scores):
             nonlocal token_scores
             scores = np.array(scores)
-            scores = nputil.log_softmax(scores, axis=-1)
+            token_scores += [scores]
             return False
 
-        logits_processor = self.logits_processors(bias_tensor, token_scores) if bias_tensor is not None else None
+        logits_processor = self.logits_processors(bias_tensor) if bias_tensor is not None else None
 
         for i, token in zip(range(max_new_tokens), self.llm.generate(input_ids,
                                                             temp=temperature,
@@ -73,7 +73,7 @@ class LlamaCppModel(LMTPModel):
             scores=ts_ar.reshape(-1, 1, *ts_ar.shape[1:])
         )
 
-    def logits_processors(self, logit_biases, token_scores):
+    def logits_processors(self, logit_biases):
         bias_tensors = None
         make_bias_tensor = self.make_bias_tensor
         
@@ -82,15 +82,13 @@ class LlamaCppModel(LMTPModel):
 
         class BatchLogitsProcessor:
             def __call__(self, input_ids, scores):
-                nonlocal bias_tensors, token_scores
-
-                scores = nputil.log_softmax(np.array(scores))
-                token_scores.append(scores)
+                nonlocal bias_tensors
+                scores = np.array(scores)
 
                 if bias_tensors is None:
                     bias_tensors = np.array(make_bias_tensor(logit_biases, scores.shape[-1]))
-
-                return (scores + bias_tensors).reshape(-1)
+                
+                return nputil.log_softmax(scores + bias_tensors, axis=-1).reshape(-1)
         
         return BatchLogitsProcessor()
 
