@@ -333,7 +333,7 @@ class LMTPDcModel(DcModel):
         ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
         next_tokens = self.tokenizer.convert_bytes_to_ids(next_tokens)
 
-        if self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
+        if self.tokenizer.bos_token_id is not None and (len(ids) == 0 or ids[0] != self.tokenizer.bos_token_id):
             ids = [self.tokenizer.bos_token_id] + ids
 
         async for token in self.client.score(ids, next_tokens):

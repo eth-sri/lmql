@@ -126,10 +126,16 @@ class LlamaTransformersTokenizer(TransformersTokenizer):
         return super().tokenize(text, asbytes, add_special_tokens)
 
     def __call__(self, text, add_special_tokens=False):
-        text = "@" + text
-        
-        text = self.tokenizer.bos_token + text
-        result = super().__call__(text, add_special_tokens=add_special_tokens)
-        result["input_ids"] = result["input_ids"][2:]
-        
-        return result
+        for dummy_token in ["@", "^", ""]:
+            text_to_tokenize = dummy_token + text
+            
+            text_to_tokenize = self.tokenizer.bos_token + text_to_tokenize
+            result = super().__call__(text_to_tokenize, add_special_tokens=add_special_tokens)
+            if len(result["input_ids"]) <= 2 and dummy_token != "":
+                # "Tokenized text '{}' was merged with dummy token @ into '{}'".format(text_to_tokenize, [self.tokenizer.convert_ids_to_tokens(i) for i in result["input_ids"]])
+                continue
+            offset = 2 if len(dummy_token) > 0 else 1
+            result["input_ids"] = result["input_ids"][offset:]
+            return result
+
+        assert False, "LLamaTransformersTokenizer.__call__ failed to workaround tokenization issue for '{}'".format(text)
