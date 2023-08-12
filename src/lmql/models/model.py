@@ -46,7 +46,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
     if model_name.startswith("llama.cpp:"):
         # kwargs["async_transport"] = True
         kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
-        warnings.warn("Running llama.cpp with '{}' tokenizer. To change, set the 'tokenizer' argument of your lmql.model(...)".format(kwargs["tokenizer"]), UserWarning)
+        warnings.warn("Running llama.cpp with the HuggingFace '{}' tokenizer. If you are not using a Llama-1 derivative model , you may need to change this. To do so, specify the 'tokenizer' argument of your lmql.model(...)".format(kwargs["tokenizer"]), UserWarning)
 
     if "endpoint" in kwargs:
         warnings.warn("info: 'endpoint' argument is ignored for inprocess=True/local: models.")

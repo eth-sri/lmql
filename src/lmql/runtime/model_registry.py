@@ -67,7 +67,7 @@ def resolve(model_name, endpoint=None, **kwargs):
         # special case for 'llama.cpp'
         if model_name.startswith("llama.cpp:"):
             kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
-            warnings.warn("Running llama.cpp with '{}' tokenizer. To change, set the 'tokenizer' argument of your lmql.model(...)".format(kwargs["tokenizer"]), UserWarning)
+            warnings.warn("Running llama.cpp with the HuggingFace '{}' tokenizer. If you are not using a Llama-1 derivative model , you may need to change this. To do so, specify the 'tokenizer' argument of your lmql.model(...)".format(kwargs["tokenizer"]), UserWarning)
 
         # determine endpoint URL
         if endpoint is None:
