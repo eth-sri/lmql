@@ -18,31 +18,20 @@ class LlamaCppModel(LMTPModel):
         print("[Loading llama.cpp model from", self.model_identifier, " with ", kwargs, "]", flush=True)
         if not "verbose" in kwargs.keys():
             kwargs["verbose"] = False
-        self.llm = Llama(model_path=model_identifier[len("llama.cpp:"):], **kwargs)
+        self.llm = Llama(model_path=model_identifier[len("llama.cpp:"):], logits_all=True, **kwargs)
 
     def eos_token_id(self):
         return 2
 
     def score(self, input_ids, attention_mask, **model_kwargs):
-        import time
-        # s = time.time()
         tokens = input_ids[0]
 
-        if len(self.llm._input_ids) > 0:
-            longest_prefix = 0
-            for a, b in zip(self.llm._input_ids, tokens[:-1]):
-                if a == b:
-                    longest_prefix += 1
-                else:
-                    break
-            if longest_prefix > 0:
-                tokens = tokens[longest_prefix:]
-                self.llm.n_tokens = longest_prefix
+        # single forward pass (use generate() in favor of eval() to handle kv cache automatically)
+        for _ in self.llm.generate(tokens, temp=0.0): break
 
-        self.llm.eval(tokens)
-        logits = np.array(self.llm.scores)
+        logits = np.array(self.llm.scores[:self.llm.n_tokens])
         logits = nputil.log_softmax(logits, axis=-1)
-        scores = np.array([logits[j][i] for j,i in enumerate(input_ids[0])])
+        scores = np.array([0.0] + [logits[j][i] for j,i in enumerate(input_ids[0][1:])])
 
         return scores.reshape(1, -1)
     
@@ -55,25 +44,26 @@ class LlamaCppModel(LMTPModel):
         input_ids = input_ids.reshape(-1).tolist()
 
         def llama_streamer(tokens, scores):
-            nonlocal token_scores, sequence
+            nonlocal token_scores
             scores = np.array(scores)
             scores = nputil.log_softmax(scores, axis=-1)
-            token_scores.append(scores)
             return False
 
-        logits_processor = self.logits_processors(bias_tensor) if bias_tensor is not None else None
+        logits_processor = self.logits_processors(bias_tensor, token_scores) if bias_tensor is not None else None
 
-        for i, token in zip(range(max_new_tokens), self.llm.generate(input_ids, max_new_tokens, 
+        for i, token in zip(range(max_new_tokens), self.llm.generate(input_ids,
                                                             temp=temperature,
                                                             stopping_criteria=llama_streamer, 
                                                             logits_processor=logits_processor)):
             assert i + len(input_ids) < self.llm.n_ctx(), "The requested number of tokens exceeds the llama.cpp model's context size. Please specify a higher n_ctx value."
-            
-            if i > 0:
-                streamer(sq_ar.reshape(1, *sq_ar.shape), ts_ar.reshape(-1, 1, *ts_ar.shape[1:]))
             sequence += [token]
             sq_ar = np.array(sequence)
             ts_ar = np.stack(token_scores, axis=0)
+
+            if i+1 >= max_new_tokens:
+                break
+            else:
+                streamer(sq_ar.reshape(1, *sq_ar.shape), ts_ar.reshape(-1, 1, *ts_ar.shape[1:]))
 
         ts_ar = np.stack(token_scores, axis=0)
         sq_ar = np.array(sequence)
@@ -83,7 +73,7 @@ class LlamaCppModel(LMTPModel):
             scores=ts_ar.reshape(-1, 1, *ts_ar.shape[1:])
         )
 
-    def logits_processors(self, logit_biases):
+    def logits_processors(self, logit_biases, token_scores):
         bias_tensors = None
         make_bias_tensor = self.make_bias_tensor
         
@@ -92,9 +82,10 @@ class LlamaCppModel(LMTPModel):
 
         class BatchLogitsProcessor:
             def __call__(self, input_ids, scores):
-                nonlocal bias_tensors
+                nonlocal bias_tensors, token_scores
 
-                scores = np.array(scores)
+                scores = nputil.log_softmax(np.array(scores))
+                token_scores.append(scores)
 
                 if bias_tensors is None:
                     bias_tensors = np.array(make_bias_tensor(logit_biases, scores.shape[-1]))
