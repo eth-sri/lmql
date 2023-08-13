@@ -45,8 +45,9 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
     # special case for 'llama.cpp'
     if model_name.startswith("llama.cpp:"):
         # kwargs["async_transport"] = True
+        if "tokenizer" not in kwargs:
+            warnings.warn("By default LMQL uses the '{}' tokenizer for all llama.cpp models. To change this, set the 'tokenizer' argument of your lmql.model(...) object.".format("huggyllama/llama-7b", UserWarning))
         kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
-        warnings.warn("Running llama.cpp with '{}' tokenizer. To change, set the 'tokenizer' argument of your lmql.model(...)".format(kwargs["tokenizer"]), UserWarning)
 
     if "endpoint" in kwargs:
         warnings.warn("info: 'endpoint' argument is ignored for inprocess=True/local: models.")
