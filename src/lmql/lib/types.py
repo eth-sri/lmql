@@ -111,7 +111,7 @@ async def is_type(ty, description=False):
     if description:
         "JSON Format:"
         "{type_schema_description(ty)}\n"
-    "As JSON: "
+    "(continue in JSON) "
     schema = type_schema(ty)
     stack = [("", "top-level", schema, already_parsed)]
     indent = ""
@@ -186,7 +186,7 @@ async def is_type(ty, description=False):
             "{indent}{t}"
         else:
             assert False, "not a supported type" + str(t)
-    payload = context.prompt.rsplit("JSON: ",1)[1]
+    payload = context.prompt.rsplit("JSON) ",1)[1]
     try:
         json_payload = json.loads(payload)
     except Exception as e:
