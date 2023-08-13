@@ -439,10 +439,8 @@ class PromptInterpreter:
         # check for tail and prescore
         if hasattr(self.dcmodel, "prescore_tokens") and (not type(s) is dc.DeterministicDecoderSequence or len(s.next_ids) == 0):
             if has_tail(mask):
-                tail_text = await s.text() + mask.tail
-                tail_ids = self.tokenizer.tokenize(tail_text, asbytes=True)[len(s.input_ids):]
+                tail_ids = self.tokenizer.decode_bytes(self.tokenizer(mask.tail)["input_ids"])
                 if len(tail_ids) > 0:
-                    # tail_tokenized = self.tokenizer.tokenize(mask.tail, asbytes=True)
                     await self.dcmodel.prescore_tokens(s, tail_ids, noscore=kwargs.get("noscore", False))
 
         return logit_mask, state
@@ -620,13 +618,11 @@ class PromptInterpreter:
 
         if state.tail is not None:
             rewritten_state = state.updated(tail=None)
-            prompt_ids = seq.input_ids.tolist()
-            tail_text = await seq.text(limit=-1) + state.tail
-            tail_ids = self.tokenizer.tokenize(tail_text, asbytes=True)[len(seq.input_ids) - 1:]
-            tail_ids = tail_ids[:-1]
-            if len(tail_ids) > 1:
-                updated_ids = prompt_ids + tail_ids[1:]
-
+            tail_ids = self.tokenizer.decode_bytes(self.tokenizer(state.tail)["input_ids"])
+            updated_ids = seq.input_ids[:-1].tolist() + tail_ids[:-1]
+            n_tail_ids = len(tail_ids) - 1
+            
+            if n_tail_ids > 1:
                 return RewrittenInputIds(
                     appended_input_ids=updated_ids,
                     strip_eos=False,
