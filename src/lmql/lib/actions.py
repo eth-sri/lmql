@@ -93,7 +93,7 @@ async def fct_call(fcts):
         action = action.strip()
         if action not in action_fcts.keys():
             print("unknown action", [action], list(action_fcts.keys()))
-            " Unknown action: {action} {DELIMITER_END}"
+            " Unknown action: {action}{DELIMITER_END}"
             result = ""
             return "(error)"
         else:
@@ -125,7 +125,9 @@ async def inline_use(fcts, instruct=True):
     first_tool_name = list(action_fcts.keys())[0] if len(action_fcts) > 0 else "tool"
 
     # add instruction prompt if no few-shot prompt was already used
-    if instruct and not INLINE_USE_PROMPT in context.prompt:
+    if instruct != False and not INLINE_USE_PROMPT in context.prompt:
+        if instruct == "llama":
+            "[[INST]]<<SYS>>"
         """
         \n\nInstructions: In your reasoning, you can use the following tools:"""
         
@@ -133,6 +135,9 @@ async def inline_use(fcts, instruct=True):
             "\n   - {fct.name}: {fct.description} Usage: {DELIMITER}{fct.example} | {fct.example_result}{DELIMITER_END}"
         '   Example Use: ... this means they had <<calc("5-2") | 3 >> 3 apples left...\n'
         "   You can also use the tools multiple times in one reasoning step.\n\n"
+        
+        if instruct == "llama":
+            "<</SYS>>[[/INST]]]"
         "Reasoning with Tools:\n\n"
     
     # decode segment-by-segment, handling action calls along the way
@@ -308,7 +313,9 @@ async def eval_or_acc(last_line, code_env, acc):
 @lmql.query
 async def reAct(fcts, instruct=True):
     '''lmql
-    if instruct:
+    if instruct != False:
+        if instruct == "llama":
+            "[[INST]]<<SYS>>"
         """
         Instructions: In your reasoning adhere to the following structure:
 
@@ -325,6 +332,9 @@ async def reAct(fcts, instruct=True):
         for fct in action_fcts.values():
             "   - {fct.name}: {fct.description}. Usage: {fct.example}. Observation: {fct.example_result}\n"
     
+        if instruct == "llama":
+            "<</SYS>>[[/INST]]"
+        
         "Now you can start reasoning.\n"
         
     offset = len(context.prompt)
