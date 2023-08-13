@@ -430,10 +430,15 @@ class lmtp_model:
 
     def __del__(self):
         if self.lmtp_inprocess_client is not None:
-            if asyncio.get_event_loop() == asyncio.get_event_loop_policy().get_event_loop():
-                pass
-            else:
-                asyncio.ensure_future(self.lmtp_inprocess_client.close())
+            try:
+                if asyncio.get_event_loop() == asyncio.get_event_loop_policy().get_event_loop():
+                    pass
+                else:
+                    asyncio.ensure_future(self.lmtp_inprocess_client.close())
+            except RuntimeError as e:
+                # ignore if event loop has already been shut down
+                if "no current event loop" in str(e): pass
+                else: raise e
 
     def __call__(self):
         # reference to factory instance
