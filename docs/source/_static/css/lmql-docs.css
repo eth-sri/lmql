@@ -294,6 +294,15 @@ html.dark .highlight-model-output .highlight {
     padding: 4pt 0pt;
 }
 
+.globaltoc li button {
+    top: 7pt !important;
+    right: 8pt !important;
+}
+
+.globaltoc p.caption {
+    margin-bottom: 5pt;
+}
+
 .globaltoc li {
     padding: 4pt;
     padding-bottom: 0;
@@ -303,6 +312,7 @@ html.dark .highlight-model-output .highlight {
     transition: background-color 0.1s ease-in-out;
     padding-left: 6pt;
     padding-right: 6pt;
+    padding-bottom: 2pt;
 }
 
 .globaltoc li.toctree-l2, .globaltoc>ul>li>ul {
@@ -333,4 +343,8 @@ html.dark p>code.literal {
 
 .sy-head-nav .link i.external-link {
     display: none;
+}
+
+img {
+    border-radius: 2pt;
 }

@@ -17,19 +17,20 @@ def handle(request):
     index = open(os.path.join(PROJECT_DIR, 'assets/index.html')).read()
     return web.Response(text=index, content_type='text/html')
 
-def studio(request):
-    index = open(os.path.join(PROJECT_DIR, 'assets/studio.html')).read()
-    return web.Response(text=index, content_type='text/html')
-
 # serve chat_assets/ folder
 def assets(request):
     path = request.match_info.get('path', '')
     # relative to this ../assets/ folder
-    assert path.startswith('chat_assets/'), path
+    if not path.startswith('chat_assets/'):
+        return web.Response(text='not found', status=404)
     path = path.replace('chat_assets/', PROJECT_DIR + '/assets/')
     return web.FileResponse(path)
 
 class websocket_executor(BaseOutputWriter):
+    """
+    Encapsulates the continuous execution of a LMQL query function and
+    streams I/O via a provided WebSocket connection.
+    """
     def __init__(self, query, ws):
         self.user_input_fut = None
         self.ws = ws
@@ -69,7 +70,13 @@ class websocket_executor(BaseOutputWriter):
             self.message_id += 1
             return await self.user_input_fut
 
-class chatter:
+class chat:
+    """
+    A minimal WebSocket-based chat server that serves a provided LMQL file 
+    as a chat application including a simple graphical user interface.
+
+    All required web resources are located in the chat_assets/ subfolder.
+    """
     def __init__(self, file, port=8089):
         self.port = port
         self.file = file
@@ -80,6 +87,7 @@ class chatter:
         ws = web.WebSocketResponse()
         await ws.prepare(request)
 
+        # read and parse query function from self.file
         with open(self.file) as f:
             source = f.read()
             try:
@@ -119,48 +127,12 @@ class chatter:
         print("websocket connection closed", len(self.executors), "executors left", flush=True)
         return ws
 
-    async def source(self, request):
-        # serves self.chatbot lmql source
-        source = open(self.file).read()
-        source = self.file + "\n" + source
-        return web.Response(text=source, content_type='text/plain')
-
-    async def post_source(self, request):
-        source = await request.text()
-
-        for e in self.executors: 
-            await e.ws.close()
-        self.executors = []
-            
-        errorout = sys.stderr
-        try:    
-            sys.stderr = io.StringIO()
-            test = lmql.query(source)
-        except Exception as e:
-            error = sys.stderr.getvalue() + str(e)
-            return web.Response(text=error, content_type='text/plain')
-        finally:
-            sys.stderr = errorout
-
-        with open(self.file, 'w') as f:
-            f.write(source)
-
-
-        return web.Response(text='ok', content_type='text/plain')
-
     async def main(self):
         app = web.Application()
         
         # host index.html
         app.add_routes([web.get('/', handle)])
 
-        # host studio.html
-        app.add_routes([web.get('/studio', studio)])
-
-        # 
-        app.add_routes([web.get('/source', self.source)])
-        app.add_routes([web.post('/source', self.post_source)])
-        
         # host chatbot query
         # websocket connection
         app.add_routes([web.get('/chat', self.handle_websocket_chat)])
