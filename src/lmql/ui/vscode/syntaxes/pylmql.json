@@ -1,6 +1,6 @@
 {
     "scopeName": "pylmql.injection",
-    "injectionSelector": "L:source.python",
+    "injectionSelector": "L:source.python, L:source.lmql",
     "patterns": [
         {
             "name": "comment.inline-lmql",
