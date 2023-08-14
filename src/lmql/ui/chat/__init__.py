@@ -1,23 +1,26 @@
-# setup to use lmql submodule
-import os
-import sys
-import io
-import json
-sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/../')
+"""
+Minimal LMQL Chat endpoint server, that serves a given LMQL file as a chat application.
 
+See assets/ for the client implementation.
+"""
 import asyncio
+import json
+import os
+
 from aiohttp import web
+
 import lmql
 from lmql.runtime.bopenai import get_stats
 from lmql.runtime.output_writer import BaseOutputWriter
 
 PROJECT_DIR = os.path.dirname(os.path.realpath(__file__))
 
+# serves index.html
 def handle(request):
     index = open(os.path.join(PROJECT_DIR, 'assets/index.html')).read()
     return web.Response(text=index, content_type='text/html')
 
-# serve chat_assets/ folder
+# serves assets/ folder as static files under /chat_assets/
 def assets(request):
     path = request.match_info.get('path', '')
     # relative to this ../assets/ folder
@@ -26,9 +29,25 @@ def assets(request):
     path = path.replace('chat_assets/', PROJECT_DIR + '/assets/')
     return web.FileResponse(path)
 
+class MessageDecorator(lmql.decorators.LMQLDecorator):
+    """
+    Provides an @message variable decorator in chat queries, allowing them
+    to specify what output variables are shown to the user (streamed).
+    """
+    def __init__(self, executor):
+        self.executor = executor
+
+    def pre(self, variable):
+        self.executor.message_id += 1
+        self.executor.current_message = ""
+        return variable
+
+    def stream(self, variable_value, context):
+        self.executor.current_message = variable_value
+
 class websocket_executor(BaseOutputWriter):
     """
-    Encapsulates the continuous execution of a LMQL query function and
+    Encapsulates the continuous execution of an LMQL query function and
     streams I/O via a provided WebSocket connection.
     """
     def __init__(self, query, ws):
@@ -38,25 +57,11 @@ class websocket_executor(BaseOutputWriter):
         self.message_id = 0
         
         self.current_message = ""
+        self.message_decorator = MessageDecorator(self)
 
     async def error_handling_query_call(self, query):
-        this = self
-        
-        class MessageDecorator(lmql.decorators.LMQLDecorator):
-            """
-            Provides @message decorator to chat queries, allowing them
-            to specify what output variables are shown to the user.
-            """
-            def pre(self, variable):
-                this.message_id += 1
-                this.current_message = ""
-                return variable
-
-            def stream(self, variable_value, context):
-                this.current_message = variable_value
-
         try:
-            await query(output_writer=self, message=MessageDecorator())
+            await query(output_writer=self, message=self.message_decorator)
         except Exception as e:
             print("error in chatbot query", flush=True)
             import traceback
@@ -72,8 +77,10 @@ class websocket_executor(BaseOutputWriter):
             "type": "response",
             "message_id": self.message_id,
             "data": {
+                # always send the full prompt (you probably want to disable this for production use)
                 'prompt': prompt, 
                 'variables': {
+                    # client expects all message output to be stored in the "ANSWER" variable (query may use different variable names)
                     "ANSWER": self.current_message
                 }
             }
@@ -92,7 +99,7 @@ class websocket_executor(BaseOutputWriter):
 class chat:
     """
     A minimal WebSocket-based chat server that serves a provided LMQL file 
-    as a chat application including a simple graphical user interface.
+    as a chat application, including a simple graphical user interface.
 
     All required web resources are located in the chat_assets/ subfolder.
     """
