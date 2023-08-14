@@ -36,10 +36,27 @@ class websocket_executor(BaseOutputWriter):
         self.ws = ws
         self.chatbot_task = asyncio.create_task(self.error_handling_query_call(query), name='chatbot query')
         self.message_id = 0
+        
+        self.current_message = ""
 
     async def error_handling_query_call(self, query):
+        this = self
+        
+        class MessageDecorator(lmql.decorators.LMQLDecorator):
+            """
+            Provides @message decorator to chat queries, allowing them
+            to specify what output variables are shown to the user.
+            """
+            def pre(self, variable):
+                this.message_id += 1
+                this.current_message = ""
+                return variable
+
+            def stream(self, variable_value, context):
+                this.current_message = variable_value
+
         try:
-            await query(output_writer=self)
+            await query(output_writer=self, message=MessageDecorator())
         except Exception as e:
             print("error in chatbot query", flush=True)
             import traceback
@@ -53,10 +70,12 @@ class websocket_executor(BaseOutputWriter):
     async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables): 
         chunk = json.dumps({
             "type": "response",
-            "message_id": self.message_id - (1 if variable != "ANSWER" else 0),
+            "message_id": self.message_id,
             "data": {
                 'prompt': prompt, 
-                'variables': program_variables.variable_values
+                'variables': {
+                    "ANSWER": self.current_message
+                }
             }
         })
 
