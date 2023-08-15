@@ -962,6 +962,8 @@ class EraseOp(Node):
         if isinstance(other, StopAtOp):
             return "after"
         return 0
+    
+# executes an arbitrary Python lambda expr on the operands (no support for advanced follow semantics)
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
@@ -975,6 +977,32 @@ class OpaqueLambdaOp(Node):
         return fmap(
             ("*", fct(*args))
         )
+    
+# forces a pre-determined value in the prompt as well as in value semantics
+# in the postprocessing stage (used internally)
+class FixedValueOp(Node):
+    def __init__(self, predecessors, variable_value, prompt_value):
+        super().__init__(predecessors)
+        self.variable_value = variable_value
+        self.prompt_value = prompt_value
+    
+    def forward(self, value, *args, **kwargs):
+        return InOpStrInSet([]).forward(value, [self.prompt_value])
+    
+    def follow(self, value, *args, **kwargs):
+        return InOpStrInSet([]).follow(value, [self.prompt_value])
+
+    def final(self, args, result=None, **kwargs):
+        return InOpStrInSet([]).final(args, result=result, **kwargs)
+
+    def postprocess_var(self, var_name):
+        return True
+    
+    def postprocess_order(self, other, **kwargs):
+        return "after"
+    
+    def postprocess(self, operands, value):
+        return self.variable_value
 
 def execute_op_stops_at_only(variable: str, op: Node, trace, result=None, sidecondition=None):
     """

@@ -28,6 +28,7 @@ from lmql.runtime.interpreter import LMQLResult
 
 from lmql.models.model import model
 from lmql.runtime.loop import main
+import lmql.runtime.decorators as decorators
 
 from typing import Optional
 

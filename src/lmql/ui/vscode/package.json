@@ -26,7 +26,7 @@
       {
         "path": "./syntaxes/pylmql.json",
         "scopeName": "pylmql.injection",
-        "injectTo": ["source.python"]
+        "injectTo": ["source.python", "source.lmql"]
       },
       {
         "path": "./syntaxes/lmql.qstring.json",
