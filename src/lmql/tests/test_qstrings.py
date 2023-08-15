@@ -98,4 +98,7 @@ def test_with_types_and_decorators():
     # with type
     assert_parse("Say 'this is a test':[RESPONSE:int]" , ["Say 'this is a test':", TemplateVariable("RESPONSE", type_expr="int", index=0)])
 
+    # with a.b.c decorator
+    assert_parse("Hello[@lmql.test WHO]!", ["Hello", TemplateVariable("WHO", decorator_exprs=["lmql.test"], index=0), "!"])
+
 run_all_tests(globals())

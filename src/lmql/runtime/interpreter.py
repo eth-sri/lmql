@@ -394,7 +394,7 @@ class PromptInterpreter:
                     if "decorators" in variable_args:
                         variable_args["decorators"] = LMQLDecoratorList(variable_args["decorators"])
                         # check for 'pre' decorator and its return value
-                        result = variable_args["decorators"].pre(s)
+                        result = variable_args["decorators"].pre(s, state.program_state)
                         if result is not s:
                             # obtain fixed value and prompt value from decorator function
                             variable_value, prompt_value = result
@@ -741,7 +741,7 @@ class PromptInterpreter:
 
             # apply postprocessing decorators if any
             if state.variable_arg("decorators") is not None:
-                variable_value, postprocessed_prompt = state.variable_arg("decorators").post(variable_value, postprocessed_prompt)
+                variable_value, postprocessed_prompt = state.variable_arg("decorators").post(variable_value, postprocessed_prompt, program_state)
 
             # set postprocessed variable value and program value
             program_state.set(variable, postprocessed_prompt, program_value=variable_value, scores=(), diff="", montonicity="fin")

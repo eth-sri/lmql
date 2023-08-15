@@ -30,8 +30,6 @@ from lmql.models.model import model
 from lmql.runtime.loop import main
 import lmql.runtime.decorators as decorators
 
-from lmql.ui.chat import chat
-
 from typing import Optional
 
 model_registry = LMQLModelRegistry

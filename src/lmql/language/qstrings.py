@@ -166,8 +166,16 @@ class QstringParser:
         assert cursor.token.type == tokenize.NAME, "Expected identifier, got {}".format(cursor.token)
         name = cursor.token.string
 
-        # check for function call
+        # check for field access
         cursor.next()
+        while cursor.token.type == tokenize.OP and cursor.token.string == ".":
+            cursor.next()
+            assert cursor.token.type == tokenize.NAME, "Expected identifier, got {}".format(cursor.token)
+            name += "." + cursor.token.string
+            cursor.next()
+
+
+        # check for function call
         if not (cursor.token.type == tokenize.OP and cursor.token.string == "("):
             return name
         

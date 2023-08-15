@@ -9,29 +9,37 @@ A chatbot is an interactive applications that continously responds to user input
 ```{lmql}
 
 name::simple-chat
+from lmql.lib.chat import message
+
 argmax 
     while True:
         "{:user} {await input()}"
-        "{:assistant} [ANSWER]"
+        "{:assistant} [@message ANSWER]"
 from
    "chatgpt"
 ```
 
-> **Note:** You can already run this query for yourself, by just pasting it into the [LMQL playground](../../quickstart.md). When executed, the playground will provide a simple chat interface as part of the model output panel.
+> **Note:** You can run this query for yourself in the [LMQL playground](../../quickstart.md). When executed, the playground will provide a simple chat interface in the model output panel.
 
-As part of the prompt statements in our program, we use designated `{:user}` and `{:assistant}` tags, to annotate our prompt in a way that the model can distinguish between user and assistant messages.
+**Tags** As part of the prompt statements in our program, we use designated `{:user}` and `{:assistant}` tags, to annotate our prompt in a way that allows the model to distinguish between user and assistant messages. 
 
-Note also, that in LMQL you have to use `await input()` instead of the traditional Python `input()` function, to make sure that the program does not block while waiting for user input.
+**Input** Note also, that in LMQL you have to use `await input()` instead of the traditional Python `input()` function, to make sure that the program does not block while waiting for user input.
 
-With respect to model choice, we use the `chatgpt` model here. Nonetheless, based on LMQL's broad support for different [inference backends](../../language/models.rst), the model can be easily replaced with any other supported model.
+**@message** To differentiate between internal output and user-facing chat message output, you can use the `@message` decorator function. This way, only the output of the decorated variables will be displayed to the user, whereas intermediate reasoning is kept internal. To learn more about chat serving, make sure to also read the chapter on [Chat Serving](./serving.md).
+
+With respect to model choice, we use the `chatgpt` model here. Nonetheless, based on LMQL's broad support for different [inference backends](../../language/models.rst), the model can be easily replaced with any other supported model. For ChatGPT, tags like `{:user}` directly translate to [OpenAI roles](https://platform.openai.com/docs/guides/gpt/chat-completions-api). For other models, LMQL inserts equivalent raw text annotations, e.g. `((user)):`.
 
 ## 2. Adding a System Prompt
 
-While the above program already works, it is not very personalized, as it does not consider any system prompt. To add a system prompt, we can simply include an additional annotated `{:system}` prompt statement:
+While the above program already works, it is not very personalized. To make the chatbot more engaging, we can add a *system prompt* that instructs the model to respond in a specific way. The system prompt is an additional instruction that we include at the beginning of our program and will not be directly visible to the user.
+
+To add a system prompt, we can simply include an additional annotated `{:system}` prompt statement:
 
 ```{lmql}
 
 name::chat-with-system
+from lmql.lib.chat import message
+
 argmax 
     "{:system} You are a marketing chatbot for the\
      language model query language (LMQL)."
@@ -42,11 +50,13 @@ from
    "chatgpt"
 ```
 
+To resulting chat application will now respond in a more personalized way, as it will consider the system prompt before responding to user input. In this case, we instruct it to respond as LMQL marketing agent. 
+
 ## 3. Serving the Chatbot
 
-Last, to move beyond the LMQL playground, we can use the `lmql chat` command to serve our chatbot as a local web application. To do so, we just save the above program as `chat.lmql` and run the following command:
+Lastly, to move beyond the playground, we can use the `lmql chat` command to serve our chatbot as a local web application. To do so, we just save the above program as `chat.lmql` and run the following command:
 
-```{bash}
+```bash
 lmql chat chat.lmql
 ```
 
@@ -66,7 +76,7 @@ Once the server is running, you can access the chatbot at the provided local URL
 A simple chatbot using the LMQL Chat UI.
 ```
 
-In this interface, you can interact with your chatbot by typing into the input field at the bottom of the screen. The chatbot will then respond to your input, while also considering the system prompt that you provided in your LMQL program. On the right, you can inspect the full internal trace of your program, including the generated prompt statements and the model output. This allows you at all times, to understand what exact input the model received and how it responded to it.
+In this interface, you can interact with your chatbot by typing into the input field at the bottom of the screen. The chatbot will then respond to your input, while also considering the system prompt that you provide in your program. On the right, you can inspect the full internal prompt of your program, including the generated prompt statements and the model output. This allows you at all times, to understand what exact input the model received and how it responded to it.
 
 ## Learn More
 

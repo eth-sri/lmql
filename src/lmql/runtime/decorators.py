@@ -5,6 +5,7 @@ process and on a per-variable basis.
 
 import inspect
 from lmql.language.qstrings import TemplateVariable
+from lmql.runtime.program_state import ProgramState
 
 class LMQLDecorator:
     """
@@ -15,7 +16,7 @@ class LMQLDecorator:
     invoked in, during query execution.
     """
 
-    def pre(self, variable: TemplateVariable):
+    def pre(self, variable: TemplateVariable, context: ProgramState):
         """
         This method is invoked before a variable value is generated. 
         
@@ -25,7 +26,7 @@ class LMQLDecorator:
         """
         return variable
     
-    def stream(self, variable_value, context):
+    def stream(self, variable_value, context: ProgramState):
         """
         This method is continously invoked during query execution, whenever a new token is explored
         by the configured decoding algorithm. 
@@ -38,7 +39,7 @@ class LMQLDecorator:
         """
         return variable_value
     
-    def post(self, variable_value, prompt_value):
+    def post(self, variable_value, prompt_value, context: ProgramState):
         """
         This method is invoked after a variable value has finished generating and all constraint-imposed
         postprocessing has been applied.
@@ -63,11 +64,11 @@ class LMQLDecoratorFunction(LMQLDecorator):
         self.post_fn = decorator
         self.num_args = len(inspect.signature(decorator).parameters)
     
-    def post(self, variable_value, prompt_value):
+    def post(self, variable_value, prompt_value, context: ProgramState):
         if self.num_args == 1:
             r = self.post_fn(variable_value)
         else: # self.num_args >= 2
-            r = self.post_fn(variable_value, prompt_value)
+            r = self.post_fn(variable_value, prompt_value, context)
         
         # If the decorator returns None, we don't want to change the value
         if r is None:
@@ -103,11 +104,11 @@ class LMQLDecoratorList(LMQLDecorator):
     def __init__(self, decorators):
         self.decorators = [wrap(decorator) for decorator in decorators]
     
-    def pre(self, variable):
+    def pre(self, variable: TemplateVariable, context: ProgramState):
         initial_variable = variable
         
         for decorator in self.decorators:
-            variable = decorator.pre(variable)
+            variable = decorator.pre(variable, context)
 
             # if a decorator prevents the variable from being generated, skip the remaining decorators
             if variable is not initial_variable:
@@ -123,14 +124,14 @@ class LMQLDecoratorList(LMQLDecorator):
 
         return variable
     
-    def stream(self, variable_value, context):
+    def stream(self, variable_value, context: ProgramState):
         for decorator in reversed(self.decorators):
             variable_value = decorator.stream(variable_value, context)
         return variable_value
     
-    def post(self, variable_value, prompt_value):
+    def post(self, variable_value, prompt_value, context: ProgramState):
         for decorator in reversed(self.decorators):
-            variable_value, prompt_value = decorator.post(variable_value, prompt_value)
+            variable_value, prompt_value = decorator.post(variable_value, prompt_value, context)
         return variable_value, prompt_value
     
 class pre(LMQLDecorator):
@@ -142,9 +143,13 @@ class pre(LMQLDecorator):
     """
     def __init__(self, decorator_fn):
         self.decorator_fn = decorator_fn
+        self.num_args = len(inspect.signature(decorator_fn).parameters)
     
-    def pre(self, variable):
-        return self.decorator_fn(variable)
+    def pre(self, variable: ProgramState, context: ProgramState):
+        if self.num_args == 1:
+            return self.decorator_fn(variable)
+        else: # self.num_args >= 2
+            return self.decorator_fn(variable, context)
 
 class streaming(LMQLDecorator):
     """

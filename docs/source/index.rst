@@ -73,6 +73,7 @@ Contents
    language/constraints.md
    language/decoders.md
    language/models.rst
+   language/decorators.md
    language/functions.md
 
 .. toctree::

@@ -23,10 +23,10 @@ Learn the basics of LMQL Chat by building a simple chatbot.
 :link: ./chat/serving.md
 Learn how to serve your chatbot via a WebSockets API.
 :::
-<!-- :::{grid-item-card} 🛠️ Integrating Tools
-:link: ./chat/tools.md
-Expose tools to your chatbot, to enable more complex interactions.
-::: -->
+:::{grid-item-card} 🧠 Internal Reasoning
+:link: ./chat/internal.md
+Build a chabot with a (hidden) internal state and reasoning.
+:::
 :::{grid-item-card} 🛡️ Defend against Prompt Injections
 :link: ./chat/defend.md
 Perform input sanitization to defend against prompt injection attacks.
@@ -38,6 +38,7 @@ Perform input sanitization to defend against prompt injection attacks.
 
 chat/overview
 chat/serving
+chat/internal
 <!-- chat/tools -->
 chat/defend
 ```

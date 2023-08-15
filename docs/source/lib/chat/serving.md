@@ -1,8 +1,8 @@
 # Serving
 
-Next to building your chat application, serving it is the next step before it can be used by others. To facilitate this and to offer a starting point for your custom implementation, LMQL includes a simple server implementation and corresponding client web UI, that communicate via the [`websocket` protocol](https://tools.ietf.org/html/rfc6455).
+After building your chat application, serving it is the next step before it can be used by others. To facilitate this and to offer a starting point for your custom implementation, LMQL includes a simple server implementation and corresponding client web UI, that communicate via the [`websocket` protocol](https://tools.ietf.org/html/rfc6455).
 
-To access and use this implementation we offer two routes: (1) Use the `lmql chat` command directly with your `.lmql` file, or (2) use the `lmql.chat` function from your own code.
+To access and use this implementation we offer two routes: (1) Use the `lmql chat` command directly with your `.lmql` file, or (2) use the `lmql.chat.chatserver` from your own code.
 
 ## Using the `lmql chat` command
 
@@ -30,18 +30,28 @@ Note that changing the `.lmql` file will **not** automatically reload the server
 A simple chatbot using the LMQL Chat UI.
 ```
 
-## Using the `lmql.chat` function
+## Using `chatserver` 
 
-Alternatively, to launch the LMQL chat server from your own code, you can use the `lmql.chat` function. This function takes the path of the query file as its only argument, and returns a chat server object, that can be launched using `run()`:
+Alternatively, to launch the LMQL chat server from your own code, you can use `lmql.lib.chat.chatserver`. This c;ass takes the path of the query file or a query function as argument, and returns a chat server object, that can be launched using `run()`:
 
 ```python
-import lmql
+from lmql.lib.chat import chatserver
 
-lmql.chat('path/to/my-query.lmql').run()
+chatserver('path/to/my-query.lmql').run()
 ```
+
+Note that when passing a query function directly, you have to always provide a `async def` function, which enables concurrent client serving.
+
+## `@message` Streaming
+
+Chat relies on a [decorator-based](../../language/decorators.md) output streaming. More specifically, only model output variables that are annotated as `@message` are streamed and shown to the user in the chat interface. This allows for a clean separation of model output and chat output, and eneables hidden/internal reasoning. 
+
+To use `@message` with your [custom output writer](../output.ipynb), make sure to inherit from `lmql.lib.chat`'s `ChatMessageOutputWriter`, which offers additional methods for specifically handling and streaming `@message` variables.
 
 ## More Advanced Usage
 
-For more advanced serving scenarios, e.g. when integrating Chat into your own web applications, please refer to the very minimal implementation of the `lmql.chat` in [`src/lmql/ui/chat/__init__.py`](https://github.com/eth-sri/lmql/blob/main/src/lmql/ui/chat/__init__.py). This implementation is very minimal and can be easily adapted to your own needs and infrastructure. The corresponding web UI is implemented in [`src/lmql/ui/chat/assets/`](https://github.com/eth-sri/lmql/blob/main/src/lmql/ui/chat/assets/) and offers a good starting point for your own implementation and UI adaptations on the client side.
+For more advanced serving scenarios, e.g. when integrating Chat into your own web applications, please refer to the very minimal implementation of `chatserver` in [`src/lmql/ui/chat/__init__.py`](https://github.com/eth-sri/lmql/blob/main/src/lmql/ui/chat/__init__.py). This implementation is very minimal and can be easily adapted to your own needs and infrastructure. The corresponding web UI is implemented in [`src/lmql/ui/chat/assets/`](https://github.com/eth-sri/lmql/blob/main/src/lmql/ui/chat/assets/) and offers a good starting point for your own implementation and UI adaptations on the client side.
 
 For other forms of output streaming e.g. via HTTP or SSE, see also the chapter on [Output Streaming](../output.ipynb)
+
+**Disclaimer**: The LMQL chat server is a simple code template that does not include any security features, authentication or cost control. It is intended for local development and testing only, and should not be used as-is in production environments. Before deploying your own chat application, make sure to implement the necessary security measures, cost control and authentication mechanisms.

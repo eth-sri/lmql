@@ -23,7 +23,7 @@ def cmd_chat():
     file = sys.argv[2]
     absolute_path = os.path.abspath(file)
     os.chdir(project_root)
-    os.system("python -m lmql.ui.chat " + absolute_path)
+    os.system("python -m lmql.lib.chat " + absolute_path)
 
 def cmd_run():
     """
