@@ -2,7 +2,6 @@ from typing import Tuple
 import sys
 
 import numpy as np
-from llama_cpp import Llama, LlamaTokenizer
 
 import lmql.utils.nputil as nputil
 from lmql.models.lmtp.backends.lmtp_model import (LMTPModel, LMTPModelResult,
@@ -10,6 +9,8 @@ from lmql.models.lmtp.backends.lmtp_model import (LMTPModel, LMTPModelResult,
 
 class LlamaCppModel(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
+        from llama_cpp import Llama
+        
         self.model_identifier = model_identifier
         self.kwargs = kwargs
 
