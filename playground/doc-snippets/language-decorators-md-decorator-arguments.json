@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "def prefix(prefix: str):\n    # actual decorator function\n    def decorator(value: str):\n        return prefix + value.strip()\n    \n    return decorator\n\n\"Say 'this is a test':[@prefix('PREFIX: ') TEST]\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
