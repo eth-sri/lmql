@@ -1,4 +1,5 @@
 import sys
+import os
 import ast
 import asyncio
 import types
@@ -161,7 +162,11 @@ def run_all_tests(g):
                 termcolor.cprint("OK", "green")
         except AssertionError as e:
             num_errors += 1
-            termcolor.cprint("FAILED", "red")
+            import traceback
+            # find last line and file
+            tb = traceback.extract_tb(e.__traceback__)
+            tb = "\n".join(str(t) for t in tb)
+            termcolor.cprint("FAILED\n{}".format(tb), "red")
             print(e)
 
     # wait for all tasks to finish

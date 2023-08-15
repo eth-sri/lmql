@@ -95,23 +95,6 @@
         setThinking(true);
         document.querySelector('.input textarea').disabled = true;
         send(message);
-
-        // window.setTimeout(() => {
-        //     addResponse('Waiting...', 'system');
-        //     let text = 'I don\'t know what you mean by "' + message + '".'
-        //     let response_id = 'response-' + Math.random().toString(36).substring(2, 15);
-        //     // add char by char over time
-        //     let i = 0;
-        //     let interval = window.setInterval(() => {
-        //         if (i >= text.length) {
-        //             window.clearInterval(interval);
-        //             addResponse(text, 'assistant', response_id);
-        //             return;
-        //         }
-        //         addResponse(text.substring(0, i), 'assistant', response_id);
-        //         i += 10;
-        //     }, 50);
-        // }, 1000);
     }
 
     let messageId = 0;
@@ -120,10 +103,13 @@
 
     window.onload = function() {
         setThinking(true);
+        
         document.getElementById('connection-status').innerText = 'Connecting...';
+        
         host = window.location.host;
         websocket = new WebSocket("ws://" + host + "/chat");
         document.getElementById('address').innerText = websocket.url;
+        
         websocket.onmessage = function(event) {
             let payload = JSON.parse(event.data);
             if (payload.type === 'response') {
@@ -171,34 +157,9 @@
     }
 
     function addResponse(s, role, id=null) {
-        // if (message.trim() === '') {
-        //     return;
-        // }
-        
         document.querySelector('.input textarea').disabled = false;
         addMessage(s, role, id);
         document.querySelector('.input textarea').focus();
-    }
-
-    function setAPISecret() {
-        const secret = document.querySelector('.secret input').value;
-        localStorage.setItem('api_secret', secret);
-        document.querySelector('.secret').classList.add('hidden');
-        document.querySelector('.input textarea').focus();
-    }
-
-    function addAPISecretEntry() {
-        const entryForm = `
-        <div class="api-key-entry">
-            <p>
-                <h1>Welcome to LMQL Chat</h1>
-                To get started, please provide an OpenAI API key. Your key will only be stored in your browser's <a href="https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage">local storage</a>, and will not be sent to our servers.<br/><br/>
-                <input type="text" placeholder="API key"/><br/>
-                <button onclick="document.querySelector('.api-key-entry').style.display = 'none';">Let's start!</button>
-            </p>
-        </div>
-        `
-        document.querySelector('.chat').innerHTML += entryForm;
     }
     </script>
 </head>

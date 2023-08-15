@@ -73,7 +73,15 @@ Contents
    language/constraints.md
    language/decoders.md
    language/models.rst
+   language/decorators.md
    language/functions.md
+
+.. toctree::
+    :maxdepth: 2
+    :caption: 📦 Standard Library
+    
+    lib/chat.rst
+    lib/output.md
 
 .. toctree::
     :maxdepth: 1
@@ -83,9 +91,8 @@ Contents
     python/langchain.ipynb
     python/llama_index.ipynb
     python/pandas.ipynb
-    python/output.md
     python/comparison.md
-   
+
 .. toctree::
     :maxdepth: 1
     :caption: 💬 Contribute

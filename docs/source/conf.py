@@ -24,8 +24,11 @@ extensions = [
     'sphinx.ext.intersphinx',
     "myst_parser",
     "lmql_snippets",
-    "nbsphinx"
+    "nbsphinx",
+    "sphinx_design"
 ]
+
+myst_enable_extensions = ["colon_fence"]
 
 source_suffix = {
     '.rst': 'restructuredtext',

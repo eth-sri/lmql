@@ -22,6 +22,7 @@ from lmql.runtime.multi_head_interpretation import (InterpretationHead,
 from lmql.runtime.program_state import ProgramState
 from lmql.runtime.stats import Stats
 from lmql.runtime.tokenizer import LMQLTokenizer
+from lmql.runtime.decorators import LMQLDecoratorList
 
 from lmql.utils.nputil import replace_inf_nan_with_str
 from lmql.runtime.interrupt import interrupt
@@ -83,8 +84,10 @@ class PromptState(NamedTuple):
     recurring_variable_counter : Dict[str, int]
     variable_offset : int
 
-    # optional extra constraint only applicable to current context (inline where)
-    constraints: Optional[ops.Node]
+    # optional extra keyword arguments passed to the currently excuting qstring
+    query_args: Optional[Dict[str, Any]]
+    # view on query_args that only contains variable arguments that apply to the current variable
+    variable_args: Optional[Dict[str, Any]]
 
     # only set after processing where clause
     valid: Optional[bool]
@@ -102,13 +105,26 @@ class PromptState(NamedTuple):
         data_dict.update(updated)
         return PromptState(**data_dict)
     
+    def variable_arg(self, name):
+        return (self.variable_args or {}).get(name, None)
+
     def full_where_condition(self, interpreter):
+        constraints = self.variable_arg("constraints")
+        
+        type_decl = self.variable_arg("type")
+        assert type_decl is None, "type declarations are not supported yet"
+
+        decoder_decl = self.variable_arg("decoder")
+        assert decoder_decl is None, "variable-decoder declarations are not supported yet"
+
         if interpreter.where is None:
-            return self.constraints
-        elif self.constraints is None:
+            return constraints
+        elif constraints is None:
             return interpreter.where
+        elif type(constraints) is ops.FixedValueOp:
+            return constraints
         else:
-            return ops.AndOp([interpreter.where, self.constraints])
+            return ops.AndOp([interpreter.where, constraints])
 
 class LMQLContext:
     def __init__(self, interpreter, state, prompt):
@@ -141,8 +157,8 @@ class LMQLContext:
     async def get_var(self, name):
         return self.program_state.get_program_value(name)
 
-    async def query(self, qstring, __locals, constraints=None):
-        return InterpreterCall(qstring, __locals, constraints, loc=None)
+    async def query(self, qstring, __locals, **kwargs):
+        return InterpreterCall(qstring, __locals, kwargs, loc=None)
 
     async def set_model(self, model_name):
         self.interpreter.set_model(model_name)
@@ -319,17 +335,18 @@ class PromptInterpreter:
         dc.DecoderSequence.graph = None
         
         variable = state.variable
-        constraints = state.constraints
+        query_args = state.query_args
+        variable_args = state.variable_args
         
         stmt_buffer = state.stmt_buffer
-        constraints_after_last_continue = constraints
+        query_args_after_last_continue = query_args
         program_variables_after_last_continue = None
         prompt = state.prompt
 
         query_head = state.query_head
 
         async def continue_for_more_prompt_stmts():
-            nonlocal stmt_buffer, query_head, constraints_after_last_continue, program_variables_after_last_continue
+            nonlocal stmt_buffer, query_head, query_args_after_last_continue, program_variables_after_last_continue
 
             if len(stmt_buffer) != 0: return
             
@@ -340,7 +357,7 @@ class PromptInterpreter:
                 await query_head.continue_()
 
             qstring = query_head.current_args[0]
-            constraints_after_last_continue = query_head.current_args[2] if len(query_head.current_args) > 2 else None
+            query_args_after_last_continue = query_head.current_args[2] if len(query_head.current_args) > 2 else None
             
             if len(query_head.current_args) > 2:
                 program_variables_after_last_continue = query_head.current_args[1]
@@ -363,13 +380,27 @@ class PromptInterpreter:
                     s = self.process_query_string(s)
                     prompt += s
                     stmt_buffer = stmt_buffer[1:]
-                    constraints = None
+                    query_args = None
+                    variable_args = None
                     
                     # keep latest prompt in transient state
                     state = state.updated(prompt=prompt)
                 elif type(s) is TemplateVariable:
                     variable = s.name
-                    constraints = constraints_after_last_continue
+                    query_args = query_args_after_last_continue
+                    variable_args = s.variable_args(query_args)
+                   
+                    # apply decorators
+                    if "decorators" in variable_args:
+                        variable_args["decorators"] = LMQLDecoratorList(variable_args["decorators"])
+                        # check for 'pre' decorator and its return value
+                        result = variable_args["decorators"].pre(s, state.program_state)
+                        if result is not s:
+                            # obtain fixed value and prompt value from decorator function
+                            variable_value, prompt_value = result
+                            # replace constraints by fixed value constraint (forces result of decorator, ignores other constraints)
+                            variable_args["constraints"] = ops.FixedValueOp([ops.Var(variable)], variable_value, prompt_value)
+
                     # keep track of number of times a variable with this name has been decoded
                     if variable not in state.recurring_variable_counter.keys():
                         state.recurring_variable_counter[s.name] = -1
@@ -406,7 +437,8 @@ class PromptInterpreter:
         return state.updated(
             variable=variable,
             prompt=prompt,
-            constraints=constraints,
+            query_args=query_args,
+            variable_args=variable_args,
             stmt_buffer=stmt_buffer,
             query_head=query_head,
             program_state=program_state
@@ -540,6 +572,11 @@ class PromptInterpreter:
         else:
             assert False, f"error: where() is called but current variable and current prompt are None and query head has result {state.query_head.result}"
 
+        # invoke streaming decorators if any
+        if state.variable_arg("decorators") is not None:
+            state.variable_arg("decorators").stream(text, program_state)
+
+        # invoke output writers
         await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace, text, where)
 
         state = state.updated(
@@ -702,6 +739,10 @@ class PromptInterpreter:
                     else:
                         postprocessed_prompt = str(result_state.query_head.result)
 
+            # apply postprocessing decorators if any
+            if state.variable_arg("decorators") is not None:
+                variable_value, postprocessed_prompt = state.variable_arg("decorators").post(variable_value, postprocessed_prompt, program_state)
+
             # set postprocessed variable value and program value
             program_state.set(variable, postprocessed_prompt, program_value=variable_value, scores=(), diff="", montonicity="fin")
 
@@ -842,7 +883,7 @@ class PromptInterpreter:
         self.root_state = PromptState(interpreter=self, subinterpreters={},
             variable=None, prompt="", stmt_buffer=[],
             query_head=query_head, program_state=context.program_state,
-            constraints=None,
+            query_args=None, variable_args=None,
             recurring_variable_counter={}, variable_offset=0,
             valid=None, final=None, mask=None, 
             stopping_phrases=None, where=None,
@@ -854,8 +895,19 @@ class PromptInterpreter:
         self.model.decoder_args = decoder_args
         self.dcmodel: dc.DcModel = self.model.get_dclib_model()
 
+        async def debug_out(decoder_step):
+            if PromptInterpreter.main != self:
+                return
+            if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
+                data = await dc.DecoderSequence.graph.json(diff=True)
+                data = replace_inf_nan_with_str(data)
+                _DCLibDebugPrinter.printer.add_decoder_state(data)
+            self.dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
+
         # handle queries w/o any TemplateVariables
         if self.root_state.query_head.result is not None:
+            # one last call to debug_out to get the final state
+            await debug_out(self.decoder_step)
             return [self.root_state.query_head.result]
 
         # prepare tokenizer
@@ -945,15 +997,6 @@ class PromptInterpreter:
 
         # set step budget at least to max_len
         step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
-        
-        async def debug_out(decoder_step):
-            if PromptInterpreter.main != self:
-                return
-            if _DCLibDebugPrinter.printer is not None and dc.DecoderSequence.graph is not None:
-                data = await dc.DecoderSequence.graph.json(diff=True)
-                data = replace_inf_nan_with_str(data)
-                _DCLibDebugPrinter.printer.add_decoder_state(data)
-            self.dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
 
         try:
             import time
@@ -1197,7 +1240,7 @@ class SubInterpreter(PromptInterpreter):
         self.root_state = PromptState(interpreter=self, subinterpreters=set(),
             variable=None, prompt=prompt, stmt_buffer=[],
             query_head=query_head, program_state=context.program_state,
-            constraints=None,
+            query_args=None, variable_args=None,
             recurring_variable_counter={}, variable_offset=parent_offset,
             valid=None, final=None, mask=None, 
             stopping_phrases=None, where=None,

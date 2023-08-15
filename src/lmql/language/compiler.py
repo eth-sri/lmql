@@ -1,5 +1,5 @@
 import ast
-import importlib
+import warnings
 import os
 import re
 import sys
@@ -175,11 +175,20 @@ class PromptScope(ast.NodeVisitor):
 
         def transform_qexpr(qexpr):
             if type(qexpr) is TemplateVariable and qexpr.name in self.distribution_vars:
+                if qexpr.decorator_exprs is not None and len(qexpr.decorator_exprs) != 0:
+                    warnings.warn(f"Warning: distribution variable {qexpr.name} is decorated with {qexpr.decorator_exprs}, but decorators are ignored for distribution variables.")
                 return DistributionVariable(qexpr.name)
             if type(qexpr) is FExpression:
                 return FExpression(f"lmql.lmql_runtime.f_escape({qexpr.expr})")
             elif type(qexpr) is TagExpression:
                 return TagExpression(f"lmql.lmql_runtime.tag(\"{qexpr.tag[1:]}\")")
+            elif type(qexpr) is TemplateVariable:
+                # make sure to scope all decorator and type expressions
+                if qexpr.decorator_exprs is not None:
+                    for d in qexpr.decorator_exprs:
+                        FreeVarCollector(self.free_vars, exclude_criteria=[self.exclude_identifier]).visit(ast.parse(d))
+                if qexpr.type_expr is not None:
+                    FreeVarCollector(self.free_vars, exclude_criteria=[self.exclude_identifier]).visit(ast.parse(qexpr.type_expr))
             return str(qexpr)
 
         node.value = stmts_to_qstring([transform_qexpr(s) for s in stmts])
@@ -331,7 +340,6 @@ class PromptClauseTransformation(FunctionCallTransformation):
 
     def transform_Constant(self, constant, constraints=None):
         if type(constant.value) is not str: return constant
-        
         qstring = constant.value
         if len(qstring) == 0: return constant
         if qstring.strip().startswith("lmql"): return constant
@@ -341,6 +349,11 @@ class PromptClauseTransformation(FunctionCallTransformation):
 
         declared_template_vars = set()
 
+        # collect variable-level decoders, types and decorators from qstring
+        decoders = []
+        types = []
+        decorators = []
+
         for stmt in qstring_to_stmts(qstring, mode="square-only"):
             if type(stmt) is str:
                 compiled_qstring += stmt
@@ -349,26 +362,47 @@ class PromptClauseTransformation(FunctionCallTransformation):
             elif type(stmt) is TemplateVariable:
                 declared_template_vars.add(stmt.name)
                 compiled_qstring += str(stmt)
+                
+                # collect decorators, types and decoders
+                decorators += [stmt.decorator_exprs]
+                types += [stmt.type_expr]
+                decoders += [stmt.decoder_expr]
 
-        # keep track of last stmt in this qstring
-        last_stmt = stmt
-
+        # empty qstrings are no-ops
         if len(compiled_qstring) == 0:
             return constant
-        
+    
+        # transform expressions embedded in f-strings
         qstring_as_fstring: ast.JoinedStr = ast.parse(f'f"""{compiled_qstring}"""').body[0].value
         function_call_transformer = FunctionCallTransformation()
         qstring_as_fstring.values = [function_call_transformer.visit(v) for v in qstring_as_fstring.values]
 
+        # check and collect extra args for decoder, type and decorators
+        extra_args = ""
+        if any(d is not None for d in decoders):
+            extra_args += ", decoder=[" + ", ".join([f"'{d}'" or "None" for d in decoders]) + "]"
+        if any(t is not None for t in types):
+            extra_args += ", type=[" + ", ".join([t or "None" for t in types]) + "]"
+        if any(d is not None for d in decorators):
+            decorator_lists = []
+            for ds in decorators:
+                if ds is None:
+                    decorator_lists.append("None")
+                else:
+                    decorator_lists.append("[" + ", ".join([str(d) for d in ds]) + "]")
+            extra_args += ", decorators=[" + ", ".join(decorator_lists) + "]"
+        extra_args = extra_args.lstrip(",")
+
+        # transform qstring to interrupt call
         if constraints is not None:
             constraint_transformation = InlineConstraintsTransformation(constraints, scope=self.query.scope)
             code_str, result_reference = constraint_transformation.transform()
             result_code = code_str + "\n"
 
             # result_code = f'yield context.query(f"""{compiled_qstring}""")'
-            result_code += interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}", "constraints=" + result_reference)
+            result_code += interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}", "constraints=" + result_reference, extra_args)
         else:
-            result_code = interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}")
+            result_code = interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}", extra_args)
 
         for v in declared_template_vars:
             get_var_call = yield_call('get_var', f'"{v}"')

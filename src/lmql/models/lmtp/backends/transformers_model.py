@@ -1,7 +1,7 @@
 from typing import Tuple
 import torch
 from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
-import random
+import numpy as np
 
 class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
@@ -43,11 +43,11 @@ class TransformersLLM(LMTPModel):
             output_hidden_states=False,
         )
 
-        next_token_logits = outputs.logits[:, -len(input_ids), :]
+        next_token_logits = outputs.logits[:, :-1, :]
         next_token_logits = torch.log_softmax(next_token_logits, dim=-1)
-        token_scores = next_token_logits.gather(-1, input_ids)
+        token_scores = next_token_logits.gather(-1, input_ids[:,1:].unsqueeze(-1))
 
-        return token_scores
+        return np.array([[0.0] + scores.flatten().tolist() for scores in token_scores])
     
     def generate(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, 
                  temperature: float, max_new_tokens: int, 
@@ -69,8 +69,7 @@ class TransformersLLM(LMTPModel):
         result = self.model.generate(**kwargs, stopping_criteria=[TokenStreamerDisguisedAsStoppingCriterion(streamer)], 
                                      eos_token_id=self.eos_token_id, pad_token_id=self.eos_token_id)
 
-        scores = [torch.log_softmax(s, dim=-1) for s in result.scores]
-        return LMTPModelResult(sequences=result.sequences, scores=scores)
+        return LMTPModelResult(sequences=result.sequences, scores=result.scores)
     
     def logits_processors(self, logit_biases):
         bias_tensors = None
@@ -86,7 +85,7 @@ class TransformersLLM(LMTPModel):
                 if bias_tensors is None:
                     bias_tensors = torch.tensor(make_bias_tensor(logit_biases, scores.shape[-1])).to(scores.device)
 
-                return scores + bias_tensors
+                return torch.log_softmax(scores + bias_tensors, dim=-1)
 
         return [BatchLogitsProcessor()]
 
@@ -95,7 +94,6 @@ class TokenStreamerDisguisedAsStoppingCriterion:
         self.token_streamer = token_streamer
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs) -> bool:
-        scores = [torch.log_softmax(s, dim=-1) for s in scores]
         self.token_streamer(input_ids, scores, **kwargs)
         return False
 

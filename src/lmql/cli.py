@@ -22,7 +22,7 @@ def cmd_chat():
         return
     file = sys.argv[2]
     absolute_path = os.path.abspath(file)
-    subprocess.run([sys.executable, "-m", "lmql.ui.chat", absolute_path], cwd=project_root)
+    subprocess.run([sys.executable, "-m", "lmql.lib.chat", absolute_path], cwd=project_root)
 
 def cmd_run():
     """

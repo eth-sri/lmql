@@ -1,7 +1,7 @@
 import lmql
 import sys
 import os
-from lmql.ui.chat import chatter
+from lmql.lib.chat import chatserver
 
 if __name__ == '__main__':
     assert len(sys.argv) == 2, "Usage: lmql chat <file>"
@@ -10,4 +10,4 @@ if __name__ == '__main__':
     # change working dir to file dir
     os.chdir(os.path.dirname(absolute_path))
     
-    chatter(absolute_path).run()
+    chatserver(absolute_path).run()
