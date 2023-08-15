@@ -1,7 +1,7 @@
 # Chat
 <div class="subtitle">Build custom chatbots with a just a couple of lines of <img class="inline-logo" src="../_static/images/lmql.svg"/> LMQL.</div>
 
-Building chat applications is one of the most common use cases for LLMs. This is why LMQL provides simple and library support for it. This chapter will walk you through the basics of building a chatbot with LMQL Chat including the core loop, output streaming, serving and defending against prompt injections.
+Building chat applications is one of the most common use cases for LLMs. This is why LMQL provides simple library support for it. This chapter will walk you through the basics of building a chatbot with LMQL Chat including the core loop, output streaming, serving and defending against prompt injections.
 
 ```{figure} https://github.com/eth-sri/lmql/assets/17903049/3f24b964-b9b6-4c50-acaa-b38e54554506
 :name: lmql-chat
