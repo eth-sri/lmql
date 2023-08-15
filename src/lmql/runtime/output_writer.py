@@ -57,14 +57,16 @@ class PrintingOutputWriter:
     async def add_interpreter_head_state(self, variable, head, prompt, where, trace, is_valid, is_final, mask, num_tokens, program_variables):
         if head == 0:
             if self.clear:
-                sys.stderr.write('\033c', flush=True)
+                sys.stderr.write('\033c')
+                sys.stderr.flush()
             if self.print_output:
                 print(f"{prompt}\n\n valid={is_valid}, final={is_final}")
     
     def add_compiler_output(self, code): pass
     
 class StreamingOutputWriter:
-    def __init__(self, variable=None):
+    def __init__(self, variable=None, clear=True):
+        self.clear = clear
         self.variable = variable
         self.last_value = None
     
@@ -87,8 +89,10 @@ class StreamingOutputWriter:
                     print(value[len(self.last_value):], end="", flush=True)
                     self.last_value = value
                 return
-            
-            sys.stderr.write('\033c', flush=True) # clear screen
+
+            if clear:
+                sys.stderr.write('\033c')
+                sys.stderr.flush()
             print(f"{prompt}\n", end="\r")
             
     def add_compiler_output(self, code): pass
