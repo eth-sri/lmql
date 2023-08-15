@@ -34,7 +34,7 @@ from
    "chatgpt"
 ```
 
-To implement internal reasoning, we adjust our query program in two ways:
+To implement internal reasoning, we adjust our query program in three ways:
 
 1. We adapt the `{:system}` prompt to include additional instructions that make sure the underlying LLM is instructed to produce internal reasoning output.
 
