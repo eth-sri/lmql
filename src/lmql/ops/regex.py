@@ -5,6 +5,14 @@ import sre_constants as c
 import sys
 from copy import copy
 
+CATEGORY_PATTERNS = {c.CATEGORY_DIGIT: re.compile(r'\d'),
+                     c.CATEGORY_NOT_DIGIT: re.compile(r'\D'),
+                     c.CATEGORY_SPACE: re.compile(r'\s'),
+                     c.CATEGORY_NOT_SPACE: re.compile(r'\S'),
+                     c.CATEGORY_WORD: re.compile(r'\w'),
+                     c.CATEGORY_NOT_WORD: re.compile(r'\W'),}
+
+
 def _deparse(seq):
     if seq is None: return seq
     pattern = ""
@@ -71,8 +79,13 @@ def _consume_char(char, seq, verbose=False, indent=0):
                 match_found = (a[1] == char)
             elif a[0] == c.RANGE:
                 match_found = (a[1][0] <= char <= a[1][1])
+            elif a[0] == c.CATEGORY:
+                if a[1] in CATEGORY_PATTERNS:
+                    match_found = CATEGORY_PATTERNS[a[1]].fullmatch(chr(char)) is not None
+                else:
+                    raise NotImplementedError(f"unsupported regex pattern {op}{a}")
             else:
-                return _ret(None)
+                raise NotImplementedError(f"unsupported regex pattern {op}{a}")
             if match_found: break
         if match_found:
             return _ret(seq[1:])
@@ -261,3 +274,11 @@ if __name__ == "__main__":
     assert Regex(r" (a|b) ").d(" a").pattern == " "
     assert Regex(r" (a|b) ").d(" a ").pattern == ""
     assert Regex(r" (a|bb|ab) ").d(" a ").pattern == "" 
+    
+    # special sequences
+    assert Regex(r"\da").d("1").compare_pattern(r"a")
+    assert Regex(r"\Da").d("a").compare_pattern(r"a")
+    assert Regex(r"\sa").d(" ").compare_pattern(r"a")
+    assert Regex(r"\Sa").d("1").compare_pattern(r"a")
+    assert Regex(r"\wa").d("1").compare_pattern(r"a")
+    assert Regex(r"\Wa").d(" ").compare_pattern(r"a")
