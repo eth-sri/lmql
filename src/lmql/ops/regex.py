@@ -46,6 +46,10 @@ def _deparse(seq):
         elif op == c.IN:
             assert isinstance(arg, list)
             pattern += '[' + ''.join([_deparse([a]) for a in arg]) + ']'
+        elif op == c.CATEGORY:
+            pattern += CATEGORY_PATTERNS[arg].pattern
+        elif op == c.NEGATE:
+            pattern += '^'
         else:
             assert False, f"unsupported regex pattern {op} with arg {arg}"
     return pattern
@@ -289,7 +293,14 @@ if __name__ == "__main__":
     assert Regex(r"\Sa").d("1").compare_pattern(r"a")
     assert Regex(r"\wa").d("1").compare_pattern(r"a")
     assert Regex(r"\Wa").d(" ").compare_pattern(r"a")
+    assert Regex(r"a\Wa").d("a").compare_pattern(r"\Wa")
+    assert Regex(r"a\wa").d("a").compare_pattern(r"\wa")
+    assert Regex(r"a\Sa").d("a").compare_pattern(r"\Sa")
+    assert Regex(r"a\sa").d("a").compare_pattern(r"\sa")
+    assert Regex(r"a\Da").d("a").compare_pattern(r"\Da")
+    assert Regex(r"a\da").d("a").compare_pattern(r"\da")
 
     # negation
     assert Regex(r"[^A-Z]a").d("1").compare_pattern(r"a")
     assert Regex(r"[^A-Z]a").d("A") is None
+    assert Regex(r"a[^A-Z]").d("a").compare_pattern(r"[^A-Z]")
