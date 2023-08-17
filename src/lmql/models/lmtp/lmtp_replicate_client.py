@@ -19,7 +19,7 @@ class LMTPReplicateClient:
         if 'REPLICATE_API_TOKEN' in os.environ:
             self.api_key = os.environ['REPLICATE_API_TOKEN']
         else: # FIXME: Allow API key to be passed in kwargs?
-            raise Exception('Must have REPLICATE_API_TOKEN defined to use Replicate transport')
+            raise Exception('Please define REPLICATE_API_TOKEN as an environment variable to use Replicate models')
 
         endpoint = endpoint.removeprefix('replicate:')
         if len(endpoint) == 0:
