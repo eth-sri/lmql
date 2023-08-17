@@ -16,9 +16,9 @@ for i,f in enumerate(files):
     try:
         print(">", f"[{i+1}/{len(files)}]", f)
 
-        cmd = "python " + os.path.join(THIS_DIR, f)
+        cmd = [sys.executable, os.path.join(THIS_DIR, f)]
         timeout = TEST_TIMEOUT
-        result = subprocess.call(cmd, shell=True, timeout=timeout)
+        result = subprocess.call(cmd, timeout=timeout)
         
         if result == 2:
             raise KeyboardInterrupt

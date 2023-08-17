@@ -1,17 +1,19 @@
 import argparse
+import shlex
+import subprocess
 import os
 
 def has_docker_image():
-    cmd = """docker image ls | grep lmql-serve"""
-    print(">", cmd)
-    return os.system(cmd) == 0
+    cmd = ['docker', 'image', 'ls', '--format', '{{.Tag}}', 'lmql-serve']
+    print(">", " ".join(shlex.quote(word) for word in cmd))
+    return len(subprocess.check_output(cmd).strip()) > 0
 
 def build_docker_image():
     ADDITIONAL_EXCLUDES = [
     ]
-    cmd = """docker build -t lmql-serve -f scripts/Dockerfile.serve ."""
-    print(">", cmd)
-    os.system(cmd)
+    cmd = ["docker", "build", "-t", "lmql-serve", "-f", "scripts/Dockerfile.serve", "."]
+    print(">", " ".join(shlex.quote(word) for word in cmd))
+    subprocess.run(cmd, check=True)
 
 parser = argparse.ArgumentParser(description="""
                                  Runs 'lmql serve-model' in a docker container.
@@ -24,7 +26,7 @@ parser.add_argument('--transformers-cache', type=str, default='$HOME/.cache/hugg
 parser.add_argument('--rebuild', action='store_true', help="Forces rebuilding the docker image")
 parser.add_argument('--extras', type=str, default='', help="Extra pip packages to install in the docker image before running lmql serve-model.")
 # all other args are passed to lmql-serve
-args, _ = parser.parse_known_args()
+args, extra_positional_args = parser.parse_known_args()
 
 if args.transformers_cache.startswith("$HOME"):
     # if homefolder exists, replace $HOME with ~
@@ -37,20 +39,20 @@ if args.transformers_cache.startswith("$HOME"):
 if not has_docker_image() or args.rebuild:
     build_docker_image()
 
-PORT=2223
-GPUS=all
+script = r"""
+exec docker run \
+    -p "$port:8899" \
+    -e TRANSFORMERS_CACHE=/transformers ${extras:+ -e EXTRA_PIP_PACKAGES="$extras"} \
+    -it --gpus "$gpus" \
+    -v "$cache:/transformers" \
+    lmql-serve "$@"
+"""
 
-cmd = """docker run \\
-    -p $PORT:8899 \\
-    -e TRANSFORMERS_CACHE=/transformers $EXTRAS \\
-    -it --gpus $GPUS \\
-    -v $CACHE:/transformers \\
-    lmql-serve $@
- """.replace("$GPUS", args.gpus) \
-    .replace("$PORT", str(args.port)) \
-    .replace("$@", " ".join(_)) \
-    .replace("$CACHE", args.transformers_cache) \
-    .replace("$EXTRAS", f"-e EXTRA_PIP_PACKAGES='{args.extras}'" if args.extras != "" else "")
-
-print(">", cmd)
-os.system(cmd)
+subprocess.run(
+    ["bash", "-c", script, "bash"] + extra_positional_args,
+    env=dict(os.environ,
+        gpus=str(args.gpus),
+        port=str(args.port),
+        cache=str(args.transformers_cache),
+        extras=str(args.extras)
+    ))

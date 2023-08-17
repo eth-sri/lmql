@@ -4,7 +4,9 @@ provided GPU-to-process layout.
 
 Only supports NVIDIA GPUs for now.
 """
+import os
 import sys
+import shlex
 import subprocess
 
 def layout_main(args):
@@ -26,16 +28,14 @@ def layout_main(args):
             serve_args.append(arg)
             i += 1
     
-    serve_args = " ".join(serve_args)
-
     processes = []
     
     num_groups = int(layout.split("x")[0])
     num_devices_per_group = int(layout.split("x")[1])
     num_devices = num_groups * num_devices_per_group
 
-    cmd = f"nvidia-smi --query-gpu=index --format=csv,noheader | head -n {num_devices}"
-    gpu_ids = subprocess.check_output(cmd, shell=True).decode("utf-8").strip().split("\n")
+    cmd = ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader"]
+    gpu_ids = subprocess.check_output(cmd).decode("utf-8").strip().split("\n")[:num_devices]
     gpu_ids = [int(gpu_id) for gpu_id in gpu_ids]
 
     # validate layout
@@ -54,18 +54,18 @@ def layout_main(args):
     for i in range(num_groups):
         group_gpu_ids = gpu_ids[i*num_devices_per_group:(i+1)*num_devices_per_group]
         group_gpu_ids = ",".join([str(gpu_id) for gpu_id in group_gpu_ids])
-        cmd = f"CUDA_VISIBLE_DEVICES={group_gpu_ids} python -m lmql.cli serve-model {serve_args} --port {port}"
-        print(f"[localhost:{port}]", cmd)
+
+        cmd = [sys.executable, "-m", "lmql.cli", "serve-model"] + serve_args + ["--port", str(port)]
+        print(f"[localhost:{port}]", " ".join(shlex.quote(word) for word in cmd))
         workers.append(f"localhost:{port}")
-        processes.append(subprocess.Popen(cmd, shell=True))
+        processes.append(subprocess.Popen(cmd, env=dict(os.environ, CUDA_VISIBLE_DEVICES=group_gpu_ids)))
         
         port += 1
 
     # run balancer
-    workers = " ".join(workers)
-    cmd = f"python -m lmql.cli serve-model balance --port {balancer_port} {workers}"
-    print(f"[localhost:{port}]", cmd)
-    processes.append(subprocess.Popen(cmd, shell=True))
+    cmd = [sys.executable, "-m", "lmql.cli", "serve-model", "balance", "--port", str(balancer_port)] + workers
+    print(f"[localhost:{port}]", " ".join(shlex.quote(word) for word in cmd))
+    processes.append(subprocess.Popen(cmd))
 
     # wait for processes to finish or Ctrl+C
     try:
