@@ -73,8 +73,15 @@ def _consume_char(char, seq, verbose=False, indent=0):
         else:
             return _ret(None)
     elif op == c.IN:
+
+        negate = False 
+        patterns = arg
+        if arg[0][0] == c.NEGATE:
+            negate = True
+            patterns = arg[1:]
+        
         match_found = False
-        for a in arg:
+        for a in patterns:
             if a[0] == c.LITERAL:
                 match_found = (a[1] == char)
             elif a[0] == c.RANGE:
@@ -87,7 +94,7 @@ def _consume_char(char, seq, verbose=False, indent=0):
             else:
                 raise NotImplementedError(f"unsupported regex pattern {op}{a}")
             if match_found: break
-        if match_found:
+        if match_found != negate: # xor -> either match and not negate or no match and negate
             return _ret(seq[1:])
         else: return _ret(None)
         low, high = arg[0][1]
@@ -282,3 +289,7 @@ if __name__ == "__main__":
     assert Regex(r"\Sa").d("1").compare_pattern(r"a")
     assert Regex(r"\wa").d("1").compare_pattern(r"a")
     assert Regex(r"\Wa").d(" ").compare_pattern(r"a")
+
+    # negation
+    assert Regex(r"[^A-Z]a").d("1").compare_pattern(r"a")
+    assert Regex(r"[^A-Z]a").d("A") is None
