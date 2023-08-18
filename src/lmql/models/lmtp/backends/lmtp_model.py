@@ -104,7 +104,7 @@ class LMTPModel:
     @staticmethod
     def register(name, module_dependencies = None):
         def wrapper(loader):
-            import importlib
+            import importlib.util
             if module_dependencies is not None:
                 for module in module_dependencies:
                     # check without importing
