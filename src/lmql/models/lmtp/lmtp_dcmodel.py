@@ -16,6 +16,7 @@ from lmql.runtime.token_distribution import TokenDistribution
 from typing import Any, List, Union
 import random
 import sys
+import traceback
 
 class LMTPDcModel(DcModel):
     def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, **kwargs):
@@ -81,6 +82,7 @@ class LMTPDcModel(DcModel):
             self.connected_signal.set()
 
     async def ws_client_loop(self):
+        import aiohttp
         from .lmtp_client import LMTPWebSocketClient
 
         try:
@@ -93,8 +95,9 @@ class LMTPDcModel(DcModel):
                     await self.close_signal.wait()
         except Exception as e:
             self.error_signal.set()
-            self.error = "Failed to communicate with lmtp endpoint: {}. Please check that the endpoint is correct and the server is running.".format(self.endpoint)
+            self.error = f"Exception {e!s} attempting to communicate with lmtp endpoint: {self.endpoint!s}. Please check that the endpoint is correct and the server is running."
             self.connected_signal.set()
+            traceback.print_tb(e.__traceback__)
 
     def make_cache_entry(self, s, payload, sampling_mode):
         scores = {}
