@@ -61,7 +61,7 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     with open(filepath, "r") as f:
         code = f.read()
     
-    q = _query_from_string(code, output_writer=printing)
+    q = _query_from_string(code, output_writer=output_writer)
     return await q(*args, **kwargs)
 
 async def run(code, *args, **kwargs):
