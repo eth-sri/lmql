@@ -1,0 +1,7 @@
+.*.cog.bak
+.cog
+.dockerignore
+__pycache__
+checkpoints
+config.toml
+work

@@ -1,8 +1,10 @@
-# Local Models / 🤗 Transformers
+# 🤗 Transformers
 
 LMQL relies on a two-process architecture: The inference process (long-running) loads the model and provides an inference API, and the interpreter process (short-lived) executes your LMQL program. This architecture is advantageous for locally-hosted models as the model loading time can be quite long or the required GPU hardware might not be available on the client machine. This chapter first discusses how to use of the two-process inference API, and then presents an alternative on how to leverage [In-Process Model Loading](#in-process-model-loading), which avoids the need for a separate `lmql serve-model` call.
 
 ![Inference Architecture](../images/inference.svg)
+
+## As Local Models
 
 **Prerequisites** Before using the local models, make sure you installed LMQL via `pip install lmql[hf]`. This ensures the dependencies for running local models are installed.
 
@@ -62,3 +64,60 @@ from
 where
     STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
 ```
+
+## Remoting To Replicate
+
+The commercial service [Replicate](https://replicate.com/) can run models uploaded to them in Docker containers in the format constructed by their [Cog](https://github.com/replicate/cog) build tool. Several of these have already been uploaded as public models.
+
+For public models, Replicate only charges for actual GPU time used; for private models, they also charge for startup and idle time. Several models wrapped for LMTP use have already been uploaded publicly, and this repository contains tools to build more.
+
+### Running A 🤗 Model On Replicate
+
+To run a model on Replicate, you need to:
+
+1. Export the environment variable `REPLICATE_API_TOKEN` with the credential to use to authenticate the request.
+
+2. Set the `transport=` argument to your model to `replicate:ORG/MODEL`, matching the name with which the model was uploaded.
+
+3. Set the `tokenizer=` argument to your model to a huggingface transformers name from which correct configuration for the tokenizer in use can be downloaded.
+
+For example:
+
+```lmql
+argmax
+    """Review: We had a great stay. Hiking in the mountains was fabulous and the food is really good.\n
+    Q: What is the underlying sentiment of this review and why?\n
+    A:[ANALYSIS]\n
+    Q: Summarizing the above analysis in a single word -- of the options "positive", "negative", and "neutral" -- how is the review best described?\n
+    A:[CLASSIFICATION]"""
+from lmql.model(
+    # model name is not actually used: endpoint completely overrides model selection
+    "meta-llama/llama-2-13b-chat-hf",
+    # in this case, uses model from https://replicate.com/charles-dyfis-net/llama-2-13b-hf--lmtp-8bit
+    endpoint="replicate:charles-dyfis-net/llama-2-13b-hf--lmtp-8bit",
+    # choosing a model with the same tokenizer as meta-llama/llama-2-13b-hf but ungated in huggingface
+    tokenizer="lmsys/vicuna-13b-v1.5-16k"
+)
+where STOPS_AT(ANALYSIS, "\n") and len(TOKENS(ANALYSIS)) < 200
+distribution CLASSIFICATION in [" positive", " negative", " neutral"]
+```
+
+### Uploading A 🤗 Model To Replicate
+
+Install [Cog](https://github.com/replicate/cog), and see the `scripts/replicate-build` section of the LMQL source tree.
+
+1. Copy `config.toml.example` to `config.toml`, and customize it.
+
+   Change `dest_prefix` to replace `YOURACCOUNT` with the name of the actual Replicate account to which you will be uploading models.
+
+   For each model you wish to build and upload, your config file should have a `[models.MODELNAME]` section, where MODELNAME reflects the name of the model as created on the [Replicate](https://replicate.com/) website.
+
+   `huggingface.repo` should reflect the Hugging Face model name you wish to wrap. If you want to pin a version, also set `huggingface.version`.
+
+   The `config` section may be used to set any values you want to pass in the `model_args` dictionary.
+
+2. Run the `./build` script, with your current working directory being `scripts/replicate-build`.
+
+   This will create a `work/` subdirectory for each model defined in your configuration file.
+
+3. In the `work/MODELNAME` directory, run the generated `./push` script to build and upload your model, or `cog predict` to test your model locally.

@@ -15,6 +15,7 @@ from lmql.runtime.token_distribution import TokenDistribution
 
 from typing import Any, List, Union
 import random
+import sys
 
 class LMTPDcModel(DcModel):
     def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, **kwargs):
@@ -22,7 +23,7 @@ class LMTPDcModel(DcModel):
 
         self.model.chunk_size = kwargs.get("chunksize", 16)
 
-        # LMTP client object (can be inprocess or websocket)
+        # LMTP client object (can be inprocess, websocket, or an alternative like replicate)
         self.client = None
         # asyncio task for client loop
         self._client_loop = None
@@ -36,7 +37,12 @@ class LMTPDcModel(DcModel):
         
         # endpoint in case of remote model
         self.endpoint = endpoint
-        if endpoint is not None and not self.endpoint.startswith("http"):
+        self.use_replicate = False
+        if endpoint is None:
+            pass
+        elif endpoint.startswith('replicate:') or endpoint == 'replicate':
+            self.use_replicate = True
+        elif not self.endpoint.startswith("http"):
             self.endpoint = "http://" + self.endpoint
 
         self.inprocess = inprocess
@@ -57,10 +63,26 @@ class LMTPDcModel(DcModel):
         await self.client.close()
         self.client = None
 
-    async def ws_client_loop(self):
+    async def replicate_client_loop(self):
         import aiohttp
+        from .lmtp_replicate_client import LMTPReplicateClient
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                self.client = LMTPReplicateClient(self.model.model_identifier, session, self.endpoint,
+                    **(self.lmtp_server_kwargs or {})
+                )
+                await self.client.check_model()
+                self.connected_signal.set()
+                await self.close_signal.wait()
+        except Exception as e:
+            self.error_signal.set()
+            self.error = str(e)
+            self.connected_signal.set()
+
+    async def ws_client_loop(self):
         from .lmtp_client import LMTPWebSocketClient
-        
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(self.endpoint) as ws:
@@ -139,10 +161,12 @@ class LMTPDcModel(DcModel):
             raise RuntimeError("LMTP client encountered an error: {}".format(self.error))
 
         if self.client is None:
-            if not self.inprocess:
-                self._client_loop = asyncio.create_task(self.ws_client_loop())
-            else:
+            if self.inprocess:
                 self._client_loop = asyncio.create_task(self.inprocess_client_loop())
+            elif self.use_replicate:
+                self._client_loop = asyncio.create_task(self.replicate_client_loop())
+            else:
+                self._client_loop = asyncio.create_task(self.ws_client_loop())
         
         await self.connected_signal.wait()
         

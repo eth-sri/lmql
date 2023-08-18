@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+
+from fnmatch import fnmatch
+import itertools
+import json
+import logging
+import os
+import pathlib
+import shlex
+import stat
+import sys
+
+import huggingface_hub
+import toml  # TODO: in Python 3.11, switch to tomllib
+
+logging.basicConfig(level=logging.INFO)
+
+UNCONDITIONAL_PATTERNS = ["*.json", "*LICENSE*", "*.md"]
+DEFAULT_DEST_PREFIX = "r8.im/YOURACCOUNT/"  # ignored if not customized
+
+
+def force_hardlink_to(dest, src):
+    logging.debug(f"Hardlinking {src!r} to {dest!r}")
+    if dest.exists() and src.exists():
+        if dest.stat() == src.stat():
+            return  # Already hardlinked, nothing to do
+        if dest.st_nlink == 1:
+            raise Exception(
+                f"Existing file blocks creation af hardlink to {src!r} at {dest!r}; but {dest!r} is not a hardlink; unsafe to delete"
+            )
+        dest.unlink()  # Existing link points to wrong place
+    dest.hardlink_to(src)
+
+
+config_path = pathlib.Path("config.toml")
+if not config_path.exists():
+    print(
+        "ERROR: Create config.toml from config.toml.example before using this tool",
+        file=sys.stderr,
+    )
+    os.exit(1)
+
+template_path = pathlib.Path(
+    os.environ.get("cog_lmql_template_root", "template")
+).resolve()
+
+workdir_base_path = pathlib.Path(
+    os.environ.get("cog_lmql_build_root", "work")
+).resolve()
+workdir_base_path.mkdir(exist_ok=True)
+
+build_config = toml.load(config_path.open())
+for model_name, model_config in build_config["models"].items():
+    workdir_path = workdir_base_path.joinpath(model_name)
+    workdir_path.mkdir(exist_ok=True)
+    if "/" in model_name:
+        raise Exception(f"ERROR: / not valid in model name {model_name!r}")
+    if model_name.startswith("."):
+        raise Exception(f"ERROR: Model names {model_name!r} must not start with a .")
+    hf_name = model_config["huggingface"]["repo"]
+    hf_version = model_config["huggingface"].get("version")
+
+    all_content = {}
+
+    snapshot_src_base_dirname = huggingface_hub.snapshot_download(
+        repo_id=hf_name,
+        revision=hf_version,
+        allow_patterns=UNCONDITIONAL_PATTERNS,
+    )
+    snapshot_src_base_path = pathlib.Path(snapshot_src_base_dirname).resolve(
+        strict=True
+    )
+    for file in snapshot_src_base_path.iterdir():
+        all_content[file.name] = file.resolve()
+
+    extra_files = set()
+
+    safetensors_available = False
+    safetensors_unwanted = (
+        model_config.get("config", {}).get("use_safetensors", None) == False
+    )
+
+    if (not safetensors_unwanted) and len(
+        indices := list(snapshot_src_base_path.glob("*.safetensors.index.json"))
+    ) > 0:
+        safetensors_available = True
+        for idx_filename in indices:
+            st_idx = json.load(idx_filename.open())
+            extra_files.update(st_idx["weight_map"].values())
+    elif len(indices := list(snapshot_src_base_path.glob("*.bin.index.json"))) > 0:
+        for idx_filename in indices:
+            st_idx = json.load(idx_filename.open())
+            extra_files.update(st_idx["weight_map"].values())
+    else:
+        extra_files.add("*")
+
+    # Download again, this time with extra_files added to our allow_patterns
+    snapshot_src_extra_dirname = huggingface_hub.snapshot_download(
+        repo_id=hf_name,
+        revision=hf_version,
+        allow_patterns=list(extra_files),
+    )
+    snapshot_src_extra_path = pathlib.Path(snapshot_src_extra_dirname).resolve(
+        strict=True
+    )
+    for file in snapshot_src_base_path.iterdir():
+        all_content[file.name] = file.resolve()
+
+    snapshot_dst_path = workdir_path.joinpath("checkpoints")
+    snapshot_dst_path.mkdir(exist_ok=True)
+
+    logging.debug(f"Known content for {model_name!r}: {all_content!r}")
+    logging.debug(
+        f"In addition to regular patterns, including {extra_files!r} in output"
+    )
+
+    entries_seen = set()
+    for basename, snapshot_src_file_path in all_content.items():
+        if basename in entries_seen:
+            continue
+        ok = False
+        for pattern in itertools.chain(UNCONDITIONAL_PATTERNS, extra_files):
+            if fnmatch(basename, pattern):
+                logging.debug(
+                    f"{basename!r} matches {pattern!r}; including {snapshot_src_file_path!r}"
+                )
+                ok = True
+                break
+        if not ok:
+            logging.debug(f"{basename!r} does not match any known pattern; ignoring")
+            continue
+        entries_seen.add(basename)
+        snapshot_dst_file_path = snapshot_dst_path.joinpath(basename)
+        force_hardlink_to(snapshot_dst_file_path, snapshot_src_file_path.resolve())
+    for snapshot_dst_file_path in snapshot_dst_path.iterdir():
+        basename = snapshot_dst_file_path.name
+        if not basename in entries_seen:
+            logging.debug(f"{basename!r} not in {entries_seen!r}, deleting")
+            snapshot_dst_file_path.unlink()
+
+    for template_file in template_path.iterdir():
+        basename = template_file.name
+        dest_path = workdir_path.joinpath(basename)
+        force_hardlink_to(dest_path, template_file.resolve())
+
+        config_content = model_config.get("config", {})
+        config_content.setdefault("use_safetensors", safetensors_available)
+        json.dump(config_content, workdir_path.joinpath("config.json").open("w"))
+
+    push_script_path = workdir_path.joinpath("push")
+
+    if build_config.get("dest_prefix") in (None, DEFAULT_DEST_PREFIX):
+        logging.warn("Not building push script because dest_prefix is not customized")
+    else:
+        dest_prefix = build_config["dest_prefix"].rstrip("/")
+        with push_script_path.open("w") as push_script_file:
+            push_cmd = [
+                "cog",
+                "push",
+                "--separate-weights",
+                f"{dest_prefix}/{model_name}",
+            ]
+            push_script_file.write(
+                "#!/bin/sh\n"
+                + " ".join(shlex.quote(word) for word in push_cmd)
+                + ' "$@"\n'
+            )
+        push_script_path.chmod(push_script_path.stat().st_mode | stat.S_IEXEC)
+
+    print(f"Directory {workdir_path} is ready to run cog in!", file=sys.stderr)
