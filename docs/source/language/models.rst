@@ -70,3 +70,4 @@ Available Model Backends
     ./azure.md
     ./hf.md
     ./llama.cpp.md
+    ./replicate.md
