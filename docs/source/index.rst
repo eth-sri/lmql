@@ -3,7 +3,7 @@ Welcome To LMQL
 
 .. raw:: html
   
-  <div class="subtitle"><img class="inline-logo" src="../_static/images/lmql.svg"/> LMQL is a programming language for large language model interaction.</div>
+  <div class="subtitle"><img class="inline-logo" src="_static/images/lmql.svg"/> LMQL is a programming language for large language model interaction.</div>
 
 LMQL facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness 
 of Python. The project is focused on enabling type-safe and robust LLM interaction, while providing a seamless experience via `scripted prompting <language/scripted_prompts.md>`_, `constraint-guided decoding <language/constraints.md>`_, `nested functions <language/functions.md>`_ and `program interoperation <language/tools.md>`_.
