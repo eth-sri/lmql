@@ -119,6 +119,10 @@ pip install git+https://github.com/eth-sri/lmql
 
 This will install the `lmql` package directly from the `main` branch of this repository. We do not continously test the `main` version, so it may be less stable than the latest PyPI release.
 
+# Contributing
+
+LMQL is a community-centric project. If you are interested in contributing to LMQL, please see the [contributing guidelines](./CONTRIBUTING.md) for more information, and reach out to us via [Discord](https://discord.gg/7eJP4fcyNT). We are looking forward to your contributions!
+
 ## Setting Up a Development Environment
 
 To setup a `conda` environment for local LMQL development with GPU support, run the following commands:
