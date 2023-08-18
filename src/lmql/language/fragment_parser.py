@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 import tokenize
 from io import StringIO
 from typing import Any, List
-import astunparse
 import ast
 import sys
 import termcolor
@@ -82,7 +81,7 @@ def remove_indentation(s, oneline=False):
     else:
         return "\n".join(lines)
 
-def remove_comments(s):
+def untokenize_without_comments(s):
     if type(s) is str: return s
     assert type(s) is list
     return tokenize.untokenize([transform_token(t) for t in s if t.type != tokenize.COMMENT])
@@ -94,7 +93,8 @@ def ast_parse(s, unindent=False, oneline=False, loc=None):
     # for special symbols
     if len(s) > 0 and all(type(e) is str for e in s): return ast.parse('"' + " ".join(s) + '"')
     try:
-        s = remove_comments(s)
+        s = [double_escape(t) for t in s]
+        s = untokenize_without_comments(s)
         if unindent: s = remove_indentation(s, oneline=oneline)
         return ast.parse(s)
     except SyntaxError as e:
@@ -125,6 +125,27 @@ def tok_str(tok):
     if tok.type == tokenize.NAME and tok.string == "AS":
         return "as"
     return tok.string
+
+def double_escape_str(s):
+    toks = tokenize.generate_tokens(StringIO(s).readline)
+    return tokenize.untokenize([double_escape(t) for t in toks])
+
+def double_escape(tok: tokenize.TokenInfo):
+    """Adds an extra layer of backslashes to make them survive the tokenize->parse->transform->unparse pipeline."""
+    if tok.type != tokenize.STRING or (not tok.string.startswith('"""lmql') and not tok.string.startswith("'''lmql")): 
+        return tok
+    t = tokenize.TokenInfo(tok.type, tok_str(tok).replace("\\n", "\\\\n"), tok.start, tok.end, tok.line)
+    return t
+
+def double_unescape_str(s):
+    toks = tokenize.generate_tokens(StringIO(s).readline)
+    return tokenize.untokenize([double_unescape(t) for t in toks])
+
+def double_unescape(tok: tokenize.TokenInfo):
+    """Removes the extra layer of backslashes added by double_escape."""
+    if tok.type != tokenize.STRING: 
+        return tok
+    return tokenize.TokenInfo(tok.type, tok_str(tok).replace("\\\\n", "\\n"), tok.start, tok.end, tok.line)
 
 class LanguageFragmentParser:
     def __init__(self):

@@ -10,14 +10,24 @@ class TemplateVariable:
     type_expr: str = None
     decoder_expr: str = None
     decorator_exprs: Optional[List[str]] = None
+    function_call: str = None
 
     # populated after first parse
     index: int = None
 
+    def __post_init__(self):
+        if "(" in self.name:
+            import ast
+            call = ast.parse(self.name).body[0].value
+            assert type(call) is ast.Call, "Failed to parse template variable name as function call: {}".format(self.name)
+            assert len(call.args) >= 1, "A function call has to have at least the template variable name as argument: {}".format(self.name)
+            self.name = ast.unparse(call.args[0]).strip()
+            self.function_call = ast.unparse(call).strip()
+
     def __str__(self):
         r = " ".join([f"@{d}" for d in self.decorator_exprs or []] + \
                     ([self.decoder_expr] if self.decoder_expr is not None else []) + \
-                     [self.name] + \
+                     [self.function_call or self.name] + \
                     ([f": {self.type_expr}"] if self.type_expr is not None else []))
         return f"[{r}]"
 

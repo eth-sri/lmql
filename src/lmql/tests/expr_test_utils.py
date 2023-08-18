@@ -3,7 +3,6 @@ import os
 import ast
 import asyncio
 import types
-import astunparse
 import inspect
 import termcolor
 from lmql.language.fragment_parser import LMQLQuery
@@ -73,7 +72,7 @@ class LMQLExpressionCompiler(ast.NodeTransformer):
 
     def visit_Assert(self, node):
         if node.msg is None:
-            node.msg = ast.Constant(f"Line {node.lineno}: Assertion '{astunparse.unparse(node).strip()}' failed.", kind="str")
+            node.msg = ast.Constant(f"Line {node.lineno}: Assertion '{ast.unparse(node).strip()}' failed.", kind="str")
         return node
     
     def visit_Call(self, node):
@@ -123,7 +122,7 @@ def lmql_test(fct):
     m = ast.parse(source)
     m = compiler.visit(m)
 
-    code = astunparse.unparse(m)
+    code = ast.unparse(m)
 
     global show_transformed
     if show_transformed: print(code.strip())

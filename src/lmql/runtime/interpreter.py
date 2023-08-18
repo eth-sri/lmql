@@ -43,8 +43,6 @@ def set_dclib_debug_printer(printer):
     if hasattr(printer, "add_decoder_state"):
         _DCLibDebugPrinter.printer = printer
 
-emoji_mapping = {}
-
 @dataclass
 class RewrittenInputIds:
     appended_input_ids: List[np.ndarray]
@@ -111,20 +109,18 @@ class PromptState(NamedTuple):
     def full_where_condition(self, interpreter):
         constraints = self.variable_arg("constraints")
         
-        type_decl = self.variable_arg("type")
-        assert type_decl is None, "type declarations are not supported yet"
+        # get variable tactic (type constraint or nested query to execute)
+        variable_tactic = self.variable_arg("tactics")
 
+        # get variable decoder (decoder to use for this variable)
         decoder_decl = self.variable_arg("decoder")
         assert decoder_decl is None, "variable-decoder declarations are not supported yet"
 
-        if interpreter.where is None:
-            return constraints
-        elif constraints is None:
-            return interpreter.where
-        elif type(constraints) is ops.FixedValueOp:
+        # check for fixed value constraints (e.g. from pre-decorators)
+        if type(constraints) is ops.FixedValueOp:
             return constraints
         else:
-            return ops.AndOp([interpreter.where, constraints])
+            return ops.AndOp.all(*[a for a in [constraints, interpreter.where, variable_tactic] if a is not None])
 
 class LMQLContext:
     def __init__(self, interpreter, state, prompt):
@@ -215,10 +211,11 @@ class PromptInterpreter:
     token masking and scripted interaction during query execution.
     """
 
-    def __init__(self, context=None, force_model=None) -> None:
+    def __init__(self, context=None, force_model=None, name="<root>") -> None:
         # model-specific components
         self.model = force_model
         self.model_identifier = force_model
+        self.name = name
         self.tokenizer: LMQLTokenizer = None
 
         # decoder configuration
@@ -261,6 +258,17 @@ class PromptInterpreter:
 
         # context to determine model
         self.context = context
+
+    def __str__(self):
+        args = []
+        if self.root_state is not None:
+            if self.root_state.query_head is not None:
+                args += (self.root_state.query_head.args, self.root_state.query_head.kwargs)
+
+        return "<PromptInterpreter {} {}({})>".format(self.user_data_key, self.name or "<none>", args)
+
+    def __repr__(self):
+        return self.__str__()
 
     def set_where_clause(self, where):
         self.where = where
@@ -647,10 +655,13 @@ class PromptInterpreter:
         if not needs_rewrite and not seq.is_done():
             return None
     
-        # assert len([h for h in seq.user_data.keys() if "head" in h]) <= 2, "at max two heads are allowed in a sequence user_data"
-
-        # obtain interpreter state from predecessor node
-        state = self.interpreter_state_from_user_data(seq.predecessor, noroot=True)
+        # obtain interpreter state from seq
+        state = self.interpreter_state_from_user_data(seq, noroot=True)
+        if state is None:
+            # this happens for the root state or when a token was inserted by the decoder logic
+            # we use the last known state for this sequence then
+            state = self.interpreter_state_from_user_data(seq.predecessor, noroot=True)
+        
         assert state is not None, "prompt interpreter state must be set in predecessor node"
 
         if state.tail is not None:
@@ -660,6 +671,7 @@ class PromptInterpreter:
             n_tail_ids = len(tail_ids) - 1
             
             if n_tail_ids > 1:
+                # print("TAIL COMPLETE", self)
                 return RewrittenInputIds(
                     appended_input_ids=updated_ids,
                     strip_eos=False,
@@ -673,11 +685,12 @@ class PromptInterpreter:
         sub_results = []
         subrewrite_applied = False
 
-        assert len(subinterpreters) <= 1
+        assert len(subinterpreters) <= 1, "internal limitation: multiple concurrent subinterpreter rewrites are currently not supported. Are you using more than one strategy constraint on the same variable?"
 
         user_data = seq.data() or {}
 
         for si in list(subinterpreters):
+            # remove stale subinterpreters
             if si.user_data_key not in seq.predecessor.user_data:
                 subinterpreters.remove(si)
                 continue
@@ -702,6 +715,9 @@ class PromptInterpreter:
             state = state.updated(subinterpreters=subinterpreters)
             sub_results[0].user_data = dc.deepmerge(sub_results[0].user_data, self.interpreter_state_user_data(state))
             sub_results[0].rewritten_seq_user_data = dc.deepmerge(sub_results[0].rewritten_seq_user_data, self.interpreter_state_user_data(state))
+
+            assert sub_results[0].user_data[self.user_data_key].subinterpreters == subinterpreters, "internal error: subinterpreter list must be updated in parent interpreter state"
+            assert sub_results[0].rewritten_seq_user_data[self.user_data_key].subinterpreters == subinterpreters, "internal error: subinterpreter list must be updated in parent interpreter state"
             
             assert len(sub_results) == 1, "internal limitation: multiple concurrent subinterpreter rewrites are currently not supported. are you using more than one strategy constraint on the same variable?"
 
@@ -736,6 +752,7 @@ class PromptInterpreter:
                     variable_value = result_state.query_head.result
                     if type(variable_value) is LMQLResult:
                         postprocessed_prompt = variable_value.prompt[len(state.prompt):]
+                        variable_value = variable_value.prompt[len(state.prompt):]
                     else:
                         postprocessed_prompt = str(result_state.query_head.result)
 
@@ -1187,30 +1204,11 @@ class PromptInterpreter:
         
         return subvalid, subfollow, calling_state
 
-class UserDataLayer:
-    def __init__(self, sqs: List[dc.DecoderSequence], mappings):
-        self.sqs: dc.DecoderSequence = sqs
-        self.mappings = mappings
-        self.prev_mappings = {}
-    
-    # enter and exit
-    def __enter__(self):
-        # for s in self.sqs:
-        #     self.prev_mappings[s.id] = s.user_data
-        #     s.user_data = self.mappings.get(s.id)
-        pass
-
-    def __exit__(self, type, value, traceback):
-        # for s in self.sqs:
-        #     self.mappings[s.id] = s.user_data
-        #     s.user_data = self.prev_mappings.get(s.id)
-        pass
-
 PromptInterpreter.main = None
 
 class SubInterpreter(PromptInterpreter):
     def __init__(self, fct, parent_interpreter: PromptInterpreter, captures: Dict[str, Any], model: str = None, model_identifier: str = None):
-        super().__init__(context=parent_interpreter)
+        super().__init__(context=parent_interpreter, name="sub:" + fct.name or "<lambda>")
         self.query_fct = fct
         self.fct = fct.fct
         self.captures = captures
@@ -1227,10 +1225,9 @@ class SubInterpreter(PromptInterpreter):
 
     def set_model(self, model):
         # ignore set_model for subinterpreters
-        pass
-
-    def user_data_layer(self, *sqs):
-        return UserDataLayer(sqs, self.user_data_mappings)
+        if model != "<dynamic>":
+            name = self.name[4:] if self.name.startswith("sub:") else self.name
+            warnings.warn("warning: the specified model of nested query '{}' is ignored. Nested queries cannot specify their own model.".format(name))
 
     async def prepare(self, parent_offset: int, prompt: str):
         # prepare initial program state
@@ -1246,6 +1243,10 @@ class SubInterpreter(PromptInterpreter):
             stopping_phrases=None, where=None,
             tail=None)
         self.root_state = await self.advance(self.root_state)
+
+        if self.decoder_kwargs.get("decoder", "__dynamic__") != "__dynamic__":
+            name = self.name[4:] if self.name.startswith("sub:") else self.name
+            warnings.warn("warning: the decoder configuration of nested query '{}' is ignored. Nested queries cannot specify their own decoder.".format(name))
 
         self.initial_subprompt_ids = await self.tokenize(self.root_state.prompt)
         self.n = len(self.initial_subprompt_ids)

@@ -8,11 +8,10 @@ from _ast import (And, AsyncFunctionDef, Await, BinOp, Call, ClassDef, Compare, 
 from io import StringIO
 from typing import Any
 
-import astunparse
-
 import lmql.runtime.lmql_runtime as lmql_runtime
 from lmql.language.fragment_parser import (FragmentParserError,
                                            LanguageFragmentParser,
+                                           double_unescape_str,
                                            LMQLDecoderConfiguration, LMQLQuery)
 from lmql.language.qstrings import (DistributionVariable, FExpression,
                                     TagExpression, TemplateVariable,
@@ -267,6 +266,12 @@ def is_query_string_with_constraints(node: ast.BoolOp):
     left_most_operand = node.values[0]
     return type(left_most_operand) is ast.Constant and type(left_most_operand.value) is str and isinstance(node.op, ast.And)
 
+def attr(s):
+    names = s.split(".")
+    element = ast.Name(names[0], ast.Load())
+    for name in names[1:]:
+        element = ast.Attribute(element, name, ast.Load())
+    return element
 class FunctionCallTransformation(ast.NodeTransformer):
     """
     Translates function calls into lmql.call calls (to enable automatic await and unpacking 
@@ -295,7 +300,7 @@ class FunctionCallTransformation(ast.NodeTransformer):
             node.keywords = keywords
             return node
 
-        wrapped = Call(ast.parse("lmql.runtime_support.call"), [f, *args], keywords)
+        wrapped = Call(attr("lmql.runtime_support.call"), [f, *args], keywords)
         wrapped = ast.Await(wrapped)
 
         return wrapped
@@ -338,20 +343,28 @@ class PromptClauseTransformation(FunctionCallTransformation):
             return self.transform_Constant(left_most_operand, constraints = constraints_expression)
         return self.generic_visit(node)
 
+    def visit_FunctionDef(self, node: FunctionDef) -> Any:
+        # do not recurse into nested functions
+        return node
+    
+    def visit_AsyncFunctionDef(self, node: AsyncFunctionDef) -> Any:
+        # do not recurse into nested functions
+        return node
+
     def transform_Constant(self, constant, constraints=None):
         if type(constant.value) is not str: return constant
         qstring = constant.value
+
         if len(qstring) == 0: return constant
         if qstring.strip().startswith("lmql"): return constant
 
-        qstring = qstring.encode("unicode_escape").decode("utf-8").encode('unicode_escape').decode('utf-8')        
         compiled_qstring = ""
 
         declared_template_vars = set()
 
         # collect variable-level decoders, types and decorators from qstring
         decoders = []
-        types = []
+        types = [] # list of (var_name, type_expr)
         decorators = []
 
         for stmt in qstring_to_stmts(qstring, mode="square-only"):
@@ -365,7 +378,7 @@ class PromptClauseTransformation(FunctionCallTransformation):
                 
                 # collect decorators, types and decoders
                 decorators += [stmt.decorator_exprs]
-                types += [stmt.type_expr]
+                types += [(stmt.name, stmt.type_expr)]
                 decoders += [stmt.decoder_expr]
 
         # empty qstrings are no-ops
@@ -381,8 +394,8 @@ class PromptClauseTransformation(FunctionCallTransformation):
         extra_args = ""
         if any(d is not None for d in decoders):
             extra_args += ", decoder=[" + ", ".join([f"'{d}'" or "None" for d in decoders]) + "]"
-        if any(t is not None for t in types):
-            extra_args += ", type=[" + ", ".join([t or "None" for t in types]) + "]"
+        if any(t is not None for v,t in types):
+            extra_args += ", tactics=[" + ", ".join([self.transform_TypeExpr(var_name, type_expr) or "None" for var_name, type_expr in types]) + "]"
         if any(d is not None for d in decorators):
             decorator_lists = []
             for ds in decorators:
@@ -409,6 +422,31 @@ class PromptClauseTransformation(FunctionCallTransformation):
             result_code += f"\n{v} = " + get_var_call
 
         return ast.parse(result_code)
+    
+    def transform_TypeExpr(self, var_name: str, type_expr: str):
+        if type_expr is None:
+            return None
+
+        node = ast.parse(type_expr).body[0].value
+
+        if type(node) is ast.Call:
+            args = node.args
+            lcls = ast.Call(ast.Name("locals", ast.Load()), [], [])
+            glbs = ast.Call(ast.Name("globals", ast.Load()), [], [])
+            kwargs = [ast.Tuple([ast.Constant("__kw:" + e.arg), e.value]) for e in node.keywords]
+            r = ast.Call(attr("lmql.runtime_support.type_expr"), [ast.Constant(var_name), node.func] + [lcls, glbs] + args + kwargs, [])
+        elif type(node) is ast.Name:
+            lcls = ast.Call(ast.Name("locals", ast.Load()), [], [])
+            glbs = ast.Call(ast.Name("globals", ast.Load()), [], [])
+            r = ast.Call(attr("lmql.runtime_support.type_expr"), [ast.Constant(var_name), node] + [lcls, glbs], [])
+        elif type(node) is ast.Constant:
+            lcls = ast.Call(ast.Name("locals", ast.Load()), [], [])
+            glbs = ast.Call(ast.Name("globals", ast.Load()), [], [])
+            r = ast.Call(attr("lmql.runtime_support.type_expr"), [ast.Constant(var_name), node] + [lcls, glbs], [])
+        else:
+            assert False, "compiler: invalid type expression: '{}'".format(node)
+
+        return ast.unparse(r)
 
 class SNFList:
     def __init__(self):
@@ -462,7 +500,7 @@ class ReturnStatementTransformer(ast.NodeTransformer):
         return node
 
     def visit_Return(self, node):
-        return ast.parse("yield ('result', " + astunparse.unparse(node.value).strip() + ")")
+        return ast.parse("yield ('result', " + ast.unparse(node.value).strip() + ")")
 
 class LMQLConstraintTransformation:
     def __init__(self, scope) -> None:
@@ -531,7 +569,7 @@ class LMQLConstraintTransformation:
                 return snf.add(f"{OPS_NAMESPACE}.CallOp([{LIB_NAMESPACE}.types.is_type, [{OPS_NAMESPACE}.Var('{var_name}'), {type_name}]], locals(), globals())")
                 # return snf.add(f"{LIB_NAMESPACE}.is_type([{type_name}, {OPS_NAMESPACE}.Var('{var_name}')])")
             
-            assert False, "operator {} is not supported.".format(astunparse.unparse(expr))
+            assert False, "operator {} is not supported.".format(ast.unparse(expr))
         elif type(expr) is ast.Constant:
             return self.default_transform_node(expr, snf).strip()
         elif type(expr) is ast.ListComp:
@@ -545,7 +583,7 @@ class LMQLConstraintTransformation:
             if is_allowed_builtin_python_call(expr.func):
                 return self.default_transform_node(expr, snf).strip()
             
-            assert type(expr.func) is ast.Name, "In LMQL constraint expressions, only function calls to direct function references are allowed: {}".format(astunparse.unparse(expr))
+            assert type(expr.func) is ast.Name, "In LMQL constraint expressions, only function calls to direct function references are allowed: {}".format(ast.unparse(expr))
             tfunc = ast.unparse(expr.func)
             targs = [self.transform_node(a, snf) for a in expr.args]
             kwargs = [f"('__kw:{e.arg}', {self.transform_node(e.value, snf)})" for e in expr.keywords]
@@ -555,7 +593,7 @@ class LMQLConstraintTransformation:
         elif type(expr) is ast.List:
             return self.default_transform_node(expr, snf).strip()
 
-        print(f"compiler warning: expressions of type {type(expr)} are not explicitly supported: '{astunparse.unparse(expr).strip()}'")
+        print(f"compiler warning: expressions of type {type(expr)} are not explicitly supported: '{ast.unparse(expr).strip()}'")
         return snf.add(self.default_transform_node(expr, snf))
 
     def default_transform_node(self, node, snf):
@@ -569,7 +607,7 @@ class LMQLConstraintTransformation:
         names = sorted(list(names))
 
         # if no template variable names are capture, node represents a constant expression
-        if len(names) == 0: return astunparse.unparse(node)
+        if len(names) == 0: return ast.unparse(node)
 
         def transform_name(node):
             node.id = self.transform_name(node, keep_variables=True, plain_python=True)
@@ -578,7 +616,7 @@ class LMQLConstraintTransformation:
 
         args = (" " + ", ".join(names)) if len(names) > 0 else ""
         var_ops = (", ".join([f"{OPS_NAMESPACE}.Var('{n}')" for n in names])).strip() if len(names) > 0 else ""
-        fct_code = astunparse.unparse(node).strip()
+        fct_code = ast.unparse(node).strip()
         
         return f"{OPS_NAMESPACE}.OpaqueLambdaOp([lambda{args}: {fct_code}, {var_ops}])"
 
@@ -720,7 +758,7 @@ class PythonFunctionWriter:
         self.file = open(self.filename, "w")
 
         self.indent = "  "
-        self.write("import lmql\nimport lmql.lib\n")
+        self.write("import lmql\n")
         self.write(self.prologue)
         
         if decorators is not None:
@@ -732,7 +770,13 @@ class PythonFunctionWriter:
 
     def write(self, code):
         self.in_memory_contents += code
-        self.file.write(code)
+        
+    def flush(self):
+        if "lmql.lib" in self.in_memory_contents:
+            # replace first import lmql
+            self.in_memory_contents = self.in_memory_contents.replace("import lmql\n", "import lmql\nimport lmql.lib\n")
+
+        self.file.write(self.in_memory_contents)
 
     def make_kwargs(self):
         if len(self.parameters) == 0:
@@ -743,6 +787,7 @@ class PythonFunctionWriter:
         return self
 
     def __exit__(self, *args):
+        self.flush()
         self.file.close()
 
     def add(self, code):
@@ -780,7 +825,7 @@ class LMQLModule(object):
         return self._code
 
 def unparse_list(ast_elements):
-    return ", ".join([astunparse.unparse(e).strip() for e in ast_elements])
+    return ", ".join([ast.unparse(e).strip() for e in ast_elements])
 
 def preprocess_text(lmql_code):
     if lmql_code.startswith("lmql"):
@@ -835,7 +880,7 @@ class LMQLCompiler:
             transformations = CompilerTransformations()
             transformations.transform(q)
 
-            model_name = astunparse.unparse(q.from_ast).strip()
+            model_name = ast.unparse(q.from_ast).strip()
             model_name = model_name_aliases.get(model_name, model_name)
             if model_name[1:-1] in model_name_aliases.keys():
                 model_name = "'" + model_name_aliases[model_name[1:-1]] + "'"
@@ -850,17 +895,17 @@ class LMQLCompiler:
             with PythonFunctionWriter("query", output_file, parameters, 
                 q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
                 
-                writer.add(yield_call("set_decoder", astunparse.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))                
+                writer.add(yield_call("set_decoder", ast.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))                
                 writer.add(yield_call("set_model", model_name))
                 writer.add("# where")
                 writer.add(q.where)
                 writer.add(yield_call("set_where_clause", q.where_expr))
                 writer.add("# prompt")
-                writer.add(astunparse.unparse(q.prompt))
+                writer.add(double_unescape_str(ast.unparse(q.prompt)))
                 if q.distribution:
                     writer.add("# distribution")
-                    # writer.add("context.set_distribution('{}', {})".format(q.distribution.variable_name, astunparse.unparse(q.distribution.values).strip()))
-                    writer.add(yield_call("set_distribution", "\"" + q.distribution.variable_name + "\"", astunparse.unparse(q.distribution.values).strip()))
+                    # writer.add("context.set_distribution('{}', {})".format(q.distribution.variable_name, ast.unparse(q.distribution.values).strip()))
+                    writer.add(yield_call("set_distribution", "\"" + q.distribution.variable_name + "\"", ast.unparse(q.distribution.values).strip()))
                 
                 writer.add(f"yield ('result', (" + yield_call("get_return_value", ()) + "))")
 

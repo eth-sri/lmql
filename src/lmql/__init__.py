@@ -16,6 +16,8 @@ import tempfile
 
 import lmql.runtime.lmql_runtime as lmql_runtime
 import lmql.runtime.lmql_runtime as runtime_support
+from lmql.runtime.lmql_runtime import is_query
+
 from lmql.utils.docstring_parser import *
 from lmql.language.compiler import LMQLCompiler
 # re-export lmql runtime functions
@@ -189,6 +191,9 @@ def query(__fct__=None, input_variables=None, is_async=True, calling_frame=None,
     module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
     module.query.extra_args = extra_args
+
+    # name the query function after the decorated function
+    module.query.name = fct.__name__
 
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)

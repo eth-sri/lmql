@@ -206,7 +206,7 @@ class LMQLQueryFunction:
         query_kwargs, runtime_args = self.make_kwargs(*args, **kwargs)
         
         forced_model = self.model or runtime_args.get("model") or (self.extra_args or {}).get("model")
-        interpreter = PromptInterpreter(force_model=forced_model)
+        interpreter = PromptInterpreter(force_model=forced_model, name=self.name)
 
         if self.output_writer is not None:
             runtime_args["output_writer"] = self.output_writer
@@ -298,3 +298,23 @@ async def call(fct, *args, **kwargs):
         return await fct(*args, **kwargs)
     else:
         return fct(*args, **kwargs)
+
+def is_query(fct):
+    """
+    Returns True if the given function is a compiled LMQL query function.
+    """
+    return hasattr(fct, "__lmql_query_function__")
+
+def type_expr(var_name, target, lcls, glbs, *args, **kwargs):
+    """
+    Transforms expressions in query strings like "Hello [WHO: <expr>]" into
+    their constraint equivalent.
+    """
+    if is_query(target):
+        return InlineCallOp([target, list((Var(var_name),) + args)], lcls, glbs)
+    elif type(target) is str:
+        return RegexOp([Var(var_name), target])
+    elif target is int:
+        return IntOp([Var(var_name)])
+    else:
+        raise TypeError("Not a valid type expression or tactic annotation '" + str(target) + "' for variable '" + var_name + "'.")
