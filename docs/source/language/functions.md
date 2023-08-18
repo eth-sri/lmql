@@ -1,175 +1,176 @@
-# External Functions and Tools
+# Nested Queries <span class="tag" data-tag-name="functions">NEW</span>
 
-LMQL extends Python and thus query code can incorporate arbitrary Python constructs including function calls.
-For instance, below, we ask the model for a simple math problem and then use Python's `eval` function to evaluate the solution.
+<div class="subtitle">Modularize your query code with nested prompting.</div>
 
-```{lmql}
-name::simple_math
+*Nested Queries* allow you to execute a query function within the context of another. By nesting multiple query functions, you can build complex programs from smaller, reusable components. For this, LMQL applies the idea of [procedural programming](https://en.wikipedia.org/wiki/Procedural_programming) to prompting.
 
-argmax
-    "A simple math problem for addition (without solution, without words): [MATH]"
-    "{eval(MATH[:-1])}"
-from 
-    'openai/text-davinci-003'
-where
-    STOPS_AT(MATH, "=")
-
-model-output::
-A simple math problem for addition (without solution, without words):
-[MATH 7 + 8 =] 15
-```
-
-
-
-Here, similar to a python [f-string](https://peps.python.org/pep-0498), we use the `{}` syntax to insert the result of the `eval` function into the prompt. The `[:-1]` indexing is used to strip of the trailing `=` sign.
-
-**Note:** While `eval` is handy for the examples in this section and allows to perform simple math, generally it can pose a security risk and should not be used in production.
-
-## Calculator
-Building on the previous example, we can now create a more complex calculator that can handle more complex expressions.
-Here we define a function `calc` that leverages the build-in `re` library for Regular Expressions to strip the input of any non-numeric characters, before calling `eval`. Subsequently we can use `calc` to augment the reasoning capabilities of the large language model with a simple calculator.
-
-Further, there we also call a function `gsm8k_samples` defined in a file `demo` within the LMQL library that returns a few-shot sample of the `gsm8k` dataset with examples of how to use the calculator.
+To better understand this concept, let's take a look at a simple example:
 
 ```{lmql}
-name::calculator
-import re
-from lmql.demo import gsm8k_samples
+name::prompt-function
 
-def calc(expr):
-      expr = re.sub(r"[^0-9+\-*/().]", "", expr)
-      return eval(expr)
+@lmql.query
+def chain_of_thought():
+    '''lmql
+    "A: Let's think step by step.\n [REASONING]"
+    "Therefore the answer is[ANSWER]" where STOPS_AT(ANSWER, ".")
+    return ANSWER.strip()
+    '''
 
-argmax(openai_chunksize=128, max_len=2048)
-      QUESTION = "Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?"
-      # few shot samples
-      "{gsm8k_samples()}"
-      # prompt template
-      "Q: {QUESTION}\n"
-      "Let's think step by step.\n"
-      for i in range(4):
-         "[REASON_OR_CALC]"
-         if REASON_OR_CALC.endswith("<<"):
-            " [EXPR]"
-            " {calc(EXPR)}>>"
-         elif REASON_OR_CALC.endswith("So the answer"):
-            break
-      "is[RESULT]"
-from 
-      'openai/text-davinci-003'
-where
-      STOPS_AT(REASON_OR_CALC, "<<") and
-      STOPS_AT(EXPR, "=") and
-      STOPS_AT(REASON_OR_CALC, "So the answer")
-
-model-output::
-Q: Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?
-Let's think step by step.
-[REASON_OR_CALC Josh bought the house for $80,000 and put in $50,000 in repairs.
-The value of the house increased by 150%, so the new value of the house is $80,000 + 150% of $80,000 = <<] [EXPR 80,000 + (80,000*1.5) =] 200000.0>> [REASON_OR_CALC $200,000.
-The profit Josh made is the difference between the new value of the house and the amount he spent on it, which is $200,000 - $80,000 - $50,000 = <<] [EXPR 200,000 - 80,000 - 50,000 =] 70000>> [REASON_OR CALC $70,000.
-So the answer] is [RESULT $70,000.]
+"Q: It is August 12th, 2020. What date was it \
+    100 days ago? [ANSWER: chain_of_thought]"
 ```
 
-## Beyond Calculators
-Function use is not limited to calculators. In the example bellow we show how text retrieval, using Pythons `async`/`await` [syntax](https://docs.python.org/3/library/asyncio.html), can be used to augment the reasoning capabilities of the large language model. 
+Here, the placeholder variable `ANSWER` is annotated with a reference to query function `chain_of_thought`. This means a nested instantiation of query function `chain_of_thought` will be used to generate the value for `ANSWER`.
+
+To understand how this behaves at runtime, consider the execution trace of this program:
+
+```{promptdown}
+animate::true
+min-height::10em
+### Model Output
+![Q: It is August 12th, 2020. What date was it 100 days ago?]
+[@wait|800]
+[@begin|incontext][chain_of_thought|A: Let's think step by step.]
+[@wait|800][REASONING|100 days ago would be May 4th, 2020.][Therefore the answer is][@end|incontext][ANSWER|May 4th, 2020]
+[@wait|800]
+[@fade|incontext]
+[@wait|800]
+[@hide|incontext]
+[:replay]
+```
+
+> You can press *Replay* to re-run the animation.
+
+To generate `ANSWER`, the additional prompt and constraints defined by `chain_of_thought` are inserted into our main query context. However, after `ANSWER` has been generated, the additional instructions are removed from the trace, leaving only the return value of the nested query call. This mechanic is comparable to a function's stack frame in procedural programming.
+
+Nesting allows you to use variable-specific instructions that are only locally relevant, without interfering with other parts of the program, encapsulating the logic of your prompts into reusable components.
+
+### Parameterized Queries
+
+You can also pass parameters to nested queries, allowing you to customize their behavior:
 
 ```{lmql}
-name::wikipedia
-async def wikipedia(q):
-   from lmql.http import fetch
-   try:
-      q = q.strip("\n '.")
-      pages = await fetch(f"https://en.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&redirects=1&titles={q}&origin=*", "query.pages")
-      return list(pages.values())[0]["extract"][:280]
-   except:
-      return "No results"
+name::prompt-function-params
 
-argmax
-   "Q: From which countries did the Norse originate?\n"
-   "Action: Let's search Wikipedia for the term '[TERM]\n"
-   result = await wikipedia(TERM)
-   "Result: {result}\n"
-   "Final Answer:[ANSWER]"
-from 
-   "openai/text-davinci-003"
-where
-   STOPS_AT(TERM, "'")
+@lmql.query
+def one_of(choices: list):
+    '''lmql
+    "Among {choices}, what do you consider \
+    most likely? [ANSWER]" where ANSWER in choices
+    return ANSWER
+    '''
 
-model-output::
-Q: From which countries did the Norse originate?
-Action: Let's search Wikipedia for the term '[TERM Norse'].
-Result: Norse is a demonym for Norsemen, a Medieval North Germanic ethnolinguistic group ancestral to modern Scandinavians, defined as speakers of Old Norse from about the 9th to the 13th centuries.
-Norse may also refer to:
-
-Final Answer: [ANSWER The Norse originated from North Germanic countries, including Denmark, Norway, Sweden, and Iceland.]
+"Q: What is the capital of France? \
+[ANSWER: one_of(['Paris', 'London', 'Berlin'])]"
 ```
 
-LMQL can also access the state of the surrounding python interpreter. To showcase this, we show how to use the `assign` and `get` functions to store and retrieve values in a simple key-value store.
+```{promptdown}
+animate::true
+min-height::10em
+
+### Model Output
+![Q: What is the capital of France?]
+[@wait|800]
+[@begin|incontext][one_of|Among ['Paris', 'London', 'Berlin'], what do you consider most likely?][@end|incontext]
+[@wait|800][ANSWER|Paris]
+[@wait|800]
+[@fade|incontext]
+[@wait|800]
+[@hide|incontext]
+[:replay]
+```
+
+For instance, here we employ `one_of` to generate the answer to a multiple-choice question. The `choices` are passed as a parameter to the nested query, allowing us to reuse the same code for different questions.
+
+### Multi-Part Programs
+
+You can also use multiple nested queries in sequence, allowing you to repeatedly inject instructions into your prompt without interfering with the overall flow:
 
 ```{lmql}
-name::kvstore
-# simple kv storage
-storage = {}
-def assign(key, value): storage[key] = value; return f'{{{key}: "{value}"}}'
-def get(key): return storage.get(key)
+name::dateformat
 
-argmax(n=1, openai_chunksize=128, max_len=2048, step_budget=4*2048)
-   """In your reasoning you can use actions. You do this as follows:
-   `action_name(<args>) # result: <inserted result>`
-   To remember things, you can use 'assign'/'get':
-   - To remember something:
-   `assign("Alice", "banana") # result: "banana"`
-   - To retrieve a stored value:
-   `get("Alice") # result: "banana"`
-   Always tail calls with " # result". Using these actions, let's solve the following question.
-   
-   Q: Alice, Bob, and Claire are playing a game. At the start of the game, they are each holding a ball: Alice has a black ball, Bob has a brown ball, and Claire has a blue ball. \n\nAs the game progresses, pairs of players trade balls. First, Bob and Claire swap balls. Then, Alice and Bob swap balls. Finally, Claire and Bob swap balls. At the end of the game, what ball does Alice have?
-   A: Let's think step by step.\n"""
-   for i in range(32):
-      "[REASONING]"
-      if REASONING.endswith("# result"):
-         cmd = REASONING.rsplit("`",1)[-1]
-         cmd = cmd[:-len("# result")]
-         "{eval(cmd)}`\n"
-      else:
-         break
-   """Therefore at the end of the game, Alice has the[OBJECT]"""
-   assert "blue ball." in OBJECT
-from 
-   "openai/text-davinci-003"
-where
-   STOPS_AT(REASONING, "# result") and STOPS_AT(REASONING, "Therefore, ") and
-   STOPS_AT(OBJECT, ".") and STOPS_AT(OBJECT, ",")            
+@lmql.query
+def dateformat():
+    '''lmql
+    "(respond in DD/MM/YYYY) [ANSWER]"
+    return ANSWER.strip()
+    '''
 
-model-output::
-(...)
-A: Let's think step by step
+"Q: When was Obama born? [ANSWER: dateformat]\n"
+"Q: When was Bruno Mars born? [ANSWER: dateformat]\n"
+"Q: When was Dua Lipa born? [ANSWER: dateformat]\n"
 
-[REASONING At the start of the game:
-`assign("Alice", "black") # result] {Alice: "black"}`
-[REASONING `assign("Bob", "brown") # result] {Bob: "brown"}`
-[REASONING `assign("Claire", "blue") # result] {Claire: "blue"}`
-
-[REASONING After Bob and Claire swap balls:
-`assign("Bob", "blue") # result] {Bob: "blue"}`
-[REASONING `assign("Claire", "brown") # result] {Claire: "brown"}`
-
-[REASONING After Alice and Bob swap balls:
-`assign("Alice", "blue") # result] {Alice: "blue"}`
-[REASONING `assign("Bob", "black") # result] {Bob: "black"}`
-
-[REASONING After Claire and Bob swap balls:
-`assign("Claire", "black") # result] {Claire: "black"}`
-[REASONING `assign("Bob", "brown") # result] {Bob: "brown"}`
-
-[REASONING At the end of the game, Alice has a blue ball:
-`get("Alice") # result] blue`
-Therefore at the end of the game, Alice has the [OBJECT blue ball.]
+"Out of these, who was born last?[LAST]"
 ```
 
-As shown in the example above, the `assign` and `get` functions can be used to store and retrieve values in a simple key-value store. The model is merely instructed to make use of these functions in its reasoning. The query then implements logic to intercept any function use and insert the result of the function call into the reasoning. This allows the model to incorporate the state of the key-value store into its reasoning.
+```{promptdown}
+animate::true
+min-height::14em
+### Model Output
+![Q: When was Obama born?]
+[@wait|200]
+[@begin|incontext][dateformat|(respond in DD/MM/YYYY)][@end|incontext]
+[@wait|200][ANSWER|04/08/1961]
+[@wait|200]
+[@fade|incontext]
+[@wait|200]
+[@hide|incontext]
+[@wait|200]
+![Q: When was Bruno Mars born?]
+[@wait|200]
+[@begin|incontext1][dateformat|(respond in DD/MM/YYYY)][@end|incontext1]
+[@wait|200][ANSWER|08/10/1985]
+[@wait|200]
+[@fade|incontext1]
+[@wait|200]
+[@hide|incontext1]
+[@wait|200]
+![Q: When was Dua Lipa born?]
+[@wait|200]
+[@begin|incontext2][dateformat|(respond in DD/MM/YYYY)][@end|incontext2]
+[@wait|200][ANSWER|22/08/1995]
+[@wait|200]
+[@fade|incontext2]
+[@wait|200]
+[@hide|incontext2]
+[@wait|200]
 
+[Out of these, who was born last?][LAST|Dua Lipa]
+[:replay]
+```
 
+We instruct the model to use a specific date format when answering our initial questions. Because of the use of `dateformat` as a nested function, the instructions are only temporarily included, once per generated answer, and removed before moving on to the next question.
 
+Once we have generated all intermediate answers, we query the LLM to compare the individual dates and determine the latest one, where this last query is not affected by the instructions of `dateformat`.
 
+## Return Values
+
+If a query function does _not_ return a value, calling it as nested function does _not_ remove the inserted instructions after execution. The effect of a nested function without return value therefore corresponds more to idea of macro expansion.
+
+This can be helpful when you want to use a fixed template in several locations, e.g. for list items. Further, as shown below, a nested function can also be parameterized to customize its behavior:
+
+```{lmql}
+name::incontext-no-return
+
+@lmql.query
+def items_list(n: int):
+    '''lmql
+    for i in range(n):
+        "-[ITEM]" where STOPS_AT(ITEM, "\n")
+    '''
+
+"A list of things not to forget to pack for your \
+ next trip:\n[ITEMS: items_list(4)]"
+```
+
+```{promptdown}
+animate::true
+min-height::10em
+
+![A list of things not to forget to pack for your next trip:]
+![ITEM|- Passport]
+![ITEM|- Toothbrush]
+![ITEM|- Phone charger]
+![ITEM|- Sunscreen]
+```
