@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "argmax\n    \"A simple math problem for addition (without solution, without words): [MATH]\"\n    \"{eval(MATH[:-1])}\"\nfrom \n    'openai/text-davinci-003'\nwhere\n    STOPS_AT(MATH, \"=\")", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

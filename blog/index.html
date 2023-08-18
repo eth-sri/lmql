@@ -279,7 +279,6 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </span><span id="1-18"><span class="s1">    return json.loads(context.prompt.split("pop icon:",1)[1])'''</span>
 </span><span id="1-19">
 </span><span id="1-20"><span class="nb">print</span><span class="p">(</span><span class="n">summarize</span><span class="p">())</span> <span class="c1"># {'name': 'Dua Lipa', 'chart_position': 3415, 'top_songs': ['New Rules', 'Havana']}</span>
-</span><span id="1-21">
 </span></pre></div>
 </div>
 <br>
@@ -298,7 +297,6 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </span><span id="1-9"><span class="n">summarize</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># LMQL enables high-level constraints to be enforced during text </span>
 </span><span id="1-10">                     <span class="c1"># generation, simplifying multi-part prompting and integration.</span>
 </span><span id="1-11"><span class="n">main_subject</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">text</span><span class="p">)</span> <span class="c1"># Language Model Query Language (LMQL)</span>
-</span><span id="1-12">
 </span></pre></div>
 </div>
 <br>
@@ -375,12 +373,12 @@ Out of these, my favorite is <span class="variable val2"><span class="variable-n
 </span><span id="1-3"><span class="nd">@lmql</span><span class="o">.</span><span class="n">query</span>
 </span><span id="1-4"><span class="k">def</span> <span class="nf">hello</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 </span><span id="1-5"><span class="w">    </span><span class="sd">'''lmql</span>
-</span><span id="1-6"><span class="sd">    argmax </span>
-</span><span id="1-7"><span class="sd">        "Hello {s} [RESPONSE]" </span>
-</span><span id="1-8"><span class="sd">        return RESPONSE</span>
-</span><span id="1-9"><span class="sd">    from </span>
-</span><span id="1-10"><span class="sd">        "chatgpt"</span>
-</span><span id="1-11"><span class="sd">    '''</span>
+</span><span id="1-6">    <span class="kp">argmax</span> 
+</span><span id="1-7">        <span class="s2">"Hello </span><span class="si">{s}</span><span class="s2"> [RESPONSE]"</span> 
+</span><span id="1-8">        <span class="k">return</span> <span class="n">RESPONSE</span>
+</span><span id="1-9">    <span class="kn">from</span> 
+</span><span id="1-10">        <span class="s2">"chatgpt"</span>
+</span><span id="1-11">    <span class="sd">'''</span>
 </span><span id="1-12">
 </span><span id="1-13"><span class="nb">print</span><span class="p">(</span><span class="n">hello</span><span class="p">(</span><span class="s2">"world"</span><span class="p">))</span> <span class="c1"># ['Hello! How can I assist you today?']</span>
 </span></pre></div>

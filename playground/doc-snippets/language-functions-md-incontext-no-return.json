@@ -1,0 +1,1 @@
+{"lmql-editor-contents": "@lmql.query\ndef items_list(n: int):\n    '''lmql\n    for i in range(n):\n        \"-[ITEM]\" where STOPS_AT(ITEM, \"\\n\")\n    '''\n\n\"A list of things not to forget to pack for your \\\n next trip:\\n[ITEMS: items_list(4)]\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
