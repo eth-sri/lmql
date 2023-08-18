@@ -25,11 +25,11 @@ argmax
     A:[CLASSIFICATION]"""
 from lmql.model(
     # model name is not actually used: endpoint completely overrides model selection
-    "meta-llama/llama-2-13b-chat-hf",
+    "meta-llama/Llama-2-13b-chat-hf",
     # in this case, uses model from https://replicate.com/charles-dyfis-net/llama-2-13b-hf--lmtp-8bit
     endpoint="replicate:charles-dyfis-net/llama-2-13b-hf--lmtp-8bit",
-    # choosing a model with the same tokenizer as meta-llama/llama-2-13b-hf but ungated in huggingface
-    tokenizer="lmsys/vicuna-13b-v1.5-16k"
+    # choosing a model with the same tokenizer as meta-llama/Llama-2-13b-hf but ungated in huggingface
+    tokenizer="AyyYOO/Luna-AI-Llama2-Uncensored-FP16-sharded",
 )
 where STOPS_AT(ANALYSIS, "\n") and len(TOKENS(ANALYSIS)) < 200
 distribution CLASSIFICATION in [" positive", " negative", " neutral"]
