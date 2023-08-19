@@ -1,3 +1,7 @@
+"""
+Flexible value parsing and comparison for language model output.
+"""
+
 import re
 
 def to_int(s: str):
