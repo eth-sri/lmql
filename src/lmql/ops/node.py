@@ -258,4 +258,3 @@ class postprocessed_value:
 class postprocessed_rewrite:
     def __init__(self, rewrite):
         self.rewrite = rewrite
-

@@ -146,7 +146,7 @@ Once we have generated all intermediate answers, we query the LLM to compare the
 
 ## Return Values
 
-If a query function does _not_ return a value, calling it as nested function does _not_ remove the inserted instructions after execution. The effect of a nested function without return value therefore corresponds more to idea of macro expansion.
+If a query function does _not_ return a value, calling it as nested function does _not_ remove the inserted instructions after execution. The effect of a nested function without return value therefore corresponds to a macro expansion, as shown below:
 
 This can be helpful when you want to use a fixed template in several locations, e.g. for list items. Further, as shown below, a nested function can also be parameterized to customize its behavior:
 
