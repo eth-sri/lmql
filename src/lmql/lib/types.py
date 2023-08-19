@@ -81,7 +81,7 @@ def extract_json(s):
 @lmql.query
 async def single_shot_as_type(s, ty, model="chatgpt"):
     '''lmql
-    argmax(openai_chunksize=1024)
+    argmax(openai_chunksize=2048)
         schema_description = type_schema_description(ty)
         "Provided a data schema of the following schema: {schema_description}\n"
         "Translate the following into a JSON payload: {s}\n"
@@ -117,6 +117,7 @@ async def is_type(ty, description=False):
     indent = ""
     while len(stack) > 0:
         t = stack.pop(0)
+        
         if type(t) is tuple:
             k = t[0]
             element_type = t[1]
@@ -141,7 +142,8 @@ async def is_type(ty, description=False):
                     "\"{existing_value}\"{line_end}"
                 else:
                     '"[STRING_VALUE]"{line_end}' where STOPS_BEFORE(STRING_VALUE, '"') and \
-                        STOPS_AT(COMMA_OR_BRACKET, ",") and ESCAPED(STRING_VALUE) and STOPS_BEFORE(STRING_VALUE, '"')
+                        STOPS_AT(COMMA_OR_BRACKET, ",") and ESCAPED(STRING_VALUE) and STOPS_BEFORE(STRING_VALUE, '"') and \
+                        len(TOKENS(STRING_VALUE)) > 1
             elif key_type is int:
                 if type(existing_value) is int:
                     "{existing_value}{line_end}"
@@ -163,7 +165,7 @@ async def is_type(ty, description=False):
                 indent += ""
                 stack = [(k, "dict-item", key_type[k], existing_value.get(k)) for k in key_type.keys()] + ["DEDENT", f"}}{line_end}"] + stack
             elif type(key_type) is list:
-                "["
+                "[["
                 existing_value = existing_value or []
                 indent += ""
                 stack = [("", "list-item", key_type[0], (0, existing_value))] + ["DEDENT", f"]{line_end}"] + stack
@@ -174,7 +176,7 @@ async def is_type(ty, description=False):
 
             if multiplicity == "n":
                 # check if another list-item should follow
-                "[COMMA_OR_BRACKET]" where STOPS_AT(COMMA_OR_BRACKET, ",") and STOPS_AT(COMMA_OR_BRACKET, "]") and ERASE(COMMA_OR_BRACKET)
+                "[COMMA_OR_BRACKET]" where STOPS_AT(COMMA_OR_BRACKET, ",") and STOPS_AT(COMMA_OR_BRACKET, "]") and ERASE(COMMA_OR_BRACKET) and len(TOKENS(COMMA_OR_BRACKET)) == 1
                 if not "]" in COMMA_OR_BRACKET:
                     ","
                     stack = [("", "list-item", key_type, (index+1, existing_list))] + stack
