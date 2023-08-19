@@ -58,8 +58,9 @@ class GenerateBatch:
     def from_calls(cls, calls):
         input_ids = [c.prompt for c in calls]
         max_len = max(len(ids) for ids in input_ids)
-        input_ids = [[0] * (max_len - len(ids)) + ids for ids in input_ids]
+        
         attention_mask = [[0] * (max_len - len(ids)) + [1] * len(ids) for ids in input_ids]
+        input_ids = [[0] * (max_len - len(ids)) + ids for ids in input_ids]
         
         temperature = calls[0].kwargs.get("temperature", 0.0)
         max_tokens = max(c.kwargs.get("max_tokens", 32) for c in calls)
@@ -97,12 +98,12 @@ class ScoreStreamer:
             scored_ids = batch.input_ids[i][offset:]
             call = batch.calls[i]
 
-            for i, (score, token) in enumerate(zip(scores, scored_ids)):
+            for j, (score, token) in enumerate(zip(scores, scored_ids)):
                 token_payload = {
                     "token": int(token),
                     "stream_id": call.stream_id,
                     "logprob": float(score),
-                    "finish_reason": "stop" if i == len(scores) - 1 else None
+                    "finish_reason": "stop" if j == len(scores) - 1 else None
                 }
                 call.put(token_payload)
 

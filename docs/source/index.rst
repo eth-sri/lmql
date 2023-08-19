@@ -1,19 +1,17 @@
-💬 Welcome to LMQL
+Welcome To LMQL
 ===================================
 
-**LMQL** (Language Model Query Language) is a programming language for large language model (LM) interaction. 
-It facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness 
-of Python. It has a focus on multi-part prompting and enables novel forms of LM interaction via `scripting <language/scripted_prompts.md>`_, `constraint-guided decoding <language/constraints.md>`_, `tool augmentation <language/functions.md>`_, and efficiency.
+.. raw:: html
+  
+  <div class="subtitle"><img class="inline-logo" src="_static/images/lmql.svg"/> LMQL is a programming language for large language model interaction.</div>
 
-LMQL is a research project by the `Secure,  Reliable, and Intelligent Systems Lab <https://www.sri.inf.ethz.ch/>`_ at ETH Zürich.
+LMQL facilitates LLM interaction by combining the benefits of natural language prompting with the expressiveness 
+of Python. The project is focused on enabling type-safe and robust LLM interaction, while providing a seamless experience via `scripted prompting <language/scripted_prompts.md>`_, `constraint-guided decoding <language/constraints.md>`_, `nested functions <language/functions.md>`_ and `program interoperation <language/tools.md>`_.
 
 Quick Start
 -----------
 
-To get started with LMQL, check out the :doc:`quickstart` guide.
-
-
-We also provide the following resources to get started with LMQL:
+To get started with LMQL, check out the :doc:`quickstart` guide or one of the following resources:
 
 
 .. raw:: html
@@ -58,13 +56,46 @@ We also provide the following resources to get started with LMQL:
 Contents
 --------
 
+To learn more about LMQL, select one of the following sections or navigate the documentation using the sidebar.
+
+.. grid:: 2
+
+    .. grid-item-card:: 🏔️ Language Overview
+        :link: language/overview.md
+          
+        Get started with the LMQL language and learn about its core concepts.
+
+    .. grid-item-card:: ⛓️ Constraints
+       :link: language/constraints.md
+
+       Learn more about token-level constraints and how to use them to guide LLM reasoning.
+
+    .. grid-item-card:: 🐍 Python Integration
+       :link: python/python.ipynb
+
+       Seamlessly interleave LMQL with Python code to integrate LMQL into your existing workflows.
+
+    .. grid-item-card:: 💬 Chat Applications
+       :link: lib/chat.rst
+
+       Learn how to build a chat application with LMQL.
+
+    .. grid-item-card:: 🚜 Available Backends
+       :link: language/models.rst
+
+       Use LMQL with a range of inference backends, including llama.cpp,
+       `transformers`, and OpenAI.
+      
+
 .. toctree::
+  :hidden:
   :maxdepth: 1
 
   quickstart
   installation
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: 📖 LMQL Language 
    
@@ -72,10 +103,21 @@ Contents
    language/scripted_prompts.md
    language/constraints.md
    language/decoders.md
-   language/models.rst
    language/functions.md
+   language/decorators.md
+   language/models.rst
+   language/tools.md
 
 .. toctree::
+    :hidden:
+    :maxdepth: 2
+    :caption: 📦 Standard Library
+    
+    lib/chat.rst
+    lib/output.md
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: 🔗 Python Integration
     
@@ -83,10 +125,10 @@ Contents
     python/langchain.ipynb
     python/llama_index.ipynb
     python/pandas.ipynb
-    python/output.md
     python/comparison.md
-   
+
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: 💬 Contribute
     

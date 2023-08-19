@@ -1,12 +1,14 @@
 from typing import Tuple
 import torch
 from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
-import random
+import numpy as np
 
 class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
         self.model_args = kwargs
+
+        self.max_batch_size = kwargs.pop("batch_size", 32)
 
         if self.model_args.pop("loader", None) == "auto-gptq":
             from auto_gptq import AutoGPTQForCausalLM
@@ -20,18 +22,16 @@ class TransformersLLM(LMTPModel):
         print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
 
-        self.max_batch_size = kwargs.get("batch_size", 8)
-
     @property
     def eos_token_id(self):
         return self.model.config.eos_token_id
 
     def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-        input_ids = torch.tensor(input_ids)
-        attention_mask = torch.tensor(attention_mask)
+        input_ids = torch.tensor(input_ids).to(self.model.device)
+        attention_mask = torch.tensor(attention_mask).to(self.model.device)
         
         # prepare model inputs
-        model_inputs = self.model.prepare_inputs_for_generation(input_ids, **model_kwargs, eos_token_id=self.eos_token_id)
+        model_inputs = self.model.prepare_inputs_for_generation(input_ids, **model_kwargs, attention_mask=attention_mask, eos_token_id=self.eos_token_id)
         model_inputs["attention_mask"] = attention_mask
 
         token_scores = []
@@ -43,22 +43,22 @@ class TransformersLLM(LMTPModel):
             output_hidden_states=False,
         )
 
-        next_token_logits = outputs.logits[:, -len(input_ids), :]
+        next_token_logits = outputs.logits[:, :-1, :]
         next_token_logits = torch.log_softmax(next_token_logits, dim=-1)
-        token_scores = next_token_logits.gather(-1, input_ids)
+        token_scores = next_token_logits.gather(-1, input_ids[:,1:].unsqueeze(-1))
 
-        return token_scores
+        return np.array([[0.0] + scores.flatten().tolist() for scores in token_scores])
     
     def generate(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor: torch.FloatTensor, streamer: TokenStreamer) -> LMTPModelResult:
-        input_ids = torch.tensor(input_ids)
-        attention_mask = torch.tensor(attention_mask)
+        input_ids = torch.tensor(input_ids).to(self.model.device)
+        attention_mask = torch.tensor(attention_mask).to(self.model.device)
         
         kwargs = {
-            "input_ids": input_ids.to(self.model.device),
+            "input_ids": input_ids,
             "do_sample": temperature > 0.0,
-            "attention_mask": attention_mask.to(self.model.device),
+            "attention_mask": attention_mask,
             "temperature": temperature,
             "max_new_tokens": max_new_tokens,
             "logits_processor": self.logits_processors(bias_tensor),
@@ -85,7 +85,7 @@ class TransformersLLM(LMTPModel):
                 if bias_tensors is None:
                     bias_tensors = torch.tensor(make_bias_tensor(logit_biases, scores.shape[-1])).to(scores.device)
 
-                return scores + bias_tensors
+                return torch.log_softmax(scores + bias_tensors, dim=-1)
 
         return [BatchLogitsProcessor()]
 

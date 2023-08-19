@@ -1,0 +1,69 @@
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+ENV PYTHONUNBUFFERED=1 
+
+# NVIDIA GPU support
+RUN apt-get update --yes --quiet && DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet --no-install-recommends \
+    software-properties-common \
+    build-essential apt-utils \
+    wget curl vim git ca-certificates kmod \
+    nvidia-driver-525 \
+ && rm -rf /var/lib/apt/lists/*
+
+# PYTHON 3.10
+RUN add-apt-repository --yes ppa:deadsnakes/ppa && apt-get update --yes --quiet
+RUN DEBIAN_FRONTEND=noninteractive apt-get install --yes --quiet --no-install-recommends \
+    python3.10 \
+    python3.10-dev \
+    python3.10-distutils \
+    python3.10-lib2to3 \
+    python3.10-gdbm \
+    python3.10-tk \
+    pip
+
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 999 \
+    && update-alternatives --config python3 && ln -s /usr/bin/python3 /usr/bin/python
+
+RUN pip install --upgrade pip
+
+# install lmql
+WORKDIR lmql
+VOLUME ~/.lmql/
+ARG GPU_ENABLED
+
+HEALTHCHECK CMD curl --fail http://localhost:$PORT/ || exit 1
+
+RUN apt-get update
+
+# install release version of lmql (for dependencies)
+RUN pip install "lmql[hf]"
+
+COPY . /lmql
+# re-install lmql from source 
+WORKDIR /lmql
+RUN pip install -e ".[hf]"
+
+VOLUME /transformers
+RUN ls /transformers
+
+ENV LMQL_VERSION="latest"
+
+# checkout LMQL version
+RUN if [ "$LMQL_VERSION" != "latest" ]; then git checkout tags/$LMQL_VERSION; fi
+
+# if ENV EXTRA_PIP_PACKAGES is set, install them at runtime (e.g. bitsandbytes or auto_gptq), not at build time
+ENV EXTRA_PIP_PACKAGES=""
+
+# create run.sh 
+RUN echo "#!/bin/bash \n\
+    set -x \n\
+    # install extra pip packages \n\
+    if [ \"\$EXTRA_PIP_PACKAGES\" != \"\" ]; then \n\
+        pip install \$EXTRA_PIP_PACKAGES \n\
+    fi \n\
+    # start lmql \n\
+    lmql serve-model --port 8899 --host 0.0.0.0 --docker_hide_port \$@" > run.sh
+
+RUN chmod +x run.sh
+
+ENTRYPOINT ["./run.sh"]

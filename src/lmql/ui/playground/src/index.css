@@ -105,23 +105,3 @@ a {
 a:hover {
   text-decoration: underline;
 }
-
-/* 
-#root {
-  margin: 100pt;
-}
-
-#sidepanel {
-  background-color: white;
-  border: 1pt solid #b2b2b2;
-  color: black;
-}
-
-#sidepanel h2 {
-  color: black;
-}
-
-#sidepanel button {
-  color: black;
-  background-color: #b2b2b2;
-} */

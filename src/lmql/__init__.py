@@ -16,6 +16,8 @@ import tempfile
 
 import lmql.runtime.lmql_runtime as lmql_runtime
 import lmql.runtime.lmql_runtime as runtime_support
+from lmql.runtime.lmql_runtime import is_query
+
 from lmql.utils.docstring_parser import *
 from lmql.language.compiler import LMQLCompiler
 # re-export lmql runtime functions
@@ -28,13 +30,11 @@ from lmql.runtime.interpreter import LMQLResult
 
 from lmql.models.model import model
 from lmql.runtime.loop import main
+import lmql.runtime.decorators as decorators
 
 from typing import Optional
 
 model_registry = LMQLModelRegistry
-
-def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
-    print("warning: connect() is deprecated. Use set_backend() instead.")
 
 def autoconnect():
     model_registry.autoconnect = True
@@ -63,7 +63,7 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     with open(filepath, "r") as f:
         code = f.read()
     
-    q = _query_from_string(code, output_writer=printing)
+    q = _query_from_string(code, output_writer=output_writer)
     return await q(*args, **kwargs)
 
 async def run(code, *args, **kwargs):
@@ -191,6 +191,9 @@ def query(__fct__=None, input_variables=None, is_async=True, calling_frame=None,
     module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
     module.query.extra_args = extra_args
+
+    # name the query function after the decorated function
+    module.query.name = fct.__name__
 
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)

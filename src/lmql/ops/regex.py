@@ -5,7 +5,13 @@ import sre_constants as c
 import sys
 from copy import copy
 
-REGEX_DERIVATIVE_FAILED = -1
+CATEGORY_PATTERNS = {c.CATEGORY_DIGIT: re.compile(r'\d'),
+                     c.CATEGORY_NOT_DIGIT: re.compile(r'\D'),
+                     c.CATEGORY_SPACE: re.compile(r'\s'),
+                     c.CATEGORY_NOT_SPACE: re.compile(r'\S'),
+                     c.CATEGORY_WORD: re.compile(r'\w'),
+                     c.CATEGORY_NOT_WORD: re.compile(r'\W'),}
+
 
 def _deparse(seq):
     if seq is None: return seq
@@ -14,6 +20,8 @@ def _deparse(seq):
         if op == c.ANY:
             pattern += '.'
         elif op == c.LITERAL:
+            if chr(arg) in sre_parse.SPECIAL_CHARS:
+                pattern += '\\'
             pattern += chr(arg)
         elif op == c.MAX_REPEAT:
             min, max, item = arg
@@ -38,6 +46,10 @@ def _deparse(seq):
         elif op == c.IN:
             assert isinstance(arg, list)
             pattern += '[' + ''.join([_deparse([a]) for a in arg]) + ']'
+        elif op == c.CATEGORY:
+            pattern += CATEGORY_PATTERNS[arg].pattern
+        elif op == c.NEGATE:
+            pattern += '^'
         else:
             assert False, f"unsupported regex pattern {op} with arg {arg}"
     return pattern
@@ -52,26 +64,46 @@ def _consume_char(char, seq, verbose=False, indent=0):
     assert isinstance(seq, list)
     if len(seq) == 0: return None
     op, arg = seq[0]
-    if verbose: print(' '*indent + f"{seq} -> {op}") 
+
+    def _ret(out):
+        if verbose: print('->', out)
+        return out
+
+    if verbose: print(' '*indent + f"{seq} -{char}-> Operator {op}", end='') 
     if op == c.ANY:
-        return seq[1:]
+        return _ret(seq[1:])
     elif op == c.LITERAL:
         if arg == char: return seq[1:]
-        else: return None
+        else:
+            return _ret(None)
     elif op == c.IN:
+
+        negate = False 
+        patterns = arg
+        if arg[0][0] == c.NEGATE:
+            negate = True
+            patterns = arg[1:]
+        
         match_found = False
-        for a in arg:
+        for a in patterns:
             if a[0] == c.LITERAL:
                 match_found = (a[1] == char)
             elif a[0] == c.RANGE:
                 match_found = (a[1][0] <= char <= a[1][1])
-            else: return None
+            elif a[0] == c.CATEGORY:
+                if a[1] in CATEGORY_PATTERNS:
+                    match_found = CATEGORY_PATTERNS[a[1]].fullmatch(chr(char)) is not None
+                else:
+                    raise NotImplementedError(f"unsupported regex pattern {op}{a}")
+            else:
+                raise NotImplementedError(f"unsupported regex pattern {op}{a}")
             if match_found: break
-        if match_found: return seq[1:]
-        else: return None
+        if match_found != negate: # xor -> either match and not negate or no match and negate
+            return _ret(seq[1:])
+        else: return _ret(None)
         low, high = arg[0][1]
-        if low <= char <= high: return seq[1:]
-        else: return None
+        if low <= char <= high: return _ret(seq[1:])
+        else: return _ret(None)
     elif op == c.BRANCH:
         must_be_none, branches = arg
         assert must_be_none is None
@@ -79,18 +111,23 @@ def _consume_char(char, seq, verbose=False, indent=0):
         for i, branch in enumerate(branches):
             dbranch = _consume_char(char, list(branch), verbose=verbose, indent=indent+2)
             if dbranch is not None: branches_out.append(dbranch)
-        if len(branches_out) == 0: return None
-        seq[0] = (op, (must_be_none, branches_out))
-        return seq
+        if len(branches_out) == 0: return _ret(None)
+        out = _simplify([(op, (must_be_none, branches_out))])
+        out.extend(seq[1:])
+        return _ret(out)
     elif op == c.SUBPATTERN:
         arg0, arg1, arg2, sseq = arg
-        assert arg0==1 and arg1==0 and arg2==0
+        assert arg1==0 and arg2==0
         assert isinstance(sseq, (sre_parse.SubPattern, list))
         sseq = list(sseq)
         dsseq = _consume_char(char, sseq, verbose=verbose, indent=indent+2)
-        if dsseq is None: return None
-        seq[0] = (op, (arg0, arg1, arg2, dsseq))
-        return seq
+        if dsseq is None:
+            return _ret(None)
+        if len(dsseq) == 0:
+            return _ret(seq[1:])
+        out = _simplify([(op, (arg0, arg1, arg2, dsseq))])
+        out.extend(seq[1:])
+        return _ret(out)
     elif op == c.MAX_REPEAT:
         min_occr, max_occr, sseq = arg
         sseq = list(sseq)
@@ -99,15 +136,15 @@ def _consume_char(char, seq, verbose=False, indent=0):
             if min_occr == 0:
                 # could not consume optional character
                 # but could recover with next
-                return _consume_char(char, seq[1:], verbose=verbose, indent=indent) 
-            else: return None
+                return _ret(_consume_char(char, seq[1:], verbose=verbose, indent=indent))
+            else: return _ret(None)
         min_occr = max(min_occr - 1, 0)
         if max_occr != c.MAXREPEAT:
             max_occr = max(max_occr - 1, min_occr)
         out = dsseq
         if max_occr > 0:
             out += [(op, (min_occr, max_occr, sseq))]
-        return out + seq[1:]
+        return _ret(out + seq[1:])
     else:
         raise NotImplementedError(f"unsupported regex pattern {op}")
 
@@ -131,6 +168,8 @@ def _simplify(seq):
         elif op == c.SUBPATTERN:
             arg0, arg1, arg2, sseq = arg
             sseq = _simplify(sseq)
+            if len(sseq) == 0:
+                return None
             if len(sseq) == 1 and sseq[0][0] != sre_parse.BRANCH:
                 return sseq[0]
             arg = arg0, arg1, arg2, sseq
@@ -233,6 +272,35 @@ if __name__ == "__main__":
     assert Regex(r"ab").d("ab").compare_pattern(r"")
     assert Regex(r"a+bc").d("a").compare_pattern(r"a*bc")
     assert Regex(r"a?bc").d("b").compare_pattern(r"c")
+    assert Regex(r".+c").d("b").pattern == ".*c"
+    
+    # escape
+    assert Regex(r"\.a").d(".").pattern == "a"
+    assert Regex(r"\.a").d("a") is None
+    
+    # branches 
     assert Regex(r"(a|bb)c").d("b").pattern == "bc"
     assert Regex(r"(b|bb)c").d("b").compare_pattern(r"b?c")
-    assert Regex(r".+c").d("b").pattern == ".*c"
+    assert Regex(r" (a|b)").d(" a").pattern == ""
+    assert Regex(r" (a|b) ").d(" a").pattern == " "
+    assert Regex(r" (a|b) ").d(" a ").pattern == ""
+    assert Regex(r" (a|bb|ab) ").d(" a ").pattern == "" 
+    
+    # special sequences
+    assert Regex(r"\da").d("1").compare_pattern(r"a")
+    assert Regex(r"\Da").d("a").compare_pattern(r"a")
+    assert Regex(r"\sa").d(" ").compare_pattern(r"a")
+    assert Regex(r"\Sa").d("1").compare_pattern(r"a")
+    assert Regex(r"\wa").d("1").compare_pattern(r"a")
+    assert Regex(r"\Wa").d(" ").compare_pattern(r"a")
+    assert Regex(r"a\Wa").d("a").compare_pattern(r"\Wa")
+    assert Regex(r"a\wa").d("a").compare_pattern(r"\wa")
+    assert Regex(r"a\Sa").d("a").compare_pattern(r"\Sa")
+    assert Regex(r"a\sa").d("a").compare_pattern(r"\sa")
+    assert Regex(r"a\Da").d("a").compare_pattern(r"\Da")
+    assert Regex(r"a\da").d("a").compare_pattern(r"\da")
+
+    # negation
+    assert Regex(r"[^A-Z]a").d("1").compare_pattern(r"a")
+    assert Regex(r"[^A-Z]a").d("A") is None
+    assert Regex(r"a[^A-Z]").d("a").compare_pattern(r"[^A-Z]")

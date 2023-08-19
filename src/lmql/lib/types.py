@@ -2,6 +2,7 @@ import lmql
 import json
 from dataclasses import dataclass, fields, is_dataclass
 from typing import List
+import warnings
 
 global is_oneshot
 is_oneshot = True
@@ -101,7 +102,7 @@ async def is_type(ty, description=False):
         try:
             already_parsed = json.loads(simple_json_result)
         except Exception as e:
-            print("Failed to parse JSON result from one-shot query: ", e, [simple_json_result])
+            warnings.warn("Failed to parse JSON result from one-shot query: " + str(e) + str([simple_json_result]))
             already_parsed = {}
     else:
         already_parsed = {}
@@ -110,7 +111,7 @@ async def is_type(ty, description=False):
     if description:
         "JSON Format:"
         "{type_schema_description(ty)}\n"
-    "As JSON: "
+    "(continue in JSON) "
     schema = type_schema(ty)
     stack = [("", "top-level", schema, already_parsed)]
     indent = ""
@@ -185,7 +186,7 @@ async def is_type(ty, description=False):
             "{indent}{t}"
         else:
             assert False, "not a supported type" + str(t)
-    payload = context.prompt.rsplit("JSON: ",1)[1]
+    payload = context.prompt.rsplit("JSON) ",1)[1]
     try:
         json_payload = json.loads(payload)
     except Exception as e:

@@ -4,6 +4,7 @@ import asyncio
 import sys
 from dataclasses import dataclass
 import random
+import warnings
 import pickle
 import os
 import time
@@ -21,13 +22,14 @@ def set_logit_bias_logging(value):
 class EmptyStreamError(Exception): pass
 class ChaosException(openai.APIError): pass
 class APIShutDownException(RuntimeError): pass
+
+class OpenAILogitBiasLimitationWarning(Warning): pass
 class MaximumRetriesExceeded(Exception): 
     def __init__(self, error: Exception, retries: int):
         self.error = error
         self.retries = retries
     
     def __str__(self):
-        print(self.error)
         return f"Maximum retries exceeded ({self.retries}) with error {type(self.error)}: {str(self.error)}"
 
 class Batcher:
@@ -119,7 +121,6 @@ def make_request_args(tasks):
 
 @dataclass
 class Stats:
-    prompt_tokens: int = 0
     tokens: int = 0
     requests: int = 0
     errors: int = 0
@@ -496,7 +497,7 @@ class ResponseStreamSliceIterator:
                 # if the stream of our self.slice errors out, we can recover by creating a new 
                 # stream via a new call to openai.Completion.create
                 attempt: RecoveryAttempt = data
-                print("OpenAI API: Underlying stream of OpenAI complete() call failed with error", type(attempt.error), attempt.error, f"Retrying... (attempt: {self.retries})", flush=True)
+                warnings.warn(f"OpenAI API: Underlying stream of OpenAI complete() call failed with error {type(attempt.error)} {attempt.error} Retrying... (attempt: {self.retries})")
                 self.retries += 1
                 # if we have exceeded the maximum number of retries, raise the error
                 if self.retries > attempt.maximum_retries:
@@ -664,9 +665,6 @@ class AsyncOpenAIAPI:
             async for x in aiter:
                 yield x
 
-        num_prompt_tokens = sum([len(p) for p in kwargs["prompt"]])
-        self.stats.prompt_tokens += num_prompt_tokens
-
         res = complete(**kwargs)
         first = await anext(res)
         return first_buffered(res, first)
@@ -686,7 +684,7 @@ class AsyncOpenAIAPI:
                 while True:
                     try:
                         if retries != self.maximum_retries:
-                            print("Retrying", retries, "more times")
+                            warnings.warn("Retrying {} more times".format(retries))
                             await asyncio.sleep(0.5)
                         task = asyncio.create_task(self._create(**kwargs))
                         res = await asyncio.wait_for(task, timeout=5.5)
@@ -696,7 +694,7 @@ class AsyncOpenAIAPI:
                             raise e
                         self.stats.errors += 1
                         retries -= 1            
-                        print("OpenAI:", str(e), '"' + str(type(e)) + '"', flush=True)
+                        warnings.warn("OpenAI: " + str(e) + ' "' + str(type(e)) + '"')
                         # do not retry if the error is definitive (API configuration error)
                         if "api.env" in str(e): raise e
                         if kwargs.get("api_config", {}).get("errors", None) == "raise":
@@ -706,7 +704,7 @@ class AsyncOpenAIAPI:
                             raise e
                         if type(e) is TimeoutError or type(e) is OpenAIRateLimitError:
                             t = (2.0 * random.random()) ** (self.maximum_retries - retries)
-                            print("Backing off for", t , "seconds")
+                            warnings.warn("Backing off for {} seconds".format(t))
                             await asyncio.sleep(t)
             except asyncio.CancelledError as e:
                 break
@@ -746,7 +744,7 @@ class AsyncOpenAIAPI:
                 biases = biases[:300]
             global logit_bias_logging
             if logit_bias_logging:
-                print("warning: the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.", file=sys.stderr)
+                warnings.warn("the required logit_bias is too large to be handled by the OpenAI API and will be limited to the first 300 tokens. This can lead to the violation of the provided constraints or undesired model output. To avoid this use less broad or no constraints.", category=OpenAILogitBiasLimitationWarning)
             kwargs["logit_bias"] = {t:b for t,b in biases}
 
         assert kwargs.get("echo", False), f"bopenai requires echo=True for to enable proper error recovery. Please handle proper prompt removal in client code."

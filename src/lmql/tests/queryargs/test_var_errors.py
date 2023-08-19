@@ -6,7 +6,7 @@ async def positional_only(s: str):
     argmax
         return s
     from
-        "chatgpt"
+        "random"
     where
         STOPS_AT(ANSWER, "test") and STOPS_AT(OTHER, "test")
     '''
@@ -19,10 +19,10 @@ async def noinput_but_specified():
     argmax
         return s, CONSTANT
     from
-        "chatgpt"
+        "random"
     '''
 
-MODEL = "chatgpt"
+MODEL = "random"
 @lmql.query
 async def external_model():
     '''lmql
@@ -30,6 +30,8 @@ async def external_model():
         "Hi[SEP]"
     from
         MODEL
+    where
+        len(TOKENS(SEP)) < 10
     '''
 
 

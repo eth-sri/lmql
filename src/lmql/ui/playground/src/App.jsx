@@ -50,6 +50,12 @@ const ContentContainer = styled.div`
   width: calc(100% - 4pt);
   height: calc(100% - 2pt);
   margin: 2pt;
+
+  @media (max-width: 40em) {
+    margin: 0pt;
+    height: 100%;
+    width: 100%;
+  }
 `;
 
 const Panel = styled.div.attrs(props => ({ className: "panel" }))`
@@ -413,7 +419,7 @@ const ModelSelectionDiv = styled.div`
   top: 0pt;
   right: 0pt;
   height: 18pt;
-  width: 40%;
+  width: 60%;
 
   &:hover {
     border-bottom: 1pt solid grey;
@@ -457,7 +463,7 @@ const ModelSelectionDiv = styled.div`
     border-radius: 4pt;
     text-align: left;
     max-height: 300pt;
-    max-height: calc(100vh - 100pt);
+    max-height: calc(50vh - 100pt);
     overflow-y: scroll;
     display: none;
     z-index: 999;
@@ -515,13 +521,14 @@ const ModelSelectionDiv = styled.div`
   .option:hover.selected, .option.selected {
     background-color: #c4c4c4;
   }
-  
+
   >input {
     z-index: 3;
     right: 20pt;
     font-size: 8pt;
     color: #ffffffae;
     padding-left: 5pt;
+    padding-right: 5pt;
     font-family: monospace;
     z-index: 999;
     border-radius: 2pt;
@@ -543,6 +550,7 @@ const ModelSelectionDiv = styled.div`
     right: 7pt;
     z-index: 1;
     opacity: 0.4;
+    cursor: pointer;
   }
 
   .overlay {
@@ -557,8 +565,8 @@ const ModelSelectionDiv = styled.div`
   }
 `
 
-function ModelSelection() {
-  const [model, setModel] = useState(persistedState.getItem("playground-model"))
+function ModelSelection(props) {
+  const [model, setModel] = useState(persistedState.getItem("playground-model") || "")
   const [selectOpen, setSelectOpen] = useState(false)
 
   const onChange = (value) => {
@@ -598,29 +606,32 @@ function ModelSelection() {
     }
   }
 
-  return <ModelSelectionDiv className={(model == "automatic" ? "auto" : "") + (selectOpen ? " active" : "") }>
-    <input spellCheck={false} placeholder="automatic" value={model} onChange={e => onChange(e.target.value)} autoCorrect={false} onKeyDown={onInputEnter}/>
+  // show as Fixed Model: <model>, edit as just <model>
+  let inputModel = selectOpen ? model : (model != "" && model != "automatic" ? "Running With: " + model : model)
+
+  return <ModelSelectionDiv className={(model == "automatic" || model == "" ? "auto" : "") + (selectOpen ? " active" : "") }>
+    <input spellCheck={false} placeholder="automatic" value={inputModel} onChange={e => onChange(e.target.value)} autoCorrect={"false"} onKeyDown={onInputEnter} onFocus={() => setSelectOpen(true)}/>
     <div className={'select ' + (selectOpen ? "open" : "")}>
-      <span class="instructions">
+      <span className="instructions">
         <b>Custom Model</b><br/>
-        Specify the model to execute your query with. You can also type in the text field above.
+        Specify the model to execute your query with. You can also type in the text field above. <i>This setting will override any model specified by the query.</i>
         {configuration.BROWSER_MODE ? <><br/><a href={"https://docs.lmql.ai/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
           Install LMQL locally </a> to use other models, e.g. from 🤗 Tranformers</>
         : null}
       </span>
-      {Object.keys(PREDEFINED).map(k => <>
+      {Object.keys(PREDEFINED).map(k => <div key={k}>
         {k != "" ? <h2 key={"key-"+k}>{k}</h2> : null}
-        {PREDEFINED[k].map(o => <div className={'option' + (o.name == model ? " selected" : "")} 
-          onClick={() => {onChange(o.name); setSelectOpen(false);}} key={k+o}>
+        {PREDEFINED[k].map((o,i) => <div className={'option' + (o.name == model ? " selected" : "")} 
+          onClick={() => {onChange(o.name); setSelectOpen(false);}} key={k+"o"+i}>
           {o.name}
-          <span class="note">
+          <span className="note">
             {o.note}
           </span>
         </div>)}
-        </>)
+        </div>)
       }
     </div>
-    <div class="overlay" style={{display: selectOpen ? "block" : "none"}} onClick={() => setSelectOpen(false)}></div>
+    <div className="overlay" style={{display: selectOpen ? "block" : "none"}} onClick={() => setSelectOpen(false)}></div>
     <BsPlus onClick={() => setSelectOpen(!selectOpen)}/>
   </ModelSelectionDiv>
 }
@@ -667,8 +678,8 @@ function EditorPanel(props) {
     editor.onDidChangeModelContent(() => {
       persistedState.setItem("lmql-editor-contents", editor.getValue())
     })
-  }
-  
+  };
+
   let fontSize = window.innerWidth < 700 ? 10 : 16
   if (displayState.mode == "embed") fontSize = 10
 
@@ -791,11 +802,14 @@ const Row = styled.div`
 
   /* if screen < 320pt */
   @media (max-width: 40em) {
+
     &.simple-mode {
       flex-direction: column;
       height: calc(100%);
       padding: 0;
       margin-right: 4pt;
+
+      margin-bottom: 0pt;
     }
 
     &.simple-mode.simple .panel {

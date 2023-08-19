@@ -4,8 +4,9 @@ LMQL runtime components.
 """
 import os
 import pathlib
+import warnings
 
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 CACHE_DIR = pathlib.Path.home() / ".cache" / "lmql"
 
 def prepare_cache_access():
@@ -29,7 +30,7 @@ def prepare_cache_access():
         cache_is_valid = False
     
     if not cache_is_valid:
-        print("LMQL cache directory ({}) format is outdated, clearing cache (existing: v{}, runtime: v{})...".format(CACHE_DIR, cache_version, CACHE_VERSION))
+        warnings.warn("LMQL cache directory ({}) format is outdated, clearing cache (existing: v{}, runtime: v{})...".format(CACHE_DIR, cache_version, CACHE_VERSION))
         for f in os.listdir(CACHE_DIR):
             os.remove(os.path.join(CACHE_DIR, f))
         with open(os.path.join(CACHE_DIR, "cache-version"), "w") as f:
@@ -59,6 +60,6 @@ class CacheDirFile:
             f.write(str(CACHE_VERSION))
 
 def cachefile(path, mode):
-    if not cache_file_exists(path) and "r" in mode:
+    if not cache_file_exists(os.path.join(CACHE_DIR, path)) and "r" in mode:
         raise FileNotFoundError("Cache file {} does not exist".format(path))
     return CacheDirFile(path, mode)

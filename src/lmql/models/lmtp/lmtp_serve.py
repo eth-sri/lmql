@@ -4,8 +4,10 @@ Command Line Interface for lmtp_inference_server.py.
 
 from .lmtp_inference_server import *
 from .utils import rename_model_args
+from .lmtp_balance import balance_main
+from .lmtp_layout import layout_main
 
-def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, loader=None, **kwargs):
+def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, static=False, **kwargs):
     """
     Serves the provided model as an LMTP/LMQL inference endpoint.
 
@@ -17,7 +19,7 @@ def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, stati
         cuda (bool, optional): If set, the model will be loaded on the GPU. Defaults to False.
         dtype (str, optional): What format to load the model weights. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes). Defaults to None.
         static (bool, optional): If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument. Defaults to False.
-        loader (str, optional): If set, the model will be loaded using a library other than transformers. This is useful when loading quantized models in formats that are not yet supported by Transformers (like GTPQ). Defaults to None.
+        loader (str, optional): If set, the model will be loaded using a library other than transformers, e.g. "auto-gtpq". This is useful when loading quantized models in formats that are not yet supported by Transformers (like GTPQ). Defaults to None.
         **kwargs: Any other argument will be passed as a keyword argument to the AutoModelForCausalLM.from_pretrained function.
 
     """
@@ -28,7 +30,6 @@ def serve(model_name, host="localhost", port=8080, cuda=False, dtype=None, stati
         "cuda": cuda,
         "dtype": dtype,
         "static": static,
-        "loader": loader,
         **kwargs
     })
 
@@ -39,10 +40,12 @@ def lmtp_serve_main(model_args):
 
     # extract explicit arguments
     host = model_args.pop("host", "localhost")
-    port = model_args.pop("port", 8080)
-    model = model_args.pop("model", None)
+    port = int(model_args.pop("port", 8080))
+    model = model_args.pop("model", "auto")
     single_thread = model_args.pop("single_thread", False)
     static = model_args.pop("static", False) or single_thread
+    # in Docker, don't show the port (it's not accessible from outside the container anyway)
+    docker_hide_port = model_args.pop("docker_hide_port", False)
     
     assert not single_thread or model != "auto", "Cannot use --single_thread mode with model 'auto'. Please specify a specific model to load."
 
@@ -67,7 +70,10 @@ def lmtp_serve_main(model_args):
     
     def web_print(*args):
         if len(args) == 1 and args[0].startswith("======== Running on"):
-            print(f"[Serving LMTP endpoint on ws://{host}:{port}/]")
+            if docker_hide_port:
+                print(f"[Serving LMTP endpoint on Docker container port]")
+            else:
+                print(f"[Serving LMTP endpoint on ws://{host}:{port}/]")
         else:
             print(*args)
     
@@ -81,27 +87,45 @@ def argparser(args):
     next_argument_name = None
     
     kwargs = {}
-    flag_args = ["cuda", "static", "single_thread"]
+    flag_args = ["cuda", "static", "single_thread", "docker_hide_port"]
 
     help_text = """
 usage: serve-model [-h] [--port PORT] [--host HOST] [--cuda] [--dtype DTYPE] [--[*] VALUE] model
 
 positional arguments:
-  model          The model to load or 'auto' if the model should be automatically loaded on client request.
+
+  model            The model to load or 'auto' if the model should be automatically loaded on client request.
+                   
+                   Can also be 'balance', in which case this serve-model instance will act as a load balancing
+                   reverse proxy for multiple endpoints, e.g. lmql serve-model balance localhost:8081 localhost:8082 localhost:8083
 
 options:
-  -h, --help     show this help message and exit
+
+  -h, --help       show this help message and exit
   --port PORT
   --host HOST
   --cuda
-  --static      If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument.
-  --dtype DTYPE  What format to load the model weights. Options: 'float16'
-                 (not available on all models), '8bit' (requires bitsandbytes)
-  --loader OPT  If set, the model will be loaded using the corresponding option. Useful for loading quantized modules in formats not
-                supported by the transformers library, like GPTQ. Available options:
-                * auto-gptq (loads GPTQ based quantized models with auto-gptq. Consider adding `--use_safetensors true` if the model is
-                             distributed in the safetensor format)
-  --[*] VALUE   Any other argument will be passed as a keyword argument to the AutoModelForCausalLM.from_pretrained function.
+  --static         If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument.
+  
+  --single_thread  Run the model on the main thread. This can lead to increased latency when processing multiple requests, but is necessary 
+                   for some models that cannot be run in the background (e.g. falcon).
+  
+  --dtype DTYPE    What format to load the model weights in. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes), 
+                   '4bit' (requires bitsandbytes).
+  
+  --loader OPT     If set, the model will be loaded using the corresponding option. Useful for loading quantized modules in formats not
+                   supported by the transformers library, like GPTQ. Available options:
+                    
+                   * auto-gptq (loads GPTQ based quantized models with auto-gptq. Consider adding `--use_safetensors true` if the model is
+                     distributed in the safetensor format)
+  
+  --layout [GROUPS]x[DEVICES]   If set, a fleet of worker processes will be started to run multiple models in parallel. The layout specifies
+                                how many instances are served, and how many GPUs to use per instance. For example, `--layout 2x2` will start 2
+                                instances, each using 2 GPUs (devices 0,1 and 2,3). The provided --port argument will be used as the base port
+                                that load balances between the instances. For more information and more advanced setups see lmtp_layout.py.
+                            
+  --[*] VALUE      Any other argument will be passed as a keyword argument to the relevant backend implementation, e.g. the 
+                   AutoModelForCausalLM.from_pretrained function.
     """
 
     for arg in args:
@@ -146,6 +170,22 @@ options:
 
     return kwargs
 
+def cli(args=None):
+    args = args or sys.argv[2:]
+
+    if len(args) > 0 and args[0] == "balance":
+        # when running as a balancer we do not serve ourselves, but instead
+        # route all traffice to worker nodes
+        args = args[1:]
+        balance_main(args)
+        return
+    elif "--layout" in args:
+        # instead of running directly, with a layout we are launching the
+        # relevant worker subprocesses, which in turn call lmtp_serve_main
+        layout_main(args)
+    else:
+        args = argparser(args)
+        lmtp_serve_main(args)
+
 if __name__ == "__main__":
-    args = argparser(sys.argv[1:])
-    lmtp_serve_main(args)
+    cli()

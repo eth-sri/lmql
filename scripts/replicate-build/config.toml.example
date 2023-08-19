@@ -1,0 +1,75 @@
+dest_prefix = "r8.im/YOURACCOUNT/"
+
+[models]
+
+## Llama-2-7b base
+[models.llama-2-7b-hf--lmql-4bit]
+huggingface.repo = "meta-llama/Llama-2-7b-hf" # could also set huggingface.version
+config.load_in_4bit = true
+
+[models.llama-2-7b-hf--lmql-8bit]
+huggingface.repo = "meta-llama/Llama-2-7b-hf"
+config.load_in_8bit = true
+
+[models.llama-2-7b-hf--lmql]
+huggingface.repo = "meta-llama/Llama-2-7b-hf"
+
+## Llama-2-7b chat
+[models.llama-2-7b-chat-hf--lmql-4bit]
+huggingface.repo = "meta-llama/Llama-2-7b-chat-hf"
+config.load_in_4bit = true
+
+[models.llama-2-7b-chat-hf--lmql-8bit]
+huggingface.repo = "meta-llama/Llama-2-7b-chat-hf"
+config.load_in_8bit = true
+
+[models.llama-2-7b-chat-hf--lmql]
+huggingface.repo = "meta-llama/Llama-2-7b-chat-hf"
+
+## Llama-2 13b base
+[models.llama-2-13b-hf--lmql-4bit]
+huggingface.repo = "meta-llama/Llama-2-13b-hf"
+config.load_in_4bit = true
+
+[models.llama-2-13b-hf--lmql-8bit]
+huggingface.repo = "meta-llama/Llama-2-13b-hf"
+config.load_in_8bit = true
+
+[models.llama-2-13b-hf--lmql]
+huggingface.repo = "meta-llama/Llama-2-13b-hf"
+
+## Llama-2 13b chat
+[models.llama-2-13b-chat-hf--lmql-4bit]
+huggingface.repo = "meta-llama/Llama-2-13b-chat-hf"
+config.load_in_4bit = true
+
+[models.llama-2-13b-chat-hf--lmql-8bit]
+huggingface.repo = "meta-llama/Llama-2-13b-chat-hf"
+config.load_in_8bit = true
+
+[models.llama-2-13b-chat-hf--lmql]
+huggingface.repo = "meta-llama/Llama-2-13b-chat-hf"
+
+## Llama-2 70b base
+[models.llama-2-70b-hf--lmql-4bit]
+huggingface.repo = "meta-llama/Llama-2-70b-hf"
+config.load_in_4bit = true
+
+[models.llama-2-70b-hf--lmql-8bit]
+huggingface.repo = "meta-llama/Llama-2-70b-hf"
+config.load_in_8bit = true
+
+[models.llama-2-70b-hf--lmql]
+huggingface.repo = "meta-llama/Llama-2-70b-hf"
+
+## Llama-2 70b chat
+[models.llama-2-70b-chat-hf--lmql-4bit]
+huggingface.repo = "meta-llama/Llama-2-70b-chat-hf"
+config.load_in_4bit = true
+
+[models.llama-2-70b-chat-hf--lmql-8bit]
+huggingface.repo = "meta-llama/Llama-2-70b-chat-hf"
+config.load_in_8bit = true
+
+[models.llama-2-70b-chat-hf--lmql]
+huggingface.repo = "meta-llama/Llama-2-70b-chat-hf"

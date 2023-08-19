@@ -4,19 +4,27 @@ var readline = require('readline');
 const stream = require('stream')
 
 const cors = require('cors')
+const crypto = require('crypto')
 const fs = require("fs")
 const express = require("express")
 const path = require('path');
 const app = require('express')();
 const http = require('http');
+const onHeaders = require('on-headers')
 const server = http.createServer(app);
 const io = require('socket.io')(server, {
   cors: {
     origin: '*',
   }
 })
-const exec = require('child_process').exec;
+const execFile = require('child_process').execFile;
 const spawn = require('child_process').spawn
+
+const hashString = function(s) {
+  return crypto.createHash('sha1').update(s).digest('hex')
+}
+
+const content_dir = process.env.content_dir || path.join(__dirname, 'base')
 
 let outputs = {};
 
@@ -30,14 +38,15 @@ io.on('connection', s => {
     const app_arguments = request.app_arguments;
     
     // run "python live.py endpoints" and get output lines as array
-    exec(`python live.py endpoints ${app_name}`, (err, stdout, stderr) => {
+    execFile(`python`, [`live.py`, `endpoints`, app_name], (err, stdout, stderr) => {
         if (err) {
             console.log(err);
             s.emit("app-error", stdout + stderr)
             return;
         }
         // get endpoints from output lines
-        const endpoints = stdout.split('\n');
+        // trimEnd in case we are on windows
+        const endpoints = stdout.split('\n').map(line => line.trimEnd());
         // remove empty lines
         endpoints.splice(endpoints.length - 1, 1);
         // find endpoint name in endpoints
@@ -79,49 +88,14 @@ io.on('connection', s => {
   })
 });
 
-app.get('/', (req, res) => {
-  // disable all caching
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, 'base/index.html'));
-});
-
-// serve client.js
-app.get('/client.js', (req, res) => {
-  let client_script = fs.readFileSync(path.join(__dirname, 'base/client.js'), {encoding: 'utf8'})
-  client_script = client_script.replace("<<<PORT>>>", port)
-  res.send(client_script)
-})
-
-// serve base/base.css
-app.get('/base.css', (req, res) => {
-    res.sendFile(path.join(__dirname, 'base/base.css'));
-});
-
-// serve all files in node_modules/monaco-editor/min as /monaco
-app.use('/vs', express.static(path.join(__dirname, 'node_modules/monaco-editor/min/vs')));
-app.use('/js/vs', express.static(path.join(__dirname, 'node_modules/monaco-editor/min/vs')));
-app.use('/app/vs', express.static(path.join(__dirname, 'node_modules/monaco-editor/min/vs')));
-
-// Expose the node_modules folder as static resources (to access socket.io.js in the browser)
-app.use('/static', express.static('node_modules'));
-
-app.get('/socket.io.min.js', (req, res) => {
-    // send client js for socket io
-    res.sendFile(path.join(__dirname, 'node_modules/socket.io/client-dist/socket.io.min.js'));
-});
-
-app.get('/socket.io.min.js.map', (req, res) => {
-    res.sendFile(path.join(__dirname, 'node_modules/socket.io/client-dist/socket.io.min.js.map'));
-});
-
 // serve /app/<app_name>
 app.get('/app/:app_name', (req, res) => {
   const app_name = req.params.app_name;
   // disable all caching
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  let html = fs.readFileSync(path.join(__dirname, 'base/index.html'), {encoding: 'utf8'})
+  let html = fs.readFileSync(path.join(content_dir, 'index.html'), {encoding: 'utf8'})
   
-  exec(`python live.py client-html ${app_name}`, (err, stdout, stderr) => {
+  execFile(`python`, [`live.py`, `client-html`, app_name], (err, stdout, stderr) => {
     if (err) {
         console.log(err);
         res.send(html.replace("<<<CLIENT_HTML>>>", "Failed to load app html for app."))
@@ -135,7 +109,7 @@ app.get('/app/:app_name', (req, res) => {
 app.get('/app/:app_name/app-client.js', (req, res) => {
   const app_name = req.params.app_name;
   // run "python live.py endpoints" and get output lines as array
-  exec(`python live.py client-script ${app_name}`, (err, stdout, stderr) => {
+  execFile(`python`, [`live.py`, `client-script`, app_name], (err, stdout, stderr) => {
     if (err) {
         console.log(err);
         res.send("")
@@ -144,6 +118,26 @@ app.get('/app/:app_name/app-client.js', (req, res) => {
     }
   });
 })
+
+function unsetLastModified() {
+  this.removeHeader('Last-Modified')
+}
+
+// see "digits" as defined in page 89 of Eelco Dolstra's PhD thesis; note some characters removed to reduce likelihood
+// of hashes forming offensive words.
+let nixStoreRegex = /^\/nix\/store\/([0123456789abcdfghijklmnpqrsvwxyz]{32})-/
+app.use('/',
+  express.static(content_dir, {
+    setHeaders: (res, path, stat) => {
+      if (nixStoreRegex.test(path)) {
+        // For Nix store contents, timestamp is set to 1 second past epoch and must be ignored.
+        // However, we can use a hash of the path as an ETag, since the path itself includes a hash.
+        res.set('ETag', hashString(path))
+        onHeaders(res, unsetLastModified)
+      }
+    }
+  })
+)
 
 let running_processes = {}
 

@@ -82,7 +82,7 @@ class ScrollState {
         if (element.metadata.environments) {
             for (let e of element.metadata.environments) {
                 if (this["hide-" + e]) {
-                    className += " hidden";
+                    className += " cmd-hidden";
                 }
                 if (this["fade-" + e]) {
                     className += " faded";
@@ -161,8 +161,6 @@ function render_var(element, cursor_state) {
     if (element.var == "#") {
         return render_heading(element, cursor_state);
     }
-
-    console.log(element.var, element.metadata)
 
     let var_name = ""
     if (!element.var.startsWith("_") && !element.var == "") {

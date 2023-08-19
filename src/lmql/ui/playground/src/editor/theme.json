@@ -79,13 +79,13 @@
       "token": "entity.name.function"
     },
     {
-      "foreground": "ffb86c",
-      "fontStyle": "italic",
+      "foreground": "E5C07B",
       "token": "variable.parameter"
     },
     {
-      "foreground": "ff79c6",
-      "token": "entity.name.tag"
+      "foreground": "56B6C2",
+      "token": "tag",
+      "fontStyle": "italic"
     },
     {
       "foreground": "50fa7b",

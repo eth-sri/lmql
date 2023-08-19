@@ -7,6 +7,7 @@ Experimental and not usable with LMQL, due to threading issues.
 from queue import Queue
 from .lmtp_client import *
 import threading
+import warnings
 
 async def threading_main_async(queue: Queue, token_queue: Queue, kill_event: threading.Event):
     transport = LMTPThreadingTransport(token_queue)
@@ -76,7 +77,7 @@ class LMTPThreadedClient:
                     consumers = self.iterators.get(stream_id, [])
                     for q in consumers: q.put_nowait(d)
             except Exception as e:
-                print("failed to handle msg", e, flush=True)
+                warnings.warn("failed to handle msg {}: {}".format(msg, e))
 
     async def close(self):
         for itr_list in self.iterators.values():

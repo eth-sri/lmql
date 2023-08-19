@@ -47,7 +47,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -174,3 +173,4 @@ wip-snippets
 .lmql-algorithms-cache
 
 *.tokens
+transformers-cache
