@@ -174,3 +174,26 @@ min-height::10em
 ![ITEM|- Phone charger]
 ![ITEM|- Sunscreen]
 ```
+
+## Nested Queries in Python
+
+To use nested queries from a Python context, you can just reference one `@lmql.query` function from another.
+
+```python
+
+@lmql.query
+def dateformat():
+    '''lmql
+    "(respond in DD/MM/YYYY)[ANSWER]"
+    return ANSWER.strip()
+    '''
+
+@lmql.query
+def main_query():
+    '''lmql
+    "Q: It is August 12th, 2020. What date was it \
+    100 days ago? [ANSWER: dateformat]"
+    '''
+```
+
+Here, `main_query` references `dateformat` as a nested query, where both functions are defined on the top level of the same file. However, you can also import and reuse query code from other files, as long as they are accessible from the scope of you main query function. Using this ability you can write libraries of reusable query functions to be used across your application or even by other users.
