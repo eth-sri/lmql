@@ -57,7 +57,7 @@
     poetryEnvReplicate = mkPoetryEnv { wantReplicate = true; };
     poetryEnvAll = mkPoetryEnv { inherit llamaDotCppPkg; wantHf = true; wantReplicate = true; };
 
-    mkLmtpServerApp = {llamaDotCppPkg, ...} @ opts: {
+    mkLmtpServerApp = {llamaDotCppPkg ? null, ...} @ opts: {
       type = "app";
       program = "${pkgs.writeShellScript "run-lmtp-server" ''
         set -a
