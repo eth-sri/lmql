@@ -53,7 +53,7 @@ def _get_secret_from_file() -> Tuple[str, str]:
 
     if not any(os.path.exists(p) for p in search_paths if p is not None):
         m = _MISSING_CREDS_ERROR_MSG_TEMPLATE.format(
-            "\n".join(" - " + p for p in search_paths if p is not None)
+            search_paths="\n".join(" - " + p for p in search_paths if p is not None)
         )
         raise FileNotFoundError(m)
 
