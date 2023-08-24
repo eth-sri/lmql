@@ -16,6 +16,8 @@ project.
 
 **General Testing** For general testing, please make sure that your code is compatible with multiple backends, e.g. if possible try to test with `transformers` models, OpenAI models and `llama.cpp`. LMQL is designed as a vendor-agnostic language, which means all features should be available across all backends. If you do not have the hardware to test changes with multiple backends, please make sure to ask a team member to run the tests for you, before merging your pull request.
 
+**Dependency Changes/Updates** After adding new dependencies, `scripts/flake.d/poetry.lock` needs to be updated. This can be done by running `(cd scripts/flake.d && exec poetry lock --no-update)` (if you run Nix, `nix develop .#minimal` will put you in a shell with the `poetry` command available, even if the `poetry.lock`, `pyproject.cfg`, and other related files are currently broken). If you are able, please also check that the Nix build works after making dependency changes; if you're not in a position to do this, please feel encouraged to request a hand on Discord.
+
 **Running Test Suites** The repository contains a number of test suites in the `src/lmql/tests/` directory. To run all 
 tests simply run `python src/lmql/tests/all.py`. Note that for some tests you need to configure an
 OpenAI API key according to the instructions in [documentation](https://docs.lmql.ai/en/stable/language/openai.html).
