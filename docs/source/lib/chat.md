@@ -38,6 +38,5 @@ Perform input sanitization to defend against prompt injection attacks.
 chat/overview
 chat/serving
 chat/internal
-<!-- chat/tools -->
 chat/defend
 ```

@@ -21,6 +21,10 @@ def get_decorated_function_code(fct):
 
     source = ""
 
+    doc = fct.__doc__
+    if doc.startswith("inline-lmql"):
+        doc = doc[len("inline-lmql"):].strip()
+        return doc.replace("__ESCAPE_NL__", "\\n")
     try:
         source = inspect.getsource(fct)
         # dedent source
@@ -41,7 +45,7 @@ def get_decorated_function_code(fct):
         common_indent = None
         lines = []
         for line in source[start-1:end]:
-            if line.strip() == "" or line.strip() == '"""lmql' or line.strip() == "'''lmql":
+            if line.strip() == "" or line.strip() == '"""lmql' or line.strip() == "'''lmql" or line.strip() == "'lmql" or line.strip() == '"lmql':
                 lines.append(line)
                 continue
             if common_indent is None:

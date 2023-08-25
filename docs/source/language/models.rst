@@ -21,7 +21,7 @@ LMQL offers two ways to specify the model that is used as underlying LLM:
 
 **Specifying the Model Externally**: The second option is to specify the model and its parameters externally, i.e. separately from the actual program code:
 
-
+ 
 .. code-block:: python
 
     import lmql
@@ -70,3 +70,4 @@ Available Model Backends
     ./azure.md
     ./hf.md
     ./llama.cpp.md
+    ./replicate.md

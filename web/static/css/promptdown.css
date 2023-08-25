@@ -77,6 +77,10 @@
     background: transparent;
 }
 
+.hidden .promptdown-bubble {
+    display: none;
+}
+
 .promptdown-bubble {
     background-color: white;
     padding: 10pt;
@@ -220,6 +224,10 @@
     display: none;
 }
 
+.cmd-hidden {
+    display: none !important;
+}
+
 .faded {
     opacity: 0.5;
     transition: opacity 0.5s;
@@ -254,8 +262,17 @@
     background-color: rgb(254, 178, 89);
 }
 .promptdown .color-yellow {
-    background-color: rgb(254, 254, 89);
+    background-color: rgb(251, 251, 192);
 }
 .promptdown .color-ochre {
     background-color: rgb(138, 188, 152);
+}
+
+.promptdown button.promptdown-button-replay {
+    position: absolute;
+    top: 6pt;
+    right: 10pt;
+    animation: fadein 0.2s;
+    color: rgb(89, 122, 254);
+    font-size: 0.8em;
 }

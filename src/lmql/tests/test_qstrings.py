@@ -101,4 +101,13 @@ def test_with_types_and_decorators():
     # with a.b.c decorator
     assert_parse("Hello[@lmql.test WHO]!", ["Hello", TemplateVariable("WHO", decorator_exprs=["lmql.test"], index=0), "!"])
 
+
+def test_functions():
+    assert_parse("Hello [f(WHO)]!", ["Hello ", TemplateVariable("f(WHO)", index=0), "!"])
+    assert_parse("Hello [f(WHO, 1, 'this is a test')]!", ["Hello ", TemplateVariable("f(WHO, 1, 'this is a test')", index=0), "!"])
+    assert_parse("Hello [f(WHO, 1, 'this is a test'): int]!", ["Hello ", TemplateVariable("f(WHO, 1, 'this is a test')", type_expr="int", index=0), "!"])
+    
+    assert_parse("Hi [inline_use(REASONING, [wiki, calc])]!", ["Hi ", TemplateVariable("inline_use(REASONING, [wiki, calc])", index=0), "!"])
+    
+
 run_all_tests(globals())

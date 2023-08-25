@@ -41,7 +41,7 @@ def lmtp_serve_main(model_args):
     # extract explicit arguments
     host = model_args.pop("host", "localhost")
     port = int(model_args.pop("port", 8080))
-    model = model_args.pop("model", None)
+    model = model_args.pop("model", "auto")
     single_thread = model_args.pop("single_thread", False)
     static = model_args.pop("static", False) or single_thread
     # in Docker, don't show the port (it's not accessible from outside the container anyway)
@@ -171,7 +171,7 @@ options:
     return kwargs
 
 def cli(args=None):
-    args = args or sys.argv[1:]
+    args = args or sys.argv[2:]
 
     if len(args) > 0 and args[0] == "balance":
         # when running as a balancer we do not serve ourselves, but instead

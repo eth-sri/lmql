@@ -2,7 +2,7 @@ name: lmql-no-gpu
 dependencies:
   - python=3.10
   - pip
-  - conda-forge::nodejs=18.15
+  - conda-forge::nodejs=20
   - pip:
     - astunparse
     - openai

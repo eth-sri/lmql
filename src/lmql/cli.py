@@ -22,8 +22,7 @@ def cmd_chat():
         return
     file = sys.argv[2]
     absolute_path = os.path.abspath(file)
-    os.chdir(project_root)
-    os.system("python -m lmql.lib.chat " + absolute_path)
+    subprocess.run([sys.executable, "-m", "lmql.lib.chat", absolute_path], cwd=project_root)
 
 def cmd_run():
     """
@@ -83,7 +82,7 @@ def cmd_run():
 
 def ensure_node_install():
     try:
-        v = subprocess.check_output("node --version", shell=True, stderr=subprocess.DEVNULL).decode("utf-8").strip()
+        subprocess.check_output(["node", "--version"], stderr=subprocess.DEVNULL).decode("utf-8").strip()
     except:
         print("""node.js is not installed. Please install it to use the LMQL playground.
 
@@ -110,27 +109,39 @@ def cmd_playground():
     print(f"[lmql playground {project_root}, liveserver=localhost:{args.live_port}, ui=localhost:{args.ui_port}]")
 
     # # make sure yarn is installed
-    if os.system("yarn --version") != 0:
-        os.system("npm install -g yarn")
+    if subprocess.call(["yarn", "--version"]) != 0:
+        subprocess.run(['npm', 'install', '-g', 'yarn'], check=True)
 
     # repo commit
     if os.path.exists(os.path.join(project_root, "../.git")):
-        commit = subprocess.check_output("git rev-parse HEAD", shell=True, cwd=project_root).decode("utf-8").strip()
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=project_root).decode("utf-8").strip()
         commit = commit[:7]
-        has_uncomitted_files = len(subprocess.check_output("git status --porcelain", shell=True, cwd=project_root).decode("utf-8").strip()) > 0
+        has_uncomitted_files = len(subprocess.check_output(["git", "status", "--porcelain"], cwd=project_root).decode("utf-8").strip()) > 0
         if has_uncomitted_files:
             commit += ' (dirty)'
             commit = f'"{commit}"'
     else:        
         commit = version_info.commit
 
+    # Ensure that we can download dependencies before we start either live.js or the debug server
+    yarn_cwd_live = os.path.join(project_root, "lmql/ui/live")
+    subprocess.run(['yarn'], cwd=yarn_cwd_live, check=True)
+
+    yarn_cwd_playground = os.path.join(project_root, 'lmql/ui/playground')
+    subprocess.run(['yarn'], cwd=yarn_cwd_playground, check=True)
+
     # live server that executes LMQL queries and returns results and debugger data
-    live_process = subprocess.Popen("yarn && yarn cross-env PORT=" + str(args.live_port) + " node live.js", 
-        shell=True, cwd=os.path.join(project_root, "lmql/ui/live"))
+    live_process = subprocess.Popen(['yarn', 'cross-env', 'node', 'live.js'],
+        cwd=yarn_cwd_live,
+        env=dict(os.environ, PORT=str(args.live_port)),
+    )
 
     # UI that displays the debugger (uses live server API for data and remote execution)
-    ui_modern_process = subprocess.Popen(f"yarn && yarn cross-env REACT_APP_BUILD_COMMIT='{commit}' REACT_APP_SOCKET_PORT={args.live_port} yarn run start", 
-        shell=True, cwd=os.path.join(project_root, "lmql/ui/playground"))
+    ui_modern_process = subprocess.Popen(
+        ['yarn', 'cross-env', 'yarn', 'run', 'start'],
+        cwd=yarn_cwd_playground,
+        env=dict(os.environ, REACT_APP_BUILD_COMMIT=str(commit), REACT_APP_SOCKET_PORT=str(args.live_port)),
+    )
 
     try:
         live_process.wait()

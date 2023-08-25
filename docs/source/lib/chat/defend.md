@@ -54,7 +54,7 @@ from
 
 To run this program, make sure the `is_disallowed` function is also included in your program code.
 
-Even thought the system prompt explicitly instructs the model to reveal the hidden phrase, if asked for, the model will not do so. This is because
+Even though the system prompt explicitly instructs the model to reveal the hidden phrase, if asked for, the model will not do so. This is because
 *disallowed* inputs as detected by our sanitization function, are replaced with boilerplate text, which means the model never sees the original, malicious user message.
 
 **Extending the Scope** The set of disallowed phrases can easily be extended by additional examples, while checking for similarity is typically quite cheap even on CPU-only systems. This makes this approach a good candidate for a simple, yet effective defense against prompt injections.

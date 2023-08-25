@@ -30,8 +30,8 @@ class CacheFile:
                     return cache.get(str(self.initial_ids), {})
         return {}
     
-    def save(self, cache):
-        if os.path.exists(self.filename):
+    def save(self, cache, overwrite=False):
+        if os.path.exists(self.filename) and not overwrite:
             with open(self.filename, "rb") as f:
                 existing_cache = pickle.load(f)
                 if existing_cache.get("model") != self.model:
@@ -43,7 +43,7 @@ class CacheFile:
             print("warning: cache file is from a different model. Its contents will be overwritten. {} != {}".format(existing_cache.get("model"), self.model))
             existing_cache = {}
         existing_cache["model"] = self.model
-        existing_cache[str(self.initial_ids)] = cache
+        existing_cache[str(self.initial_ids)] = {k: v for k,v in cache.items() if not any(asyncio.isfuture(v) for v in v)}
         
         with open(self.filename, "wb") as f:
             pickle.dump(existing_cache, f)
@@ -97,8 +97,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             cf = CacheFile(self.cache_file, self.initial_ids, self.delegate.model_identifier)
             try:
                 cf.save(self.cache)
+            except EOFError:
+                cf.save(self.cache, overwrite=True)
             except Exception as e:
                 print("error: failed to save token cache to file", e, flush=True)
+                print([e])
                 pass
 
         self.model.cache_delegate = None

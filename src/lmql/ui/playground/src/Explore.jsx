@@ -218,7 +218,6 @@ const Tile = styled.div.attrs({
   margin-left: 0pt;
   margin-top: 0pt;
   cursor: pointer;
-  transition: 0.05s ease-in-out transform;
   height: 80pt;
   width: 100pt;
   border: 1pt solid #d4d4d4;
@@ -229,6 +228,8 @@ const Tile = styled.div.attrs({
   
   align-items: flex-start;
   justify-content: flex-start;
+
+  transition: 0.1s linear transform;
 
   :hover {
     transform: scale(1.05);
