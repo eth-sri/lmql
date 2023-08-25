@@ -38,7 +38,11 @@ if not has_docker_image() or args.rebuild:
     build_docker_image()
 
 PORT=2223
-GPUS=all
+GPUS="all"
+if args.extras != "":
+    EXTRAS = "-e EXTRA_PIP_PACKAGES='{}'".format(args.extras)
+else:
+    EXTRAS=""
 
 cmd = """docker run \\
     -p $PORT:8899 \\
@@ -50,7 +54,7 @@ cmd = """docker run \\
     .replace("$PORT", str(args.port)) \
     .replace("$@", " ".join(_)) \
     .replace("$CACHE", args.transformers_cache) \
-    .replace("$EXTRAS", f"-e EXTRA_PIP_PACKAGES='{args.extras}'" if args.extras != "" else "")
+    .replace("$EXTRAS", EXTRAS)
 
 print(">", cmd)
 os.system(cmd)
