@@ -81,5 +81,31 @@ def test_double_tail_call():
     "The answer is [ANSWER: cot_one_of(['Hello', 'Greetings'])]"
     '''
 
+class NestedQueryMethods:
+    def __init__(self):
+        self.a = 12
+
+    @lmql.query
+    def chain_of_thought(self):
+        '''lmql
+        """A. Let's think step by step ({self.a}):
+        [REASONING]
+        Therefore the answer is[ANSWER]""" where STOPS_AT(ANSWER, ".") and len(TOKENS(ANSWER)) == 10 and len(TOKENS(REASONING)) == 10
+        return ANSWER.strip() 
+        '''
+
+    @lmql.query(model=lmql.model("random", seed=123))
+    def question(self):
+        '''lmql
+        """Q: Why is the sky blue?
+        [ANSWER: self.chain_of_thought]"""
+        return ANSWER.strip().rstrip(".").capitalize()
+        '''
+
+def test_nested_queries():
+    q = NestedQueryMethods()
+    r = q.question()
+    assert r[0] == "Pla stuntsvasive uspsribeicester defenders netted profoundly centos", f"Expected fixed random value but got {r}"
+
 if __name__ == "__main__":
     run_all_tests(globals())

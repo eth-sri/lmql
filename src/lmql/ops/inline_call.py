@@ -7,6 +7,14 @@ class InlineCallOp(Node):
     def __init__(self, predecessors, lcls, glbs):
         super().__init__(predecessors)
         fct, args = predecessors
+        
+        # check for bound method and value of self
+        if inspect.ismethod(fct):
+            self.self_binding = fct.__self__
+        else:
+            self.self_binding = None
+        
+        # apart from this use LMQLQueryFunction directly
         fct = fct.__lmql_query_function__
 
         variable_arg, self.args = args[0], args[1:]
@@ -26,11 +34,6 @@ class InlineCallOp(Node):
         
         # set positional arguments
         assert fct.function_context is not None, "LMQL in-context function " + str(fct) + " has no function context."
-        signature: inspect.Signature = fct.function_context.argnames
-        signature_args = signature.parameters
-        
-        # assert len(self.args) == len(signature_args), f"LMQL in-context function '{fct.name or str(fct)[:120]}' expects {len(signature_args)} positional arguments {fct.function_context.argnames} arguments, but got {len(self.args)} positional arguments: {self.args}"
-
         self.query_kwargs = None
 
     def execute_predecessors(self, trace, context):
@@ -63,6 +66,8 @@ class InlineCallOp(Node):
             kwargs = {k[0][len("__kw:"):]: k[1] for k in args if is_kwarg(k)}
             args = [a for a in args if not is_kwarg(a)]
 
+            if self.self_binding is not None:
+                kwargs["__self__"] = self.self_binding
             query_kwargs, _ = self.query_fct.make_kwargs(*args, **kwargs)
             self.query_kwargs = query_kwargs
         else:

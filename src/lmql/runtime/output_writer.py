@@ -90,7 +90,7 @@ class StreamingOutputWriter:
                     self.last_value = value
                 return
 
-            if clear:
+            if self.clear:
                 sys.stderr.write('\033c')
                 sys.stderr.flush()
             print(f"{prompt}\n", end="\r")

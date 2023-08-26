@@ -129,8 +129,10 @@ class LMQLQueryFunction:
         
         signature = self.function_context.argnames
         args_of_query = self.function_context.args_of_query
-        scope = self.function_context.scope
+        if "__self__" in kwargs: kwargs["self"] = kwargs.pop("__self__")
         
+        scope = self.function_context.scope
+
         runtime_args = {k:v for k,v in kwargs.items() if not k in signature.parameters.keys() and k not in args_of_query}
         query_kwargs = {k:v for k,v in kwargs.items() if k in signature.parameters.keys()}
 
@@ -154,11 +156,12 @@ class LMQLQueryFunction:
                     raise e
             else:    
                 if len(e.args) == 1 and e.args[0].startswith("missing "):
-                    e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
+                    e.args = (f"Call to @lmql.query function is " + e.args[0] + "." + f" Expecting {signature}, but got positional arguments {args} and keyword arguments {kwargs}.",)
                 elif len(e.args) == 1:
                     e.args = (e.args[0] + "." + f" Expecting {signature}, but got positional args {args} and {kwargs}.",)
                 raise e
         
+        # apply default arguments
         signature.apply_defaults()
 
         # special case, if signature is empty (no input variables provided)

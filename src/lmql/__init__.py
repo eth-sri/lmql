@@ -28,11 +28,13 @@ from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
 
-from lmql.models.model import model
+from lmql.models.model import model, LMQLModel
 from lmql.runtime.loop import main
 import lmql.runtime.decorators as decorators
 
-from typing import Optional
+from typing import Optional, Union
+from functools import wraps
+import lmql.language.inspect as inspect
 
 model_registry = LMQLModelRegistry
 
@@ -41,6 +43,14 @@ def autoconnect():
 
 def set_backend(backend):
     model_registry.backend_configuration = backend
+
+def set_default_model(model: Union[str, LMQLModel]):
+    """
+    Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are used.
+
+    This applies globally in the current process.
+    """
+    LMQLModelRegistry.default_model = model
 
 def load(filepath=None, autoconnect=False, force_model=None, output_writer=None):
     if autoconnect: 
@@ -177,24 +187,27 @@ def query(__fct__=None, input_variables=None, is_async=True, calling_frame=None,
     scope = LMQLInputVariableScope(fct, calling_frame)
     code = get_decorated_function_code(fct)
 
+    # compile query and load it into this python process
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(code)
     module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
-    
+
+    # get function signature
     is_async = inspect.iscoroutinefunction(fct)
+    decorated_fct_signature = inspect.signature(fct)
     
-    decorate_fct_signature = inspect.signature(fct)
     compiled_query_fct_args = inspect.getfullargspec(module.query.fct).args
     
     # set the function context of the query based on the function context of the decorated function
-    module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
+    module.query.function_context = FunctionContext(decorated_fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
     module.query.extra_args = extra_args
 
     # name the query function after the decorated function
     module.query.name = fct.__name__
 
+    @wraps(fct)
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)
 
