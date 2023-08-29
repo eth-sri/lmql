@@ -12,14 +12,15 @@ def instantiate_test_llm():
         # result is not important; would love to use "random"
         model="random",
         temperature=1.7,
-        max_length=10
+        max_length=10,
+        endpoint="127.0.0.1:5000"
     )
 
 # setup to run lmql serve-model
 @pytest.fixture(scope="module", autouse=True)
 def run_lmql_serve_model():
     import subprocess
-    p = subprocess.Popen(["lmql", "serve-model", "random", "--seed", "123"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen(["lmql", "serve-model", "random", "--host", "127.0.0.1", "--port", "5000", "--seed", "123"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     yield p
 
 # teardown to stop lmql serve-model

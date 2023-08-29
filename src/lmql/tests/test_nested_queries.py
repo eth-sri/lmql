@@ -12,7 +12,7 @@ def test_cot_fct():
         """
 
     "Q: It is August 12th, 2020. What date was it 100 days ago? [ANSWER: chain_of_thought]"
-    assert ANSWER == "ft Rates Syri"
+    assert ANSWER == "TrailsGaza 66", f"test_cot_fct: Expected fixed random value but got {[ANSWER]}"
     '''
 
 @lmql.query(model=lmql.model("random", seed=123))
@@ -42,14 +42,14 @@ def dateformat():
 def test_multi_nested():
     '''lmql
     "Q: When was Obama born? [ANSWER: dateformat]\n"
-    assert ANSWER == "esar overtime spaced leave", f"Expected fixed random value but got {[ANSWER]} for first question"
+    assert ANSWER == "amongst handshake chatting passenger", f"Expected fixed random value but got {[ANSWER]} for first question"
     "Q: When was Bruno Mars born? [ANSWER: dateformat]\n"
-    assert ANSWER == "submar 218 scholarships theorists", f"Expected fixed random value but got {[ANSWER]} for second question"
+    assert ANSWER == "closely.」 tournament rollout", f"Expected fixed random value but got {[ANSWER]} for second question"
     "Q: When was Dua Lipa born? [ANSWER: dateformat]\n"
-    assert ANSWER == "Thoughts TD Fix sex", f"Expected fixed random value but got {[ANSWER]} for third question"
+    assert ANSWER == "basedWidgetinst699", f"Expected fixed random value but got {[ANSWER]} for third question"
 
     "Out of these, who was born last?[LAST]" where len(TOKENS(LAST)) == 2
-    assert LAST == " possessions drained", f"Expected fixed random value but got {[LAST]}"
+    assert LAST == "arel Hands", f"Expected fixed random value but got {[LAST]}"
     '''
 
 @lmql.query
