@@ -10,7 +10,7 @@ TEST_TIMEOUT = float(os.environ.get("TEST_TIMEOUT", 3*60.0))
 errors = 0 
 files = [f for f in files if f.startswith("test_")]
 
-print(f"Testing LMQL distribution {lmql.__version__} at {lmql.__file__} with {len(files)} tests")
+print(f"Testing LMQL distribution {lmql.__version__} at {lmql.__file__} with {len(files)} test suites")
 
 for i,f in enumerate(files):
     try:

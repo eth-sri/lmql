@@ -19,6 +19,7 @@ from langchain.llms.utils import enforce_stop_tokens
 from langchain.schema import LLMResult
 
 from lmql.runtime.tokenizer import LMQLTokenizer, load_tokenizer
+from lmql.runtime.model_registry import LMQLModelRegistry
 
 if TYPE_CHECKING:
     from tenacity import RetryCallState
@@ -175,7 +176,12 @@ class LMTP(LLM):
 
             from langchain_lmtp import LMTP
 
-            llm = LMTP(model="lmtp://localhost:8000/1")
+            llm = LMTP(
+                model="gpt2",
+                temperature=1.7,
+                max_length=10,
+                # endpoint="localhost:8080", # default
+            )
     """
 
     model: str
@@ -226,10 +232,7 @@ class LMTP(LLM):
 
     def _get_tokenizer(self) -> LMQLTokenizer:
         if self.tokenizer is None:
-            if self.model.startswith("llama.cpp:"):
-                self.tokenizer = load_tokenizer("huggyllama/llama-7b")
-            else:
-                self.tokenizer = load_tokenizer(self.model)
+            self.tokenizer = LMQLModelRegistry.get(self.model).get_tokenizer()
         return self.tokenizer
 
     def _call(
@@ -305,7 +308,7 @@ class LMTP(LLM):
         decoded = None
 
         async with aiohttp.ClientSession() as session:
-            async with session.ws_connect("http://localhost:8080") as sock:
+            async with session.ws_connect("ws://" + self.endpoint) as sock:
                 client = LMTPWebSocketClient(self.model, sock)
                 client.connect()
 
