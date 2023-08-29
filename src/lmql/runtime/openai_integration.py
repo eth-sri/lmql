@@ -103,7 +103,12 @@ class DclibOpenAiModel(DcModel):
         
         self.model_identifier = "openai/" + self.model.model_identifier
 
-        self.model.chunk_size = kwargs.get("openai_chunksize", 64 if not self.mock else 8)
+        # check for openai_chunksize
+        if kwargs.get("openai_chunksize", None) is not None:
+            warnings.warn("Warning: openai_chunksize is deprecated. Please use 'chunksize' instead.")
+            kwargs["chunksize"] = kwargs["openai_chunksize"]
+
+        self.model.chunk_size = kwargs.get("chunksize", 64 if not self.mock else 8)
         self.model.nostop = kwargs.get("openai_nonstop", False)
         self.num_billed_tokens = {}
         self.num_requests = 0
@@ -195,6 +200,10 @@ class DclibOpenAiModel(DcModel):
         logprobs = []
         async for data in await openai.Completion.create(**kwargs):
             logprobs += data["logprobs"]["token_logprobs"]
+
+        # replace None at the beginning with 0.0
+        logprobs = [0.0 if v is None else v for v in logprobs]
+
         return np.array(logprobs[offset:], dtype=np.float32)
 
     async def queue_api_score(self, kwargs):
@@ -334,6 +343,8 @@ class DclibOpenAiModel(DcModel):
         buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
         t = b""
         to_skip = b"".join(input_ids)
+        if len(input_ids) == 0:
+            to_skip = b"<|endoftext|>"
 
         # skip echoed prompt prefix (cannot just offset by tokenized_input_ids since server-side the prompt may be tokenized differently)
         while len(t) < len(to_skip):
@@ -541,7 +552,10 @@ class DclibOpenAiModel(DcModel):
 
                 # get sampled token and score
                 next_token = complete_data["logprobs"]["tokens"]
-                next_token_score = complete_data["logprobs"]["token_logprobs"]
+                next_token_score = complete_data["logprobs"]["token_logprobs"] or 0.0 # assume 0.0 if logprob is None (beginning of sequence)
+                
+                if complete_data["logprobs"]["top_logprobs"] is None:
+                    complete_data["logprobs"]["top_logprobs"] = {complete_data["logprobs"]["tokens"]: 0.0}
                 
                 probs = sorted(list(complete_data["logprobs"]["top_logprobs"].items()))
                 logprobs = [p[1] for p in probs]

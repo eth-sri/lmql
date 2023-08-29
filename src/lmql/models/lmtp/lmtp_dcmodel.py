@@ -232,7 +232,7 @@ class LMTPDcModel(DcModel):
 
         ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
         
-        if self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
+        if len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
             ids = [self.tokenizer.bos_token_id] + ids
 
         return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
