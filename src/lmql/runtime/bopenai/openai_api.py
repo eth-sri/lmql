@@ -158,14 +158,17 @@ def get_endpoint_and_headers(kwargs):
     
     # use standard public API config
     from lmql.runtime.openai_secret import openai_secret, openai_org
+    headers = {
+        "Authorization": f"Bearer {openai_secret}",
+        "Content-Type": "application/json",
+    }
+    if openai_org:
+        headers['OpenAI-Organization'] = openai_org
     if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
         endpoint = "https://api.openai.com/v1/chat/completions"
     else:
         endpoint = "https://api.openai.com/v1/completions"
-    return endpoint, {
-        "Authorization": f"Bearer {openai_secret}",
-        "Content-Type": "application/json",
-    }
+    return endpoint, headers
 
 async def chat_api(**kwargs):
     global stream_semaphore
