@@ -20,7 +20,7 @@ def instantiate_test_llm():
 @pytest.fixture(scope="module", autouse=True)
 def run_lmql_serve_model():
     import subprocess
-    p = subprocess.Popen(["lmql", "serve-model", "random", "--host", "127.0.0.1", "--port", "5000", "--seed", "123"])
+    p = subprocess.Popen(["python", "-m", "lmql.cli", "serve-model", "random", "--host", "127.0.0.1", "--port", "5000", "--seed", "123"])
     yield p
 
 # teardown to stop lmql serve-model
