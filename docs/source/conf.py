@@ -65,6 +65,7 @@ html_theme_options = {
     "dark_logo": "_static/logo.svg",
     "twitter_url": "https://twitter.com/lmqllang",
     "github_url": "https://github.com/eth-sri/lmql",
+    "discord_url": "https://discord.gg/7eJP4fcyNT",
     "nav_links": [
         {
             "title": "Examples",
@@ -79,6 +80,4 @@ html_theme_options = {
             "url": "https://discord.gg/7eJP4fcyNT"
         }
     ],
-    "home_page_in_toc": True,
-    "show_navbar_depth": 3,
 }
