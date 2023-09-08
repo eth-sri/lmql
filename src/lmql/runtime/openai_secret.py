@@ -41,6 +41,7 @@ def _get_secret_from_env() -> Tuple[str, str]:
         openai_secret = os.environ["OPENAI_API_KEY"]
     else:
         raise ValueError("OpenAI API secret not found in env variables")
+    
     return openai_secret, openai_org
 
 
@@ -59,13 +60,21 @@ def _get_secret_from_file() -> Tuple[str, str]:
 
     valid_paths = [p for p in search_paths if os.path.exists(p)]
 
+    openai_secret = None
+    # openai_org is optional
+    openai_org = None
+    lines = []
+
     # get openai secret from file
     with open(valid_paths[0], "r") as f:
         for line in f:
+            lines += [line]
             if line.startswith("openai-secret: "):
                 openai_secret = line.split("openai-secret: ")[1].strip()
             elif line.startswith("openai-org: "):
                 openai_org = line.split("openai-org: ")[1].strip()
+
+    assert openai_secret is not None, "No 'openai-secret: ' entry found in api.env file:\n\n{}".format("".join(lines))
 
     return openai_secret, openai_org
 

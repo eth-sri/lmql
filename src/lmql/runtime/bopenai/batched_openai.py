@@ -497,7 +497,7 @@ class ResponseStreamSliceIterator:
                 # if the stream of our self.slice errors out, we can recover by creating a new 
                 # stream via a new call to openai.Completion.create
                 attempt: RecoveryAttempt = data
-                warnings.warn(f"OpenAI API: Underlying stream of OpenAI complete() call failed with error {type(attempt.error)} {attempt.error} Retrying... (attempt: {self.retries})")
+                warnings.warn(f"OpenAI API: Underlying stream of OpenAI complete() call failed with error\n\n{attempt.error} ({type(attempt.error)})\n\nRetrying... (attempt: {self.retries})", source=attempt.error)
                 self.retries += 1
                 # if we have exceeded the maximum number of retries, raise the error
                 if self.retries > attempt.maximum_retries:
@@ -697,6 +697,10 @@ class AsyncOpenAIAPI:
                         warnings.warn("OpenAI: " + str(e) + ' "' + str(type(e)) + '"')
                         # do not retry if the error is definitive (API configuration error)
                         if "api.env" in str(e): raise e
+                        # handle definitive errors
+                        if "Incorrect API key provided" in str(e): raise e
+                        if "No such organization" in str(e): raise e
+
                         if kwargs.get("api_config", {}).get("errors", None) == "raise":
                             raise e
                         await asyncio.sleep(0.5)
