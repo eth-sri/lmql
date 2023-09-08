@@ -24,6 +24,7 @@ extensions = [
     'sphinx.ext.intersphinx',
     "myst_parser",
     "lmql_snippets",
+    "warn_about_latest",
     "nbsphinx",
     "sphinx_design"
 ]

@@ -137,4 +137,3 @@ To learn more about LMQL, select one of the following sections or navigate the d
     Discord <https://discord.gg/7eJP4fcyNT>
     GitHub Issues <https://github.com/eth-sri/lmql/issues>
     E-Mail <mailto:hello@lmql.ai>
-  

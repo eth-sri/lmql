@@ -389,3 +389,14 @@ span.tag {
     padding: 0.2em;
     margin-left: 0.5em;
 }
+
+.note.latest {
+    font-size: 0.8em;
+    background-color: rgba(48, 237, 19, 0.135);
+    padding: 5pt;
+    margin-bottom: 10pt;
+}
+
+.note.latest .admonition-title {
+    font-size: 0.8em;
+}
