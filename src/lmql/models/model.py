@@ -2,6 +2,13 @@ from lmql.models.lmtp.utils import rename_model_args
 import warnings
 
 class LMQLModel:
+    """
+    Descriptor base class for results of lmql.model(...) calls.
+
+    The actual model runs either remotely (lmql serve-model), in-process via self.model or
+    via an API (e.g. OpenAI).
+    """
+
     def __init__(self, model_identifier, model=None, **kwargs):
         self.model_identifier = model_identifier
         self.kwargs = kwargs
@@ -19,7 +26,8 @@ LMQLModel.inprocess_instances = {}
 
 def inprocess(model_name, use_existing_configuration=False, **kwargs):
     """
-    Loads a 'transformers' model in-process.
+    Loads a 'transformers' model in-process and returns an LMQLModel object
+    to use this in-process model in LMQL.
 
     This is useful when you don't want to spawn a separate 'lmql serve-model' process.
 

@@ -312,7 +312,7 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
     # slow GPT-only tokenizer (python-backed)
     if PythonBackedTokenizer.is_available(model_identifier):
         if not "SLOW_TOKENIZER_OK" in os.environ.keys():
-            warnings.warn("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
+            warnings.warn("warning: using the slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken). The slow tokenizer is not recommended for production use and only supported for demo uses.".format(model_identifier), UserWarning, stacklevel=-1)
         
         return LMQLTokenizer(model_identifier, tokenizer_impl=PythonBackedTokenizer(model_identifier))
     

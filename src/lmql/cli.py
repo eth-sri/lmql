@@ -37,11 +37,16 @@ def cmd_run():
     parser.add_argument("lmql_file", type=str, help="path to the LMQL file to run")
     parser.add_argument("--no-clear", action="store_true", dest="no_clear", help="don't clear inbetween printing results")
     parser.add_argument("--no-realtime", action="store_true", dest="no_realtime", help="don't print text as it's being generated")
+    parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="don't print anything")
     parser.add_argument("--time", action="store_true", dest="time", help="Time the query.")
 
     args = parser.parse_args(sys.argv[2:])
 
     absolute_path = os.path.abspath(args.lmql_file)
+
+    if args.quiet:
+        args.no_clear = True
+        args.no_realtime = True
 
     writer = lmql.printing
     writer.clear = not args.no_clear

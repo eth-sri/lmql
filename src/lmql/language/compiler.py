@@ -443,8 +443,12 @@ class PromptClauseTransformation(FunctionCallTransformation):
             lcls = ast.Call(ast.Name("locals", ast.Load()), [], [])
             glbs = ast.Call(ast.Name("globals", ast.Load()), [], [])
             r = ast.Call(attr("lmql.runtime_support.type_expr"), [ast.Constant(var_name), node] + [lcls, glbs], [])
+        elif type(node) is ast.Attribute:
+            lcls = ast.Call(ast.Name("locals", ast.Load()), [], [])
+            glbs = ast.Call(ast.Name("globals", ast.Load()), [], [])
+            r = ast.Call(attr("lmql.runtime_support.type_expr"), [ast.Constant(var_name), node] + [lcls, glbs], [])
         else:
-            assert False, "compiler: invalid type expression: '{}'".format(node)
+            assert False, "compiler: not a supported type expression: '{}'".format(ast.unparse(node))
 
         return ast.unparse(r)
 

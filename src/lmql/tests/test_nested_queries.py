@@ -12,7 +12,7 @@ def test_cot_fct():
         """
 
     "Q: It is August 12th, 2020. What date was it 100 days ago? [ANSWER: chain_of_thought]"
-    assert ANSWER == "ft Rates Syri"
+    assert ANSWER == "TrailsGaza 66", f"test_cot_fct: Expected fixed random value but got {[ANSWER]}"
     '''
 
 @lmql.query(model=lmql.model("random", seed=123))
@@ -42,14 +42,14 @@ def dateformat():
 def test_multi_nested():
     '''lmql
     "Q: When was Obama born? [ANSWER: dateformat]\n"
-    assert ANSWER == "esar overtime spaced leave", f"Expected fixed random value but got {[ANSWER]} for first question"
+    assert ANSWER == "amongst handshake chatting passenger", f"Expected fixed random value but got {[ANSWER]} for first question"
     "Q: When was Bruno Mars born? [ANSWER: dateformat]\n"
-    assert ANSWER == "submar 218 scholarships theorists", f"Expected fixed random value but got {[ANSWER]} for second question"
+    assert ANSWER == "closely.」 tournament rollout", f"Expected fixed random value but got {[ANSWER]} for second question"
     "Q: When was Dua Lipa born? [ANSWER: dateformat]\n"
-    assert ANSWER == "Thoughts TD Fix sex", f"Expected fixed random value but got {[ANSWER]} for third question"
+    assert ANSWER == "basedWidgetinst699", f"Expected fixed random value but got {[ANSWER]} for third question"
 
     "Out of these, who was born last?[LAST]" where len(TOKENS(LAST)) == 2
-    assert LAST == " possessions drained", f"Expected fixed random value but got {[LAST]}"
+    assert LAST == "arel Hands", f"Expected fixed random value but got {[LAST]}"
     '''
 
 @lmql.query
@@ -80,6 +80,32 @@ def test_double_tail_call():
     '''lmql
     "The answer is [ANSWER: cot_one_of(['Hello', 'Greetings'])]"
     '''
+
+class NestedQueryMethods:
+    def __init__(self):
+        self.a = 12
+
+    @lmql.query
+    def chain_of_thought(self):
+        '''lmql
+        """A. Let's think step by step ({self.a}):
+        [REASONING]
+        Therefore the answer is[ANSWER]""" where STOPS_AT(ANSWER, ".") and len(TOKENS(ANSWER)) == 10 and len(TOKENS(REASONING)) == 10
+        return ANSWER.strip() 
+        '''
+
+    @lmql.query(model=lmql.model("random", seed=123))
+    def question(self):
+        '''lmql
+        """Q: Why is the sky blue?
+        [ANSWER: self.chain_of_thought]"""
+        return ANSWER.strip().rstrip(".").capitalize()
+        '''
+
+def test_nested_queries():
+    q = NestedQueryMethods()
+    r = q.question()
+    assert r[0] == "Pla stuntsvasive uspsribeicester defenders netted profoundly centos", f"Expected fixed random value but got {r}"
 
 if __name__ == "__main__":
     run_all_tests(globals())

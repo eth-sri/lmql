@@ -70,8 +70,7 @@ class TiktokenTokenizer:
         return b"".join(token_bytes).decode("utf-8", "replace")
     
     def convert_token_bytes_to_ids(self, tokens):
-        text = self.convert_bytes_to_string(tokens)
-        return self.encode(text)
+        return [self.enc.encode_single_token(t) for t in tokens]
 
     def __call__(self, text_or_list, add_special_tokens=False):
         if isinstance(text_or_list, str):
