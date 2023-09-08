@@ -21,8 +21,8 @@ argmax "Hello[WHO]" from "openai/{AZURE_DEPLOYMENT}" where len(TOKENS(WHO)) < 2
 """
 
 async def test_missing_api_type():
-    # this will try to use openai.com with Azure credentials
-    await run_with_env_vars(AZURE_API_KEY, AZURE_API_BASE, None, "Incorrect API key provided")
+    # this will try to use openai.com with Azure API base, which will fail
+    await run_with_env_vars(AZURE_API_KEY, AZURE_API_BASE, None, "Resource not found")
 
 async def test_all_valid():
     await run_with_env_vars(AZURE_API_KEY, AZURE_API_BASE, "azure-chat", None)
@@ -40,7 +40,7 @@ async def test_model_invalid_key():
     await run_with_lmql_model(AZURE_API_BASE, "azure-chat", "invalid-key", "Access denied due to invalid subscription key or wrong API endpoint.")
 
 async def test_model_invalid_base():
-    await run_with_lmql_model("https://doesnotexist404123.openai.azure.com/", "azure-chat", AZURE_API_KEY, "Cannot connect to host")
+    await run_with_lmql_model("https://doesnotexist404123.openai.azure.com/", "azure-chat", AZURE_API_KEY, "Error communicating with OpenAI")
 
 async def test_base_missing():
     await run_with_lmql_model(None, "azure-chat", AZURE_API_KEY, "Please specify the Azure API base URL")
@@ -101,6 +101,7 @@ async def run_with_env_vars(api_key, api_base, api_type, expected_error):
         if api_base is not None:
             env["OPENAI_API_BASE"] = api_base
 
+        # show all relevant envs
         assert_output_has_error(["lmql", "run", "f.lmql"], expected_error, env=env)
 
 

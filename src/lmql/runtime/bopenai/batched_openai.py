@@ -24,6 +24,8 @@ class ChaosException(openai.APIError): pass
 class APIShutDownException(RuntimeError): pass
 
 class OpenAILogitBiasLimitationWarning(Warning): pass
+class OpenAIRequestFailedWarning(Warning): pass
+
 class MaximumRetriesExceeded(Exception): 
     def __init__(self, error: Exception, retries: int):
         self.error = error
@@ -700,6 +702,7 @@ class AsyncOpenAIAPI:
                         # handle definitive errors
                         if "Incorrect API key provided" in str(e): raise e
                         if "No such organization" in str(e): raise e
+                        if "InvalidRequestError" in str(type(e)): raise e
 
                         if kwargs.get("api_config", {}).get("errors", None) == "raise":
                             raise e
@@ -735,7 +738,7 @@ class AsyncOpenAIAPI:
             request_id = self.request_ctr
             self.request_ctr += 1
         else:
-            print("re-trying request id", request_id)
+            warnings.warn("OpenAI request failed with error. Retrying...", category=OpenAIRequestFailedWarning)
         
         kwargs = {"future": result_fut, "request_id": request_id, **kwargs}
         

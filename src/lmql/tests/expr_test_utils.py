@@ -150,7 +150,7 @@ def run_all_tests(g):
     for k in list(g.keys()):
         try:
             if k.startswith("test"): 
-                print("Running", k, "." * (40 - len(k)), end=" ")
+                print("Running", k, "." * (40 - len(k)), end=" ", flush=True)
                 
                 if (type(g[k]) is LMQLQueryFunction or hasattr(g[k], "lmql_code")) and g[k].is_async:
                     loop.run_until_complete(g[k]())

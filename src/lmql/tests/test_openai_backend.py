@@ -6,7 +6,7 @@ import sys
 import os
 
 LMQL_FILE = """
-argmax "Hello[WHO]" from "chatgpt" where len(TOKENS(WHO)) < 2
+argmax "Hello[WHO]" from "openai/text-ada-001" where len(TOKENS(WHO)) < 2
 """
 
 """
