@@ -1,12 +1,12 @@
 import lmql
 import pytest
 import sys
-
-from lmql.models.lmtp.lmtp_langchain import LMTP
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+import os
 
 @pytest.fixture(scope="module", name="test_llm")
 def instantiate_test_llm():
+    from lmql.models.lmtp.lmtp_langchain import LMTP
+
     return LMTP(
         # The model below can be replaced with any other model
         # result is not important; would love to use "random"
@@ -49,5 +49,9 @@ def test_do_sync(test_llm):
     assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "predict result is not as expected"
 
 if __name__ == "__main__":
+    if not "RUN_LC_TESTS" in os.environ:
+        print("Skipping LMTP tests because RUN_LC_TESTS is not set")
+        sys.exit(0)
+
     # only run this file with pytest
     sys.exit(pytest.main(args=["-s", __file__]))

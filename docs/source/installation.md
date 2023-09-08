@@ -40,7 +40,7 @@ Note that when using local [🤗 Transformers](https://huggingface.co/transforme
 
 ## Configuring OpenAI API Credentials
 
-If you want to use OpenAI models, you have to configure your API credentials. To do so you can either define the `OPENAI_API_KEY` environment variable or create a file `api.env` in the active working directory, with the following contents.
+If you want to use OpenAI models, you have to configure your API credentials. To do so you can either define the `OPENAI_API_KEY` environment variable or create a file `api.env` in the active working directory, with the following contents:
 
 ```
 openai-org: <org identifier>
@@ -48,3 +48,5 @@ openai-secret: <api secret>
 ```
 
 For system-wide configuration, you can also create an `api.env` file at `$HOME/.lmql/api.env` or at the project root of your LMQL distribution (e.g. `src/` in a development copy).
+
+Alternatively, you can use LMQL-specific env variables `LMQL_OPENAI_SECRET` and `LMQL_OPENAI_ORG`.
