@@ -109,5 +109,8 @@ def test_functions():
     
     assert_parse("Hi [inline_use(REASONING, [wiki, calc])]!", ["Hi ", TemplateVariable("inline_use(REASONING, [wiki, calc])", index=0), "!"])
     
+def test_newline():
+    assert_parse("Say 'this is a test':[RESPONSE : test(s='[INST] foo bar baz\n> ')]", ["Say 'this is a test':", TemplateVariable("RESPONSE", type_expr="test(s='[INST] foo bar baz\n> ')", index=0)])
 
-run_all_tests(globals())
+if __name__ == "__main__":
+    run_all_tests(globals())

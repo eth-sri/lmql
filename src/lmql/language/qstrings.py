@@ -76,6 +76,17 @@ class TokenCursor:
     def __init__(self, s):
         self.tokens = tokenize.generate_tokens(io.StringIO(s).readline)
         self.token = next(self.tokens)
+        self.s = s
+
+    def n_to_skip(self):
+        end_line = self.token.end[0] - 1
+        lines = self.s.split("\n")
+        n = 0
+        for i, line in enumerate(lines):
+            if i >= end_line:
+                break
+            n += len(line) + 1
+        return n + self.token.end[1]
 
     def next(self):
         self.token = next(self.tokens)
@@ -241,7 +252,7 @@ class QstringParser:
         if cursor.token.type == tokenize.OP and cursor.token.string == "]":
             self.state = "string"
             self.stmts[-1] = TemplateVariable(name, decorator_exprs=decorators)
-            self.skip(cursor.token.end[1], swallow=True)
+            self.skip(cursor.n_to_skip(), swallow=True)
             self.state = "string"
             return
             
@@ -254,7 +265,7 @@ class QstringParser:
         if cursor.token.type == tokenize.OP and cursor.token.string == "]":
             self.state = "string"
             self.stmts[-1] = TemplateVariable(name, decoder_expr=decoder, decorator_exprs=decorators)
-            self.skip(cursor.token.end[1], swallow=True)
+            self.skip(cursor.n_to_skip(), swallow=True)
             self.state = "string"
             return
 
@@ -282,5 +293,5 @@ class QstringParser:
         
         self.state = "string"
         self.stmts[-1] = TemplateVariable(name, tokenize.untokenize(type_tokens).strip(), decoder_expr=decoder, decorator_exprs=decorators)
-        self.skip(cursor.token.end[1], swallow=True)
+        self.skip(cursor.n_to_skip(), swallow=True)
         self.state = "string"
