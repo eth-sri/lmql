@@ -79,5 +79,5 @@ html_theme_options = {
             "title": "Community",
             "url": "https://discord.gg/7eJP4fcyNT"
         }
-    ],
+    ]
 }

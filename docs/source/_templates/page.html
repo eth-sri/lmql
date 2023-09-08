@@ -1,0 +1,9 @@
+{% extends "!page.html" %}
+
+{% block content %}
+<!-- only if config release version is 'latest' -->
+{% if release == 'latest' %}
+<div class="latest-note"> You are reading the <i>latest</i> version of the documentation. Functionality described here, is only available in the latest version of the LMQL. </div>
+{% endif %}
+{{super()}}
+{% endblock %}

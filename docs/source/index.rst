@@ -1,6 +1,6 @@
 Welcome To LMQL
 ===================================
-
+ 
 .. raw:: html
   
   <div class="subtitle"><img class="inline-logo" src="_static/images/lmql.svg"/> LMQL is a programming language for large language model interaction.</div>
@@ -137,3 +137,4 @@ To learn more about LMQL, select one of the following sections or navigate the d
     Discord <https://discord.gg/7eJP4fcyNT>
     GitHub Issues <https://github.com/eth-sri/lmql/issues>
     E-Mail <mailto:hello@lmql.ai>
+  
