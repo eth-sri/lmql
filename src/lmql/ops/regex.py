@@ -45,11 +45,16 @@ def _deparse(seq):
             pattern += chr(low) + '-' + chr(high)
         elif op == c.IN:
             assert isinstance(arg, list)
-            pattern += '[' + ''.join([_deparse([a]) for a in arg]) + ']'
+            if len(arg) == 1 and arg[0][0] == c.CATEGORY:
+                pattern += _deparse(arg)
+            else:
+                pattern += '[' + ''.join([_deparse([a]) for a in arg]) + ']'
         elif op == c.CATEGORY:
             pattern += CATEGORY_PATTERNS[arg].pattern
         elif op == c.NEGATE:
             pattern += '^'
+        elif op == c.GROUPREF:
+            pattern += f"\\{arg}"
         else:
             assert False, f"unsupported regex pattern {op} with arg {arg}"
     return pattern
@@ -60,20 +65,37 @@ def _parse(pattern):
     seq = list(seq)
     return seq
 
+def _subgroups(seq, groupid, value=None, remove=False):
+    out = []
+    is_int = isinstance(groupid, int)
+    for op, arg in seq:
+        if op == c.GROUPREF:
+            if arg == groupid:
+                if value is not None:
+                    out.extend(value)
+                if remove:
+                    continue
+            elif is_int and isinstance(arg, int) and remove and arg > groupid:
+                arg -= 1
+        out.append((op, arg))
+    return out
+
 def _consume_char(char, seq, verbose=False, indent=0):
     assert isinstance(seq, list)
-    if len(seq) == 0: return None
+    
+    def _ret(out, is_consumed=True):
+        if out is None: is_consumed = False
+        if verbose: print(f'-> {out}({is_consumed})')
+        return out, is_consumed
+
+    if len(seq) == 0: return _ret([], False)
     op, arg = seq[0]
-
-    def _ret(out):
-        if verbose: print('->', out)
-        return out
-
     if verbose: print(' '*indent + f"{seq} -{char}-> Operator {op}", end='') 
+
     if op == c.ANY:
         return _ret(seq[1:])
     elif op == c.LITERAL:
-        if arg == char: return seq[1:]
+        if arg == char: return _ret(seq[1:])
         else:
             return _ret(None)
     elif op == c.IN:
@@ -109,34 +131,41 @@ def _consume_char(char, seq, verbose=False, indent=0):
         assert must_be_none is None
         branches_out = []
         for i, branch in enumerate(branches):
-            dbranch = _consume_char(char, list(branch), verbose=verbose, indent=indent+2)
+            dbranch, _ = _consume_char(char, list(branch), verbose=verbose, indent=indent+2)
             if dbranch is not None: branches_out.append(dbranch)
         if len(branches_out) == 0: return _ret(None)
         out = _simplify([(op, (must_be_none, branches_out))])
         out.extend(seq[1:])
         return _ret(out)
     elif op == c.SUBPATTERN:
-        arg0, arg1, arg2, sseq = arg
+        groupid, arg1, arg2, sseq = arg
+        groupvalue = []
         assert arg1==0 and arg2==0
         assert isinstance(sseq, (sre_parse.SubPattern, list))
         sseq = list(sseq)
-        dsseq = _consume_char(char, sseq, verbose=verbose, indent=indent+2)
+        dsseq, is_consumed = _consume_char(char, sseq, verbose=verbose, indent=indent+2)
+        if not is_consumed:
+            rest = _subgroups(seq[1:], groupid, remove=True)
+            return _consume_char(char, rest, verbose=verbose, indent=indent+2)
         if dsseq is None:
             return _ret(None)
+        groupvalue.append((c.LITERAL, char))
+        if verbose: print(f" group {groupid} = {groupvalue}")
         if len(dsseq) == 0:
             return _ret(seq[1:])
-        out = _simplify([(op, (arg0, arg1, arg2, dsseq))])
-        out.extend(seq[1:])
+        out = _simplify([(op, (groupid, arg1, arg2, dsseq))])
+        rest = _subgroups(seq[1:], groupid, value=groupvalue, remove=(len(out)==0))
+        out.extend(rest)
         return _ret(out)
     elif op == c.MAX_REPEAT:
         min_occr, max_occr, sseq = arg
         sseq = list(sseq)
-        dsseq = _consume_char(char, sseq, verbose=verbose, indent=indent+2)
+        dsseq, _ = _consume_char(char, sseq, verbose=verbose, indent=indent+2)
         if dsseq is None:
             if min_occr == 0:
                 # could not consume optional character
                 # but could recover with next
-                return _ret(_consume_char(char, seq[1:], verbose=verbose, indent=indent))
+                return _ret(*_consume_char(char, seq[1:], verbose=verbose, indent=indent))
             else: return _ret(None)
         min_occr = max(min_occr - 1, 0)
         if max_occr != c.MAXREPEAT:
@@ -148,7 +177,7 @@ def _consume_char(char, seq, verbose=False, indent=0):
     else:
         raise NotImplementedError(f"unsupported regex pattern {op}")
 
-def _simplify(seq):
+def _simplify(seq, remove_groups=False):
     def _simplify_op(op, arg):
         if op == c.BRANCH:
             must_be_none, branches = arg
@@ -170,7 +199,7 @@ def _simplify(seq):
             sseq = _simplify(sseq)
             if len(sseq) == 0:
                 return None
-            if len(sseq) == 1 and sseq[0][0] != sre_parse.BRANCH:
+            if remove_groups and len(sseq) == 1 and sseq[0][0] != sre_parse.BRANCH:
                 return sseq[0]
             arg = arg0, arg1, arg2, sseq
         return op, arg
@@ -232,8 +261,8 @@ class Regex:
         if self._check_cache(chars): return None
         seq = self.seq
         for i, char in enumerate(chars):
-            seq = _consume_char(char, seq, verbose=verbose)
-            if seq is None:
+            seq, is_consumed = _consume_char(char, seq, verbose=verbose)
+            if seq is None or not is_consumed:
                 self._cache_add(chars[:(i+1)])
                 return None
         return seq
@@ -250,6 +279,10 @@ class Regex:
         if seq is None: return None
         seq = _simplify(seq)
         return Regex(_deparse(seq))
+    
+    def simplify(self, remove_groups=True):
+        seq = _simplify(self.seq, remove_groups=remove_groups)
+        return Regex(_deparse(seq))
    
     def fullmatch(self, text):
         return self.compiled_pattern.fullmatch(text) is not None
@@ -257,7 +290,14 @@ class Regex:
     def compare_pattern(self, pattern):
         return _deparse(_simplify(_parse(self.pattern))) == _deparse(_simplify(_parse(pattern)))
     
+    def __repr__(self):
+        return f"Regex({self.pattern})"
+    
 if __name__ == "__main__":
+    # print(Regex(r"a?").d(""))
+    
+    # sys.exit()
+    
     assert Regex(r"abc").d("a").compare_pattern(r"bc")
     assert Regex(r"abc").d("ab").compare_pattern(r"c")
     assert Regex(r"abc").d("b") is None
@@ -279,8 +319,8 @@ if __name__ == "__main__":
     assert Regex(r"\.a").d("a") is None
     
     # branches 
-    assert Regex(r"(a|bb)c").d("b").pattern == "bc"
-    assert Regex(r"(b|bb)c").d("b").compare_pattern(r"b?c")
+    assert Regex(r"(a|bb)c").d("b").simplify().pattern == "bc"
+    assert Regex(r"(b|bb)c").d("b").simplify().compare_pattern(r"b?c")
     assert Regex(r" (a|b)").d(" a").pattern == ""
     assert Regex(r" (a|b) ").d(" a").pattern == " "
     assert Regex(r" (a|b) ").d(" a ").pattern == ""
@@ -304,3 +344,11 @@ if __name__ == "__main__":
     assert Regex(r"[^A-Z]a").d("1").compare_pattern(r"a")
     assert Regex(r"[^A-Z]a").d("A") is None
     assert Regex(r"a[^A-Z]").d("a").compare_pattern(r"[^A-Z]")
+
+    # backward reference and groups    
+    assert Regex(r"(\d+)-\1").d("123-").pattern == r"123"
+    assert Regex(r"(\d+)-\1").d("123").pattern == r"(\d*)-123\1"
+    assert Regex(r"(\d+)-(\s*)-\2").d("123-").pattern == r"(\s*)-\1" 
+    assert Regex(r"(\d+)-(\s*)-\2").d("123").pattern == r"(\d*)-(\s*)-\2"
+    assert Regex(r"(?P<test>\d+)-(\s*)-\2(?P=test)").d("123-").pattern == r"(\s*)-\1123" # TODO names work, but are not output
+    assert Regex(r"(?P<test>\d+)-(\s*)-\2(?P=test)").d("123").pattern == r"(\d*)-(\s*)-\2123\1"
