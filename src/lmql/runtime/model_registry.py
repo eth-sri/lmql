@@ -66,9 +66,15 @@ def resolve(model_name, endpoint=None, **kwargs):
 
         # special case for 'llama.cpp'
         if model_name.startswith("llama.cpp:"):
-            if "tokenizer" not in kwargs:
-                warnings.warn("By default LMQL uses the '{}' tokenizer for all llama.cpp models. To change this, set the 'tokenizer' argument of your lmql.model(...) object.".format("huggyllama/llama-7b", UserWarning))
-            kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
+            if "tokenizer" in kwargs:
+                kwargs["tokenizer"] = kwargs["tokenizer"]
+            else:
+                tokenizer_path = os.path.join(os.path.dirname(model_name.replace("llama.cpp:", "")), "tokenizer.model")
+                if os.path.exists(tokenizer_path):
+                    kwargs["tokenizer"] = tokenizer_path
+                else:
+                    warnings.warn("File tokenizer.model not present in the same folder as the model weights. Using default '{}' tokenizer for all llama.cpp models. To change this, set the 'tokenizer' argument of your lmql.model(...) object.".format("huggyllama/llama-7b", UserWarning))
+                    kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
 
         # determine endpoint URL
         if endpoint is None:
