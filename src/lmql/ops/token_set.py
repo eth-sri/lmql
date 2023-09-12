@@ -546,6 +546,9 @@ def tset(*tokens, regex=False, prefix=False, exact=False, charlen=None, name=Non
     return TokenSet(set(tokens), minus=False, prefix=prefix, exact=exact, name=name)
 
 def charlen_tsets():
+    # make sure token_lengths is initialized
+    VocabularyMatcher.instance()._make_mask_from_char_length(1)
+
     l1 = tset(charlen=1)
     token_lengths = VocabularyMatcher.instance().token_lengths
     assert token_lengths is not None, "VocabularyMatcher.instance().token_lengths is None even though it should be fully initialized."

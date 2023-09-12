@@ -147,6 +147,16 @@ class PromptScope(ast.NodeVisitor):
         else:
             super().generic_visit(node)
 
+    def visit_ImportFrom(self, node: ImportFrom) -> Any:
+        for alias in node.names:
+            self.defined_vars.add(alias.asname or alias.name)
+        super().generic_visit(node)
+
+    def visit_Import(self, node: Import) -> Any:
+        for alias in node.names:
+            self.defined_vars.add(alias.asname or alias.name)
+        super().generic_visit(node)
+
     def scope_Constant(self, node):
         if type(node.value) is not str: return super().visit_Constant(node)
         qstring = node.value
