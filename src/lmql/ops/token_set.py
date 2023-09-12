@@ -150,7 +150,6 @@ class VocabularyMatcher:
     def _make_mask_from_regex(self, regex, prefix=False):
         regex = regex.replace(" ", self.space_repr)
         regex = regex.replace("\n", self.nl_repr)
-        regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
 
         mask = np.zeros([self.vocab_size], dtype=np.bool_)
         if prefix:

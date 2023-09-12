@@ -66,6 +66,7 @@ def resolve(model_name, endpoint=None, **kwargs):
 
         # special case for 'llama.cpp'
         if model_name.startswith("llama.cpp:"):
+            # kwargs["tokenizer"] = kwargs.get("tokenizer", "danielhanchen/open_llama_3b")
             if "tokenizer" in kwargs:
                 kwargs["tokenizer"] = kwargs["tokenizer"]
             else:
