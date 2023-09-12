@@ -25,6 +25,15 @@ test_hello_oneline = lmql.F("Say 'this is a test': [RESPONSE]", "len(TOKENS(RESP
 
 # test_davinci_says_it = lmql.F("Say 'this is a test': [RESPONSE]", model="openai/text-davinci-003")
 
+@lmql.query(decoder="argmax", model=lmql.model("random", seed=123))
+def test_with_inline_import():
+    '''lmql
+    import re
+    "Say 'this is a test':[RESPONSE]" where len(TOKENS(RESPONSE)) < 10
+
+    assert re.search("Say 'this is a test':", context.prompt) is not None, f"Prompt did not contain 'Say 'this is a test':'"
+    '''
+
 
 @lmql.query(decoder="sample", temperature=1.2, model=lmql.model("random", seed=123))
 def test_joke():
