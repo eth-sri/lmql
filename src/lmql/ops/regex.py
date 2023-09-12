@@ -294,10 +294,6 @@ class Regex:
         return f"Regex({self.pattern})"
     
 if __name__ == "__main__":
-    # print(Regex(r"a?").d(""))
-    
-    # sys.exit()
-    
     assert Regex(r"abc").d("a").compare_pattern(r"bc")
     assert Regex(r"abc").d("ab").compare_pattern(r"c")
     assert Regex(r"abc").d("b") is None
