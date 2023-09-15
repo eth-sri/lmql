@@ -74,11 +74,7 @@ class TransformersTokenizer:
         It must hold that self.convert_bytes_to_string(self.decode_tokens_bytes(ids)) == self.decode(ids).
         """
         ids = self.convert_token_bytes_to_ids(token_bytes)
-
-        print("Input tokens", token_bytes)
-        res = self.tokenizer.decode(ids)
-        print("Output res", res)
-        return res
+        return self.tokenizer.decode(ids)
     
     def convert_token_bytes_to_ids(self, tokens):
         """
@@ -130,7 +126,6 @@ class LlamaTransformersTokenizer(TransformersTokenizer):
         return super().tokenize(text, asbytes, add_special_tokens)
 
     def __call__(self, text, add_special_tokens=False):
-        print("CALLLLL", add_special_tokens)
         for dummy_token in ["@", "^", ""]:
             text_to_tokenize = dummy_token + text
             
