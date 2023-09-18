@@ -61,7 +61,7 @@ def is_azure_chat(kwargs):
     return ("api_type" in api_config and "azure-chat" in api_config.get("api_type", ""))
 
 async def complete(**kwargs):
-    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"] or is_azure_chat(kwargs):
+    if (kwargs["model"].startswith("gpt-3.5-turbo") and not kwargs["model"].startswith("gpt-3.5-turbo-instruct")) or "gpt-4" in kwargs["model"] or is_azure_chat(kwargs):
         async for r in chat_api(**kwargs): yield r
     else:
         async for r in completion_api(**kwargs): yield r
@@ -164,7 +164,7 @@ def get_endpoint_and_headers(kwargs):
     }
     if openai_org:
         headers['OpenAI-Organization'] = openai_org
-    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
+    if (kwargs["model"].startswith("gpt-3.5-turbo") and not kwargs["model"].startswith("gpt-3.5-turbo-instruct")) or "gpt-4" in kwargs["model"]:
         endpoint = "https://api.openai.com/v1/chat/completions"
     else:
         endpoint = "https://api.openai.com/v1/completions"
