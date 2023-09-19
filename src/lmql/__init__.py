@@ -28,7 +28,7 @@ from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
 
-from lmql.models.model import model, LMQLModel
+from lmql.models.model import model, LMQLModelDescriptor
 from lmql.runtime.loop import main
 import lmql.runtime.decorators as decorators
 
@@ -44,9 +44,9 @@ def autoconnect():
 def set_backend(backend):
     model_registry.backend_configuration = backend
 
-def set_default_model(model: Union[str, LMQLModel]):
+def set_default_model(model: Union[str, LMQLModelDescriptor]):
     """
-    Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are used.
+    Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.
 
     This applies globally in the current process.
     """

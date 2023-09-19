@@ -9,6 +9,7 @@ from lmql.ops.node import *
 from lmql.ops.inline_call import InlineCallOp
 from lmql.ops.booleans import *
 from lmql.ops.regex import Regex
+from lmql.models.model_info import model_info
 
 lmql_operation_registry = {}
 
@@ -193,7 +194,7 @@ class IntOp(Node):
                 ("*", False)
             )
 
-        if "turbo" in context.runtime.model_identifier or "gpt-4" in context.runtime.model_identifier:
+        if model_info(context.runtime.model_identifier).is_chat_model:
             if not all([c in "0123456789" for c in v]):
                 return fmap(
                     ("*", False)

@@ -5,7 +5,7 @@ def test_or():
     @lmql.query
     async def q():
         '''lmql
-        sample(temperature=0.8, openai_chunksize=30, max_len=128)
+        sample(temperature=0.8, chunksize=30, max_len=128)
             "The movie review in positive sentiment is: '[OUTPUT]"
         FROM
             "openai/text-ada-001"
