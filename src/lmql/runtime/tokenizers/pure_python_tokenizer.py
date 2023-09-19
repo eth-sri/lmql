@@ -12,9 +12,9 @@ class PythonBackedTokenizer:
         try:
             import gpt3_tokenizer
             openai_models = [
-                "text-ada-001",
-                "text-babbage-001",
-                "text-davinci-",
+                "ada-",
+                "babbage-",
+                "davinci-",
                 "gpt"
             ]
 
