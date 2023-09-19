@@ -9,6 +9,7 @@ import pickle
 import os
 import time
 from functools import total_ordering
+import warnings
 
 from .openai_api import complete, OpenAIRateLimitError, Capacity
 
@@ -735,7 +736,7 @@ class AsyncOpenAIAPI:
             request_id = self.request_ctr
             self.request_ctr += 1
         else:
-            print("re-trying request id", request_id)
+            warnings.warn("OpenAI request with ID {} failed (timeout or other error) and will be retried".format(request_id), UserWarning)
         
         kwargs = {"future": result_fut, "request_id": request_id, **kwargs}
         
