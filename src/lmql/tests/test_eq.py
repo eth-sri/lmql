@@ -90,7 +90,7 @@ async def test_later_var_token_constrained():
 async def test_stops_before_exact_token_len():
     '''lmql
     argmax(max_len=256, chunksize=4)
-        "A rhyme named '[NAME]':\n"
+        "A rhyme named '[NAME]':\n" where len(TOKENS(NAME)) == 4
         assert not "'" in NAME
         "Verse: [RHYME]\n"
         assert tlen(RHYME) == 4
