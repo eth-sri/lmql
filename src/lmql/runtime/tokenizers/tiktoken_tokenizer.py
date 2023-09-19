@@ -108,7 +108,7 @@ class TiktokenTokenizer:
 
     @property
     def name(self):
-        return "tiktoken-" + self.model_identifier
+        return "tiktoken-" + self.enc.name
 
 def get_tokenizer(model_identifier):
     import tiktoken

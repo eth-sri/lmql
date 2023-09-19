@@ -89,7 +89,7 @@ async def test_later_var_token_constrained():
 @lmql.query
 async def test_stops_before_exact_token_len():
     '''lmql
-    argmax(max_len=256, openai_chunksize=4)
+    argmax(max_len=256, chunksize=4)
         "A rhyme named '[NAME]':\n"
         assert not "'" in NAME
         "Verse: [RHYME]\n"

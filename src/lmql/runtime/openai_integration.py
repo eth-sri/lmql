@@ -20,6 +20,9 @@ from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
 from lmql.models.model_info import model_info
+from lmql.models.model import LMQLModel
+from typing import Type
+
 import warnings
 
 def is_allowed(m): 
@@ -995,8 +998,8 @@ class HFModelStatsAdapter:
     def cost_estimate(self, model):
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
-def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
-    class OpenAIModel:
+def openai_model(model_identifier, endpoint=None, mock=False, **kwargs) -> Type[LMQLModel]:
+    class OpenAIModel(LMQLModel):
         def __init__(self) -> None:
             self.model_identifier = model_identifier
             self.served_model = None
@@ -1014,11 +1017,6 @@ def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
             return self._tokenizer
 
         def get_dclib_model(self):
-            bos_token_id = self.get_tokenizer().bos_token_id
-            eos_token_id = self.get_tokenizer().eos_token_id
-
-            dc.set_dclib_tokenizer(self.get_tokenizer())
-
             full_args = {**kwargs, **self.decoder_args}
             return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **full_args)
 

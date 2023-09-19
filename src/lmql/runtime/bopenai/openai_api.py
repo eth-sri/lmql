@@ -67,20 +67,16 @@ async def complete(**kwargs):
     else:
         async for r in completion_api(**kwargs): yield r
 
-global tokenizer
-tokenizer = None
+global tokenizers
+tokenizers = {}
 
-def tokenize_ids(text):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = load_tokenizer("gpt2")
-    ids = tokenizer(text)["input_ids"]
-    return ids
-
-def tokenize(text, openai_byte_encoding=False):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = load_tokenizer("gpt2")
+def tokenize(text, model, openai_byte_encoding=False):
+    global tokenizers
+    if not model in tokenizers:
+        tokenizer = load_tokenizer("tiktoken:" + model)
+        tokenizers[model] = tokenizer
+    else:
+        tokenizer = tokenizers[model]
     ids = tokenizer(text)["input_ids"]
     raw = tokenizer.decode_bytes(ids)
     if openai_byte_encoding:
@@ -176,9 +172,10 @@ async def chat_api(**kwargs):
 
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
+    model = kwargs["model"]
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
-    prompt_tokens = tokenize(kwargs["prompt"][0], openai_byte_encoding=True)
+    prompt_tokens = tokenize(kwargs["prompt"][0], model=model, openai_byte_encoding=True)
 
     timeout = kwargs.pop("timeout", 1.5)
     
@@ -323,7 +320,7 @@ async def chat_api(**kwargs):
                                         })
                                     continue
                                 text = delta["content"]
-                                tokens = tokenize((" " if received_text == "" else "") + text, openai_byte_encoding=True)
+                                tokens = tokenize((" " if received_text == "" else "") + text, model=model, openai_byte_encoding=True)
                                 received_text += text
 
                                 # convert tokens to OpenAI format

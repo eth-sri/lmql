@@ -31,8 +31,9 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.runtime.model_registry import LMQLModelRegistry
-from lmql.models.model import model, LMQLModel
+from lmql.models.model import model, LMQLModelDescriptor
 from lmql.models.model_info import model_info
+from lmql.runtime.context import ContextTokenizer
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -296,7 +297,7 @@ class PromptInterpreter:
         if type(model_name) is str:
             model_name = model(model_name)
 
-        assert isinstance(model_name, LMQLModel), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
+        assert isinstance(model_name, LMQLModelDescriptor), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
         model_object = model_name
 
         if model_name.model is not None:
@@ -386,7 +387,7 @@ class PromptInterpreter:
                 s = stmt_buffer[0]
 
                 if type(s) is str:
-                    s = self.process_query_string(s)
+                    s = self.process_query_string(s, first=len(prompt) == 0)
                     prompt += s
                     stmt_buffer = stmt_buffer[1:]
                     query_args = None
@@ -453,10 +454,14 @@ class PromptInterpreter:
             program_state=program_state
         )
 
-    def process_query_string(self, s: str):
-        if model_info(self.model_identifier).is_chat_model:
-            # replace all r"<lmql:(.*?)\/>" tags with ((\1))
-            s = re.sub(r"<lmql:(.*?)\/>", r"((\1)):", s)
+    def process_query_string(self, s: str, first=False):
+        if not model_info(self.model_identifier).is_chat_model:
+            # check if this is the first token in the prompt and it is a tag
+            first_tag = s.startswith("<lmql:") and first
+            # replace <lmql:ROLE/> with ((ROLE)):
+            s = re.sub(r"<lmql:(.*?)\/>", r"\n((\1)):", s)
+            # strip off leading newline if it was added due to a tag
+            if first_tag: s = s[1:]
         s = unescape_qstring(s)
         return s
 
@@ -1022,26 +1027,28 @@ class PromptInterpreter:
             self.decoder_step = 0
             average_step_time = None
             start = time.time()
-            async for _ in decoder_fct(prompt, **decoder_args):
-                await debug_out(self.decoder_step)
-                self.decoder_step += 1
 
-                if step_budget is not None and self.decoder_step >= step_budget:
-                    warnings.warn("warning: step budget exceeded")
-                    break
+            with ContextTokenizer(self.model.get_tokenizer()):
+                async for _ in decoder_fct(prompt, **decoder_args):
+                    await debug_out(self.decoder_step)
+                    self.decoder_step += 1
 
-                if interrupt.check():
-                    interrupt.clear()
-                    raise InterruptedError("lmql.runtime.interrupt")
-                
-                average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
+                    if step_budget is not None and self.decoder_step >= step_budget:
+                        warnings.warn("warning: step budget exceeded")
+                        break
 
-                if "performance_stats" in decoder_args:
-                    if self.decoder_step % 10 == 0:
-                        Stats.print_all()
-                        print("step", self.decoder_step, "time", average_step_time)
+                    if interrupt.check():
+                        interrupt.clear()
+                        raise InterruptedError("lmql.runtime.interrupt")
+                    
+                    average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
 
-                start = time.time()
+                    if "performance_stats" in decoder_args:
+                        if self.decoder_step % 10 == 0:
+                            Stats.print_all()
+                            print("step", self.decoder_step, "time", average_step_time)
+
+                    start = time.time()
             
             assert False, "decoder {} did not finish with dc.finish(), which means no result sequences were returned. \n\nThe reason for this may be a too small max_len value (max_len={}) ".format(decoder_args["decoder"], decoder_args["max_len"])
                 
@@ -1249,9 +1256,7 @@ class SubInterpreter(PromptInterpreter):
             name = self.name[4:] if self.name.startswith("sub:") else self.name
             warnings.warn("warning: the decoder configuration of nested query '{}' is ignored. Nested queries cannot specify their own decoder.".format(name))
 
-        self.initial_subprompt_ids = await self.tokenize(self.root_state.prompt)
-        self.n = len(self.initial_subprompt_ids)
-
+        self.n = parent_offset
         self.root_state = self.root_state.updated(variable_offset=self.n)
 
     def run(self, prompt, **kwargs):
