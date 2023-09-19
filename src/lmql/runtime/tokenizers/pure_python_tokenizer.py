@@ -1,8 +1,6 @@
 class PythonBackedTokenizer:
     """ Custom tokenizer to be used only in a browser environment. This tokenizer only supports GPT tokenization. """
     def __init__(self, model_identifier):
-        import gpt3_tokenizer
-        assert "gpt" in model_identifier, "PythonBackedTokenizer only supports GPT family models"
 
         self.bos_token_id = 50256
         self.eos_token_id = 50256
@@ -13,7 +11,14 @@ class PythonBackedTokenizer:
     def is_available(model_identifier):
         try:
             import gpt3_tokenizer
-            return "gpt" in model_identifier
+            openai_models = [
+                "text-ada-001",
+                "text-babbage-001",
+                "text-davinci-",
+                "gpt"
+            ]
+
+            return any([m in model_identifier for m in openai_models])
         except:
             return False
 

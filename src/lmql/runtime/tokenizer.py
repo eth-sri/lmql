@@ -325,7 +325,7 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
         
         return LMQLTokenizer(model_identifier, tokenizer_impl=PythonBackedTokenizer(model_identifier))
     
-    raise TokenizerNotAvailableError("Failed to locate a suitable tokenizer implementation for '{}' (if you are not using GPT models, please install the 'transformers' package)".format(model_identifier))
+    raise TokenizerNotAvailableError("Failed to locate a suitable tokenizer implementation for '{}' (Make sure your current environment provides a tokenizer backend like 'transformers', 'tiktoken' or 'llama.cpp' for this model)".format(model_identifier))
 
 def get_vocab(tokenizer):
     if hasattr(tokenizer, "vocab"):

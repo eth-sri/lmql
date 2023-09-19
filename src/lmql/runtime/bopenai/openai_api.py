@@ -3,9 +3,11 @@ import os
 if "LMQL_BROWSER" in os.environ:
     # use mocked aiohttp for browser (redirects to JS for network requests)
     import lmql.runtime.maiohttp as aiohttp
+    LMQL_BROWSER = True
 else:
     # use real aiohttp for python
     import aiohttp
+    LMQL_BROWSER = False
 
 import json
 import time
@@ -364,6 +366,8 @@ async def completion_api(**kwargs):
     max_tokens = kwargs.get("max_tokens", 0)
 
     timeout = kwargs.pop("timeout", 1.5)
+
+    assert not (LMQL_BROWSER and "logit_bias" in kwargs and "gpt-3.5-turbo" in kwargs["model"]), "gpt-3.5-turbo completion models do not support logit_bias in the LMQL browser distribution, because the required tokenizer is not available in the browser. Please use a local installation of LMQL to use logit_bias with gpt-3.5-turbo models."
 
     async with CapacitySemaphore(num_prompts * max_tokens):
         
