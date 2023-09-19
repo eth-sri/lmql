@@ -1,7 +1,11 @@
-from lmql.models.model import LMQLModel, inprocess
+from lmql.models.model import LMQLModelDescriptor, inprocess, LMQLModel
 import os
 import warnings
 
+"""
+Model name aliases to enable more convenient access to 
+popular models.
+"""
 model_name_aliases = {
     "chatgpt": "openai/gpt-3.5-turbo",
     "gpt-4": "openai/gpt-4",
@@ -9,6 +13,8 @@ model_name_aliases = {
 class LMQLModelRegistry: 
     """
     Central registry of models and backends that can be used in LMQL.
+
+    Use get() to resolve a LMQLModelDescriptor to a usable LMQLModel.
     """
     backend_configuration = None
 
@@ -20,30 +26,16 @@ class LMQLModelRegistry:
         if model in model_name_aliases:
             model = model_name_aliases[model]
 
-        if type(model) is LMQLModel:
+        if type(model) is LMQLModelDescriptor:
             if model.model is not None:
                 return model.model
             else:
                 kwargs = {**model.kwargs, **kwargs}
                 model = model.model_identifier
 
-        client = LMQLModelRegistry.clients.get(model, None)
+        return resolve(model, **kwargs)
 
-        if client is None:
-            # use resolve to obtain model connection from model identifier
-            if model not in LMQLModelRegistry.registry:
-                resolve(model, **kwargs)
-
-            # strip off local
-            if model.startswith("local:"):
-                model = model[6:]
-
-            client = LMQLModelRegistry.registry[model]()
-            LMQLModelRegistry.clients[model] = client
-
-        return client
-
-def resolve(model_name, endpoint=None, **kwargs):
+def resolve(model_name, endpoint=None, **kwargs) -> LMQLModel:
     """
     Automatically registers a model backend implementation for the provided
     model name, deriving the implementation from the model name.
@@ -52,9 +44,7 @@ def resolve(model_name, endpoint=None, **kwargs):
         from lmql.runtime.openai_integration import openai_model
 
         # hard-code openai/ namespace to be openai-API-based
-        Model = openai_model(model_name[7:], endpoint=endpoint, **kwargs)
-        register_model(model_name, Model)
-        register_model("*", Model)
+        return openai_model(model_name[7:], endpoint=endpoint, **kwargs)
     else:
         from lmql.models.lmtp.lmtp_dcmodel import lmtp_model
 
@@ -84,15 +74,9 @@ def resolve(model_name, endpoint=None, **kwargs):
         else:
             Model = lmtp_model(model_name, endpoint=endpoint, **kwargs)
         
-        register_model(model_name, Model)
-        return
-
-def register_model(identifier, ModelClass):
-    LMQLModelRegistry.registry[identifier] = ModelClass
+        return Model
 
 LMQLModelRegistry.autoconnect = None
 
-LMQLModelRegistry.registry = {}
 # instance of model clients in this process
-LMQLModelRegistry.clients = {}
 LMQLModelRegistry.default_model = "openai/text-davinci-003"

@@ -81,7 +81,7 @@ def extract_json(s):
 @lmql.query
 async def single_shot_as_type(s, ty, model="chatgpt"):
     '''lmql
-    argmax(openai_chunksize=1024)
+    argmax(chunksize=1024)
         schema_description = type_schema_description(ty)
         "Provided a data schema of the following schema: {schema_description}\n"
         "Translate the following into a JSON payload: {s}\n"
