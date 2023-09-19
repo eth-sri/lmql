@@ -3,6 +3,11 @@ import torch
 from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
 import numpy as np
 
+def format_call(model_name, **kwargs):
+    if len(kwargs) == 0:
+        return f'"{model_name}"'
+    return f'"{model_name}", {", ".join([f"{k}={v}" for k, v in kwargs.items()])}'
+
 class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
@@ -12,11 +17,11 @@ class TransformersLLM(LMTPModel):
 
         if self.model_args.pop("loader", None) == "auto-gptq":
             from auto_gptq import AutoGPTQForCausalLM
-            print("[Loading", self.model_identifier, "with", f"AutoGPTQForCausalLM.from_quantized({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+            print("[Loading", self.model_identifier, "with", "AutoGPTQForCausalLM.from_quantized({})]".format(format_call(self.model_identifier, **self.model_args)), flush=True)
             self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
         else:
             from transformers import AutoModelForCausalLM
-            print("[Loading", self.model_identifier, "with", f"AutoModelForCausalLM.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+            print("[Loading", self.model_identifier, "with", "AutoModelForCausalLM.from_pretrained({})]".format(format_call(self.model_identifier, **self.model_args)), flush=True)
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
         
         print("[", self.model_identifier, " ready on device ", self.model.device, 
