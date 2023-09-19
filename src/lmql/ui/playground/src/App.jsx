@@ -585,6 +585,7 @@ function ModelSelection(props) {
       {"name": "openai/text-babbage-001", "note": "OpenAI", inprocess: false},
       {"name": "openai/text-davinci-001", "note": "OpenAI", inprocess: false},
       {"name": "openai/text-davinci-003", "note": "OpenAI", inprocess: false},
+      {"name": "openai/gpt-3.5-turbo-instruct", "note": "OpenAI", inprocess: false},
       {"name": "chatgpt", "note": "OpenAI", inprocess: false},
       {"name": "gpt-4", "note": "OpenAI", inprocess: false}
     ]

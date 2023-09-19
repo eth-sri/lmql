@@ -267,11 +267,20 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
     # check for tiktoken
-    if type in ["auto", "tiktoken"]:
+    if type in ["auto", "tiktoken"] or model_identifier.startswith("tiktoken:"):
+        if model_identifier.startswith("tiktoken:"):
+            model_identifier = model_identifier[len("tiktoken:"):]
+
+        # map gpt-3.5-turbo* to gpt-3.5-turbo
+        if "turbo" in model_identifier:
+            tiktoken_identifier = "gpt-3.5-turbo"
+        else:
+            tiktoken_identifier = model_identifier
+
         tiktoken_available = False
         # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
         try:
-            if TiktokenTokenizer.is_available(model_identifier):
+            if TiktokenTokenizer.is_available(tiktoken_identifier):
                 tiktoken_available = True
         except:
             tiktoken_available = False
@@ -280,9 +289,9 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             def loader():
                 if cache_file_exists(cache_path):
                     with cachefile(cache_path, "rb") as f:
-                        return LMQLTokenizer(model_identifier, pickle.load(f))
+                        return LMQLTokenizer(tiktoken_identifier, pickle.load(f))
                 else:
-                    t = TiktokenTokenizer(model_identifier)
+                    t = TiktokenTokenizer(tiktoken_identifier)
 
                     with cachefile(cache_path, "wb") as f:
                         pickle.dump(t, f)

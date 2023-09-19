@@ -32,6 +32,7 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.models.model import model, LMQLModel
+from lmql.models.model_info import model_info
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -453,7 +454,7 @@ class PromptInterpreter:
         )
 
     def process_query_string(self, s: str):
-        if not ("turbo" in self.model_identifier or "gpt-4" in self.model_identifier or "chatgpt" in self.model_identifier):
+        if model_info(self.model_identifier).is_chat_model:
             # replace all r"<lmql:(.*?)\/>" tags with ((\1))
             s = re.sub(r"<lmql:(.*?)\/>", r"((\1)):", s)
         s = unescape_qstring(s)

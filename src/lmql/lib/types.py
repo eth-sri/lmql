@@ -147,7 +147,7 @@ async def is_type(ty, description=False):
                     "{existing_value}{line_end}"
                 else:
                     # Chat API models do not support advanced integer constraints
-                    if "turbo" in context.interpreter.model_identifier or "gpt-4" in context.interpreter.model_identifier:
+                    if context.interpreter.model_identifier.endswith("-turbo") or "gpt-4" in context.interpreter.model_identifier:
                         "[INT_VALUE]" where STOPS_AT(INT_VALUE, ",") and len(TOKENS(INT_VALUE)) < 4
                         if line_end.startswith(",") and not INT_VALUE.endswith(","):
                             ","

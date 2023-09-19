@@ -6,6 +6,8 @@ def unicode(v):
     assert type(r) is str
     return r
 
+CL100K_EXCLUDED_IDS = range(100256, 100276)
+
 class TiktokenTokenizer:
     def __init__(self, model_identifier):
         import tiktoken
@@ -15,7 +17,16 @@ class TiktokenTokenizer:
 
         self.bytes_can_concat = True
 
-        self.vocab = {self.enc.decode([i]): i for i in range(self.enc.max_token_value)}
+        self.vocab = {}
+        for i in range(self.enc.max_token_value):
+            if self.enc.name == "cl100k_base" and i in CL100K_EXCLUDED_IDS:
+                continue
+            try:
+                self.vocab[self.enc.decode([i])] = i
+            except:
+                print(i)
+                pass
+        
         self.stats = Stats("tiktoken")
 
         for i in range(self.enc.n_vocab, self.enc.max_token_value):

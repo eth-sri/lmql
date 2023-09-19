@@ -13,6 +13,7 @@ import asyncio
 
 from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.stats import Stats
+from lmql.models.model_info import model_info
 
 class OpenAIStreamError(Exception): pass
 class OpenAIRateLimitError(OpenAIStreamError): pass
@@ -61,7 +62,7 @@ def is_azure_chat(kwargs):
     return ("api_type" in api_config and "azure-chat" in api_config.get("api_type", ""))
 
 async def complete(**kwargs):
-    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"] or is_azure_chat(kwargs):
+    if model_info(kwargs["model"]).is_chat_model or is_azure_chat(kwargs):
         async for r in chat_api(**kwargs): yield r
     else:
         async for r in completion_api(**kwargs): yield r
@@ -164,7 +165,7 @@ def get_endpoint_and_headers(kwargs):
     }
     if openai_org:
         headers['OpenAI-Organization'] = openai_org
-    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
+    if model_info(kwargs["model"]).is_chat_model:
         endpoint = "https://api.openai.com/v1/chat/completions"
     else:
         endpoint = "https://api.openai.com/v1/completions"
