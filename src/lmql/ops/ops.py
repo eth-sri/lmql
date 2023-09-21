@@ -263,20 +263,17 @@ class TokensOp(Node):
         if v is None: return None
         contains_next_token = v != strip_next_token(v)
 
-        if not contains_next_token:
-            tokens = tuple(context.runtime.model.sync_tokenize(v))
-            return tokens
-        v = strip_next_token(v)
-        tokens = tuple(context.runtime.model.sync_tokenize(v))
-
         var_op: Var = self.predecessors[0]
         assert type(var_op) is Var, "The first argument of TOKENS must be a direct reference to a template variable."
         tokens = context.get_tokens(var_op.name)
 
-        return fmap(
-            ("eos", tokens),
-            ("*", (*tokens, NextToken))
-        )
+        if not contains_next_token:
+            return tokens
+        else:
+            return fmap(
+                ("eos", tokens),
+                ("*", (*tokens, NextToken))
+            )
 
     def final(self, x, context, operands=None, result=None, **kwargs):
         return x[0]

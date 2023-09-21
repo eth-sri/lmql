@@ -9,7 +9,6 @@ from typing import Any, Dict, Optional
 from lmql.ops.ops import *
 from lmql.runtime.langchain import chain, call_sync
 from lmql.runtime.output_writer import silent
-from lmql.runtime.interpreter import PromptInterpreter
 from lmql.runtime.postprocessing.conditional_prob import \
     ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
@@ -206,6 +205,8 @@ class LMQLQueryFunction:
         return self.__acall__(*args, **kwargs)
 
     async def __acall__(self, *args, **kwargs):
+        from lmql.runtime.interpreter import PromptInterpreter
+
         query_kwargs, runtime_args = self.make_kwargs(*args, **kwargs)
         
         forced_model = self.model or runtime_args.get("model") or (self.extra_args or {}).get("model")

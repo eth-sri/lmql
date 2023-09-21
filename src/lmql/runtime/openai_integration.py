@@ -20,7 +20,7 @@ from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
 from lmql.models.model_info import model_info
-from lmql.models.model import LMQLModel
+from lmql.api.llm import ModelAPIAdapter
 from typing import Type
 
 import warnings
@@ -220,7 +220,6 @@ class DclibOpenAiModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens, noscore=False):
         if noscore: return np.zeros(len(next_tokens), dtype=np.float32)
         
-        prompt_str = self.tokenizer.convert_bytes_to_string(s.input_ids)
         res = await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids))
 
         server_side_swallowed_tokens = 0
@@ -998,8 +997,8 @@ class HFModelStatsAdapter:
     def cost_estimate(self, model):
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
-def openai_model(model_identifier, endpoint=None, mock=False, **kwargs) -> Type[LMQLModel]:
-    class OpenAIModel(LMQLModel):
+def openai_model(model_identifier, endpoint=None, mock=False, **kwargs) -> ModelAPIAdapter:
+    class OpenAIModel(ModelAPIAdapter):
         def __init__(self) -> None:
             self.model_identifier = model_identifier
             self.served_model = None
@@ -1028,4 +1027,4 @@ def openai_model(model_identifier, endpoint=None, mock=False, **kwargs) -> Type[
 
         def sync_tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]
-    return OpenAIModel
+    return OpenAIModel()

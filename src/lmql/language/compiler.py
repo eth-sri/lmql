@@ -19,7 +19,7 @@ from lmql.language.qstrings import (DistributionVariable, FExpression,
 from lmql.language.validator import LMQLValidationError, LMQLValidator
 from lmql.ops.ops import lmql_operation_registry
 from lmql.runtime.dclib import get_all_decoders
-from lmql.runtime.model_registry import model_name_aliases
+from lmql.models.aliases import model_name_aliases
 
 OPS_NAMESPACE = "lmql.ops"
 LIB_NAMESPACE = "lmql.lib"

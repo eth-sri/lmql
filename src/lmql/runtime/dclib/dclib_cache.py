@@ -396,7 +396,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         self.calls += 1
         sq, tokens, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
         self.save_cached(sq.input_ids, tokens, scores, user_data)
-        
+
+    async def score_tokens(self, *args, **kwargs):
+        async for s in self.delegate.score_tokens(*args, **kwargs):
+            yield s
+
     def save_cached(self, ids: List[bytes], tokens, scores, user_data):
         # add cache entries along pre-scored trajectory
         for tok, score in zip(tokens, scores):

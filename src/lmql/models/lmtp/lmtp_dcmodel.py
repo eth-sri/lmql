@@ -12,7 +12,7 @@ import numpy as np
 import lmql.utils.nputil as nputil
 import lmql.runtime.masks as masks
 from lmql.runtime.token_distribution import TokenDistribution
-from lmql.models.model import LMQLModel
+from lmql.api.llm import ModelAPIAdapter
 
 from typing import Any, List, Union, Type
 import random
@@ -468,11 +468,11 @@ class lmtp_model:
                 if "no current event loop" in str(e): pass
                 else: raise e
 
-    def __call__(self) -> LMQLModel:
+    def __call__(self) -> ModelAPIAdapter:
         # reference to factory instance
         this = self
 
-        class LMTPAdapterModel(LMQLModel):
+        class LMTPAdapterModel(ModelAPIAdapter):
             def __init__(self) -> None:
                 self.model_identifier = this.model_identifier
                 self.served_model = None
@@ -508,8 +508,5 @@ class lmtp_model:
             
             async def detokenize(self, input_ids):
                 return self.get_tokenizer().decode(input_ids)
-
-            def sync_tokenize(self, text):
-                return self.get_tokenizer()(text)["input_ids"]
 
         return LMTPAdapterModel()

@@ -15,7 +15,6 @@ from lmql.ops.follow_map import FollowMap
 from lmql.ops.token_set import VocabularyMatcher, has_tail, tset
 from lmql.ops.follow_map import fmap
 from lmql.runtime.interrupt import interrupt
-from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.multi_head_interpretation import (InterpretationHead,
                                                     InterpretationHeadDone,
                                                     InterpreterCall)
@@ -30,10 +29,11 @@ from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, Distribut
 from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
-from lmql.runtime.model_registry import LMQLModelRegistry
-from lmql.models.model import model, LMQLModelDescriptor
 from lmql.models.model_info import model_info
 from lmql.runtime.context import ContextTokenizer
+from lmql.api.llm import LLM
+
+from lmql.api.scoring import dc_score
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -189,6 +189,8 @@ class LMQLContext:
 
         return LMQLResult(self.state.prompt, await self.get_all_vars(),self.interpreter.distribution_variable, self.interpreter.distribution_values)
 
+    async def score(self, *args, **kwargs):
+        return await dc_score(self.interpreter.dcmodel, self.prompt, *args, **kwargs)
 
 @dataclass
 class LMQLResult:
@@ -216,7 +218,7 @@ class PromptInterpreter:
     def __init__(self, context=None, force_model=None, name="<root>") -> None:
         # model-specific components
         self.model = force_model
-        self.model_identifier = force_model
+        self.model_identifier = force_model.model_identifier if isinstance(force_model, LLM) else force_model
         self.name = name
         self.tokenizer: LMQLTokenizer = None
 
@@ -288,54 +290,21 @@ class PromptInterpreter:
         self.decoder_kwargs = kwargs
         self.decoder_kwargs["decoder"] = method
 
-        if "backend" in kwargs:
-            LMQLModelRegistry.backend_configuration = kwargs["backend"]
-
-    def set_model(self, model_name):
-        model_args = {}
-
-        if type(model_name) is str:
-            model_name = model(model_name)
-
-        assert isinstance(model_name, LMQLModelDescriptor), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
-        model_object = model_name
-
-        if model_name.model is not None:
-            model_object = model_name.model
-            # if model_object is a type reference, instantiate it
-            if callable(model_object):
-                model_object = model_object()
-
-            self.model_identifier = model_object.model_identifier
-            self.model = model_object
-
-            # setup the VocabularyMatcher to use the concrete vocabulary of the model
-            VocabularyMatcher.init(self.model.get_tokenizer())
-
-            return
-        else:
-            model_name = model_object.model_identifier
-            model_args = model_object.kwargs
-
-        if self.model is None:
-            self.model = model_name
-            self.model_identifier = model_name
-        elif type(self.model_identifier) is not str:
-            self.model_identifier = self.model.model_identifier
-
-        client = LMQLModelRegistry.get(self.model, **model_args)
-
-        if callable(client):
-            client = client()
+    def set_model(self, model_handle: Union[str, LLM]):
+        if model_handle == "<dynamic>" and self.model is not None:
+            model_handle = self.model
+        
+        model_handle = LLM.from_descriptor(model_handle)
+        self.model_identifier = model_handle.model_identifier
 
         # setup the VocabularyMatcher to use the concrete vocabulary of the model
-        VocabularyMatcher.init(client.get_tokenizer())
+        VocabularyMatcher.init(model_handle.get_tokenizer())
         
         # for OpenAI models we optimize for compact logit masks
         if self.model_identifier.startswith("openai/"):
             self.prefers_compact_mask = True
 
-        self.model = client
+        self.model = model_handle
 
     async def advance(self, state: PromptState):
         if state.variable is not None:
@@ -782,7 +751,7 @@ class PromptInterpreter:
             
             appended_value_prompt = prompt[prompt_length_before:]
 
-            #  advance to next variable in prompt program (appends intermediate instructions to prompt)
+            #  advance to next variable in prompt program (appends intermediate instructions to prompt in addition to the just decoded variable value)
             assert not assert_no_advance, f"error: prompt interpreter tried to advance query program even though assert_no_advance was set"
 
             state = state.updated(variable=variable, prompt=prompt, program_state=program_state)
@@ -921,7 +890,7 @@ class PromptInterpreter:
         # prepare dcmodel
         decoder_args = self.decoder_kwargs
         self.model.decoder_args = decoder_args
-        self.dcmodel: dc.DcModel = self.model.get_dclib_model()
+        self.dcmodel: dc.DcModel = self.model.adapter.get_dclib_model()
 
         async def debug_out(decoder_step):
             if PromptInterpreter.main != self:
@@ -1234,7 +1203,7 @@ class SubInterpreter(PromptInterpreter):
         self.initial_subprompt_ids = None
         
         self.model = model
-        self.model_identifier = model_identifier
+        self.model_identifier = model_identifier.model_identifier if isinstance(model_identifier, LLM) else model_identifier
 
     def set_model(self, model):
         # ignore set_model for subinterpreters
