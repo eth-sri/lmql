@@ -5,6 +5,7 @@ asynchronously in the same process.
 
 import asyncio
 import pickle
+import warnings
 
 from .lmtp_scheduler import TokenSession, Scheduler
 from .errors import LMTPStreamError
@@ -84,7 +85,7 @@ class LMTPAsyncClient:
                         consumers = self.iterators.get(stream_id, [])
                         for q in consumers: q.put_nowait(d)
                 except Exception as e:
-                    print("failed to handle msg", e, flush=True)
+                    warnings.warn("failed to handle msg {}: {}".format(msg, e))
         except asyncio.CancelledError:
             return
 

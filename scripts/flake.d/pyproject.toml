@@ -1,0 +1,51 @@
+[tool.poetry]
+name = "lmql-deps"
+version = "0.999999"
+description = "poetry wrapper around the lmql query language for language models"
+authors = [
+  "Luca Beurer-Kellner",
+  "Marc Fischer",
+  "Martin Vechev",
+]
+homepage = "https://lmql.ai"
+documentation = "https://docs.lmql.ai"
+maintainers = ["The LMQL Team <hello@lmql.ai>"]
+license = "Apache-2.0"
+readme = "README.md"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+lmql = { path = "../../" }
+
+# FIXME: Can we get these pulled in from LMQL setup.cfg?
+accelerate = { version = "^0.21.0", optional = true }
+aiohttp-sse-client = { version = "^0.2.1", optional = true }
+llama-cpp-python = { version = "^0.1.77", optional = true }
+transformers = { version = ">=4.28.1", optional = true }
+
+# very optional: only used with hf extra _on Linux x86-64_
+nvidia-cusparse-cu11 = {version = "11.7.4.91", platform = "linux", optional = true}
+nvidia-cusolver-cu11 = {version = "11.4.0.1", platform = "linux", optional = true}
+nvidia-cublas-cu11 = {version = "11.10.3.66", platform = "linux", optional = true}
+nvidia-nvtx-cu11 = {version = "11.7.91", platform = "linux", optional = true}
+nvidia-cufft-cu11 = {version = "10.9.0.58", platform = "linux", optional = true}
+nvidia-cudnn-cu11 = {version = "8.5.0.96", platform = "linux", optional = true}
+nvidia-cuda-nvrtc-cu11 = {version = "11.7.99", platform = "linux", optional = true}
+triton = {version = "2.0.0", platform = "linux", optional = true}
+nvidia-cuda-cupti-cu11 = {version = "11.7.101", platform = "linux", optional = true}
+nvidia-nccl-cu11 = {version = "2.14.3", platform = "linux", optional = true}
+nvidia-curand-cu11 = {version = "10.2.10.91", platform = "linux", optional = true}
+nvidia-cuda-runtime-cu11 = {version = "11.7.99", platform = "linux", optional = true}
+
+[tool.poetry.extras]
+hf = [ "accelerate", "transformers" ]
+llama = [ "llama-cpp-python" ]
+replicate = [ "transformers", "aiohttp-sse-client" ]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

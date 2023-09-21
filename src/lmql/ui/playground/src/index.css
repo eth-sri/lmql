@@ -1,6 +1,8 @@
 body {
   margin: 0;
-  font-family: 'Open Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   padding: 0pt;
@@ -95,22 +97,11 @@ span.subtitle a, span.subtitle .link {
   }
 }
 
-/* 
-#root {
-  margin: 100pt;
+a {
+  color: #6b77ff;
+  text-decoration: none;
 }
 
-#sidepanel {
-  background-color: white;
-  border: 1pt solid #b2b2b2;
-  color: black;
+a:hover {
+  text-decoration: underline;
 }
-
-#sidepanel h2 {
-  color: black;
-}
-
-#sidepanel button {
-  color: black;
-  background-color: #b2b2b2;
-} */

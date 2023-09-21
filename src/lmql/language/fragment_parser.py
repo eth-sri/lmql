@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 import tokenize
 from io import StringIO
 from typing import Any, List
-import astunparse
 import ast
 import sys
 import termcolor
@@ -16,6 +15,14 @@ class FragmentParserError(Exception): pass
 class LMQLDecoderConfiguration:
     method: ast.AST
     decoding_args: List[ast.keyword]
+
+    @property
+    def has_dump_compiled_code_flag(self):
+        for kwa in self.decoding_args:
+            if kwa.arg == "dump_compiled_code":
+                if type(kwa.value) is ast.Constant and kwa.value.value == True:
+                    return True
+        return False
 
 @dataclass
 class LMQLDistributionClause:
@@ -53,7 +60,6 @@ def is_keyword(tok, kw):
     return tok.type == tokenize.NAME and tok.string.lower() == kw.lower()
 
 def remove_indentation(s, oneline=False):
-    # print([s])
     lines = []
 
     min_indent = " " * len(s)
@@ -63,15 +69,6 @@ def remove_indentation(s, oneline=False):
         unindented_line = line.lstrip()
         line_indent = len(line) - len(unindented_line)
         min_indent = min_indent if len(min_indent) < line_indent else line[:line_indent]
-        # print(unindented_line, [line[:line_indent], line], line_indent)
-        
-        # buf = StringIO(line)
-        # toks = [t for t in tokenize.generate_tokens(buf.readline)]
-        # print(tokenize.tok_name[toks[-4].type])
-        
-        # lines.append(line.lstrip())
-
-    # print("min_indent is", len(min_indent), [min_indent])
 
     for line in s.split("\n"):
         if line.strip() == "" or line == "\\": continue
@@ -84,7 +81,7 @@ def remove_indentation(s, oneline=False):
     else:
         return "\n".join(lines)
 
-def remove_comments(s):
+def untokenize_without_comments(s):
     if type(s) is str: return s
     assert type(s) is list
     return tokenize.untokenize([transform_token(t) for t in s if t.type != tokenize.COMMENT])
@@ -93,8 +90,11 @@ def transform_token(t):
     return t
 
 def ast_parse(s, unindent=False, oneline=False, loc=None):
+    # for special symbols
+    if len(s) > 0 and all(type(e) is str for e in s): return ast.parse('"' + " ".join(s) + '"')
     try:
-        s = remove_comments(s)
+        s = [double_escape(t) for t in s]
+        s = untokenize_without_comments(s)
         if unindent: s = remove_indentation(s, oneline=oneline)
         return ast.parse(s)
     except SyntaxError as e:
@@ -126,6 +126,27 @@ def tok_str(tok):
         return "as"
     return tok.string
 
+def double_escape_str(s):
+    toks = tokenize.generate_tokens(StringIO(s).readline)
+    return tokenize.untokenize([double_escape(t) for t in toks])
+
+def double_escape(tok: tokenize.TokenInfo):
+    """Adds an extra layer of backslashes to make them survive the tokenize->parse->transform->unparse pipeline."""
+    if tok.type != tokenize.STRING or (not tok.string.startswith('"""lmql') and not tok.string.startswith("'''lmql")): 
+        return tok
+    t = tokenize.TokenInfo(tok.type, tok_str(tok).replace("\\n", "\\\\n"), tok.start, tok.end, tok.line)
+    return t
+
+def double_unescape_str(s):
+    toks = tokenize.generate_tokens(StringIO(s).readline)
+    return tokenize.untokenize([double_unescape(t) for t in toks])
+
+def double_unescape(tok: tokenize.TokenInfo):
+    """Removes the extra layer of backslashes added by double_escape."""
+    if tok.type != tokenize.STRING: 
+        return tok
+    return tokenize.TokenInfo(tok.type, tok_str(tok).replace("\\\\n", "\\n"), tok.start, tok.end, tok.line)
+
 class LanguageFragmentParser:
     def __init__(self):
         self.state = "start" # "decode" | "prompt" | "where" | "scoring" | "import"
@@ -141,10 +162,6 @@ class LanguageFragmentParser:
             self.query.prologue = []
             self.state = "prompt"
 
-        # print("decode_str", remove_comments(self.query.decode_str))
-        # print("prompt_str", remove_comments(self.query.prompt_str))
-        # print("from_str", remove_comments(self.query.from_str))
-
         self.prologue_transform()
         self.inline_where_transform()
         self.ast_parse()
@@ -159,7 +176,6 @@ class LanguageFragmentParser:
             tok = prompt_tokens[i]
             lookahead = prompt_tokens[i+1]
             if tok.type == tokenize.STRING and lookahead.type == tokenize.NAME and lookahead.string == "where":
-                # print(prompt_tokens[i+1])
                 prompt_tokens[i+1] = tokenize.TokenInfo(type=tokenize.OP, string="and", start=lookahead.start, end=lookahead.end, line=lookahead.line)
         
 
@@ -277,7 +293,6 @@ class LanguageFragmentParser:
                 try:
                     untokenized = tokenize.untokenize([last_tok, tok]).split(last_tok.string)[1]
                     if not untokenized.startswith(" "):
-                        # print("merge name and tok", last_tok, tok)
                         self.query.prompt_str.pop(-1)
                 except:
                     pass

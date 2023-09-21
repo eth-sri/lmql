@@ -1,0 +1,41 @@
+{
+    "precomputed/simple-chat.json": {
+        "name": "Generating a Dad Joke",
+        "variables": ["JOKE", "PUNCHLINE"],
+        "anchors": {
+            "inline_use": {
+                "type": "multiline",
+                "text": "<tt>inline_use</tt> is one of the supported tool use paradigms, where tool execution is automatically handled inline by the language runtime."
+            },
+            "Therefore": "After tool execution has finished, <i>intermediate instructions are automatically</i> removed from the program, to avoid cluttering the LLM's reasoning process.",
+            "wiki": {
+                "type": "multiline",
+                "text": "Seamlessly expose standard Python functions as tools during LLM execution, to augment the model with additional capabilities."
+            },
+            "Example: calc(\"1+2*3\")": {
+                "type": "multiline",
+                "text": "Based on simple example usage of the <tt>calc</tt> tool, LMQL constructs a dynamic prompt, to allow the LLM to discover and use the tool."
+            },
+            "INT(ANSWER)": "Use datatype constraints like <tt>INT</tt> to obtain a robust response after the tool-augmented reasoning process has completed."
+        },
+        "extra-output": "./logs/multi-tool.pd",
+        "playground-link": "json-robust"
+    },
+    "precomputed/react-reasoning.json": {
+        "name": "React Reasoning",
+        "variables": [],
+        "anchors": {
+            "lmql.lib.actions": "LMQL comes with a standard library of tool use paradigms, but also offers extendibility, allowing the definition of  custom protocols.",
+            "reAct(REASONING, [wiki, calc])": "Adhering to the same interface, tool use protocols like <t>reAct</t> can swapped out in a flexible manner, allowing for experimentation with different paradigms."
+        },
+        "extra-output": "./logs/react-reasoning.pd"
+    },
+    "precomputed/code-interpreter.json": {
+        "name": "Code Interpreter",
+        "variables": [],
+        "anchors": {
+            "exec_code(REASONING)": "Using <t><b>exec_code</b></t>, the LLM is instructed to generate code. The generated code is then executed, and the line-wise output is fed back into the LLM, to enable a feedback loop."
+        },
+        "extra-output": "./logs/code-interpreter.pd"
+    }
+}

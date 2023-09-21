@@ -153,7 +153,9 @@ async def beam_sample(prompt_ids: np.ndarray, n=4, max_len=None, temperature=Non
     for num_steps in range(0, max_len):
         if len(h) == 0: break
 
-        h = h.extend(await model.sample(h, num_samples=n, temperature=temperature))
+        h = dc.repeat(h, n*len(h))
+        h = h.extend(await model.sample(h, num_samples=1, temperature=temperature))
+        
         h = await model.rewrite(h)
         h, done = (h + done).separate_by(not_done)
 
@@ -200,7 +202,7 @@ async def beam_search(prompt_ids: np.ndarray, n=4, max_len=None, **kwargs):
 
         yield (h, done)
     
-    dc.finish(done)
+    dc.finish(dc.array_sorted(done.flatten(), key=lambda s: -s.logprobs.sum()))
 
     yield (h, done)
 
@@ -449,7 +451,6 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
     active = seqs.reshape(lambda s: s.id)
     variable_done = dc.seqs()
     active_variable.set(None)
-    sample = method == "sample"
 
     def is_active_variable(s):
         v = s.data("head.variable")
@@ -466,10 +467,8 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
 
         while not is_seq_beams_search_done(active, variable_done, num_beams=b):
             # inner variable decoding (beam_sample with 2*n beams and branching factor n)
-            if sample:
-                active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
-            else:
-                active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
+            kwargs.pop("temperature", None)
+            active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
             
             active = await model.rewrite(active)
 
@@ -492,6 +491,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
             if sample:
                 active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
             else:
+                kwargs.pop("temperature", None)
                 active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
             
             for s in active.flatten().items():
@@ -603,3 +603,6 @@ async def var(prompt_ids: np.ndarray, b=2, n=None, max_len=384, subdecoder="samp
 def is_seq_beams_search_done(active_hypotheses, done_hypotheses, num_beams, scorer=None):
     return len(active_hypotheses) == 0 or (len(done_hypotheses) == num_beams and dc.max_score(active_hypotheses, scorer=scorer) < dc.min_score(done_hypotheses, scorer=scorer))
 
+@dc.decoder
+def incontext(*args, **kwargs):
+    raise NotImplementedError("incontext is not a valid decoder function for standalone use")

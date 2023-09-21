@@ -55,6 +55,7 @@ export function registerLmqlLanguage(monaco) {
             "beam",
             "ARGMAX",
             "argmax",
+            "incontext",
             "SAMPLE",
             "BEST_K",
             "best_k",
@@ -244,20 +245,30 @@ export function registerLmqlLanguage(monaco) {
             whitespace: [
                 [/\s+/, 'white'],
                 [/(^#.*$)/, 'comment'],
-                [/'''/, 'string', '@endDocString'],
+                // use ''' but not '''lmql
+                [/'''[^(lmql)]/, 'string', '@endDocString'],
+                [/'''lmql/, 'comment'],
+                [/'''$/, 'comment'],
                 [/"""/, 'string', '@endDblDocString']
             ],
             endDocString: [
-                [/[^']+/, 'string'],
+                { include: '@queryString' },
+                [/[^'\[\{]/, 'string'],
                 [/\\'/, 'string'],
                 [/'''/, 'string', '@popall'],
                 [/'/, 'string']
             ],
-            endDblDocString: [
-                [/[^"]+/, 'string'],
+            endLmqlDocString: [
+                // everything like top-level
+                // [/[^(''')]+/, 'root'],
+                [/'''/, 'comment', '@popall'],
+            ],
+            endDblDocString: [  
+                { include: '@queryString' },
+                [/[^"\[\{]/, 'string'],
                 [/\\"/, 'string'],
                 [/"""/, 'string', '@popall'],
-                [/"/, 'string']
+                [/"/, 'string'],
             ],
 
             // Recognize hex, negatives, decimals, imaginaries, longs, and scientific notation
@@ -268,25 +279,51 @@ export function registerLmqlLanguage(monaco) {
 
             // Recognize strings, including those broken across lines with \ (but not without)
             strings: [
+                [/r'[^']*'/, 'string.regex'],
+                [/r"[^"]*"/, 'string.regex'],
                 [/'$/, 'string.escape', '@popall'],
                 [/'/, 'string.escape', '@stringBody'],
                 [/"$/, 'string.escape', '@popall'],
                 [/"/, 'string.escape', '@dblStringBody']
             ],
             stringBody: [
+                { include: '@queryString' },
+                
                 [/[^\\']+$/, 'string', '@popall'],
-                [/[^\\']+/, 'string'],
+                [/\[\[+/, 'string'],
+                [/[^\\'\[\{]/, 'string'],
                 [/\\./, 'string'],
                 [/'/, 'string.escape', '@popall'],
                 [/\\$/, 'string']
             ],
             dblStringBody: [
+                { include: '@queryString' },
                 [/[^\\"]+$/, 'string', '@popall'],
-                [/[^\\"]+/, 'string'],
+                [/[^\\"\[\{}]/, 'string'],
                 [/\\./, 'string'],
                 [/"/, 'string.escape', '@popall'],
                 [/\\$/, 'string']
-            ]
+            ],
+            queryString: [
+                [/r'[^']*'/, 'string.regex'],
+                [/r"[^"]*"/, 'string.regex'],
+                // check for regex
+                [/\[\[/, 'string'],
+                [/\{\{/, 'string'],
+                [/\[/, 'string', '@placeholderVar'],
+                [/\{/, 'string', '@templateVar']
+            ],
+            // var: type or just var
+            placeholderVar: [
+                [/:/, 'storage', '@pop'],
+                [/\]/, 'string', '@pop'],
+                [/[^\]:]+/, 'storage']
+            ],
+            templateVar: [
+                [/:[^}]+/, 'tag'],
+                [/\}/, 'string', '@pop'],
+                [/[^\}]+/, 'variable.parameter']
+            ],
         }
     };
     

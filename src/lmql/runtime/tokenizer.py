@@ -7,18 +7,21 @@ See .tokenizers for concrete implementations.
 import os
 import pickle
 import numpy as np
+import warnings
 from typing import Optional
 
 from lmql.runtime.caching import cache_file_exists, cachefile
 
 from lmql.runtime.tokenizers.pure_python_tokenizer import PythonBackedTokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
-from threading import Thread
 
 global special_token_mappings
 special_token_mappings = {}
 global reverse_special_token_mappings
 reverse_special_token_mappings = {}
+
+class TokenizerNotAvailableError(Exception):
+    pass
 
 class LMQLTokenizer:
     INVALID_CHARACTER = "\uFFFD"
@@ -26,30 +29,48 @@ class LMQLTokenizer:
     def __init__(self, model_identifier, tokenizer_impl=None, loader=None):
         self._tokenizer_impl = None
         self.loader_thread = None
+        self.loader_failed = False
+
+        self.model_identifier = model_identifier
+
+        self._vocab = None
+        self.vocab_range = None
 
         if loader is not None:
+            from threading import Thread
             def load():
                 t = loader()
                 self._tokenizer_impl = t
                 self.loader_thread = None
+                
+                self._vocab = get_vocab(self.tokenizer_impl)
+                self.vocab_range = max(max(self._vocab.values()) + 1, self.tokenizer_impl.vocab_size)
             self.loader_thread = Thread(target=load)
             self.loader_thread.start()
         else:
             self._tokenizer_impl = tokenizer_impl
-
-        self.model_identifier = model_identifier
-        self.detokenizer_cache = {}
-
-        self._vocab = get_vocab(self.tokenizer_impl)
-        self.vocab_range = max(max(self._vocab.values()) + 1, self.tokenizer_impl.vocab_size)
+            self._vocab = get_vocab(self.tokenizer_impl)
+            self.vocab_range = max(max(self._vocab.values()) + 1, self.tokenizer_impl.vocab_size)
 
         if "FORCE_TIKTOKEN" in os.environ:
             assert type(self.tokenizer_impl) is TiktokenTokenizer
 
     @property
+    def model_vocab_size(self):
+        """
+        The model vocab size is the size of the vocabulary that a model uses
+        as the dimensionality of its output distribution. This is different from
+        the vocab_size of the tokenizer, which is the size of the vocabulary
+        + some reserved LMQL-specific tokens.
+        """
+        return self.vocab_range
+    
+    @property
     def tokenizer_impl(self):
         if self._tokenizer_impl is None:
             self.loader_thread.join()
+        if self._tokenizer_impl is None:
+            raise TokenizerNotAvailableError("Failed to load suitable tokenizer for model '{}'".format(self.model_identifier))
         return self._tokenizer_impl
     
     @property
@@ -58,9 +79,11 @@ class LMQLTokenizer:
 
     @property
     def vocab_size(self):
-        # in LMQL vocab_size is the vocab_range (the highest vocabulary ID + 1)
-        # this allows us to use a dense one hot array where no IDs are skipped
-        return self.vocab_range
+        """
+        The vocab_size is the vocab_range (the highest vocabulary ID + 1)
+        this allows us to use a dense one hot array where no IDs are skipped.
+        """
+        return self.vocab_range + 100 # 100 reserved tokens for LMQL tags
 
     @property
     def bos_token_id(self) -> Optional[int]:
@@ -166,20 +189,29 @@ class LMQLTokenizer:
         else:
             return {"input_ids": input_ids}
     
+    def is_special_id(self, id: str):
+        return id >= self.model_vocab_size
+
+    def truncate_to_model_dim(self, mask):
+        if mask is None:
+            return mask
+        return mask[:self.model_vocab_size]
+
     def special_token_id(self, identifier):
         global special_token_mappings
         global reverse_special_token_mappings
         
         if identifier not in special_token_mappings:
             if len(special_token_mappings) == 0:
-                # offset vocabulary IDs by at least the next decimal power of 10
-                offset = 10 ** (len(str(self.vocab_range)))
+                # offset vocabulary IDs by at least 1 to avoid collisions with the tokenizer's vocabulary
+                offset = self.vocab_range + 1
                 special_token_mappings[identifier] = offset
                 reverse_special_token_mappings[offset] = identifier
             else:
                 next_id = max(special_token_mappings.values()) + 1
                 special_token_mappings[identifier] = next_id
                 reverse_special_token_mappings[next_id] = identifier
+                assert next_id < self.vocab_size, "LMQL special tokens exhausted (only 100 allowed by default)"
         return special_token_mappings[identifier]
     
     def chunk_out_by_special_ids(self, input_ids, tokenize=True):
@@ -230,22 +262,25 @@ class LMQLTokenizer:
         return segments
             
 
-def load_tokenizer_notransformers(model_identifier):
-    if not "SLOW_TOKENIZER_OK" in os.environ.keys():
-        print("warning: using slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken)".format(model_identifier))
-    assert PythonBackedTokenizer.is_available(), "PythonBackedTokenizer not available. Please make sure the 'gpt3_tokenizer' package is installed."
-    
-    return PythonBackedTokenizer(model_identifier)
-
 def load_tokenizer(model_identifier, type="auto", **kwargs):
     cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
-    if type in ["auto", "tiktoken"]:
+    # check for tiktoken
+    if type in ["auto", "tiktoken"] or model_identifier.startswith("tiktoken:"):
+        if model_identifier.startswith("tiktoken:"):
+            model_identifier = model_identifier[len("tiktoken:"):]
+
+        # map gpt-3.5-turbo* to gpt-3.5-turbo
+        if "turbo" in model_identifier:
+            tiktoken_identifier = "gpt-3.5-turbo"
+        else:
+            tiktoken_identifier = model_identifier
+
         tiktoken_available = False
         # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
         try:
-            if TiktokenTokenizer.is_available(model_identifier):
+            if TiktokenTokenizer.is_available(tiktoken_identifier):
                 tiktoken_available = True
         except:
             tiktoken_available = False
@@ -254,9 +289,9 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             def loader():
                 if cache_file_exists(cache_path):
                     with cachefile(cache_path, "rb") as f:
-                        return LMQLTokenizer(model_identifier, pickle.load(f))
+                        return LMQLTokenizer(tiktoken_identifier, pickle.load(f))
                 else:
-                    t = TiktokenTokenizer(model_identifier)
+                    t = TiktokenTokenizer(tiktoken_identifier)
 
                     with cachefile(cache_path, "wb") as f:
                         pickle.dump(t, f)
@@ -264,32 +299,33 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             
             return LMQLTokenizer(model_identifier, loader=loader)
 
-    try:
-        assert type in ["auto", "hf"]
+    # check for huggingface tokenizers
+    from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
+    import os
+    os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-        def loader():
-            import os
-            os.environ["TOKENIZERS_PARALLELISM"] = "true"
+    if type in ["auto", "hf"]:
+        if TransformersTokenizer.is_available(model_identifier):
+            def loader():
+                if cache_file_exists(cache_path):
+                    with cachefile(cache_path, "rb") as f:
+                        return LMQLTokenizer(pickle.load(f), model_identifier)
+                else:
+                    t = TransformersTokenizer.from_pretrained(model_identifier, **kwargs)
 
-            from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
-
-            assert TransformersTokenizer.is_available(model_identifier), "TransformersTokenizer not available. Please make sure the 'transformers' package is installed."
-
-            if cache_file_exists(cache_path):
-                with cachefile(cache_path, "rb") as f:
-                    return LMQLTokenizer(pickle.load(f), model_identifier)
-            else:
-                t = TransformersTokenizer.from_pretrained(model_identifier, **kwargs)
-
-                with cachefile(cache_path, "wb") as f:
-                    pickle.dump(t, f)
-            return t
-        return LMQLTokenizer(model_identifier, loader=loader)
-    except Exception as e:
-        # fallback to non-transformers tokenizer
-        t = load_tokenizer_notransformers(model_identifier)
-
-        return LMQLTokenizer(model_identifier, t)
+                    with cachefile(cache_path, "wb") as f:
+                        pickle.dump(t, f)
+                return t
+            return LMQLTokenizer(model_identifier, loader=loader)
+    
+    # slow GPT-only tokenizer (python-backed)
+    if PythonBackedTokenizer.is_available(model_identifier):
+        if not "SLOW_TOKENIZER_OK" in os.environ.keys():
+            warnings.warn("warning: using the slow python-backed tokenizer as no other tokenizer is available for {} (transformers or tiktoken). The slow tokenizer is not recommended for production use and only supported for demo uses.".format(model_identifier), UserWarning, stacklevel=-1)
+        
+        return LMQLTokenizer(model_identifier, tokenizer_impl=PythonBackedTokenizer(model_identifier))
+    
+    raise TokenizerNotAvailableError("Failed to locate a suitable tokenizer implementation for '{}' (Make sure your current environment provides a tokenizer backend like 'transformers', 'tiktoken' or 'llama.cpp' for this model)".format(model_identifier))
 
 def get_vocab(tokenizer):
     if hasattr(tokenizer, "vocab"):

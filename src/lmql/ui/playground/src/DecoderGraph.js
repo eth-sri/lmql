@@ -175,6 +175,9 @@ function layoutDecoderGraph(cy) {
             if (node.hasClass("compound")) return;
             if (node.data("_noUserData")) return;
 
+            // console.log("data", node.data())
+            depth = parseInt(node.data("seq_id").substr(2))
+
             if (depth >= mostLikelyDepth) {
                 if (depth > mostLikelyDepth) {
                     mostLikelyMostRecentNode = null

@@ -4,65 +4,32 @@ from itertools import product
 
 from lmql.ops.token_set import *
 from lmql.ops.follow_map import *
+from lmql.ops.node import *
+
+from lmql.ops.inline_call import InlineCallOp
+from lmql.ops.booleans import *
+from lmql.ops.regex import Regex
+from lmql.models.model_info import model_info
 
 lmql_operation_registry = {}
 
 # @LMQLOp('function_name') decorator
 def LMQLOp(name):
     def class_transformer(cls):
+        # get full import path of cls
+        cls_name = cls.__name__
+        
+        # if not in lmql.ops.ops, then use direct cls reference
+        if cls.__module__ != "lmql.ops.ops":
+            cls_name = cls
+
         if type(name) is list:
             for n in name:
-                lmql_operation_registry[n] = f"{cls.__name__}"
+                lmql_operation_registry[n] = cls_name
             return cls
-        lmql_operation_registry[name] = f"{cls.__name__}"
+        lmql_operation_registry[name] = cls_name
         return cls
     return class_transformer
-
-class Node:
-    def __init__(self, predecessors):
-        assert type(predecessors) is list, "Predecessors must be a list, not {}".format(type(predecessors))
-        self.predecessors = predecessors
-        self.depends_on_context = False
-    
-    def execute_predecessors(self, trace, context):
-        return [execute_op(p, trace=trace, context=context) for p in self.predecessors]
-
-    def forward(self, *args, **kwargs):
-        raise NotImplementedError(type(self) + " does not implement forward()")
-
-    def follow(self, *args, **kwargs):
-        raise NotImplementedError(type(self) + " does not implement follow()")
-    
-    def final(self, args, **kwargs):
-        if all([a == "fin" for a in args]):
-            return "fin"
-        return "var"
-
-    def __nodelabel__(self):
-        return str(type(self))
-    
-    def postprocess_var(self, var_name):
-        """
-        Returns true if this operations provides postprocessing semantics for complete values for the given variable name.
-        """
-        return False
-
-    def postprocess(self, operands, value):
-        """
-        Returns the postprocessed variant of `value`. Only called if `postprocess_var` returns true for variable name of value.
-        
-        You can return a tuple of postprocessed_rewrite (prompt) and postprocessed_value (variable value), to additionally 
-        provide different postprocessing semantics for the variable value and the rewrite of the prompt.
-        """
-        pass
-
-    def postprocess_order(self, other, **kwargs):
-        """
-        Orders application of postprocessing operations. Returns "before", "after" or 0 if order is not defined.
-        
-        Only invoked for `other` operations, that return true for the same `postprocess_var`.
-        """
-        return 0 # by default, no order is defined (only one postprocessing operation per variable can be applied)
 
 def DynamicTypeDispatch(name, type_map):
     class TypeDispatchingNode(Node):
@@ -128,31 +95,6 @@ def DynamicTypeDispatch(name, type_map):
             return name
 
     return TypeDispatchingNode
-
-NextToken = "<lmql.next>"
-
-def is_next_token(t): 
-    return t == NextToken
-
-def strip_next_token(x):
-    if type(x) is list:
-        return [i for i in x if not is_next_token(i)]
-    elif type(x) is tuple:
-        return tuple(i for i in x if not is_next_token(i))
-    if type(x) is not str:
-        return x
-    if x.endswith(NextToken):
-        x = x[:-len(NextToken)]
-    return x
-
-class postprocessed_value:
-    def __init__(self, value):
-        self.value = value
-class postprocessed_rewrite:
-    def __init__(self, rewrite):
-        self.rewrite = rewrite
-
-
 @LMQLOp("SENTENCES")
 class Sentences(Node):
     def forward(self, v, **kwargs):
@@ -234,18 +176,33 @@ class IntOp(Node):
         v = strip_next_token(v)
 
         context = kwargs.get("context", None)
+
         if context.runtime.prefers_compact_mask:
             number_tokens = tset("1","2","3","4","5","6","7","8","9","Ġ2","Ġ3","Ġ4","Ġ5","Ġ0","Ġ6","Ġ7","Ġ8","Ġ9","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","37","48","66","55","47","49","65","68","31","67","59","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True, name="number_tokens")
-            number_continuation_tokens = tset("0","1","2","3","4","5","6","7","8","9","00","01","10","12","50","19","11","20","30","15","14","16","13","25","18","17","24","80","40","22","60","23","29","27","26","28","99","33","70","45","35","64","75","21","38","44","36","32","39","34","05","37","48","66","55","47","08","49","09","65","07","02","04","03","68","31","67","59","06","77","58","69","88","46","57","43","42","78","79","90","95","41","56","54","98","76","52","53","51","86","74","89","72","73","96","71","63","62","85","61","97","84","87","94","92","83","93","91","82","81", exact=True, name="number_continuation_tokens")
         else:
             number_tokens = tset("[ 1-9][0-9]*$", regex=True, name="full_number_tokens")
-            number_continuation_tokens = tset("[0-9]+$", regex=True, name="full_number_continuation_tokens")
+            number_cont_tokens = tset("[1-9][0-9]*$", regex=True, name="number_continuation_tokens")
 
         if not has_next_token:
             return fmap(
                 ("eos", len(v.strip()) != 0),
                 ("*", self.forward(v))
             )
+
+        if not all([c.strip() in ",0123456789" for c in v]) and len(v.strip()) > 0:
+            return fmap(
+                ("*", False)
+            )
+
+        if model_info(context.runtime.model_identifier).is_chat_model:
+            if not all([c in "0123456789" for c in v]):
+                return fmap(
+                    ("*", False)
+                )
+            else:
+                return fmap(
+                    ("*", True)
+                )
 
         if len(v) == 0:
             return fmap(
@@ -256,21 +213,22 @@ class IntOp(Node):
             if len(v.strip()) == 0:
                 # do not allow empty strings
                 return fmap(
-                    (number_continuation_tokens, True),
+                    (number_cont_tokens, True),
                     ("eos", False),
                     ("*", False)
                 )
 
+            # allow anything (either continue as number or stop by predicting any other 
+            # token, which will be removed by the postprocessing)
             return fmap(
-                (number_continuation_tokens, True),
-                ("eos", True),
-                ("*", False)
+                ("*", True)
             )
         
     def postprocess_var(self, var_name):
         return var_name == self.predecessors[0].name
 
     def postprocess(self, operands, raw):
+        raw = "".join([c for c in raw if c in "0123456789"])
         value = int(raw)
         return postprocessed_rewrite(str(value)), postprocessed_value(value)
 
@@ -381,13 +339,6 @@ class LenOp(Node):
 
     def final(self, x, operands=None, result=None, **kwargs):
         return x[0]
-
-class NotOp(Node):
-    def forward(self, op, **kwargs):
-        return not op
-
-    def follow(self, v, **kwargs):
-        return not v
 
 class Lt(Node):
     def forward(self, *args, **kwargs):
@@ -572,58 +523,6 @@ class SelectOp(Node):
             return "fin"
         else: return "var"
 
-class Var(Node):
-    def __init__(self, name, python_variable=False):
-        super().__init__([])
-        self.name = name
-        self.python_variable = python_variable
-
-        self.depends_on_context = True
-        
-        # indicates whether the downstream node requires text diff information
-        self.diff_aware_read = False
-
-    async def json(self):
-        return self.name
-
-    def forward(self, context, **kwargs):
-        if self.python_variable:
-            return context.python_scope.get(self.name)
-
-        if self.diff_aware_read:
-            return (context.get(self.name, None), context.get_diff(self.name, None))
-        
-        return context.get(self.name, None)
-    
-    def follow(self, context, **kwargs):
-        if self.python_variable:
-            return context.python_scope.get(self.name)
-
-        value = context.get(self.name, None)
-        if value is None: return None
-        
-        # also return the text diff if required
-        if self.diff_aware_read:
-            value = (value, context.get_diff(self.name, None))
-
-        # strip_next_token but also supports tuples
-        def strip_nt(v):
-            if type(v) is tuple: return (strip_next_token(v[0]), v[1])
-            else: return strip_next_token(v)
-
-        return fmap(
-            ("eos", PredeterminedFinal(strip_nt(value), "fin")),
-            ("*", value),
-        )
-
-    def final(self, x, context, operands=None, result=None, **kwargs):
-        if self.python_variable:
-            return "fin"
-        return context.final(self.name)
-
-    def __repr__(self) -> str:
-        return f"<Var {self.name}>"
-
 class RawValueOp(Node):
     def __init__(self, args):
         super().__init__([])
@@ -757,57 +656,6 @@ InOp = DynamicTypeDispatch("InOp", (
     ("*", InOpStrInSet),
 ))
 
-class OrOp(Node):
-    def forward(self, *args, **kwargs):
-        if any([a == True for a in args]):
-            return True
-        elif all([a == False for a in args]):
-            return False
-        else:
-            return None
-
-    def follow(self, *args, **kwargs):
-        return fmap(
-            ("*", self.forward(*args))
-        )
-
-    def final(self, args, operands=None, result=None, **kwargs):
-        if result:
-            if any(a == "fin" and v == True for a,v in zip(args, operands)):
-                return "fin"
-            return "var"
-        else: # not result
-            if any(a == "var" for a in args):
-                return "var"
-            return "fin"
-
-class AndOp(Node):
-    def forward(self, *args, **kwargs):
-        if type(args[0]) is tuple and len(args) == 1:
-            args = args[0]
-
-        if any([a == False for a in args]):
-            return False
-        elif any([a is None for a in args]):
-            return None
-        else:
-            return all([a for a in args])
-
-    def follow(self, *v, **kwargs):
-        return fmap(
-            ("*", self.forward(*v))
-        )
-
-    def final(self, args, operands=None, result=None, **kwargs):
-        if result:
-            if all([a == "fin" for a in args]):
-                return "fin"
-            return "var"
-        else: # not result
-            if any([a == "fin" and v == False for a,v in zip(args, operands)]):
-                return "fin"
-            return "var"
-
 def seq_starts_with(seq1, seq2):
     num_matching = sum([1 if i1 == i2 else 0 for i1,i2 in zip(seq1, seq2)])
     return num_matching == len(seq2)
@@ -821,6 +669,45 @@ def remainder(seq: str, phrase: str):
     if overlap == 0: return None
     else: return phrase[i:]
 
+@LMQLOp("REGEX")
+class RegexOp(Node):
+    def forward(self, *args, **kwargs):
+        if any([a is None for a in args]): return None
+        x = args[0]
+        ex = args[1]
+        assert isinstance(ex, str)
+        return Regex(ex).fullmatch(x)
+    
+    def follow(self, *args, **kwargs):
+        if any([a is None for a in args]): return None
+        x = args[0]
+        ex = args[1]
+        assert isinstance(ex, str)
+        
+        if x == strip_next_token(x):
+            return fmap(
+                ("*", Regex(ex).fullmatch(x))
+            )
+
+        r = Regex(ex)
+        rd = r.d(strip_next_token(x)) # take derivative
+        print(f"r={r.pattern} x={strip_next_token(x)} --> {rd.pattern if rd is not None else '[no drivative]'}")
+        if rd is None:
+            return False 
+        elif rd.is_empty(): # derivative is empty -> full match; therefore we must end
+            return fmap(
+                ("eos", True)
+            )
+        else: # only permit tokens form the regex derivative
+            return fmap(
+                (tset(rd.pattern, regex=True, prefix=True), True),
+                #('*', False)
+            )
+
+    def final(self, ops_final, result=None, operands=None, **kwargs):
+        if ops_final[0] == "fin": return "fin"
+        else: return "var"
+
 @LMQLOp("STARTS_WITH")
 class StartsWithOp(Node):
     def forward(self, *args, **kwargs):
@@ -828,6 +715,7 @@ class StartsWithOp(Node):
         
         x = args[0]
         allowed_phrases = args[1]
+        if isinstance(args[1], str): allowed_phrases = [allowed_phrases]
 
         for phrase in allowed_phrases:
             if x.startswith(phrase):
@@ -840,6 +728,7 @@ class StartsWithOp(Node):
 
         x = args[0]
         allowed_phrases = args[1]
+        if isinstance(args[1], str): allowed_phrases = [allowed_phrases]
 
         # if there is any full match, then the result is True
         if any(strip_next_token(x).startswith(phrase) for phrase in allowed_phrases):
@@ -866,17 +755,15 @@ class StartsWithOp(Node):
             return "fin"
         
         return super().final(ops_final, **kwargs)
-
 @LMQLOp(["STOPS_AT", "stops_at"])
 class StopAtOp(Node):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._tokenized_stopping_phrase_cache = {}
 
     def execute_predecessors(self, trace, context):
         var_op: Var = self.predecessors[0]
         assert type(var_op) is Var, "The first argument of STOPS_AT must be a direct reference to a template variable."
-        assert type(self.predecessors[1]) is str, "The second argument of STOPS_AT must be a string literal."
+        assert type(self.predecessors[1]) is str or type(self.predecessors[1]) is Var, "The second argument of STOPS_AT must be a string literal, but is {}.".format(type(self.predecessors[1]))
         var_op.diff_aware_read = True
         return super().execute_predecessors(trace, context)
     
@@ -913,7 +800,8 @@ class StopAtOp(Node):
     def stopping_phrase(self, trace):
         if type(self.predecessors[1]) is Node:
             return trace[self.predecessors[1]]
-        return self.predecessors[1]
+        if type(self.predecessors[1]) is str:
+            return self.predecessors[1]
 
     def postprocess_var(self, var_name):
         return var_name == self.predecessors[0].name
@@ -981,6 +869,102 @@ class StopBeforeOp(StopAtOp):
 
         return postprocessed_rewrite(value), postprocessed_value(value)
 
+class CallOp(Node):
+    def __new__(cls, predecessors, lcls, glbs):
+        fct, *args = predecessors
+        if hasattr(fct, "__lmql_query_function__"):
+            return InlineCallOp(predecessors, lcls, glbs)
+        
+        return super().__new__(cls)
+
+    def __init__(self, predecessors, lcls, glbs):
+        super().__init__(predecessors)
+        
+        self.fct, *self.args = predecessors
+
+    def forward(self, *args, **kwargs):
+        if any([a is None for a in args]): return None
+        fct, *args = args
+        return fct(*args)
+    
+    def follow(self, *v, **kwargs):
+        if any([a is None for a in v]): return None
+
+        fct, *args = v
+        return fmap(("*", fct(*args)))
+
+@LMQLOp(["ESCAPED", "escaped"])
+class EscapedOp(Node):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def execute_predecessors(self, trace, context):
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of STOPS_AT must be a direct reference to a template variable."
+        return super().execute_predecessors(trace, context)
+    
+    def forward(self, *args, **kwargs):
+        return True
+    
+    def follow(self, *args, **kwargs):
+        return fmap(("*", True))
+    
+    def final(self, ops_final, operands, result, **kwargs):
+        return ops_final[0]
+    
+    @property
+    def variable(self):
+        return self.predecessors[0]
+
+    def postprocess_var(self, var_name):
+        return var_name == self.predecessors[0].name
+
+    def postprocess(self, operands, value):
+        value = value.replace("\n",  "\\n")
+        value = value.replace("\t",  "\\t")
+
+        return postprocessed_rewrite(value), postprocessed_value(value)
+
+    def postprocess_order(self, other, **kwargs):
+        if isinstance(other, StopAtOp):
+            return "after"
+        return 0
+
+@LMQLOp(["ERASE"])
+class EraseOp(Node):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def execute_predecessors(self, trace, context):
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of STOPS_AT must be a direct reference to a template variable."
+        return super().execute_predecessors(trace, context)
+    
+    def forward(self, *args, **kwargs):
+        return True
+    
+    def follow(self, *args, **kwargs):
+        return fmap(("*", True))
+    
+    def final(self, ops_final, operands, result, **kwargs):
+        return ops_final[0]
+    
+    @property
+    def variable(self):
+        return self.predecessors[0]
+
+    def postprocess_var(self, var_name):
+        return var_name == self.predecessors[0].name
+
+    def postprocess(self, operands, value):
+        return postprocessed_rewrite(""), postprocessed_value(value)
+
+    def postprocess_order(self, other, **kwargs):
+        if isinstance(other, StopAtOp):
+            return "after"
+        return 0
+    
+# executes an arbitrary Python lambda expr on the operands (no support for advanced follow semantics)
 class OpaqueLambdaOp(Node):
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
@@ -994,74 +978,32 @@ class OpaqueLambdaOp(Node):
         return fmap(
             ("*", fct(*args))
         )
-
-def create_mask(follow_map, valid, final):
-    if follow_map is None:
-        return "*"
     
-    allowed_tokens = tset()
-    otherwise_result = None
-
-    for pattern, result in follow_map:
-        if pattern == "*":
-            otherwise_result = result
-
-        if result is not None:
-            value, final = result
-        else:
-            value = None
-            final = "var"
-
-        if value == True or value is None:
-            allowed_tokens = union(allowed_tokens,pattern)
-        elif value == False and final == ("var",):
-            allowed_tokens = union(allowed_tokens, pattern)
-        elif value is None and len(follow_map.components) == 1:
-            allowed_tokens = "*"
-        elif result == (False, ('fin',)):
-            if pattern != "*":
-                allowed_tokens = setminus(allowed_tokens, pattern)
-
-    if allowed_tokens == "∅":
-        return tset("eos")
-
-    if len(allowed_tokens) == 0:
-        if otherwise_result is not None:
-            othw_value, othw_final = otherwise_result
-        else:
-            othw_value, othw_final = None, "var"
-        if not othw_value and othw_final == ("fin",):
-            return tset("eos")
-        else:
-            return "*"
-
-    return allowed_tokens
-
-def is_node(op):
-    return issubclass(type(op), Node)
-
-def derive_predecessor_final(op, trace):
-    def get_final(v):
-        # for nodes, get final value from trace
-        if is_node(v): return trace[v][1]
-        # for constants, final value is always "fin"
-        return "fin"
-    return [get_final(p) for p in op.predecessors]
-
-def derive_final(op, trace, context, result):
-    predecessor_final = derive_predecessor_final(op, trace)
-
-    def get_predecessor_result(v):
-        if is_node(v): return trace[v][0]
-        return v
+# forces a pre-determined value in the prompt as well as in value semantics
+# in the postprocessing stage (used internally)
+class FixedValueOp(Node):
+    def __init__(self, predecessors, variable_value, prompt_value):
+        super().__init__(predecessors)
+        self.variable_value = variable_value
+        self.prompt_value = prompt_value
     
-    predecessor_values = [get_predecessor_result(p) for p in op.predecessors]
-
-    context_arg = ()
-    if op.depends_on_context: 
-        context_arg += (context,)
+    def forward(self, value, *args, **kwargs):
+        return InOpStrInSet([]).forward(value, [self.prompt_value])
     
-    return op.final(predecessor_final, *context_arg, operands=predecessor_values, result=result)
+    def follow(self, value, *args, **kwargs):
+        return InOpStrInSet([]).follow(value, [self.prompt_value])
+
+    def final(self, args, result=None, **kwargs):
+        return InOpStrInSet([]).final(args, result=result, **kwargs)
+
+    def postprocess_var(self, var_name):
+        return True
+    
+    def postprocess_order(self, other, **kwargs):
+        return "after"
+    
+    def postprocess(self, operands, value):
+        return self.variable_value
 
 def execute_op_stops_at_only(variable: str, op: Node, trace, result=None, sidecondition=None):
     """
@@ -1134,7 +1076,13 @@ def execute_postprocess(op: Node, var_name: str, value: str, context=None):
                 elif relative_order == "after":
                     i += 1
                 else:
-                    assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
+                    relative_order = current_op.postprocess_order(op, operands=current_op_inputs, other_inputs=inputs)
+                    if relative_order == "before":
+                        i += 1
+                    elif relative_order == "after":
+                        break
+                    else:
+                        assert len(postprocessors) == 0, "The specified set of constraints contains multiple incompatible postprocessing operations for the same variable. The conflicting operations are: {} and {}. Please make sure the used constraints implement postprocess_order for each other, to use them together.".format(current_op, op)
             postprocessors.insert(i, (op, inputs))
 
     # filter out stopping conditions as postprocessors that were not actually triggered (due to unfulfilled sideconditions)
@@ -1167,64 +1115,3 @@ def execute_postprocess(op: Node, var_name: str, value: str, context=None):
         rewritten_value = value
     
     return rewritten_value, rewritten_prompt
-
-def execute_op(op: Node, trace=None, context=None, return_final=False, semantics="forward"):
-    # for constant dependencies, just return their value
-    if not is_node(op): 
-        return op
-    
-    # only evaluate each operation once
-    if op in trace.keys(): 
-        return trace[op][0]
-    
-    # compute predecessor values
-    inputs = op.execute_predecessors(trace, context)
-    
-    if op.depends_on_context: 
-        inputs += (context,)
-
-    inputs_final = derive_predecessor_final(op, trace)
-    semantics_fct = op.__getattribute__(semantics)
-    result = semantics_fct(*inputs, final=inputs_final)
-    is_final = derive_final(op, trace, context, result)
-    
-    if trace is not None: 
-        trace[op] = (result, is_final)
-
-    if return_final:
-        return result, is_final
-
-    return result
-
-def digest(expr, context, follow_context, no_follow=False):
-    if expr is None: return True, "fin", {}, {}
-
-    trace = {}
-    follow_trace = {}
-    expr_value, is_final = execute_op(expr, trace=trace, context=context, return_final=True)
-
-    if no_follow:
-        return expr_value, is_final, trace, follow_trace
-
-    for op, value in trace.items():
-        # determine follow map of predecessors
-        if len(op.predecessors) == 0: 
-            # empty argtuple translates to no follow input
-            intm = all_fmap((ArgTuple(), ["fin"])) 
-        else:
-            # use * -> value, for constant value predecessor nodes
-            def follow_map(p):
-                if is_node(p): return follow_trace[p]
-                else: return fmap(("*", (p, ("fin",))))
-            intm = fmap_product(*[follow_map(p) for p in op.predecessors])
-        
-        # apply follow map
-        op_follow_map = follow_apply(intm, op, value, context=follow_context)
-
-        # name = op.__class__.__name__
-        # print(name, value)
-        # print("follow({}) = {}".format(name, op_follow_map))
-
-        follow_trace[op] = op_follow_map
-    
-    return expr_value, is_final, trace, follow_trace

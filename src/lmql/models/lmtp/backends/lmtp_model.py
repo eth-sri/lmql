@@ -104,12 +104,12 @@ class LMTPModel:
     @staticmethod
     def register(name, module_dependencies = None):
         def wrapper(loader):
-            import importlib
+            import importlib.util
             if module_dependencies is not None:
                 for module in module_dependencies:
-                    try:
-                        importlib.import_module(module)
-                    except ImportError:
+                    # check without importing
+                    spec = importlib.util.find_spec(module)
+                    if spec is None:
                         def error_func(*args, **kwargs):
                             assert False, "To use the {} backend, please install the '{}' package.".format(name, module)
                         LMTPModel.registry[name] = error_func

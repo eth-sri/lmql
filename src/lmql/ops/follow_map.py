@@ -155,6 +155,24 @@ class FollowMap(Iterable):
     def map(self, fct):
         mappings = [(pattern, fct(pattern, value)) for pattern, value in self.components]
         return fmap(*mappings)
+    
+    def flat_map(self, fct, simplify=True):
+        mappings = []
+        
+        for pattern, value in self.components:
+            submap = fct(pattern, value)
+            if submap is None:
+                mappings.append((pattern, value))
+            else:
+                submap = submap.intersect(pattern)
+                for subpattern, subvalue in submap.components:
+                    mappings.append((subpattern, subvalue))
+        result = fmap(*mappings)
+        
+        if simplify: result.simplify()
+
+        return result
+
 
 def zip_fmap(*fmaps):
     """

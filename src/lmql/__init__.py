@@ -16,6 +16,8 @@ import tempfile
 
 import lmql.runtime.lmql_runtime as lmql_runtime
 import lmql.runtime.lmql_runtime as runtime_support
+from lmql.runtime.lmql_runtime import is_query
+
 from lmql.utils.docstring_parser import *
 from lmql.language.compiler import LMQLCompiler
 # re-export lmql runtime functions
@@ -25,21 +27,30 @@ from lmql.runtime.lmql_runtime import (FunctionContext, LMQLInputVariableScope,
 from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.output_writer import headless, printing, silent, stream
 from lmql.runtime.interpreter import LMQLResult
-from lmql.models.model import model
-from lmql.runtime.loop import main
 
-from typing import Optional
+from lmql.models.model import model, LMQLModelDescriptor
+from lmql.runtime.loop import main
+import lmql.runtime.decorators as decorators
+
+from typing import Optional, Union
+from functools import wraps
+import lmql.language.inspect as inspect
 
 model_registry = LMQLModelRegistry
-
-def connect(server="http://localhost:8080", model_name="EleutherAI/gpt-j-6B"):
-    print("warning: connect() is deprecated. Use set_backend() instead.")
 
 def autoconnect():
     model_registry.autoconnect = True
 
 def set_backend(backend):
     model_registry.backend_configuration = backend
+
+def set_default_model(model: Union[str, LMQLModelDescriptor]):
+    """
+    Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.
+
+    This applies globally in the current process.
+    """
+    LMQLModelRegistry.default_model = model
 
 def load(filepath=None, autoconnect=False, force_model=None, output_writer=None):
     if autoconnect: 
@@ -62,7 +73,7 @@ async def run_file(filepath, *args, output_writer=None, force_model=None, **kwar
     with open(filepath, "r") as f:
         code = f.read()
     
-    q = _query_from_string(code, output_writer=printing)
+    q = _query_from_string(code, output_writer=output_writer)
     return await q(*args, **kwargs)
 
 async def run(code, *args, **kwargs):
@@ -176,27 +187,34 @@ def query(__fct__=None, input_variables=None, is_async=True, calling_frame=None,
     scope = LMQLInputVariableScope(fct, calling_frame)
     code = get_decorated_function_code(fct)
 
+    # compile query and load it into this python process
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(code)
     module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
-    
+
+    # get function signature
     is_async = inspect.iscoroutinefunction(fct)
+    decorated_fct_signature = inspect.signature(fct)
     
-    decorate_fct_signature = inspect.signature(fct)
     compiled_query_fct_args = inspect.getfullargspec(module.query.fct).args
     
     # set the function context of the query based on the function context of the decorated function
-    module.query.function_context = FunctionContext(decorate_fct_signature, compiled_query_fct_args, scope)
+    module.query.function_context = FunctionContext(decorated_fct_signature, compiled_query_fct_args, scope)
     module.query.is_async = is_async
     module.query.extra_args = extra_args
 
+    # name the query function after the decorated function
+    module.query.name = fct.__name__
+
+    @wraps(fct)
     def lmql_query_wrapper(*args, **kwargs):
         return module.query(*args, **kwargs)
 
     # copy some attributes of model.query to the wrapper function
     for attr in ["aschain", "lmql_code", "is_async", "output_variables"]:
         setattr(lmql_query_wrapper, attr, getattr(module.query, attr))
+    setattr(lmql_query_wrapper, "__lmql_query_function__", module.query)
 
     return lmql_query_wrapper
 
@@ -206,6 +224,16 @@ async def static_prompt(query_fct, *args, **kwargs):
     """
     res = await query_fct(*args, **kwargs, return_prompt_string=True)
     return res[0]
+
+def main(query_fct, *args, **kwargs):
+    """
+    Runs the provided query function in the main thread
+    and returns the result.
+
+    This call is blocking.
+    """
+    import asyncio
+    return asyncio.run(query_fct(*args, **kwargs))
 
 def serve(*args, **kwargs):
     assert not "LMQL_BROWSER" in os.environ, "lmql.serve is not available in the browser distribution of LMQL."

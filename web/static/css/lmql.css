@@ -649,6 +649,11 @@ span.option {
     border: 1pt solid rgba(0, 0, 0, 0.199);
 }
 
+a.option {
+    margin-left: 8pt;
+    font-size: 12pt !important;
+}
+
 .example-badges {
     margin-bottom: 10pt;
 }
@@ -1288,5 +1293,35 @@ section.blog h2, section.blog h3 {
     .hide-on-small {
         display: none !important;
         background-color: green;
+    }
+}
+
+.new {
+    display: flex;
+    flex-direction: row;
+    border-radius: 2pt;
+    font-size: 16t;
+    margin-bottom: 20pt;
+    margin-left: 15pt;
+    background-color: #3273dc;
+    line-height: 2.0;
+}
+
+.new a {
+    text-decoration: underline;
+    margin-left: 10pt;
+    color: white;
+}
+
+.new h1 {
+    font-weight: bold;
+    display: inline;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+@media (max-width: 420pt) {
+    .new {
+        margin-left: -5pt;
+        font-size: 10pt;
     }
 }

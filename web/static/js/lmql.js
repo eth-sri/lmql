@@ -69,6 +69,8 @@ window.addEventListener('load', function() {
     findParent(this, 'example-selector').querySelectorAll('#' + selected).forEach(e => {
       e.style.display = 'flex';
       e.classList.add('selected');
+
+      e.querySelectorAll(".promptdown").forEach(e => e.play());
     });
 
     // set anchor

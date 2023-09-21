@@ -2,7 +2,7 @@ import asyncio
 import sys
 from .cache import apply
 
-async def map(q, items, chunksize=None, progress=False, **kwargs):
+async def map(q, items, chunksize=None, progress=False, parameter=None, **kwargs):
     chunks = []
     if chunksize is None:
         chunksize = len(items)
@@ -16,7 +16,7 @@ async def map(q, items, chunksize=None, progress=False, **kwargs):
         chunks = tqdm.tqdm(chunks, file=sys.stdout)
 
     for chunk in chunks:
-        results = await asyncio.gather(*[apply(q, x) for x in chunk])
+        results = await asyncio.gather(*[apply(q, x, **kwargs) for x in chunk])
         total_results += results
 
     return total_results

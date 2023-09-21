@@ -1,0 +1,11 @@
+build:
+  gpu: true
+  python_version: '3.10'
+  python_packages:
+  - 'git+https://github.com/eth-sri/lmql@main#egg=lmql'
+  - 'accelerate'
+  - 'bitsandbytes'
+  - 'safetensors'
+  - 'scipy'
+  - 'transformers>=4.28.1'
+predict: "predict.py:Predictor"

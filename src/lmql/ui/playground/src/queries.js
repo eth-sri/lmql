@@ -50,8 +50,8 @@ where
             state: 'precomputed/list.json'
          },
          {
-            name: "📝 Generate JSON",
-            description: "Template-Based Generation",
+            name: "📝 Templates",
+            description: "Template-Based Generation for JSON data",
             code: `argmax 
     """
     Write a summary of Bruno Mars, the singer:
@@ -74,6 +74,139 @@ where
          }
       ]
    },
+   {
+    category: "Features In Preview", 
+    highlight: true,
+    queries: [
+       {
+          // hello world
+          name: "👨‍👩‍👧 Types / JSON",
+          description: "Generate schema-safe, typed data.",
+          code: `import lmql
+from dataclasses import dataclass
+
+@dataclass
+class Employer:
+    employer_name: str
+    location: str
+
+@dataclass
+class Person:
+    name: str
+    age: int
+    employer: Employer
+    job: str
+
+argmax
+    "Alice is a 21 years old and works as an engineer at LMQL Inc in Zurich, Switzerland.\\n"
+    "Structured: [PERSON_DATA]\\n"
+    "Their name is {PERSON_DATA.name} and she works in {PERSON_DATA.employer.location}."
+from 
+    "openai/text-davinci-003" 
+where 
+    type(PERSON_DATA) is Person
+          
+`,
+          state: 'precomputed/json-robust.json'
+       },
+       {
+          name: "🛠️ Multi-Tool Use",
+          description: "Simply expose Python functions as LLM tools.",
+          code: `from lmql.lib.actions import inline_use, calc, wiki
+
+argmax
+    "Q: What is the population of the US and Germany combined?\\n"
+    "A: Let's think step by step\\n"
+    "[REASONING]\\n"
+    "Therefore the answer is[ANSWER]"
+from 
+    'openai/text-davinci-003'
+where
+    inline_use(REASONING, [wiki, calc]) and INT(ANSWER)
+          `,
+            state: ''
+       },
+       {
+          name: "🔤 Regex Constraints",
+          description: "Specify constraints using regex.",
+          code: `"It's the last day of June so today is [RESPONSE]" where REGEX(RESPONSE, r"[0-9]{2}/[0-9]{2}")`,
+            state: 'precomputed/date-regex.json'
+       },
+       {
+          // hello world
+          name: "❤️ Sentiment Constraints",
+          description: "Affect sentiment with in-context instructions.",
+          code: `@lmql.query(cache="mood.tokens", model="chatgpt")
+async def mood_description(m: str):
+    '''lmql
+    print("Generating mood for", m)
+    """Provide a one sentence instruction that prompts a model to write text that 
+    is written in a {m} tone, addressing some previously provided question.\\n"""
+    "[SUMMARY]\\n"
+    return SUMMARY.strip();
+    '''
+
+@lmql.query
+async def mood(m: str):
+    '''lmql
+    """
+    Instruction: {await mood_description(m)}
+    Answer: [RESPONSE]
+    """ where stops_at(RESPONSE, ".") and stops_at(RESPONSE, "\\n")
+
+    return RESPONSE.strip(); 
+    '''
+
+# main query
+argmax
+    for q in ["Hi", "Who are you", "How is your day going?"]:
+        "Q: {q}\\n"
+        "A: [RESPONSE]\\n"
+from 
+    "chatgpt" 
+where 
+    mood(RESPONSE, "loving like a partner")
+          
+`,
+          state: ''
+       },
+       {
+          // hello world
+          name: "📝 Write A Poem",
+          description: "Insert dynamic instructions during generation.",
+          code: `@lmql.query
+async def rhyme():
+    '''
+    """
+    Above is the beginning of the poem. Generate the next verse that rhymes with the last line and has the same number of syllables.
+    [VERSE]
+    """ where stops_before(VERSE, "\\n")
+    return VERSE
+    '''
+
+@lmql.query
+async def first_verse():
+    '''
+    """
+    Generate a verse that would be perfect for the start of a beautiful rhyme. 
+    [VERSE]
+    """ where stops_before(VERSE, "\\n")
+    return VERSE
+    '''
+
+argmax
+    "[FIRST_VERSE]\\n"
+    for i in range(5):
+        "[VERSE]\\n"
+from 
+    "chatgpt" 
+where 
+    rhyme(VERSE) and first_verse(FIRST_VERSE)
+`,
+          state: ''
+       }
+    ]
+ },
    {
       category: "LLM Reasoning", 
       queries: [

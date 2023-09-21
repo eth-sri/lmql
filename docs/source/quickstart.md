@@ -57,7 +57,7 @@ On each LLM call, the concatenation of all prompt statements so far, form the pr
     
 After a prompt statement has been executed, the contained template variables are automatically exposed to the surrounding program context. This allows you to react to model output and incorporate the results in your program logic. To learn more about this form of interactive prompting, please see [Scripted Prompting](./language/scripted_prompts.md).
 
-**Model Clause** `from "openai/text-ada-001"`: In this extended version we now specify a specific model to use for text generation. LMQL supports [OpenAI models](https://platform.openai.com/docs/models), like GPT-3.5 variants, ChatGPT, and GPT-4, but also self-hosted models, e.g. via [🤗 Transformers](https://huggingface.co/transformers). For more details, please see [Models](./language/models.md). By default, LMQL relies on `openai/text-davinci-003`, if not specified otherwise.
+**Model Clause** `from "openai/text-ada-001"`: In this extended version we now specify a specific model to use for text generation. LMQL supports [OpenAI models](https://platform.openai.com/docs/models), like GPT-3.5 variants, ChatGPT, and GPT-4, but also self-hosted models, e.g. via [🤗 Transformers](https://huggingface.co/transformers). For more details, please see [Models](./language/models.rst). By default, LMQL relies on `openai/text-davinci-003`, if not specified otherwise.
 ## 3. Enjoy
 
 These basic steps should get you started with LMQL. If you need more inspiration before writing your own queries, you can explore the examples included with the [Playground IDE](https://lmql.ai/playground) or showcased on the [LMQL Website](https://lmql.ai/).

@@ -1,0 +1,17 @@
+### Code Generation
+![bubble:user|Q: Compute the square root of (123123 - 19) * 12.]
+![bubble:system| (LLM can use inline code execution during reasoning)]
+[_instr("code=1")|# step by step solution in Python (a solution() 
+ # function that returns the result)
+]
+[_code("code=1")|def solution():
+  # Step 1: Calculate (123123 - 19)
+  result1 = 123123 - 19 #|| [INTERPRETER| 123104]
+  # Step 2: Multiply (123104) by 12 
+  result2 = result1 * 12 #|| [INTERPRETER| 1477248]
+  # Step 3: Calculate the square root of 1477248 
+  result3 = 1477248 ** 0.5 #|| [INTERPRETER| 1215.4209]
+  return result3  #|| [INTERPRETER| 1215.4209]
+]
+
+[bubble:assistant| Therefore the answer is [ANSWER| 1215.4209] ]

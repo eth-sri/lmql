@@ -100,7 +100,7 @@ Alternatively, `lmql run` can be used to execute local `.lmql` files. Note that 
 
 ### Configuring OpenAI API Credentials
 
-If you want to use OpenAI models, you have to configure your API credentials. To do so, create a file `api.env` in the active working directory, with the following contents.
+If you want to use OpenAI models, you have to configure your API credentials. To do so you can either define the `OPENAI_API_KEY` environment variable or create a file `api.env` in the active working directory, with the following contents:
 
 ```
 openai-org: <org identifier>
@@ -108,6 +108,8 @@ openai-secret: <api secret>
 ```
 
 For system-wide configuration, you can also create an `api.env` file at `$HOME/.lmql/api.env` or at the project root of your LMQL distribution (e.g. `src/` in a development copy).
+
+Alternatively, you can use LMQL-specific env variables `LMQL_OPENAI_SECRET` and `LMQL_OPENAI_ORG`.
 
 ## Installing the Latest Development Version
 
@@ -118,6 +120,10 @@ pip install git+https://github.com/eth-sri/lmql
 ```
 
 This will install the `lmql` package directly from the `main` branch of this repository. We do not continously test the `main` version, so it may be less stable than the latest PyPI release.
+
+# Contributing
+
+LMQL is a community-centric project. If you are interested in contributing to LMQL, please see the [contributing guidelines](./CONTRIBUTING.md) for more information, and reach out to us via [Discord](https://discord.gg/7eJP4fcyNT). We are looking forward to your contributions!
 
 ## Setting Up a Development Environment
 

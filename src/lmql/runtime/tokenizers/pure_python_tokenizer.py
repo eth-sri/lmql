@@ -1,18 +1,24 @@
 class PythonBackedTokenizer:
     """ Custom tokenizer to be used only in a browser environment. This tokenizer only supports GPT tokenization. """
     def __init__(self, model_identifier):
-        import gpt3_tokenizer
-        assert "gpt" in model_identifier, "PythonBackedTokenizer only supports GPT family models"
 
         self.bos_token_id = 50256
         self.eos_token_id = 50256
         self._vocab = None
+        self.model_identifier = model_identifier
 
     @staticmethod
-    def is_available():
+    def is_available(model_identifier):
         try:
             import gpt3_tokenizer
-            return True
+            openai_models = [
+                "ada-",
+                "babbage-",
+                "davinci-",
+                "gpt"
+            ]
+
+            return any([m in model_identifier for m in openai_models])
         except:
             return False
 
@@ -100,7 +106,18 @@ class PythonBackedTokenizer:
             s = [s]
             unpack = True
         
-        input_ids = [gpt3_tokenizer.encode(se) if se != "<|endoftext|>" else [self.eos_token_id] for se in s]
+        def encode_segment(se):
+            # split segment by <|endoftext|> and encode each segment
+            if "<|endoftext|>" in se:
+                segments = se.split("<|endoftext|>", 1)
+                return encode_segment(segments[0]) + [self.eos_token_id] + encode_segment(segments[1])
+
+            if se == "<|endoftext|>":
+                return [self.eos_token_id]
+            else:
+                return gpt3_tokenizer.encode(se)
+
+        input_ids = [encode_segment(se) for se in s]
         
         if unpack:
             return {"input_ids": input_ids[0]}

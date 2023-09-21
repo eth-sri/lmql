@@ -1,0 +1,17 @@
+### Chat
+![bubble:user|Q: What is the population of Germany and the US combined? 
+Let's think step by step.][@wait|800]
+
+[@begin|incontext]![bubble:system| In your reasoning you are allowed to use the following tools: [_|wiki] and [_c|calc]. You can use them by typing the name of the tool followed by the input in parentheses. For example, to search for the population of a country, you can type [_|&lt;&lt;wiki("Population of France")|| ... &gt;&gt;]...]
+[@end|incontext]
+[bubble:assistant| A: First, let's find the population of Germany and the US. We can use the wiki tool to search for the population of each country.
+For Germany[_|&lt;&lt;wiki("Population of Germany")||][@wait|100]![TOOL| The demography of Germany is monitored by the Statistisches Bundesamt (Federal Statistical Office of Germany). According to the most recent data, Germany's population is 84,270,625...&gt;&gt;]
+For the US, [_|&lt;&lt;wiki("Population of the United States")||][@wait|100]![TOOL| The United States had an official estimated resident population of 333,287,557 ...&gt;&gt;]
+Now, let's use the calc tool to add the two populations together. The population of Germany and the US combined is [@wait|100][_c|&lt;&lt;calc("84270625 + 333287557")||]![CALC|417558182&gt;&gt;]
+]
+[@wait|800]
+![bubble:system| (removing intermediate instructions from prompt)]
+[@wait|400]
+[@fade|incontext]
+[@wait|1000]
+[bubble:assistant| Therefore the answer is [RESPONSE| 417558182] ]

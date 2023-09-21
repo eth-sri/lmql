@@ -61,6 +61,10 @@ processes.append(autobuild_blog_p)
 autobuild_web_p = subprocess.Popen(["onchange", "index.template.html", "**/*.js", "**/*.css", "**/*.md", "-e", "./index.html", "--", "node", "generate.js"], cwd="web")
 processes.append(autobuild_web_p)
 
+# autobuild web/actions
+auto_build_actions_p = subprocess.Popen(["onchange", "**/*.js", "**/*.css", "**/*.md", "**/*.html", "**/*.pd", "**/*.json", "-e", "./index.html", "--", "node", "generate.js"], cwd="web/actions")
+processes.append(auto_build_actions_p)
+
 while True:
     try:
         print(summary)

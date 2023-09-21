@@ -1,0 +1,66 @@
+.side-by-side {
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.side-by-side .query pre {
+    font-size: 12pt;
+    color: white;
+}
+
+.example-badges .option {
+    font-size: 14pt;
+}
+
+.lmql-keyword {
+    font-weight: bold;
+}
+
+
+pre.promptdown {
+    border-radius: 4pt;
+    flex: 1;
+    padding: 15pt !important;
+    margin-right: 5pt;
+    margin-left: 5pt;
+    margin-top: 5pt !important;
+    z-index: 999999;
+    display: block;
+    padding-top: 0pt;
+    font-size: 12pt !important;
+
+    min-height: 490pt;
+
+    background-color: white;
+    color: black;
+}
+
+@media only screen and (max-width: 420pt) {
+    pre.promptdown {
+        width: 110%;
+        margin-left: -5%;
+    }
+}
+
+.promptdown span.t {
+    display: inline;
+}
+
+pre.promptdown h3 {
+    font-weight: 500;
+    position: relative;
+    top: -8pt;
+}
+
+.container.is-max-desktop {
+    max-width: 900pt;
+}
+
+.big .badge {
+    font-size: 12pt !important;
+    height: 15pt;
+    position: relative;
+    top: -4pt;
+    line-height: 15pt;
+    background-color: rgb(115, 115, 228);
+}

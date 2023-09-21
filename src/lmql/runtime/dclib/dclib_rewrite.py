@@ -47,9 +47,38 @@ class DcModelRewriteMixin:
         # do not rewrite deterministic sequences (rewrite mask set to False)
         mask_seq_to_rewrite = np.array([s.needs_rewrite for s in seqs], dtype=np.bool_)
 
-        rewriter = self.model_args["modern_rewriter"]
-        rewritten_ids = await rewriter(seqs, mask_seq_to_rewrite)
+        rewriting_iterations = 0
+        results = [None for _ in seqs]
+        still_need_rewrite = list(zip(range(len(seqs)), seqs, mask_seq_to_rewrite))
+
+        did_rewrite = False
+        
+        while len(still_need_rewrite) > 0:
+            rewriting_iterations += 1
+            
+            indices = [i for i, _, _ in still_need_rewrite]
+            seqs = [s for _, s, _ in still_need_rewrite]
+            mask = [v for _, _, v in still_need_rewrite]
+            
+            rewriter = self.model_args["modern_rewriter"]
+            rewritten_ids = await rewriter(seqs, mask)
+            final_result = rewritten_ids.final
+
+            if rewritten_ids.strip_eos[0] != False:
+                did_rewrite = True
+
+            still_need_rewrite = []
+            iteration_results = await self.apply_rewrite(seqs, rewritten_ids, noscore=noscore, unwrap=unwrap)
+            for i, s, done in zip(indices, iteration_results, final_result):
+                results[i] = s
+                if not done and s.is_done():
+                    still_need_rewrite.append((i, s, mask_seq_to_rewrite[i]))
+        
+        # print("rewrite iterations:", rewriting_iterations)
+
+        return unwrap(results)
     
+    async def apply_rewrite(self, seqs, rewritten_ids, noscore=False, unwrap=lambda v: v):
         # update user data, if rewriter provides it
         for s, user_data in zip(seqs, rewritten_ids.user_data):
             s.user_data = deepmerge(deepcopy(s.user_data), user_data) if user_data is not None else s.user_data
@@ -125,15 +154,12 @@ class DcModelRewriteMixin:
                 return DecoderSequence(continued_seq.input_ids, continued_seq.logprobs, continued_seq.deterministic, stop_phrase=continued_seq.stop_phrase,
                                     predecessor=continued_seq, user_data=user_data, sticky_user_data_keys=continued_seq.sticky_user_data_keys, epsilon_node=True)
 
-            # check if rewriting action provides user data specifically for the rewritten sequence
-            # user_data = rewritten_ids.rewritten_seq_user_data[seqidx] or user_data
-
             # value tokens
             num_value_tokens = value_offset - offset
             deterministic = [True if i + 1 > num_value_tokens else False for i in range(len(appended_ids))]
             continuation = (await self.score([continued_seq], [appended_ids], deterministic=deterministic, stop_phrase=False, needs_rewrite=False, user_data=user_data, noscore=noscore))[0]
             
-            continuation.stop_phrase = s.stop_phrase[:len(continuation.input_ids)]
+            # continuation.stop_phrase = s.stop_phrase[:len(continuation.input_ids) - 1] 
             continuation.needs_rewrite = False
             
             steps = 0

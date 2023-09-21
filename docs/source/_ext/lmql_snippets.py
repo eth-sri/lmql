@@ -2,10 +2,12 @@ from docutils import nodes
 from docutils.parsers.rst import Directive
 from pygments import highlight
 from pygments.lexers import PythonLexer
-from pygments.token import Name, Keyword
+from pygments.lexer import inherit
+from pygments.token import Name, Keyword, Comment, String
 from pygments.formatters import HtmlFormatter
 
 import os
+import re
 import json
 
 class LmqlLexer(PythonLexer):
@@ -36,6 +38,14 @@ class LmqlLexer(PythonLexer):
             if token is Name and value in self.EXTRA_KEYWORDS:
                 yield index, Keyword.Pseudo, value
             else:
+                # check for Token.Literal.String.Doc
+                if token is String.Doc:
+                    if value.startswith("'''lmql\n"):
+                        yield index, String.Doc, value[:len("'''lmql\n")]
+                        for i2, t2, v2 in self.get_tokens_unprocessed(value[len("'''lmql\n"):-len("'''")]):
+                            yield i2, t2, v2
+                        yield index, String.Doc, value[-len("'''"):]
+                        continue
                 yield index, token, value
         
 def output_format(output):
@@ -158,10 +168,44 @@ class LmqlSnippet(Directive):
 
         return [paragraph_node]
 
+class PromptDown(Directive):
+    has_content = True
+
+    def run(self):
+        content = ""
+        attributes = {}
+
+        for line in self.content:
+            # check for options that look like OPTION::VALUE
+            if line.startswith("animate::"):
+                attributes["animate"] = line[9:]
+            elif line.startswith("min-height::"):
+                attributes["min-height"] = line[12:]
+            elif line.startswith("replay-button::"):
+                attributes["replay-button"] = line[15:]
+            else:
+                content += line + "\n"
+        
+        code = f"""<pre class='promptdown' style='min-height: {attributes.get("min-height", "0")}' animate='{attributes.get("animate", "true")}' min-height='{attributes.get("min-height", "0")}'>{content}</pre>"""
+        
+        print("content", [content], end="\n\n")
+
+        paragraph_node = nodes.paragraph()
+        paragraph_node += nodes.raw('', code, format='html')
+    
+        return [paragraph_node]
+
 def setup(app):
     app.add_directive("lmql", LmqlSnippet)
+    app.add_directive("promptdown", PromptDown)
     app.add_css_file('css/lmql-docs.css')
+    app.add_css_file('css/promptdown.css')
     app.add_js_file('js/lmql-playground.js')
+    app.add_js_file('js/promptdown.js')
+    # custom lexer
+    app.add_lexer("lmql", LmqlLexer)
+    app.add_lexer("python", LmqlLexer)
+    app.add_lexer("ipython3", LmqlLexer)
 
     return {
         'version': '0.1',

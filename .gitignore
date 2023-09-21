@@ -12,6 +12,8 @@ web/index.html
 **/node_modules/*
 **/.DS_Store
 
+# Nix build output
+result
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,jupyternotebooks
@@ -47,7 +49,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -174,3 +175,4 @@ wip-snippets
 .lmql-algorithms-cache
 
 *.tokens
+transformers-cache

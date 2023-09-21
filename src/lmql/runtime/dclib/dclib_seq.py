@@ -6,7 +6,7 @@ from lmql.utils import nputil
 
 from dataclasses import dataclass
 
-from .dclib_global import get_tokenizer
+from lmql.runtime.context import get_tokenizer
 from .dclib_array import DataArray, Continuation, topk, alpha_length_normalized, alpha_length_normalized_det
 
 detokenize_seqs = True
@@ -110,8 +110,11 @@ class DecoderSequence:
         self.epsilon_node = epsilon_node
 
         # if no deterministic is provided assume all tokens to be deterministic
-        if deterministic is None: self.deterministic = np.array([True for _ in range(len(input_ids))])
+        if deterministic is None: self.deterministic = np.array([True for _ in range(len(input_ids))], dtype=np.bool_)
         else: self.deterministic = deterministic
+
+        assert self.deterministic.dtype == np.bool_
+
         assert len(self.deterministic) == len(self.input_ids), "Length of determinism status does not match length of inputs"
 
         # if no stop_phrase is provided assume no tokens to be stop_phrase
@@ -250,13 +253,38 @@ class DecoderSequence:
             # text = str([await get_tokenizer().decode(self.input_ids)])[2:-2],
             root = True
 
+        # handle empty seq
+        if len(self.input_ids) == 0:
+            return {
+                "seq_id": self.id,
+                "text": [""],
+                "seqtext": "",
+                "root": root,
+                "logprob": [],
+                "logprobs": [],
+                "logprobs_det": [],
+                "logprobs_norm": [],
+                "seqlogprob": 0,
+                **({"deterministic": True} if self.epsilon_node else {}),
+                "score_det": 0,
+                "score_nor": 0,
+                "score_tot": 0,
+                "pool": self.pool,
+                "user_data": await self.user_data_json(),
+                "token_id": "",
+                "deterministic_5": [],
+                "stop_phrase_5": [],
+                "prompt_len" : self.prompt_len,
+                "sticky_user_data_keys": list(self.sticky_user_data_keys)
+            }
+
         return {
             "seq_id": self.id,
             # "input_ids": self.input_ids.tolist(),
             "text": [text],
             "seqtext": seqtext,
             "root": root,
-            "logprob": self.logprobs[-1],
+            "logprob": self.logprobs[-1:] if len(self.logprobs) > 0 else [],
             "logprobs": self.logprobs[-5:].tolist(),
             "logprobs_det": self.logprobs[-5:][self.deterministic[-5:]].tolist(),
             "logprobs_norm": self.logprobs[-5:][~self.deterministic[-5:]].tolist(),
@@ -335,7 +363,7 @@ class DecoderSequence:
             logprobs=np.concatenate([self.logprobs, continuation.logprob.reshape(1)]),
             # deterministic tokens are only extended in DeterministicDecoderSequence.extend.
             # So here, all extended tokens are non-deterministic, i.e. model predictions.
-            deterministic=np.concatenate([self.deterministic, np.array([False])]),
+            deterministic=np.concatenate([self.deterministic, np.array([False])], dtype=np.bool_),
             stop_phrase=stop_phrase,
             predecessor=self,
             user_data=self.extend_user_data(continuation),
@@ -349,7 +377,7 @@ class DecoderSequence:
         
         stop_phrases = self.data("head").stopping_phrases["tokenized"] if self.data("head") is not None else []
 
-        if stop_phrases is None:
+        if stop_phrases is None or len(stop_phrases) == 0:
             return new_stop_phrase
 
         ids = np.concatenate([self.input_ids, continuation.token.reshape(1)])
@@ -368,10 +396,11 @@ class DecoderSequence:
         ids = ", ".join([str(i) for i in self.input_ids[-10:]])
         return f"<seq token_len={len(self.input_ids)} ids=[... {ids}]>"
 
-    async def text(self, offset:int=None, limit:int=None, pretty=True) -> str:
+    async def text(self, offset:int=None, limit:int=None, pretty=False) -> str:
         offset = offset or 0
         limit = limit or len(self.input_ids)
         raw_text = get_tokenizer().decode(self.input_ids[offset:limit])
+        
         if not pretty: 
             return raw_text
         else:
@@ -403,6 +432,7 @@ class DecoderSequence:
         
         tokens = [t for t, s in zip(next_tokens, next_token_scores) if s > DecoderSequence.truncation_threshold]
         scores = [s for s in next_token_scores if s > DecoderSequence.truncation_threshold]
+
         if len(tokens) == 0:
             print("WARNING: all continuation token fall below truncation threshold. This is likely due to a too small truncation factor. Try increasing it. Continuing with the top 1 token.")
             tokens = [t for t, s in zip(next_tokens, next_token_scores)][:1]
@@ -486,29 +516,25 @@ class DeterministicDecoderSequence(DecoderSequence):
         if self.user_data is None: return
         if not "head" in self.user_data: return
 
-        # lmql-specific user data should be different for deterministic sequences
-        head_variable = resolve_path(self.user_data, "head.variable")
-
-        if head_variable is not None:
-            # if "before(" in head_variable:
-            #     head_variable = head_variable.split(":before(", 1)[0]
-            # if head_variable == "__done__":
-            #     set_path(self.user_data, "head", self.user_data["head"].updated(variable="__done__"))
-            # else:
-            #     if len(self.next_ids) > 0:
-            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable + ":before(" + str(len(self.next_ids)) + ")"))
-            #     else:
-            #         set_path(self.user_data, "head", self.user_data["head"].updated(variable=head_variable))
-            # deterministic sequences don't have stopping phrases
-            set_path(self.user_data, "head", self.user_data["head"].updated(stopping_phrases={"tokenized": [], "text": []}))
-        else:
-            set_path(self.user_data, "head", self.user_data["head"].updated(variable="<prompt>"))
+        # lmql-specific user data has to be different for deterministic sequences
         
-        if len(self.next_ids) > 0:
-            set_path(self.user_data, "head", self.user_data["head"].updated(mask="{token_id=" + str(self.next_ids[0]) + "}"))
-        else:
-            set_path(self.user_data, "head", self.user_data["head"].updated(mask="<not available yet>"))
-    
+        # make sure to update all "head" an "head[...]" user data keys (head[...] belong to subinterpreters)
+        head_user_data_keys = [k for k in self.user_data.keys() if k.startswith("head[") or k == "head"]
+        
+        for head_key in head_user_data_keys:
+            head_variable = resolve_path(self.user_data, f"{head_key}.variable")
+            
+            if head_variable is not None:
+                # deterministic sequences don't have stopping phrases
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(stopping_phrases={"tokenized": [], "text": []}))
+            else:
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(variable="<prompt>"))
+            
+            if len(self.next_ids) > 0:
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(mask="{token_id=" + str(self.next_ids[0]) + "}"))
+            else:
+                set_path(self.user_data, head_key, self.user_data[head_key].updated(mask="<not available yet>"))
+
     @property
     def is_query_constrained(self):
         """Deterministic sequences are not query constrained, as long as they are fixed to their predetermined content."""
@@ -567,7 +593,7 @@ class DeterministicDecoderSequence(DecoderSequence):
 
         extended_input_ids = np.concatenate([self.input_ids, continuation.token.reshape(1)])
         extended_logprobs = np.concatenate([self.logprobs, continuation.logprob.reshape(1)])
-        extended_deterministic = np.concatenate([self.deterministic, np.array([True]) if self.next_deterministic is None else self.next_deterministic[0:1]])
+        extended_deterministic = np.concatenate([self.deterministic, np.array([True]) if self.next_deterministic is None else self.next_deterministic[0:1]], dtype=np.bool_)
 
         reduced_next_ids = self.next_ids[1:]
         reduced_next_logprobs = self.next_logprobs[1:] if self.next_logprobs is not None else None
@@ -577,7 +603,6 @@ class DeterministicDecoderSequence(DecoderSequence):
 
         stop_phrase = self.detect_stop_phrase(continuation)
         if self.data("injected_stop_phrase"):
-            print(self)
             assert not extended_deterministic[-1]
 
         return DeterministicDecoderSequence(
@@ -640,6 +665,10 @@ class DeterministicDecoderSequence(DecoderSequence):
                 print("warning: a deterministic token scored below the truncation threshold ({})".format(DecoderSequence.truncation_threshold))
         
         return Continuation(predetermined_token, score, user_data)
+    
+    def __str__(self) -> str:
+        ids = ", ".join([str(i) for i in self.input_ids[-10:]])
+        return f"<detseq token_len={len(self.input_ids)} ids=[... {ids}] next_ids=[{self.next_ids[:10]}]>"
 
 def is_deterministic(s):
     return issubclass(type(s), DeterministicDecoderSequence)

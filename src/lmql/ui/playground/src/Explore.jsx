@@ -2,6 +2,10 @@ import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import {queries} from "./queries";
 import { displayState, persistedState, trackingState } from "./State";
+import {configuration} from "./Configuration"
+
+import { BUILD_INFO } from './build_info';
+import { isLocalMode} from './Configuration';
 
 export const PromptPopup = styled.div`
   position: absolute;
@@ -13,6 +17,7 @@ export const PromptPopup = styled.div`
   z-index: 999;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 
   animation: fade-in 0.2s;
 
@@ -38,12 +43,14 @@ export const PromptPopup = styled.div`
 export const Dialog = styled.div`
   background-color: #ffffff;
   border-radius: 4pt;
+  overflow: hidden;
   padding: 10pt;
   margin: auto;
-  max-width: 500pt;
+  max-width: 1100pt;
   max-height: 500pt;
-  overflow: auto;
   color: black;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica;
 
   input {
     border: none;
@@ -80,29 +87,78 @@ export const Dialog = styled.div`
 `
 
 const ExploreDialog = styled(Dialog)`
-  width: 550pt;
-  height: 550pt;
-  max-height: 100vh;
-  max-width: 100vh;
+  width: 800pt;
+  height: 700pt;
+  max-height: calc(100vh - 40pt);
+  max-width: 100vw;
   overflow-y: auto;
-  position: relative;
-  padding: 20pt;
 
-  @media (max-width: 550pt) {
+  /* invisible scroll bar */
+  ::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+  }
+
+  position: relative;
+  padding: 0pt;
+  
+
+  @media (max-width: 800pt) {
+    border-radius: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    max-width: 100vw !important;
+  }
+  
+
+  @media (max-width: 450pt) {
     width: calc(100vw - 20pt);
     height: calc(100vh - 20pt);
     max-height: 100vh;
-    max-width: 100vh;
+    max-width: 100vw;
     overflow-y: auto;
     position: relative;
     padding: 10pt;
     padding-bottom: 80pt;
+    padding-left: 0;
+    margin: 0;
+
+    div.tile {
+      display: block !important;
+      height: 40pt;
+      width: 100% !important;
+
+      &:hover {
+        transform: none !important;
+        border: 1pt solid #ababab;
+      }
+    }
   }
 
-  /* very light white to grey grdient */
-  background: linear-gradient(180deg, #ffffff 0%, #e4e2e2 100%);
-
   >div {
+    padding: 5pt 20pt;
+    position: relative;
+  }
+
+  >div .sidenote a {
+    padding-left: 2pt;
+  }
+
+  >div .sidenote {
+    position: absolute;
+    top: 15pt;
+    right: 15pt;
+    font-size: 8pt;
+  }
+
+  div.highlight {
+    background-color: #f5f5f5;
+    margin: 5pt;
+    border-radius: 4pt;
+  }
+
+  >div>div {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -110,6 +166,13 @@ const ExploreDialog = styled(Dialog)`
 
   p {
     text-align: justify;
+  }
+
+  h1 {
+    margin: 0;
+    padding: 20pt;
+    font-weight: bold;
+    padding-bottom: 10pt;
   }
 
   h1 img {
@@ -122,7 +185,6 @@ const ExploreDialog = styled(Dialog)`
 
   h2 {
     font-size: 12pt;
-    color: #373737;
   }
 
   h3 {
@@ -130,6 +192,7 @@ const ExploreDialog = styled(Dialog)`
     color: #373737;
     margin: 0;
     z-index: 999;
+    font-weight: 700;
   }
 
   .close {
@@ -148,31 +211,34 @@ const ExploreDialog = styled(Dialog)`
 const Tile = styled.div.attrs({
   className: "tile"
 })`
-  background-color: #1e1e1e;
+  background-color: white;
   border-radius: 4pt;
   padding: 10pt;
   margin: 10pt;
   margin-left: 0pt;
   margin-top: 0pt;
   cursor: pointer;
-  transition: 0.1s;
   height: 80pt;
   width: 100pt;
-  border: 2pt solid white;
+  border: 1pt solid #d4d4d4;
   opacity: 0.9;
   position: relative;
   display: flex;
   flex-direction: column;
+  
   align-items: flex-start;
-  justify-content: flex-end;
+  justify-content: flex-start;
+
+  transition: 0.1s linear transform;
 
   :hover {
     transform: scale(1.05);
     opacity: 1.0;
+    border: 1pt solid #9b9a9a;
   }
 
   h3 {
-    color: #e9e8e8;
+    color: #212121;
   }
 
   code {
@@ -180,7 +246,7 @@ const Tile = styled.div.attrs({
   }
 
   p {
-    color: white;
+    color: #010101;
     font-size: 10pt;
     font-style: italic;
     z-index: 999;
@@ -200,7 +266,7 @@ const Tile = styled.div.attrs({
 `
 
 export const ExploreState = {
-    visible: false,
+    visible: window.location.hash === "#explore",
     setVisibility: (s) => {
         ExploreState.visible = s;
         ExploreState.listeners.forEach((l) => l(s));
@@ -223,7 +289,7 @@ const CodeContainer = styled.div.attrs({
   top: 0;
   left: 0;
   width: 100%;
-  color: white;
+  color: #323232;
 
   .keyword {
     color: #ff79c6;
@@ -255,64 +321,9 @@ const CodeContainer = styled.div.attrs({
     left: 0;
     right: 0;
     height: 20pt;
-    background: linear-gradient(180deg, transparent 0%, #1e1e1e 100%);
+    /* background: linear-gradient(180deg, transparent 0%, #f5f5f561 100%); */
   }
 `
-
-const TypingContainer = styled.span`
-  .cursor {
-    animation: blink 2s linear infinite;
-    transform: scale(2.2);
-    transform-origin: top middle;
-    font-size: 25pt;
-    height: 15pt;
-    background-color: #313131;
-    width: 1pt;
-    position: relative;
-    left: 6pt;
-    content: " ";
-    overflow: hidden;
-    display: inline-block;
-  }
-
-  @keyframes blink {
-    0% {
-      opacity: 0;
-    }
-    50% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-`
-
-
-function TypedText() {
-  const text = "Welcome To LMQL";
-  const speed = 50;
-  let [index, setIndex] = useState(window.textWasTyped ? text.length : 0);
-  let [isTyping, setIsTyping] = useState(!window.textWasTyped);
-
-  useEffect(() => {
-    if (!isTyping) return;
-    
-    if (index < text.length) {
-      setTimeout(() => {
-        setIndex(index + 1);
-      }, speed);
-    } else {
-      setIsTyping(false);
-      window.textWasTyped = true;
-    }
-  })
-
-  return <TypingContainer>
-    {text.substring(0, index)}
-    <span className="cursor"></span>
-  </TypingContainer>
-}
 
 function BasicHighlighted(props) {
   const s = props.code;
@@ -332,18 +343,69 @@ function BasicHighlighted(props) {
 }
 
 const Description = styled.p`
-  font-size: 12pt;
+  font-size: 14pt;
   color: #696969;
+  padding: 0pt 20pt;
+  font-weight: 500;
+  margin-top: 0pt;
+`
+
+const LinkBox = styled.div`
+  display: flex;
+  flex-direction: row;
+
+  a.button {
+    display: block;
+    border: 1pt solid #6b77ff;
+    padding: 5pt;
+    margin-top: 15pt;
+    margin-right: 5pt;
+    border-radius: 2pt;
+    color: #6b77ff;
+
+    font-size: 10pt;
+  }
+
+  a.button:first-child {
+    color: white;
+    background-color: #6b77ff;
+
+    &:hover {
+      background-color: #8e98ea;
+      text-decoration: none;
+    }
+  }
 `
 
 const CiteBox = styled.code`
   display: block;
-  background-color: #dfdede;
+  background-color: #f5f5f5;
   padding: 4pt;
   border-radius: 4pt;
 `
 
+const PoweredBy = styled.div`
+  font-size: 8pt;
+  color: #696969;
+  text-align: center;
+  margin: auto;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10pt;
+
+  >div:nth-child(2) {
+    margin-left: 5pt;
+  }
+`
+
 let didLoadAnchor = false;
+
+const PreviewQueries = {
+  queries: [],
+  listeners: []
+}
 
 export function Explore() {
     const [visible, setVisible] = useState(ExploreState.visible);
@@ -362,7 +424,26 @@ export function Explore() {
       } else {
         persistedState.setItem("lmql-editor-contents", q.code)
       }
-  }
+    }
+
+    let [exploreQueries, setExploreQueries] = useState(configuration.NEXT_MODE ? PreviewQueries.queries : queries);
+
+    useEffect(() => {
+      if (configuration.NEXT_MODE) {
+        let url = "https://raw.githubusercontent.com/lmql-lang/awesome-lmql/main/next/showcase-playground.js";
+        url += "?nocache=" + Math.random();
+        fetch(url).then((r) => r.text()).then((r) => {
+          // eslint-disable-next-line no-eval
+          let queries = eval(r).queries;
+          PreviewQueries.queries = queries;
+          PreviewQueries.listeners.forEach((l) => l());
+          console.log("Loaded list of Preview release queries.", queries)
+        }).catch((e) => {
+          console.error(e)
+          console.error("Error loading list of Preview release queries.")
+        });
+      }
+    }, [])
 
     useEffect(() => {
         // register listeners
@@ -390,24 +471,50 @@ export function Explore() {
         }
     }, []);
 
+    useEffect(() => {
+      if (configuration.NEXT_MODE) {
+        const listener = () => {
+          setExploreQueries(PreviewQueries.queries);
+        }
+        PreviewQueries.listeners.push(listener);
+        return () => {
+          PreviewQueries.listeners = PreviewQueries.listeners.filter((l) => l !== listener);
+        }
+      }
+    }, [])
+
+
     if (!visible) return null;
+
+    let description = <>
+    LMQL is a query language for large language models. Explore the examples below to get started.
+    <LinkBox>
+      <a className="button" target="_blank" rel="noreferrer" href="https://docs.lmql.ai">Documentation</a>
+      <a className="button" target="_blank" rel="noreferrer" href="https://lmql.ai">Overview</a>
+    </LinkBox>
+    </>
+
+    if (configuration.NEXT_MODE) {
+      description = <>This is the preview channel of LMQL. It contains the latest features, but may be unstable. If you are looking for the stable version, please visit <a href="https://lmql.ai/playground">the stable Playground IDE</a>.</>
+    }
 
     return <PromptPopup>
         <div className="click-handler" onClick={() => ExploreState.setVisibility(false)}/>
         <ExploreDialog>
           <h1 key="welcome">
             <img src="/lmql.svg" alt="LMQL Logo"/>  
-            <TypedText text="Welcome To LMQL" speed={20}/>
+            Welcome To LMQL
           </h1>
-          <Description>
-            LMQL is a query language for large language models. This playground allows you to explore LMQL's capabilities. To get started, choose one of the example queries below, demonstrating <i>constrained model use</i>, <i>control-flow guided generation</i>, and tool-augmented LLMs.
-          </Description>
+          <Description>{description}</Description>
           <span className="close" onClick={() => ExploreState.setVisibility(false)}>
             &times;
           </span>
-          {queries.map(c => 
-            <>
+          {exploreQueries.map(c => 
+            <div className={c.highlight ? "highlight" : ""} key={c.category + "-container"}>
             <h2 key={c.category}>{c.category}</h2>
+            {c.highlight && <span class="sidenote">
+              <a href="https://github.com/eth-sri/lmql/issues" target="_blank" rel="noreferrer" title="Please report any issue you find with Preview features to help us improve LMQL."> Report Issues</a>
+            </span>}
             <div key={c.category + "-div"}>
             {c.queries.map((q,i) => <Tile key={c.category + "-" + i} onClick={() => onClickTile(q)}>
               {/* {q.state && <div className="badge">PRECOMPUTED</div>} */}
@@ -416,13 +523,28 @@ export function Explore() {
               <p>{q.description}</p>
             </Tile>)}
             </div>
-            </>
+            </div>
           )}
-          <h2 key="read-paper">Read the Paper</h2>
+          {!configuration.NEXT_MODE && <>
+          <div>
+          <h2 key="read-paper">Read More</h2>
           <CiteBox key="cite">
           Beurer-Kellner, Luca, Marc Fischer, and Martin Vechev. "Prompting Is Programming: A Query Language For Large Language Models." 
           <a target="_blank" rel="noreferrer" href="https://arxiv.org/pdf/2212.06094">arXiv preprint arXiv:2212.06094</a> (2022).
           </CiteBox>
+          <br/>
+          <PoweredBy>
+            <div>LMQL {BUILD_INFO.info().commit}</div>
+            <div>
+            {(configuration.BROWSER_MODE && !isLocalMode()) && <span> In-Browser, Made with ❤️ + <a href="https://pyodide.org" target="_blank" rel="noreferrer">Pyodide</a> + <a href="https://webassembly.org/" target="_blank" rel="noreferrer">WebAssembly</a></span>}
+              {BUILD_INFO.info().date != "-" ? <>
+                <br/>
+                Build on {BUILD_INFO.info().date}
+              </> : null}
+            </div>
+          </PoweredBy>
+          </div>
+          </>}
         </ExploreDialog>
     </PromptPopup>
 }

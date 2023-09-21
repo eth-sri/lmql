@@ -11,6 +11,7 @@ See lmtp_client for an example how to connect to this server via 'websocket'.
 import asyncio
 import json
 import aiohttp
+import warnings
 from aiohttp import web
 
 from .lmtp_scheduler import *
@@ -38,7 +39,7 @@ class LMTPWebSocketTransport:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print("LMTPWebSocketTransport.dumper error", e, flush=True)
+                warnings.warn("LMTPWebSocketTransport.dumper error".format(e))
 
     async def send(self, type, payload):
         await self.queue.put(payload)

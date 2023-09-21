@@ -1,0 +1,21 @@
+### Agent Trace
+
+![bubble:user| What is two times the birth year of Michelle Obama?
+Let's think step by step] [@begin|incontext] ![bubble:system| Instructions: In your reasoning adhere to the following structure: Thought: <your conclusions>
+If required you can also use the following actions: Action: tool(<ARG>), Observation: <TOOL OUTPUT>
+Available Tools: wiki: ..., calc: ... . Now you can start reasoning.] [@end|incontext]
+[bubble:assistant|Thought: [THOUGHT| To answer this question, I need to know the birth year of Michelle Obama.]
+[@wait|400] Action: [ACTION| wiki("Michelle Obama")]
+[@wait|400] Observation: [TOOL| Michelle LaVaughn Robinson Obama (born January 17, 1964) is an American attorney and author who served as the first lady of the United States from 2009 to 2017, being married to former president Barack Obama.  
+Raised on the South Side of Chicago, Obama is a graduate of Princeton]
+
+[@wait|400] Thought: [THOUGHT| Michelle Obama was born in 1964.]
+[@wait|400] Action: [ACTION| calc("2*1964")]
+[@wait|400] Observation: [TOOL| 3928]
+]
+[@wait|800]
+![bubble:system| (removing intermediate instructions from prompt)]
+[@wait|400]
+[@fade|incontext]
+[@wait|1000]
+[bubble:assistant| Therefore the answer is [ANSWER| 3928] ]

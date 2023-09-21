@@ -1,5 +1,6 @@
 import re
 import atexit
+import warnings
 
 from tokenize import Token
 from typing import Iterable, Tuple
@@ -8,8 +9,10 @@ from itertools import product
 from lmql.utils import nputil
 import numpy as np
 from lmql.runtime.stats import Stats
-from lmql.runtime.caching import cachefile, cache_file_exists
+from lmql.runtime.caching import cachefile
 from lmql.runtime.tokenizer import get_vocab
+from lmql.ops.regex import Regex
+from lmql.runtime.context import get_tokenizer
 
 class VocabularyMatcher:
     """
@@ -28,6 +31,7 @@ class VocabularyMatcher:
 
         self.stats = Stats("VocabularyMatcher")
         self.disk_cached = 0
+        self.cache = {}
 
     @property
     def eos_token_id(self):
@@ -35,7 +39,7 @@ class VocabularyMatcher:
 
     @staticmethod
     def init(tokenizer):
-        if VocabularyMatcher._instance is not None:
+        if tokenizer.name in VocabularyMatcher._instances:
             return
 
         # first try to load pickled matcher from cache (faster)
@@ -48,23 +52,28 @@ class VocabularyMatcher:
 
         try:
             with cachefile(matcher_path, "rb") as f:
-                VocabularyMatcher._instance = pickle.load(f)
-                VocabularyMatcher._instance.stats = Stats("VocabularyMatcher")
+                _instance = pickle.load(f)
+                _instance.stats = Stats("VocabularyMatcher")
         except:
-            VocabularyMatcher._instance = VocabularyMatcher(tokenizer, tokenizer.model_identifier)
+            _instance = VocabularyMatcher(tokenizer, tokenizer.model_identifier)
 
-        if cache_file_exists(cache_path) and False:
+        try:
             with cachefile(cache_path, "rb") as f:
                 try:
                     import time
                     s = time.time()
-                    VocabularyMatcher.cache = pickle.load(f)
-                    VocabularyMatcher._instance.disk_cached = len(VocabularyMatcher.cache)
-                    # print("Matcher cache loaded in {}s".format(time.time() - s))
+                    _instance.cache = pickle.load(f)
+                    _instance.disk_cached = len(_instance.cache)
                 except:
-                    print("Failed to load token mask cache from {}. If the cache is corrupted, please delete it.".format(cache_path))
+                    warnings.warn("Failed to load token mask cache from {}. If the cache is corrupted, please delete it.".format(cache_path))
+        except:
+            # no cache file
+            pass
 
-        atexit.register(lambda: VocabularyMatcher._instance.save())
+        # save in instance pool
+        VocabularyMatcher._instances[tokenizer.name] = _instance
+        # save on exit
+        atexit.register(lambda: _instance.save())
 
     def save(self):
         # save cache to disk
@@ -89,28 +98,28 @@ class VocabularyMatcher:
             return False
 
         with cachefile(cache_path, "wb") as f:
-            pickle.dump({k: v for k, v in VocabularyMatcher.cache.items() if is_cached(k)}, f)
+            pickle.dump({k: v for k, v in self.cache.items() if is_cached(k)}, f)
 
     @staticmethod
     def instance():
-        if VocabularyMatcher._instance is None:
+        tokenizer = get_tokenizer()
+        if not tokenizer.name in VocabularyMatcher._instances:
             raise Exception("VocabularyMatcher not initialized.")
-        return VocabularyMatcher._instance
+        return VocabularyMatcher._instances[tokenizer.name]
 
     @staticmethod
     def ensure_ready():
         VocabularyMatcher.instance()
 
-    @staticmethod
-    def with_cache(keys, provider):
+    def with_cache(self, keys, provider):
         keys = [k for k in keys if k is not None]
         for k in keys:
-            if k in VocabularyMatcher.cache.keys():
-                return VocabularyMatcher.cache[k]
+            if k in self.cache.keys():
+                return self.cache[k]
         else:
             result = provider()
             for k in keys:
-                VocabularyMatcher.cache[k] = result
+                self.cache[k] = result
             return result
 
     def mask_cache_name(self, tokens=None, regex=None, minus=None, prefix=None, exact=None, charlen=None, name=None):
@@ -135,27 +144,30 @@ class VocabularyMatcher:
                     mask = self._make_mask_from_char_length(charlen)
                 else:
                     assert regex is not None, "TokenSetConcrete: either tokens or regex must be set."
-                    assert not prefix, "TokenSetConcrete: prefix is not supported for regex."
-                    mask = self._make_mask_from_regex(regex)
+                    mask = self._make_mask_from_regex(regex, prefix)
 
                 if minus: mask = np.logical_not(mask)
 
                 return mask
             
-            return VocabularyMatcher.with_cache(cache_keys, do_make_mask)
+            return self.with_cache(cache_keys, do_make_mask)
 
-    def _make_mask_from_regex(self, regex):
+    def _make_mask_from_regex(self, regex, prefix=False):
         regex = regex.replace(" ", self.space_repr)
         regex = regex.replace("\n", self.nl_repr)
-
         regex = regex.replace(" ", self.tokenizer.tokenize(" ")[0])
 
         mask = np.zeros([self.vocab_size], dtype=np.bool_)
-
-        pattern = re.compile(regex, re.UNICODE)
-        for id, subtoken in self.vocab.items():
-            if pattern.match(subtoken) is not None:
-                mask[id] = True
+        if prefix:
+            r = Regex(regex)
+            for id, subtoken in self.vocab.items():
+                if r.is_prefix(subtoken):
+                    mask[id] = True
+        else:
+            pattern = re.compile(regex, re.UNICODE)
+            for id, subtoken in self.vocab.items():
+                if pattern.match(subtoken) is not None:
+                    mask[id] = True
 
         return mask
 
@@ -250,8 +262,7 @@ class VocabularyMatcher:
             ", ".join([t for t in sorted(list(tokens))]) + ("..." if truncated else "")
         )
 
-VocabularyMatcher._instance = None
-VocabularyMatcher.cache = {}
+VocabularyMatcher._instances = {}
 
 def has_tail(mask):
     if mask is None: return False
@@ -533,12 +544,15 @@ def tset(*tokens, regex=False, prefix=False, exact=False, charlen=None, name=Non
         return TokenSet(charlen=charlen, name=name)
     if regex:
         assert len(tokens) == 1, "cannot create a TokenSet from multiple regexes."
-        return TokenSet(regex=tokens[0], name=name)
+        return TokenSet(regex=tokens[0], prefix=prefix, name=name)
     if len(tokens) == 1 and type(tokens[0]) is set:
         return TokenSet(set(list(tokens[0])), minus=False, name=name)
     return TokenSet(set(tokens), minus=False, prefix=prefix, exact=exact, name=name)
 
 def charlen_tsets():
+    # make sure token_lengths is initialized
+    VocabularyMatcher.instance()._make_mask_from_char_length(1)
+
     l1 = tset(charlen=1)
     token_lengths = VocabularyMatcher.instance().token_lengths
     assert token_lengths is not None, "VocabularyMatcher.instance().token_lengths is None even though it should be fully initialized."

@@ -30,8 +30,8 @@ class CacheFile:
                     return cache.get(str(self.initial_ids), {})
         return {}
     
-    def save(self, cache):
-        if os.path.exists(self.filename):
+    def save(self, cache, overwrite=False):
+        if os.path.exists(self.filename) and not overwrite:
             with open(self.filename, "rb") as f:
                 existing_cache = pickle.load(f)
                 if existing_cache.get("model") != self.model:
@@ -43,7 +43,7 @@ class CacheFile:
             print("warning: cache file is from a different model. Its contents will be overwritten. {} != {}".format(existing_cache.get("model"), self.model))
             existing_cache = {}
         existing_cache["model"] = self.model
-        existing_cache[str(self.initial_ids)] = cache
+        existing_cache[str(self.initial_ids)] = {k: v for k,v in cache.items() if not any(asyncio.isfuture(v) for v in v)}
         
         with open(self.filename, "wb") as f:
             pickle.dump(existing_cache, f)
@@ -97,8 +97,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             cf = CacheFile(self.cache_file, self.initial_ids, self.delegate.model_identifier)
             try:
                 cf.save(self.cache)
+            except EOFError:
+                cf.save(self.cache, overwrite=True)
             except Exception as e:
                 print("error: failed to save token cache to file", e, flush=True)
+                print([e])
                 pass
 
         self.model.cache_delegate = None
@@ -124,6 +127,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         logits_mask_result = await self.delegate.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs, required=True)
         self.mask_cache[s.id] = logits_mask_result
 
+        # update user data with new information obtained when computing logits masks
         if s.user_data is None:
             s.user_data = {}
         s.user_data = deepmerge(deepcopy(s.user_data), logits_mask_result.user_data[0])
@@ -137,6 +141,12 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         kwargs = {**self.delegate.model_args, **kwargs}
 
         keys = []
+
+        # check for sample-id
+        if s.data("dc-edge-type"):
+            # if the edge type aligns with dc-edge-type, use that instead (includes a unique sample id if available)
+            if s.data("dc-edge-type").startswith(edge_type):
+                edge_type = s.data("dc-edge-type")
 
         # compute logits mask
         mask = (await self.get_mask(s, **kwargs)).logits_mask[0]
@@ -223,10 +233,9 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
             # apply operation for non-cached
             non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
-            # if len(non_cached) == 0:
-            #     print("cache hit for", len(cache_keys[0][0][0]), cache_keys[0][0][0][-50:], "with", cached_tokens[0][0])
             # generator over new results
             non_cached_argmax = iter((await self.delegate.argmax(DataArray(non_cached), **kwargs)).items())                
+            
             results = []
             # put new results in cache
             for i, (s, key, c) in enumerate(zip(seqs, cache_keys, cached_tokens)):
@@ -255,26 +264,27 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             # check cache for all
             temperature = kwargs.get('temperature', 1.0)
             sampling_mode = "top-1" if temperature == 0.0 else "sample-{}".format(temperature)
-            
-            cache_entries = [await self.get_cache(s, sampling_mode, **kwargs) for s in seqs]
-            cached_tokens = [e[1] for e in cache_entries]
+
+            cache_entries = [await self.get_cache(s, sampling_mode, user_data=True, **kwargs) for s in seqs]
+            cached_cont = [e[1] for e in cache_entries]
             cache_keys = [e[0] for e in cache_entries]
             
             # apply operation for non-cached
-            non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
+            non_cached = [s for s, cont in zip(seqs, cached_cont) if cont is None]
+            
             # generator over new results
             non_cached_sample = iter((await self.delegate.sample(DataArray(non_cached), num_samples=num_samples, **kwargs)).items())
-            
             results = []
             # put new results in cache
-            for i, (s, key, c) in enumerate(zip(seqs, cache_keys, cached_tokens)):
-                if c is None: 
+            for i, (s, key, cont) in enumerate(zip(seqs, cache_keys, cached_cont)):
+                if cont is None: 
                     r = next(non_cached_sample)
                     results.append(r)
                     self.set_cache(key, r)
                 else:
-                    token, logprob = c
-                    user_data = (await self.get_mask(s, **kwargs)).user_data
+                    token, logprob, cached_user_data = cont
+                    interpreter_user_data =(await self.get_mask(s, **kwargs)).user_data 
+                    user_data = [deepmerge(iud, cached_user_data) for iud in interpreter_user_data]
                     continuation = s.make_successors(token.reshape(1), logprob, logits=None, user_data=user_data)
                     results.append(continuation)
                     self.hits += 1
@@ -457,11 +467,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 
             # determine detseq deterministic flags
             if type(deterministic) is bool:
-                deterministic_flags = np.concatenate([sq.deterministic, np.array([deterministic])])
+                deterministic_flags = np.concatenate([sq.deterministic, np.array([deterministic])], dtype=np.bool_)
                 next_deterministic = np.array([deterministic] * len(completion[1:]))
             else:
                 assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
-                deterministic_flags = np.concatenate([sq.deterministic, np.array(deterministic[:1])])
+                deterministic_flags = np.concatenate([sq.deterministic, np.array(deterministic[:1])], dtype=np.bool_)
                 next_deterministic = np.array(deterministic[1:])
 
             # create actual detseq
@@ -518,6 +528,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             #     if tk in self.cache and type(self.cache[tk][0]) is not asyncio.Future:
                             #         print("token_consumer: token for {} from stream already in cache ({} streams): {}".format(tk, len(self.token_streams), self.cache[tk]))
 
+                            if edge_type is not None and "sample-id" in edge_type:
+                                # keep track of sample id based edge types as user data
+                                user_data = user_data.copy()
+                                user_data["dc-edge-type"] = edge_type
+                            
                             self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data, verbose=False)
 
                             if self.show_speculative:

@@ -19,7 +19,11 @@ from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
+from lmql.models.model_info import model_info
+from lmql.models.model import LMQLModel
+from typing import Type
 
+import warnings
 
 def is_allowed(m): 
     """
@@ -41,11 +45,10 @@ class CompleteTask:
             if type(e) is not openai.error.APIError and type(e) is not openai.error.ServiceUnavailableError:
                 raise e
             if retries > 0:
-                print("OpenAI API error: ", e, ". Retrying...", flush=True)
-                print("Retrying operation due to OpenAI API error", e)
+                warnings.warn("OpenAI API error: {} Retrying...".format(e))
                 return await self.run(retries - 1)
             else:
-                print("Exceeded ", retries, " retries. Giving up.", flush=True)
+                warnings.warn("Exceeded {} retries. Giving up.".format(retries))
                 raise e
 
 @dataclass
@@ -104,7 +107,12 @@ class DclibOpenAiModel(DcModel):
         
         self.model_identifier = "openai/" + self.model.model_identifier
 
-        self.model.chunk_size = kwargs.get("openai_chunksize", 64 if not self.mock else 8)
+        # check for openai_chunksize
+        if kwargs.get("openai_chunksize", None) is not None:
+            warnings.warn("Warning: openai_chunksize is deprecated. Please use 'chunksize' instead.")
+            kwargs["chunksize"] = kwargs["openai_chunksize"]
+
+        self.model.chunk_size = kwargs.get("chunksize", 64 if not self.mock else 8)
         self.model.nostop = kwargs.get("openai_nonstop", False)
         self.num_billed_tokens = {}
         self.num_requests = 0
@@ -152,8 +160,8 @@ class DclibOpenAiModel(DcModel):
             else:
                 # otherwise we can treat this as a score call
                 return CompletionCall("fixed", token, s.input_ids, kwargs, stopping_phrases=stopping_phrases)
-        elif num_allowed < self.tokenizer.vocab_size:
-            if self.tokenizer.vocab_size - num_allowed > num_allowed:
+        elif num_allowed < self.tokenizer.model_vocab_size:
+            if self.tokenizer.model_vocab_size - num_allowed > num_allowed:
                 # if we have to mask more than half of the tokens, we should just invert the masking
                 invert = True
         else: # num_allowed == mask.shape[-1] (full vocabulary)
@@ -163,7 +171,7 @@ class DclibOpenAiModel(DcModel):
         return CompletionCall("complete", mask, s.input_ids, kwargs, invert=invert, stopping_phrases=stopping_phrases)
 
     async def api_score(self, input_ids, offset):
-        if input_ids[0] == self.tokenizer.bos_token_id:
+        if len(input_ids) > 0 and input_ids[0] == self.tokenizer.bos_token_id:
             input_ids = input_ids[1:]
 
         prompt_str = self.tokenizer.convert_bytes_to_string(input_ids)
@@ -196,6 +204,10 @@ class DclibOpenAiModel(DcModel):
         logprobs = []
         async for data in await openai.Completion.create(**kwargs):
             logprobs += data["logprobs"]["token_logprobs"]
+
+        # replace None at the beginning with 0.0
+        logprobs = [0.0 if v is None else v for v in logprobs]
+
         return np.array(logprobs[offset:], dtype=np.float32)
 
     async def queue_api_score(self, kwargs):
@@ -209,16 +221,14 @@ class DclibOpenAiModel(DcModel):
         if noscore: return np.zeros(len(next_tokens), dtype=np.float32)
         
         prompt_str = self.tokenizer.convert_bytes_to_string(s.input_ids)
-        tokenized_input_ids = await self.tokenize(prompt_str)
-
-        res = await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(tokenized_input_ids))
+        res = await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids))
 
         server_side_swallowed_tokens = 0
         while len(res) < len(next_tokens):
             res = np.append(res, 0.0)
             server_side_swallowed_tokens += 1
         if server_side_swallowed_tokens > 0:
-            print("warning: The OpenAI API has merged {} token(s) server-side, which will reflect in inaccurate 0.0 scores in the decoding tree".format(server_side_swallowed_tokens))
+            warnings.warn("warning: The OpenAI API has merged {} token(s) server-side, which will reflect in inaccurate 0.0 scores in the decoding tree".format(server_side_swallowed_tokens))
 
         return res
     
@@ -233,11 +243,11 @@ class DclibOpenAiModel(DcModel):
         def make_detseq(s, token_score, completion):
             # compose deterministic flags
             if type(deterministic) is bool:
-                deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])])
+                deterministic_flags = np.concatenate([s.deterministic, np.array([deterministic])], dtype=np.bool_)
                 next_deterministic = np.array([deterministic] * len(completion[1:]))
             else:
                 assert type(deterministic) is list and len(deterministic) == len(completion), "If deterministic is a list, it must have the same length as the number of tokens to be scored, but is {} and {}".format(deterministic, completion)
-                deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])])
+                deterministic_flags = np.concatenate([s.deterministic, np.array(deterministic[:1])], dtype=np.bool_)
                 next_deterministic = np.array(deterministic[1:])
 
             return detseq(ids=np.concatenate([s.input_ids, completion[:1]], axis=0), 
@@ -275,7 +285,7 @@ class DclibOpenAiModel(DcModel):
         tokenized_input_ids = await self.tokenize(prompt_str)
 
         # do not include bos token in prompt for request
-        if input_ids[0] == self.tokenizer.bos_token_id:
+        if len(input_ids) > 0 and input_ids[0] == self.tokenizer.bos_token_id:
             input_ids = input_ids[1:]
 
         temperature = completion_call.kwargs.get("temperature", 0.0)
@@ -321,7 +331,7 @@ class DclibOpenAiModel(DcModel):
         if len(completion_call.stopping_phrases) > 0:
             if len(completion_call.stopping_phrases) > 4:
                 # same but blaming it more on OpenAI
-                print("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
+                warnings.warn("warning: the number of stopping phrases that would need to be passed to the OpenAI API is greater than 4. Since the OpenAI API only supports up to 4 stopping phrases, the first 4 stopping phrases will be passed to the API. Other stopping phrases will also be enforced, but may lead to an increase in the number of tokens billed to the user.")
             # skip stopping phrases for more speculative execution
             if not self.model.nostop:
                 kwargs.update({"stop": completion_call.stopping_phrases[:4]})
@@ -337,6 +347,8 @@ class DclibOpenAiModel(DcModel):
         buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
         t = b""
         to_skip = b"".join(input_ids)
+        if len(input_ids) == 0:
+            to_skip = b"<|endoftext|>"
 
         # skip echoed prompt prefix (cannot just offset by tokenized_input_ids since server-side the prompt may be tokenized differently)
         while len(t) < len(to_skip):
@@ -353,9 +365,6 @@ class DclibOpenAiModel(DcModel):
             return [[t[0]] for t in await self.model.tokenize(tokens)]
         return tokens
     
-    async def openai_cache_delegate(self, kwargs, tokens, scores):
-        print(tokens, scores, self.cache_delegate)
-
     def count_billed_tokens(self, n, model):
         if model not in self.num_billed_tokens.keys():
             self.num_billed_tokens[model] = 0
@@ -475,6 +484,8 @@ class DclibOpenAiModel(DcModel):
                         }
                         # print("token stream gives", result_id, tokens, scores, edge_type, flush=True)
 
+                        scores = [0.0 if str(s) == "[]" else s for s in scores]
+
                         yield (s, tokens, scores, edge_type, user_data)
                     except IndexError:
                         break
@@ -509,6 +520,7 @@ class DclibOpenAiModel(DcModel):
         """
         Returns a pool with `n` sampled successor nodes per node in the pool.
         """
+
         kwargs = {**self.model_args, **kwargs}
 
         async def op_sample(seqs):
@@ -531,19 +543,23 @@ class DclibOpenAiModel(DcModel):
                 if "fixed" in complete_data.keys():
                     next_token = [complete_data["logprobs"]["tokens"]]
                     next_token_score = complete_data["logprobs"]["token_logprobs"]
+                    if str(next_token_score) == "[]": next_token_score = np.array([0.0])
                     next_token_ids.append(np.array([next_token]))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
-                    
+
                     full_logits = TokenDistribution()
                     full_logits[next_token] = next_token_score
-                    # else: 
-                    #  next_token is a special token, which is not in the vocab
+
                     logits.append(full_logits)
+
                     continue
 
                 # get sampled token and score
                 next_token = complete_data["logprobs"]["tokens"]
-                next_token_score = complete_data["logprobs"]["token_logprobs"]
+                next_token_score = complete_data["logprobs"]["token_logprobs"] or 0.0 # assume 0.0 if logprob is None (beginning of sequence)
+                
+                if complete_data["logprobs"]["top_logprobs"] is None:
+                    complete_data["logprobs"]["top_logprobs"] = {complete_data["logprobs"]["tokens"]: 0.0}
                 
                 probs = sorted(list(complete_data["logprobs"]["top_logprobs"].items()))
                 logprobs = [p[1] for p in probs]
@@ -627,11 +643,11 @@ class DclibOpenAiModel(DcModel):
         assert k <= 5, "The OpenAI API only supports topk probabilities with k <= 5"
         assert k >= 1, "topk_continuations() requires k >= 1"
         
-        assert not "turbo" in self.model_identifier, f"Chat API models do not support topk_continuations which is required for the requested decoding algorithm, use 'sample' or 'argmax' instead."
+        assert not model_info(self.model_identifier).is_chat_model, f"Chat API models do not support topk_continuations which is required for the requested decoding algorithm, use 'sample' or 'argmax' instead."
 
         kwargs = {**self.model_args, **kwargs}
         kwargs.update({"temperature": 0.0})
-        
+
         async def op_topk(seqs):
             completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=k, **kwargs)
             
@@ -650,6 +666,7 @@ class DclibOpenAiModel(DcModel):
                 if "fixed" in complete_data.keys():
                     next_token = [complete_data["logprobs"]["tokens"]]
                     next_token_score = complete_data["logprobs"]["token_logprobs"]
+                    if str(next_token_score) == "[]": next_token_score = np.array([0.0])
                     next_token_ids.append(np.array([next_token]))
                     next_token_scores.append(np.array([next_token_score], dtype=np.float32))
                     
@@ -981,8 +998,8 @@ class HFModelStatsAdapter:
     def cost_estimate(self, model):
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
-def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
-    class OpenAIModel:
+def openai_model(model_identifier, endpoint=None, mock=False, **kwargs) -> Type[LMQLModel]:
+    class OpenAIModel(LMQLModel):
         def __init__(self) -> None:
             self.model_identifier = model_identifier
             self.served_model = None
@@ -993,18 +1010,13 @@ def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
         def get_tokenizer(self):
             if self._tokenizer is None:
                 if not mock:
-                    self._tokenizer = load_tokenizer("gpt2")
+                    self._tokenizer = load_tokenizer("tiktoken:" + self.model_identifier)
                 else:
                     self._tokenizer = load_tokenizer(self.model_identifier)
             self.served_model = self
             return self._tokenizer
 
         def get_dclib_model(self):
-            bos_token_id = self.get_tokenizer().bos_token_id
-            eos_token_id = self.get_tokenizer().eos_token_id
-
-            dc.set_dclib_tokenizer(self.get_tokenizer())
-
             full_args = {**kwargs, **self.decoder_args}
             return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **full_args)
 

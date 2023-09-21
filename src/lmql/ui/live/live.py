@@ -68,7 +68,11 @@ async def lmql(code, *args, web=False):
     model = None
     if len(args) > 0 and type(args[0]) is dict:
         model = args[0].get("model")
-        if model == "automatic": model = None
+        if model is not None and (model == "automatic" or len(model.strip()) == 0): 
+            model = None
+
+        if model is not None:
+            print("Running with fixed model: '{}'".format(model))
 
     if code.startswith("./"):
         with open(code) as f:

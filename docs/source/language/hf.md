@@ -1,12 +1,12 @@
 # Local Models / 🤗 Transformers
 
-LMQL relies on a two-process architecture: The inference process (long-running) loads the model and provides an inference API, and the interpreter process (short-lived) executes your LMQL program. This architecture is advantageous for locally-hosted models as the model loading time can be quite long or the required GPU hardware might not be available on the client machine. This chapter first discusses how to use of the two-process inference API, and then presents an alternative on how to leverage [In-Process Model Loading](#in-process-model-loading), which avoids the need for a separate `lmql serve-model` call.
+LMQL relies on a two-process architecture: The inference process (long-running) loads the model and provides an inference API, and the interpreter process (short-lived) executes your LMQL program. This architecture is advantageous for locally-hosted models as the model loading time can be quite long or the required GPU hardware might not be available on the client machine. This chapter first discusses how to use of the two-process inference API, and then presents an alternative on how to leverage [In-Process Model Loading](#in-process-model-loading), which avoids the need for a separate server process within the same architecture.
 
 ![Inference Architecture](../images/inference.svg)
 
-**Prerequisites** Before using the local models, make sure you installed LMQL via `pip install lmql[hf]`. This ensures the dependencies for running local models are installed.
+**Prerequisites** Before using a local model, make sure you installed LMQL via `pip install lmql[hf]`. This ensures the dependencies for running local models are installed. This requirement also applies to [llama.cpp](./llama.cpp.md), as LMQL still relies on HuggingFace `transformers` for tokenization.
 
-Then, to start an LMQL inference process, e.g. for the `gpt2-medium` model, you can run the following command:
+Then, to start an LMQL inference service, e.g. for the `gpt2-medium` model, you can run the following command:
 
 ```bash
 lmql serve-model gpt2-medium --cuda
@@ -14,7 +14,7 @@ lmql serve-model gpt2-medium --cuda
 
 > `--cuda` will load the model on the GPU, if available. If multiple GPUs are available, the model will be distributed across all GPUs. To run with CPU inference, omit the `--cuda` flag. If you only want to use a specific GPU, you can specify the `CUDA_VISIBLE_DEVICES` environment variable, e.g. `CUDA_VISIBLE_DEVICES=0 lmql serve-model gpt2-medium`.
 
-By default, this exposes the LMQL inference API on port 8080. When serving a model remotely, make sure to tunnel/forward the port to your client machine. Now, when executing an LMQL query in the playground or via the CLI, you can simply specify e.g. `gpt2-medium`, and the runtime will automatically connect to the model server running on port 8080 to obtain model-generated text.
+By default, this exposes an [LMQL/LMTP inference API](https://github.com/eth-sri/lmql/blob/main/src/lmql/models/lmtp/README.md) on port 8080. When serving a model remotely, make sure to tunnel/forward the port to your client machine. Now, when executing an LMQL query in the playground or via the CLI, you can simply specify e.g. `gpt2-medium`, and the runtime will automatically connect to the model server running on port 8080 to obtain model-generated text.
 
 
 ### Configuration
@@ -35,11 +35,11 @@ For example, to enable `trust_remote_code` to `True` with the `from_pretrained` 
 lmql serve-model gpt2-medium --cuda --port 9999 --trust_remote_code True
 ```
 
-Alternatively, you can also serve a model directly from within your own Python applications, simply by running `lmql.serve("gpt2-medium", cuda=True, port=9999 trust_remote_code=True)`. Just as with the CLI, standard `transformers` arguments are forwarded to the `from_pretrained` function.
+Alternatively, you can also start to serve a model directly from within a Python environment, by running `lmql.serve("gpt2-medium", cuda=True, port=9999, trust_remote_code=True)`. Just as with the CLI, standard `transformers` arguments are passed through to the `from_pretrained` function.
 
 ## In-Process Models
 
-If you would like to load the model in-process, without having to execute a separate `lmql serve-model` command, you can do so by specifying instantiating a custom `lmql.model` object with `local:` as part of the model name. For example, to load the `gpt2-medium` model in-process, run the following command:
+If you would like to load the model in-process, without having to execute a separate `lmql serve-model` command, you can do so by instantiating a custom `lmql.model` object with `local:` as part of the model name. For example, to load the `gpt2-medium` model in-process, run the following command:
 
 ```{lmql}
 
