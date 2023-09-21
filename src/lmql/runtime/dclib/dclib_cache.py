@@ -89,6 +89,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         return mc
     
     @property
+    def model_identifier(self):
+        return self.delegate.model_identifier
+
+    @property
     def tokenizer(self):
         return self.delegate.tokenizer
 

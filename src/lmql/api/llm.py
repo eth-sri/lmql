@@ -53,60 +53,22 @@ class ModelAPIAdapter(ABC):
         Detokenizes the given input_ids and returns the detokenized text.
         """
         raise NotImplementedError()
-
-"""
-The default model for workloads or queries that do not specify 
-a model explicitly.
-"""
-default_model = "openai/gpt-3.5-turbo-instruct"
-
-def get_default_model() -> Union[str, 'lmql.LLM']:
-    """
-    Returns the default model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.
-
-    This applies globally in the current process.
-    """
-    global default_model
-    return default_model
-
-def set_default_model(model: Union[str, 'lmql.LLM']):
-    """
-    Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.
-
-    This applies globally in the current process.
-    """
-    global default_model
-    default_model = model
-
-"""
-Lazily initialized query to generate text from an LLM using the .generate(...) 
-and .generate_sync(...) methods.
-"""
-
-_generate_query = None
-
-def get_generate_query():
-    global _generate_query
-    if _generate_query is None:
-        @query
-        async def generate_query(prompt, max_tokens=32):
-            '''lmql
-            "{prompt}[RESPONSE]" where len(TOKENS(RESPONSE)) < max_tokens
-            return context.prompt
-            '''
-        _generate_query = generate_query
-    return _generate_query
-
 class LLM:
+    """
+    An LMQL LLM is the core model object that is used to represent a specific
+    language model. 
+    
+    An LLM object can be used directly or passed to an LMQL query. For direct use,
+    consider the methods `generate` and `score` to generate text or score a list of
+    potential continuations against a prompt.
+    """
+
     def __init__(self, model_identifier: str, adapter: ModelAPIAdapter = None):
         self.model_identifier = model_identifier
         self.adapter = adapter
 
     def get_tokenizer(self) -> LMQLTokenizer:
         return self.adapter.get_tokenizer()
-
-    def __str__(self):
-        return f"lmql.LLM({self.model_identifier})"
 
     async def generate(self, prompt, max_tokens=32, **kwargs):
         kwargs["model"] = self
@@ -122,10 +84,16 @@ class LLM:
     def generate_sync(self, *args, **kwargs):
         return asyncio.run(self.generate(*args, **kwargs))
 
-    def score(self, prompt, values, *args, **kwargs):
+    def score(self, prompt, values, **kwargs):
         dcmodel = self.adapter.get_dclib_model()
         with dc.ContextTokenizer(self.adapter.get_tokenizer()):
-            return dc_score(dcmodel, prompt, values, *args, **kwargs)
+            return dc_score(dcmodel, prompt, values, **kwargs)
+
+    def __str__(self):
+        return f"lmql.LLM({self.model_identifier})"
+    
+    def __repr__(self):
+        return str(self)
 
     @classmethod
     def from_descriptor(cls, model_identifier: Union[str, 'LLM'], **kwargs):
@@ -133,17 +101,12 @@ class LLM:
         Constructs an LMQL model descriptor object to be used in 
         a `from` clause or as `model=<MODEL>` argument to @lmql.query(...).
 
-        Examples:
-
-        lmql.model("openai/gpt-3.5-turbo-instruct") # OpenAI API model
-        lmql.model("random", seed=123) # randomly sampling model
-        lmql.model("llama.cpp:<YOUR_WEIGHTS>.bin") # llama.cpp model
-        
-        lmql.model("local:gpt2") # load a `transformers` model in process
-        lmql.model("local:gpt2", cuda=True, load_in_4bit=True) # load a `transformers` model in process with additional arguments
+        Alias for `lmql.model(...)`.
         """
         if model_identifier == "<dynamic>" or model_identifier is None:
             model_identifier = get_default_model()
+
+        assert isinstance(model_identifier, (str, LLM)), "model_identifier must be a string or LLM object"
 
         # do nothing if already a descriptor
         if type(model_identifier) is LLM:
@@ -153,13 +116,15 @@ class LLM:
         if model_identifier in model_name_aliases:
             model_identifier = model_name_aliases[model_identifier]
         
+        # remember original name
         original_name = model_identifier
 
+        # resolve default model
         if model_identifier == "<dynamic>":
             global default_model
             model_identifier = default_model
         
-        endpoint = kwargs.get("endpoint", None)
+        endpoint = kwargs.pop("endpoint", None)
 
         if model_identifier.startswith("openai/"):
             from lmql.runtime.openai_integration import openai_model
@@ -198,11 +163,55 @@ class LLM:
                 Model = lmtp_model(model_identifier, endpoint=endpoint, **kwargs)
             
             return cls(original_name, adapter=Model())
-        
+
+"""
+The default model for workloads or queries that do not specify 
+a model explicitly.
+"""
+default_model = "openai/gpt-3.5-turbo-instruct"
+
+def get_default_model() -> Union[str, LLM]:
+    """
+    Returns the default model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.
+
+    This applies globally in the current process.
+    """
+    global default_model
+    return default_model
+
+def set_default_model(model: Union[str, LLM]):
+    """
+    Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.
+
+    This applies globally in the current process.
+    """
+    global default_model
+    default_model = model
+
+
+"""
+Lazily initialized query to generate text from an LLM using the .generate(...) 
+and .generate_sync(...) methods.
+"""
+_generate_query = None
+def get_generate_query():
+    global _generate_query
+    if _generate_query is None:
+        @query
+        async def generate_query(prompt, max_tokens=32):
+            '''lmql
+            "{prompt}[RESPONSE]" where len(TOKENS(RESPONSE)) < max_tokens
+            return context.prompt
+            '''
+        _generate_query = generate_query
+    return _generate_query
+
 def model(model_identifier, **kwargs) -> LLM:
     """
-    Constructs an LMQL model descriptor object to be used in 
-    a `from` clause or as `model=<MODEL>` argument to @lmql.query(...).
+    Constructs a LLM model to be used in a `from` clause, as `model=<MODEL>` 
+    argument to @lmql.query(...) or directly as `model.generate(...)`.
+
+    Alias for `lmql.LLM.from_descriptor(...)`.
 
     Examples:
 

@@ -8,10 +8,11 @@ import lmql.runtime.dclib as dc
 import lmql.utils.nputil as nputil
 
 class ScoringResult:
-    def __init__(self, prompt, continuations, seqs: List[dc.seq]):
+    def __init__(self, prompt, continuations, seqs: List[dc.seq], model_identifier: str):
         self.seqs = [s.expand() for s in seqs]
         self.prompt = prompt
         self.continuations = continuations
+        self.model_identifier = model_identifier
 
     @property
     def token_scores(self):
@@ -50,9 +51,11 @@ class ScoringResult:
         return self.continuations[self.scores(agg=agg).argmax()]
 
     def __str__(self):
-        return "\n".join([f"-{c}: {score}" for c,score in zip(self.continuations, self.scores(agg="sum"))])
+        
+        return "ScoringResult(model={})\n".format(self.model_identifier) + \
+            "\n".join([f"-{c}: {score}" for c,score in zip(self.continuations, self.scores(agg="sum"))])
 
-async def dc_score(model: dc.DcModel, prompt, values, *args, **kwargs):
+async def dc_score(model: dc.DcModel, prompt, values, **kwargs):
     if type(values) is str:
         values = [values]
 
@@ -64,4 +67,4 @@ async def dc_score(model: dc.DcModel, prompt, values, *args, **kwargs):
     all_scores = []
 
     kwargs["noscore"] = False
-    return ScoringResult(prompt, values, await model.score([prompt_seq] * len(value_ids), value_ids, *args, **kwargs))
+    return ScoringResult(prompt, values, await model.score([prompt_seq] * len(value_ids), value_ids, **kwargs), model.model_identifier)

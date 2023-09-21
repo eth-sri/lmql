@@ -34,6 +34,7 @@ from lmql.runtime.context import ContextTokenizer
 from lmql.api.llm import LLM
 
 from lmql.api.scoring import dc_score
+from lmql.api import score
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -190,6 +191,9 @@ class LMQLContext:
         return LMQLResult(self.state.prompt, await self.get_all_vars(),self.interpreter.distribution_variable, self.interpreter.distribution_values)
 
     async def score(self, *args, **kwargs):
+        model = kwargs.get("model", None)
+        if model is not None:
+            return await score(self.prompt, *args, **kwargs)
         return await dc_score(self.interpreter.dcmodel, self.prompt, *args, **kwargs)
 
 @dataclass
@@ -292,6 +296,10 @@ class PromptInterpreter:
 
     def set_model(self, model_handle: Union[str, LLM]):
         if model_handle == "<dynamic>" and self.model is not None:
+            model_handle = self.model
+        
+        # check if a model is already set (forced by caller)
+        if self.model is not None:
             model_handle = self.model
         
         model_handle = LLM.from_descriptor(model_handle)
