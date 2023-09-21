@@ -528,6 +528,7 @@ class PromptInterpreter:
                 variable = variable.split(":before",1)[0]
 
             text = await s.text(variable_offset, pretty=False)
+            text_tokens = s.input_ids[variable_offset:].tolist()
             diff_text = text[len(await s.text(variable_offset, limit=-1, pretty=False)):]
 
             # run applicable inline ops (sub interpreters)
@@ -535,13 +536,13 @@ class PromptInterpreter:
 
             # current context
             program_state: ProgramState = state.program_state.copy()
-            program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc")
+            program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
             program_state.subinterpreter_results = subvalid
             program_state.prompt = state.prompt
 
             # follow context
             follow_program_state: ProgramState = state.program_state.copy()
-            follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc")
+            follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
             follow_program_state.subinterpreter_results = subfollow
             follow_program_state.prompt = state.prompt
 
@@ -737,11 +738,12 @@ class PromptInterpreter:
             variable = state.variable
             
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
+            text_tokens = seq.input_ids[state.variable_offset:].tolist()
             text_diff = text[len(await seq.text(state.variable_offset, limit=-2, pretty=False)):]
             
             variable_value = text
             # set raw variable value
-            program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin")
+            program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin", tokens=text_tokens)
 
             where = state.full_where_condition(self)
 
@@ -803,6 +805,9 @@ class PromptInterpreter:
             if old_prompt != prompt:
                 n_tokens_to_strip = len(seq.input_ids) - variable_offset
                 value_ids, program_ids = await asyncio.gather(*[self.tokenize(appended_value_prompt), self.tokenize(appended_program_prompt)])
+                
+                # update IDs in program state
+                program_state.variable_tokens[variable] = value_ids
 
                 assert len(seq.input_ids) - n_tokens_to_strip == variable_offset, f"error: variable offset is not correct. expected {len(seq.input_ids) - n_tokens_to_strip} but got {state.variable_offset}"
                 
@@ -1021,14 +1026,14 @@ class PromptInterpreter:
         # set step budget at least to max_len
         step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
 
-        try:
-            import time
+        with ContextTokenizer(self.model.get_tokenizer()):
+            try:
+                import time
 
-            self.decoder_step = 0
-            average_step_time = None
-            start = time.time()
+                self.decoder_step = 0
+                average_step_time = None
+                start = time.time()
 
-            with ContextTokenizer(self.model.get_tokenizer()):
                 async for _ in decoder_fct(prompt, **decoder_args):
                     await debug_out(self.decoder_step)
                     self.decoder_step += 1
@@ -1049,43 +1054,43 @@ class PromptInterpreter:
                             print("step", self.decoder_step, "time", average_step_time)
 
                     start = time.time()
-            
-            assert False, "decoder {} did not finish with dc.finish(), which means no result sequences were returned. \n\nThe reason for this may be a too small max_len value (max_len={}) ".format(decoder_args["decoder"], decoder_args["max_len"])
                 
-        except dc.FinishException as fe:
-            # one last call to debug_out to get the final state
-            await debug_out(self.decoder_step)
-            # if dc.finish is used, the decoder sets the sequences it considers 
-            # finished (return them to prompt interpreter)
-            result_sequences = fe.result_sequences
-            
-            billable_tokens = 0
-            for s in result_sequences:
-                upper = len(s.input_ids)
-                has_deterministic_tail = False
-                while s.deterministic[upper-1] and upper >= 0:
-                    upper -= 1
-                    has_deterministic_tail = True
-                # +1 for the eos token
-                billable_tokens += upper + (1 if has_deterministic_tail else 0)
-            
-            results = []
+                assert False, "decoder {} did not finish with dc.finish(), which means no result sequences were returned. \n\nThe reason for this may be a too small max_len value (max_len={}) ".format(decoder_args["decoder"], decoder_args["max_len"])
+                    
+            except dc.FinishException as fe:
+                # one last call to debug_out to get the final state
+                await debug_out(self.decoder_step)
+                # if dc.finish is used, the decoder sets the sequences it considers 
+                # finished (return them to prompt interpreter)
+                result_sequences = fe.result_sequences
+                
+                billable_tokens = 0
+                for s in result_sequences:
+                    upper = len(s.input_ids)
+                    has_deterministic_tail = False
+                    while s.deterministic[upper-1] and upper >= 0:
+                        upper -= 1
+                        has_deterministic_tail = True
+                    # +1 for the eos token
+                    billable_tokens += upper + (1 if has_deterministic_tail else 0)
+                
+                results = []
 
-            for i,s in enumerate(result_sequences):
-                state = self.interpreter_state_from_user_data(s)
-                if state.query_head.result is not None:
-                    results.append(state.query_head.result)
-                else:
-                    state = await self.advance(state)
-                    assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
+                for i,s in enumerate(result_sequences):
+                    state = self.interpreter_state_from_user_data(s)
+                    if state.query_head.result is not None:
+                        results.append(state.query_head.result)
+                    else:
+                        state = await self.advance(state)
+                        assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
 
-                    assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), decoder_args["decoder"])
-                    results.append(state.query_head.result)
-            
-            # set decoder step +1, for all stats logging that happens in postprocessing
-            self.decoder_step += 1
+                        assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), decoder_args["decoder"])
+                        results.append(state.query_head.result)
+                
+                # set decoder step +1, for all stats logging that happens in postprocessing
+                self.decoder_step += 1
 
-            return results
+                return results
         
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 

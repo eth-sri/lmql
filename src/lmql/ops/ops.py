@@ -253,8 +253,11 @@ class TokensOp(Node):
     def forward(self, x, context, **kwargs):
         if x is None: return None
         if x == "": return []
-
-        return tuple(context.runtime.model.sync_tokenize(x))
+        
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of TOKENS must be a direct reference to a template variable."
+        tokens = context.get_tokens(var_op.name)
+        return tuple(tokens)
 
     def follow(self, v, context=None, **kwargs):
         if v is None: return None
@@ -265,6 +268,10 @@ class TokensOp(Node):
             return tokens
         v = strip_next_token(v)
         tokens = tuple(context.runtime.model.sync_tokenize(v))
+
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of TOKENS must be a direct reference to a template variable."
+        tokens = context.get_tokens(var_op.name)
 
         return fmap(
             ("eos", tokens),
