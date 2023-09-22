@@ -34,9 +34,9 @@ LMQL supports multiple inference backends, each of which has its own set of para
 Specifying The Model
 --------------------
 
-After creating an :code:`lmql.LLM` object, you can use it pass it to a query program to specify the model to use during execution. There are two ways to do this:
+After creating an :code:`lmql.LLM` object, you can pass it to a query program to specify the model to use during execution. There are two ways to do this:
 
-**Option A: Queries with `from` Clause**: The first option is to simply specify the model as part of the query itself. For this, you can use the `from` in combination with the indented syntax. This can be particularly useful, if your choice of model is intentional and should be part of your program.
+**Option A: Queries with `from` Clause**: The first option is to specify the model as part of the query itself. For this, you can use :code:`from` in combination with the indented syntax. This can be particularly useful, if your choice of model is intentional and should be part of your program.
 
 .. lmql:: 
     name::specify-model
@@ -45,7 +45,9 @@ After creating an :code:`lmql.LLM` object, you can use it pass it to a query pro
     from
         "openai/text-ada-001"
 
-Here, we specify :code:`openai/text-ada-001` directly, but the shown code is equivalent to the use of :code:`lmql.model(...)`, i.e. :code:`lmql.model("openai/text-ada-001")`.
+Here, we specify :code:`openai/text-ada-001` directly, but the shown code is equivalent to the use of :code:`lmql.model(...)`, i.e. :code:`lmql.model("openai/text-ada-001")`. 
+
+Note, that the :code:`from` keyword is only available with the indented syntax as shown here, where the decoder keywords is provided explicitly. If you are not using this syntax, please consider Option B below.
 
 **Option B: Specifying the Model Externally**: The second option is to specify the model and its parameters externally, i.e. separately from the actual program code:
 

@@ -89,7 +89,7 @@ To learn more about LMQL, select one of the following sections or navigate the d
     .. grid-item-card:: 💻 Generations API
        :link: lib/generations.md
 
-       Start using LMQL via a lightweight Python API, before diving deeper into the language.
+       Start using LMQL via a lightweight Python API, before diving deep into the language.
       
 
 .. toctree::
