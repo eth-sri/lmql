@@ -241,8 +241,12 @@ class LanguageFragmentParser:
     def digest(self, tok):
         if self.state == "start":
             if tok.type == tokenize.NAME:
+                # detect .<decoder_name> as property access, which should not be 
+                # interpreted as a decoder keyword
+                is_property_access = len(self.query.prologue) > 0 and self.query.prologue[-1].type == tokenize.OP and self.query.prologue[-1].string == "."
+
                 # when we encounter the first decoder keyword, we switch to the query parsing state
-                if tok.string.lower() in get_all_decoders():
+                if tok.string.lower() in get_all_decoders() and not is_property_access:
                     self.query.decode_str += [tok]
                     self.state = "decode"
                     return
