@@ -162,3 +162,5 @@ def set_default_model(model: Union[str, LLM])
 ```
 
 Sets the model to be used when no `from` clause or `@lmql.query(model=<model>)` are specified in LMQL. The default model applies globally in the current process and affects both LMQL queries and Generation API methods like [`lmql.generate`](#lmql-generate) and [`lmql.score`](#lmql-score) functions.
+
+You can also specify the environment variable `LMQL_DEFAULT_MODEL` to set the default model for a given process.

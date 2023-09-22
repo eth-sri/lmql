@@ -225,7 +225,10 @@ class LLM:
 The default model for workloads or queries that do not specify 
 a model explicitly.
 """
-default_model = "openai/gpt-3.5-turbo-instruct"
+default_model = os.environ.get("LMQL_DEFAULT_MODEL", 
+                               # otherwise use 'openai/gpt-3.5-turbo-instruct' (in browser, we use 
+                               # openai/text-davinci-003, because 3.5 tokenizers are not supported in the browser)
+                               "openai/gpt-3.5-turbo-instruct" if not "LMQL_BROWSER" in os.environ else "openai/text-davinci-003")
 
 def get_default_model() -> Union[str, LLM]:
     """
