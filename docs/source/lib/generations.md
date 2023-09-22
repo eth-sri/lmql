@@ -2,7 +2,7 @@
 
 <div class="subtitle">A simple Python API for LMQL-based text generation and scoring.</div>
 
-The *Generations API* is a lightweight library with the goal of providing high-level access to LMQL core features, such as various inference backends, constrained generation, and advanced caching and scoring. The API was designed to be easy to use and does not require users to write any LMQL themselves.
+The *Generations API* is a lightweight library with the goal of providing high-level access to LMQL core features, such as its inference backends, (constrained) generation, and scoring. The API was designed to be easy to use and does not require users to write any LMQL themselves.
 
 <div style="margin-bottom: -10pt"></div>
 
