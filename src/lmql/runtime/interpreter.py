@@ -190,11 +190,11 @@ class LMQLContext:
 
         return LMQLResult(self.state.prompt, await self.get_all_vars(),self.interpreter.distribution_variable, self.interpreter.distribution_values)
 
-    async def score(self, *args, **kwargs):
+    async def score(self, values, **kwargs):
         model = kwargs.get("model", None)
         if model is not None:
-            return await score(self.prompt, *args, **kwargs)
-        return await dc_score(self.interpreter.dcmodel, self.prompt, *args, **kwargs)
+            return await score(self.prompt, values, **kwargs)
+        return await dc_score(self.interpreter.dcmodel, self.prompt, values, **kwargs)
 
 @dataclass
 class LMQLResult:
@@ -313,6 +313,11 @@ class PromptInterpreter:
             self.prefers_compact_mask = True
 
         self.model = model_handle
+
+        # prepare dcmodel
+        decoder_args = self.decoder_kwargs
+        self.model.adapter.decoder_args = {**decoder_args, **self.extra_kwargs}
+        self.dcmodel: dc.DcModel = self.model.adapter.get_dclib_model()
 
     async def advance(self, state: PromptState):
         if state.variable is not None:
@@ -895,11 +900,6 @@ class PromptInterpreter:
             tail=None)
         self.root_state = await self.advance(self.root_state)
 
-        # prepare dcmodel
-        decoder_args = self.decoder_kwargs
-        self.model.adapter.decoder_args = {**decoder_args, **self.extra_kwargs}
-        self.dcmodel: dc.DcModel = self.model.adapter.get_dclib_model()
-
         async def debug_out(decoder_step):
             if PromptInterpreter.main != self:
                 return
@@ -934,7 +934,7 @@ class PromptInterpreter:
         # make sure that the initial prompt is not considered part of a variable
         self.root_state = self.root_state.updated(variable_offset=n)
 
-        decoder_args = decoder_args.copy()
+        decoder_args = self.decoder_kwargs.copy()
 
         # pass processor as decoder argument
         decoder_args["modern_logits_processor"] = self.where_processor

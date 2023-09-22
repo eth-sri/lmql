@@ -166,6 +166,7 @@ def run_all_tests(g):
             tb = traceback.extract_tb(e.__traceback__)
             tb = "\n".join(traceback.format_list(tb))
             termcolor.cprint("FAILED\n{}".format(tb), "red")
+            termcolor.cprint("AssertionError: {}".format(e), "red")
             print(e)
 
     # wait for all tasks to finish

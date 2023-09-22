@@ -1,4 +1,6 @@
 import lmql
+import numpy as np
+
 from lmql.tests.expr_test_utils import run_all_tests
 
 def test_generate_sync():
@@ -32,7 +34,8 @@ def test_score_sync():
     
     assert type(result) is lmql.ScoringResult
     assert len(result.seqs) == 1
-    assert len(result.token_scores) == 1 and result.token_scores[0].shape == (2,)
+    assert len(result.token_scores) == 1 and result.token_scores[0].shape == (1,)
+    assert len(result.full_token_scores) == 1 and np.array(result.full_token_scores[0]).shape == (2,)
 
     assert result.logprobs().shape == (1,)
 
@@ -43,7 +46,8 @@ def test_llm_score_two():
 
     assert type(result) is lmql.ScoringResult
     assert len(result.seqs) == 2
-    assert len(result.token_scores) == 2 and result.token_scores[0].shape == (2,)
+    assert len(result.token_scores) == 2 and result.token_scores[0].shape == (1,)
+    assert len(result.full_token_scores) == 2 and np.array(result.full_token_scores[0]).shape == (2,)
 
     assert result.argmax() in ["World", "Test"]
 
@@ -58,7 +62,7 @@ def test_llm_openai():
         print("Skipping test_api.test_llm_openai because no OpenAI API configuration could be found.")
         return
 
-    m = lmql.model("openai/gpt-3.5-turbo-instruct")
+    m = lmql.model("openai/gpt-3.5-turbo-instruct", silent=True)
     assert m.score_sync("Hello", ["World", "Test"]).argmax() == "World"
 
 if __name__ == "__main__":

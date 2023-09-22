@@ -14,15 +14,22 @@ class ScoringResult:
     Provides methods to aggregate scores and return the best continuation.
     """
 
-    def __init__(self, prompt, continuations, seqs: List[dc.seq], model_identifier: str):
+    def __init__(self, prompt, continuations: List[str], num_value_tokens: List[int], seqs: List[dc.seq], model_identifier: str):
         self.seqs = [s.expand() for s in seqs]
         self.prompt = prompt
+        # the continuations that were scored
         self.continuations = continuations
+        # per continuation, the number of tokens that originate from the appended continuation value
+        self.num_value_tokens = num_value_tokens
         self.model_identifier = model_identifier
 
     @property
-    def token_scores(self):
+    def full_token_scores(self):
         return [s.logprobs for s in self.seqs]
+
+    @property
+    def token_scores(self):
+        return [s.logprobs[-self.num_value_tokens[i]:] for i,s in enumerate(self.seqs)]
 
     def scores(self, agg="sum", **kwargs):
         """
@@ -83,10 +90,11 @@ async def dc_score(model: dc.DcModel, prompt, values, **kwargs):
 
     prompt_seq = dc.seq(model.tokenizer.tokenize(prompt, asbytes=True))
     value_ids = [model.tokenizer.tokenize(value, asbytes=True) for value in values]
+    num_value_ids = [len(ids) for ids in value_ids]
 
     kwargs.pop("internal", None)
     all_tokens = []
     all_scores = []
 
     kwargs["noscore"] = False
-    return ScoringResult(prompt, values, await model.score([prompt_seq] * len(value_ids), value_ids, **kwargs), model.model_identifier)
+    return ScoringResult(prompt, values, num_value_ids, await model.score([prompt_seq] * len(value_ids), value_ids, **kwargs), model.model_identifier)
