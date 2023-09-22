@@ -1,5 +1,6 @@
 import io
 import os
+import json
 from dataclasses import dataclass
 
 from lmql.ops.ops import Node
@@ -108,6 +109,14 @@ class CytoscapeNode:
         # print("update label", l)
         self.graph.nodes[self.node]["data"]["label"] = l
 
+# JSON encoder that uses str to convert non-JSON-serializable objects
+class StringFallbackEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            return json.JSONEncoder.default(self, obj)
+        except:
+            return str(obj)
+
 class CytoscapeGraph:
     def __init__(self) -> None:
         self.nodes = {}
@@ -122,7 +131,7 @@ class CytoscapeGraph:
         }
 
         if return_dict: return d
-        else: return json.dumps(d)
+        else: return json.dumps(d, cls=StringFallbackEncoder)
 
     def add_node(self, node_data, label=None):
         # {

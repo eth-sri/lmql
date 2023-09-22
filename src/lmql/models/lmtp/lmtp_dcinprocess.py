@@ -1,32 +1,11 @@
 from lmql.models.lmtp.utils import rename_model_args
+
 import warnings
-
-class LMQLModel:
-    """
-    Descriptor base class for results of lmql.model(...) calls.
-
-    The actual model runs either remotely (lmql serve-model), in-process via self.model or
-    via an API (e.g. OpenAI).
-    """
-
-    def __init__(self, model_identifier, model=None, **kwargs):
-        self.model_identifier = model_identifier
-        self.kwargs = kwargs
-
-        # if this is a fixed reference to an existing model
-        self.model = model
-
-    def __repr__(self) -> str:
-        return str(self)
-    
-    def __str__(self):
-        return "<LMQLModel: {}>".format(self.model_identifier)
-
-LMQLModel.inprocess_instances = {}
+lmtp_model_inprocess_instances = {}
 
 def inprocess(model_name, use_existing_configuration=False, **kwargs):
     """
-    Loads a 'transformers' model in-process and returns an LMQLModel object
+    Loads a 'transformers' model in-process and returns an LMQLModelDescriptor object
     to use this in-process model in LMQL.
 
     This is useful when you don't want to spawn a separate 'lmql serve-model' process.
@@ -44,7 +23,7 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
     Return:
         InProcessServer: An object representing the loaded model, can be passed in the 'from' clause of a query.
     """
-    from .lmtp.lmtp_dcmodel import lmtp_model
+    from .lmtp_dcmodel import lmtp_model
     assert not model_name.startswith("openai/"), "openai/ models cannot be loaded with inprocess=True, they always use the remote API."
 
     # extract/reassign renamed like 'cuda'
@@ -67,29 +46,12 @@ def inprocess(model_name, use_existing_configuration=False, **kwargs):
         else:
             cmdline_args += f"--{k} {v} "
 
-    if cmdline_args in LMQLModel.inprocess_instances.keys():
-        warnings.warn("info: reusing existing in-process model.")
-        model = LMQLModel.inprocess_instances[cmdline_args]
-        return LMQLModel(model_name, model=model)
+    global lmtp_model_inprocess_instances
 
-    if use_existing_configuration:
-        # find existing match for model_name only
-        for cmdargs, p in LMQLModel.inprocess_instances.items():
-            if cmdargs.split(" ")[0] == model_name:
-                return LMQLModel(model_name, model=p)
-    
+    if cmdline_args in lmtp_model_inprocess_instances.keys():
+        return lmtp_model_inprocess_instances[cmdline_args]
+
     kwargs["inprocess"] = True
     model = lmtp_model(model_name, **kwargs)
-    LMQLModel.inprocess_instances[cmdline_args] = model
-    return LMQLModel(model_name, model=model)
-
-def model(model_identifier, **kwargs):
-    # handle inprocess models
-    is_inprocess = kwargs.pop("inprocess", False) or model_identifier.startswith("local:")
-    if is_inprocess and model_identifier.startswith("local:"):
-        model_identifier = model_identifier[6:]
-
-    if is_inprocess:
-        return inprocess(model_identifier, **kwargs)
-    else:
-        return LMQLModel(model_identifier, **kwargs)
+    lmtp_model_inprocess_instances[cmdline_args] = model
+    return model

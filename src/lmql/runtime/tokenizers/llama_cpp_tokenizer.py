@@ -43,10 +43,19 @@ class LlamaCPPTokenizer:
         return [f"{i}".encode("utf-8") for i in ids]
 
     def __call__(self, text, add_special_tokens=False):
-        result =  self.tokenizer.encode(text)
-        return {
-            "input_ids": result
-        }
+        for dummy_token in ["@", "^", ""]:
+            text_to_tokenize = dummy_token + text
+            
+            text_to_tokenize = text_to_tokenize
+            result = {"input_ids": self.tokenizer.encode(text_to_tokenize)}
+            if len(result["input_ids"]) <= 1 and dummy_token != "":
+                # "Tokenized text '{}' was merged with dummy token @ into '{}'".format(text_to_tokenize, [self.tokenizer.convert_ids_to_tokens(i) for i in result["input_ids"]])
+                continue
+            offset = 1 if len(dummy_token) > 0 else 0
+            result["input_ids"] = result["input_ids"][offset:]
+            return result
+
+        assert False, "LLamaTransformersTokenizer.__call__ failed to workaround tokenization issue for '{}'".format(text)
     
     def convert_bytes_to_string(self, token_bytes):
         """
@@ -60,9 +69,10 @@ class LlamaCPPTokenizer:
                 ids = self.convert_token_bytes_to_ids(token_bytes)
                 res = self.tokenizer.decode(ids)
                 return f" {res}"
+        
+        token_bytes = [str(self.tokenizer.bos_id()).encode("utf-8")] + token_bytes
         ids = self.convert_token_bytes_to_ids(token_bytes)
-        res = self.tokenizer.decode(ids)
-        return res
+        return self.tokenizer.decode(ids)
     
     def decode(self, ids, clean_up_tokenization_spaces=True):
         """
@@ -79,6 +89,9 @@ class LlamaCPPTokenizer:
         """
         return [int(t.decode("utf-8")) for t in tokens]
     
+    def convert_tokens_to_string(self, tokens):
+        return self.tokenizer.Decode(tokens)
+
     @property
     def vocab(self):
         return { self.tokenizer.id_to_piece(id): id for id in range(self.tokenizer.get_piece_size()) }

@@ -19,6 +19,10 @@ from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
+from lmql.models.model_info import model_info
+from lmql.api.llm import ModelAPIAdapter
+from typing import Type
+
 import warnings
 
 def is_allowed(m): 
@@ -192,11 +196,6 @@ class DclibOpenAiModel(DcModel):
             **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
-        if self.model_args.get("chatty_openai", False):
-            args = kwargs.copy()
-            # args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
-            print(f"openai score: {args}", flush=True)
-
         logprobs = []
         async for data in await openai.Completion.create(**kwargs):
             logprobs += data["logprobs"]["token_logprobs"]
@@ -216,7 +215,6 @@ class DclibOpenAiModel(DcModel):
     async def _score_next_tokens(self, s, next_tokens, noscore=False):
         if noscore: return np.zeros(len(next_tokens), dtype=np.float32)
         
-        prompt_str = self.tokenizer.convert_bytes_to_string(s.input_ids)
         res = await self.api_score(np.concatenate([s.input_ids, next_tokens], axis=0), len(s.input_ids))
 
         server_side_swallowed_tokens = 0
@@ -334,11 +332,6 @@ class DclibOpenAiModel(DcModel):
 
         # TODO: we are now overestimate the number of tokens billed to the user since we are not account for stopping phrases for the sake of streaming
         self.count_billed_tokens(len(tokenized_input_ids) + kwargs.get("max_tokens") * batch_size, self.model_identifier)
-        
-        if self.model_args.get("chatty_openai", False):
-            args = kwargs.copy()
-            # args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
-            print(f"openai complete: {args}", flush=True)
 
         buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
         t = b""
@@ -639,7 +632,7 @@ class DclibOpenAiModel(DcModel):
         assert k <= 5, "The OpenAI API only supports topk probabilities with k <= 5"
         assert k >= 1, "topk_continuations() requires k >= 1"
         
-        assert not "turbo" in self.model_identifier, f"Chat API models do not support topk_continuations which is required for the requested decoding algorithm, use 'sample' or 'argmax' instead."
+        assert not model_info(self.model_identifier).is_chat_model, f"Chat API models do not support topk_continuations which is required for the requested decoding algorithm, use 'sample' or 'argmax' instead."
 
         kwargs = {**self.model_args, **kwargs}
         kwargs.update({"temperature": 0.0})
@@ -994,8 +987,8 @@ class HFModelStatsAdapter:
     def cost_estimate(self, model):
         return openai.AsyncConfiguration.get_stats().cost_estimate(model)
 
-def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
-    class OpenAIModel:
+def openai_model(model_identifier, endpoint=None, mock=False, **kwargs) -> ModelAPIAdapter:
+    class OpenAIModel(ModelAPIAdapter):
         def __init__(self) -> None:
             self.model_identifier = model_identifier
             self.served_model = None
@@ -1006,19 +999,17 @@ def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
         def get_tokenizer(self):
             if self._tokenizer is None:
                 if not mock:
-                    self._tokenizer = load_tokenizer("gpt2")
+                    self._tokenizer = load_tokenizer("tiktoken:" + self.model_identifier)
                 else:
                     self._tokenizer = load_tokenizer(self.model_identifier)
             self.served_model = self
             return self._tokenizer
 
         def get_dclib_model(self):
-            bos_token_id = self.get_tokenizer().bos_token_id
-            eos_token_id = self.get_tokenizer().eos_token_id
-
-            dc.set_dclib_tokenizer(self.get_tokenizer())
-
             full_args = {**kwargs, **self.decoder_args}
+            full_args.pop("model", None)
+            full_args.pop("mock", None)
+            full_args.pop("endpoint", None)
             return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **full_args)
 
         async def tokenize(self, text):
@@ -1029,4 +1020,4 @@ def openai_model(model_identifier, endpoint=None, mock=False, **kwargs):
 
         def sync_tokenize(self, text):
             return self.get_tokenizer()(text)["input_ids"]
-    return OpenAIModel
+    return OpenAIModel()

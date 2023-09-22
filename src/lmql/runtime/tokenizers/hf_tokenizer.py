@@ -6,7 +6,6 @@ def unicode(v):
 class TransformersTokenizer:
     def __init__(self, model_identifier, tokenizer):
         from transformers import AutoTokenizer
-        
         self.model_identifier = model_identifier
         self.tokenizer = tokenizer
 

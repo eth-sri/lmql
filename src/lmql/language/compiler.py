@@ -19,7 +19,7 @@ from lmql.language.qstrings import (DistributionVariable, FExpression,
 from lmql.language.validator import LMQLValidationError, LMQLValidator
 from lmql.ops.ops import lmql_operation_registry
 from lmql.runtime.dclib import get_all_decoders
-from lmql.runtime.model_registry import model_name_aliases
+from lmql.models.aliases import model_name_aliases
 
 OPS_NAMESPACE = "lmql.ops"
 LIB_NAMESPACE = "lmql.lib"
@@ -146,6 +146,16 @@ class PromptScope(ast.NodeVisitor):
                 self.visit_where(constraint)
         else:
             super().generic_visit(node)
+
+    def visit_ImportFrom(self, node: ImportFrom) -> Any:
+        for alias in node.names:
+            self.defined_vars.add(alias.asname or alias.name)
+        super().generic_visit(node)
+
+    def visit_Import(self, node: Import) -> Any:
+        for alias in node.names:
+            self.defined_vars.add(alias.asname or alias.name)
+        super().generic_visit(node)
 
     def scope_Constant(self, node):
         if type(node.value) is not str: return super().visit_Constant(node)

@@ -3,7 +3,6 @@ Similar to 'inspect' module, but for LMQL queries.
 """
 
 import inspect
-from lmql.runtime.lmql_runtime import is_query
 
 def getsource(fct):
     """
@@ -18,3 +17,9 @@ def getcompiled(fct):
     """
     assert is_query(fct), f"getcompiled() expects a LMQL query function, got {fct}"
     return inspect.getsource(fct.__lmql_query_function__.fct)
+
+def is_query(fct):
+    """
+    Returns True if the given function is a compiled LMQL query function.
+    """
+    return hasattr(fct, "__lmql_query_function__")

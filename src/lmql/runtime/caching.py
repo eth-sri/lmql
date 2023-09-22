@@ -6,7 +6,7 @@ import os
 import pathlib
 import warnings
 
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 CACHE_DIR = pathlib.Path.home() / ".cache" / "lmql"
 
 def prepare_cache_access():
@@ -32,7 +32,8 @@ def prepare_cache_access():
     if not cache_is_valid:
         warnings.warn("LMQL cache directory ({}) format is outdated, clearing cache (existing: v{}, runtime: v{})...".format(CACHE_DIR, cache_version, CACHE_VERSION))
         for f in os.listdir(CACHE_DIR):
-            os.remove(os.path.join(CACHE_DIR, f))
+            if os.path.isfile(os.path.join(CACHE_DIR, f)):
+                os.remove(os.path.join(CACHE_DIR, f))
         with open(os.path.join(CACHE_DIR, "cache-version"), "w") as f:
             f.write(str(CACHE_VERSION))
 

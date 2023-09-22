@@ -12,8 +12,9 @@ import numpy as np
 import lmql.utils.nputil as nputil
 import lmql.runtime.masks as masks
 from lmql.runtime.token_distribution import TokenDistribution
+from lmql.api.llm import ModelAPIAdapter
 
-from typing import Any, List, Union
+from typing import Any, List, Union, Type
 import random
 import sys
 import traceback
@@ -467,11 +468,11 @@ class lmtp_model:
                 if "no current event loop" in str(e): pass
                 else: raise e
 
-    def __call__(self):
+    def __call__(self) -> ModelAPIAdapter:
         # reference to factory instance
         this = self
 
-        class LMTPDcModelCls:
+        class LMTPAdapterModel(ModelAPIAdapter):
             def __init__(self) -> None:
                 self.model_identifier = this.model_identifier
                 self.served_model = None
@@ -488,11 +489,6 @@ class lmtp_model:
                 return self._tokenizer
 
             def get_dclib_model(self):
-                bos_token_id = self.get_tokenizer().bos_token_id
-                eos_token_id = self.get_tokenizer().eos_token_id
-
-                dc.set_dclib_tokenizer(self.get_tokenizer())
-
                 inprocess_client_constructor = None
 
                 if this.inprocess:
@@ -501,8 +497,12 @@ class lmtp_model:
                 else:
                     lmtp_server_kwargs = None
 
+                full_args = {**this.kwargs}
+                for key in ["inprocess", "endpoint", "lmtp_server_kwargs", "inprocess_client_constructor"]:
+                    full_args.pop(key, None)
+
                 return LMTPDcModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, 
-                                 inprocess_client_constructor=inprocess_client_constructor, **self.decoder_args)
+                                 inprocess_client_constructor=inprocess_client_constructor, **full_args)
 
             async def tokenize(self, text):
                 return self.get_tokenizer().tokenize(text, asbytes=True)
@@ -510,10 +510,4 @@ class lmtp_model:
             async def detokenize(self, input_ids):
                 return self.get_tokenizer().decode(input_ids)
 
-            def sync_tokenize(self, text):
-                return self.get_tokenizer()(text)["input_ids"]
-            
-            def report_metrics(self, metrics):
-                pass
-
-        return LMTPDcModelCls()
+        return LMTPAdapterModel()

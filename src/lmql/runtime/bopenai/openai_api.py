@@ -3,9 +3,11 @@ import os
 if "LMQL_BROWSER" in os.environ:
     # use mocked aiohttp for browser (redirects to JS for network requests)
     import lmql.runtime.maiohttp as aiohttp
+    LMQL_BROWSER = True
 else:
     # use real aiohttp for python
     import aiohttp
+    LMQL_BROWSER = False
 
 import json
 import time
@@ -13,6 +15,7 @@ import asyncio
 
 from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.stats import Stats
+from lmql.models.model_info import model_info
 
 class OpenAIStreamError(Exception): pass
 class OpenAIRateLimitError(OpenAIStreamError): pass
@@ -61,25 +64,21 @@ def is_azure_chat(kwargs):
     return ("api_type" in api_config and "azure-chat" in api_config.get("api_type", ""))
 
 async def complete(**kwargs):
-    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"] or is_azure_chat(kwargs):
+    if model_info(kwargs["model"]).is_chat_model or is_azure_chat(kwargs):
         async for r in chat_api(**kwargs): yield r
     else:
         async for r in completion_api(**kwargs): yield r
 
-global tokenizer
-tokenizer = None
+global tokenizers
+tokenizers = {}
 
-def tokenize_ids(text):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = load_tokenizer("gpt2")
-    ids = tokenizer(text)["input_ids"]
-    return ids
-
-def tokenize(text, openai_byte_encoding=False):
-    global tokenizer
-    if tokenizer is None:
-        tokenizer = load_tokenizer("gpt2")
+def tokenize(text, model, openai_byte_encoding=False):
+    global tokenizers
+    if not model in tokenizers:
+        tokenizer = load_tokenizer("tiktoken:" + model)
+        tokenizers[model] = tokenizer
+    else:
+        tokenizer = tokenizers[model]
     ids = tokenizer(text)["input_ids"]
     raw = tokenizer.decode_bytes(ids)
     if openai_byte_encoding:
@@ -164,7 +163,7 @@ def get_endpoint_and_headers(kwargs):
     }
     if openai_org:
         headers['OpenAI-Organization'] = openai_org
-    if kwargs["model"].startswith("gpt-3.5-turbo") or "gpt-4" in kwargs["model"]:
+    if model_info(kwargs["model"]).is_chat_model:
         endpoint = "https://api.openai.com/v1/chat/completions"
     else:
         endpoint = "https://api.openai.com/v1/completions"
@@ -175,9 +174,10 @@ async def chat_api(**kwargs):
 
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
+    model = kwargs["model"]
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
-    prompt_tokens = tokenize(kwargs["prompt"][0], openai_byte_encoding=True)
+    prompt_tokens = tokenize(kwargs["prompt"][0], model=model, openai_byte_encoding=True)
 
     timeout = kwargs.pop("timeout", 1.5)
     
@@ -237,7 +237,12 @@ async def chat_api(**kwargs):
         stream_start = time.time()
 
         async with aiohttp.ClientSession() as session:
+            api_config = kwargs.get("api_config", {})
             endpoint, headers = get_endpoint_and_headers(kwargs)
+            
+            if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
+                print(f"openai complete: {kwargs}", flush=True)
+            
             async with session.post(
                     endpoint,
                     headers=headers,
@@ -322,7 +327,7 @@ async def chat_api(**kwargs):
                                         })
                                     continue
                                 text = delta["content"]
-                                tokens = tokenize((" " if received_text == "" else "") + text, openai_byte_encoding=True)
+                                tokens = tokenize((" " if received_text == "" else "") + text, model=model, openai_byte_encoding=True)
                                 received_text += text
 
                                 # convert tokens to OpenAI format
@@ -367,13 +372,21 @@ async def completion_api(**kwargs):
 
     timeout = kwargs.pop("timeout", 1.5)
 
+    assert not (LMQL_BROWSER and "logit_bias" in kwargs and "gpt-3.5-turbo" in kwargs["model"]), "gpt-3.5-turbo completion models do not support logit_bias in the LMQL browser distribution, because the required tokenizer is not available in the browser. Please use a local installation of LMQL to use logit_bias with gpt-3.5-turbo models."
+
     async with CapacitySemaphore(num_prompts * max_tokens):
         
         current_chunk = ""
         stream_start = time.time()
         
+
         async with aiohttp.ClientSession() as session:
+            api_config = kwargs.get("api_config", {})
             endpoint, headers = get_endpoint_and_headers(kwargs)
+            
+            if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
+                print(f"openai complete: {kwargs}", flush=True)
+
             async with session.post(
                     endpoint,
                     headers=headers,

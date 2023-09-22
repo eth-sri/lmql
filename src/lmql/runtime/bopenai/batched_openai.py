@@ -9,6 +9,7 @@ import pickle
 import os
 import time
 from functools import total_ordering
+import warnings
 
 from .openai_api import complete, OpenAIRateLimitError, Capacity
 
@@ -614,6 +615,7 @@ class AsyncOpenAIAPI:
 
     def start_stats_logger(self):
         self.stats_logger = asyncio.create_task(self.stats_logger_worker())
+    
     def stop_stats_logger(self):
         self.stats_logger.cancel()
 
@@ -633,18 +635,19 @@ class AsyncOpenAIAPI:
         self.warn_chaos()
 
     def __del__(self):
-        if self.stats_logger is not None:
+        if hasattr(self, "stats_logger") and self.stats_logger is not None:
             self.stats_logger.cancel()
-        # cancel the score worker task
-        self.complete_api_worker.cancel()
-        for worker in self.complete_request_workers:
-            worker.cancel()
-        try:
-            loop = asyncio.get_event_loop()
-            while not all([t.done() for t in (self.complete_request_workers + [self.complete_api_worker])]):
-                loop._run_once()
-        except:
-            pass # if no more event loop is around, no need to wait for the workers to finish
+        
+            # cancel the score worker task
+            self.complete_api_worker.cancel()
+            for worker in self.complete_request_workers:
+                worker.cancel()
+            try:
+                loop = asyncio.get_event_loop()
+                while not all([t.done() for t in (self.complete_request_workers + [self.complete_api_worker])]):
+                    loop._run_once()
+            except:
+                pass # if no more event loop is around, no need to wait for the workers to finish
 
     async def api_complete_worker(self, queue):
         while True:
@@ -735,7 +738,7 @@ class AsyncOpenAIAPI:
             request_id = self.request_ctr
             self.request_ctr += 1
         else:
-            print("re-trying request id", request_id)
+            warnings.warn("OpenAI request with ID {} failed (timeout or other error) and will be retried".format(request_id), UserWarning)
         
         kwargs = {"future": result_fut, "request_id": request_id, **kwargs}
         

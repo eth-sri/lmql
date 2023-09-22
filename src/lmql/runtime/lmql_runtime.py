@@ -9,10 +9,10 @@ from typing import Any, Dict, Optional
 from lmql.ops.ops import *
 from lmql.runtime.langchain import chain, call_sync
 from lmql.runtime.output_writer import silent
-from lmql.runtime.interpreter import PromptInterpreter
 from lmql.runtime.postprocessing.conditional_prob import \
     ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
+from lmql.api.inspect import is_query
 
 class LMQLInputVariableScope:
     def __init__(self, f, calling_frame):
@@ -206,8 +206,10 @@ class LMQLQueryFunction:
         return self.__acall__(*args, **kwargs)
 
     async def __acall__(self, *args, **kwargs):
+        from lmql.runtime.interpreter import PromptInterpreter
+
         query_kwargs, runtime_args = self.make_kwargs(*args, **kwargs)
-        
+
         forced_model = self.model or runtime_args.get("model") or (self.extra_args or {}).get("model")
         interpreter = PromptInterpreter(force_model=forced_model, name=self.name)
 
@@ -301,12 +303,6 @@ async def call(fct, *args, **kwargs):
         return await fct(*args, **kwargs)
     else:
         return fct(*args, **kwargs)
-
-def is_query(fct):
-    """
-    Returns True if the given function is a compiled LMQL query function.
-    """
-    return hasattr(fct, "__lmql_query_function__")
 
 def type_expr(var_name, target, lcls, glbs, *args, **kwargs):
     """
