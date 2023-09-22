@@ -110,7 +110,7 @@ This applies globally in the current process.
 def get_tokenizer(self) -> LMQLTokenizer
 ```
 
-**Return Value** Returns the tokenizer used by the model.
+Returns the tokenizer used by the model.
 
 ```python
 async def generate(
