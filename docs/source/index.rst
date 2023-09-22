@@ -116,7 +116,7 @@ To learn more about LMQL, select one of the following sections or navigate the d
 .. toctree::
     :hidden:
     :maxdepth: 2
-    :caption: 📦 Standard Library
+    :caption: 📦 Library
     
     lib/generations.md
     lib/chat.rst
