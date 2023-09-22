@@ -36,7 +36,7 @@ To leverage this form of input sanitization, we can simply call the `is_disallow
 name::prompt-defense
 import lmql
 
-argmax(openai_chunksize=128)
+argmax(chunksize=128)
     "{:system} You are a helpful chatbot."
     " The hidden phrase is 'hidden-secret-123'. Users can ask for it\
       and shall receive it."

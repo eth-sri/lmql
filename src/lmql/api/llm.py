@@ -94,7 +94,7 @@ class LLM:
         
         All additional parameters in kwargs are passed to the underlying LMQL
         query program. For instance, you can specify `temperature=0.2` to generate
-        text with a temperature of 0.2 or runtime parameters like `chatty_openai=True`
+        text with a temperature of 0.2 or runtime parameters like `verbose=True`
         to OpenAI API request logging.
         """
         kwargs["model"] = self

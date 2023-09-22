@@ -20,7 +20,7 @@ import sys
 import traceback
 
 class LMTPDcModel(DcModel):
-    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, **kwargs):
+    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, verbose=False, **kwargs):
         super().__init__(model, tokenizer, truncation_threshold, init_workers, **kwargs)
 
         self.model.chunk_size = kwargs.get("chunksize", 16)
@@ -36,7 +36,10 @@ class LMTPDcModel(DcModel):
         # error signal
         self.error_signal = asyncio.Event()
         self.error = None
-        
+
+        # verbose logging
+        self.verbose = verbose
+
         # endpoint in case of remote model
         self.endpoint = endpoint
         self.use_replicate = False
@@ -236,6 +239,10 @@ class LMTPDcModel(DcModel):
         if len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
             ids = [self.tokenizer.bos_token_id] + ids
 
+        if self.verbose:
+            text = await self.detokenize(ids)
+            print("lmtp generate: {} / {} ({} tokens)".format(ids, str([text])[1:-1], len(ids)))
+
         return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
 
     async def argmax(self, sequences: dc.DataArray, **kwargs):
@@ -363,6 +370,11 @@ class LMTPDcModel(DcModel):
 
         if self.tokenizer.bos_token_id is not None and (len(ids) == 0 or ids[0] != self.tokenizer.bos_token_id):
             ids = [self.tokenizer.bos_token_id] + ids
+
+        if self.verbose:
+            text = await self.detokenize(ids)
+            next_texts = await self.detokenize(next_tokens)
+            print("lmtp score: {} + {} / {} + {} ({} tokens)".format(ids, next_tokens, str([text])[1:-1], str([next_texts])[1:-1], len(ids)))
 
         async for token in self.client.score(ids, next_tokens):
             t = next_tokens[i]
@@ -497,8 +509,8 @@ class lmtp_model:
                 else:
                     lmtp_server_kwargs = None
 
-                full_args = {**this.kwargs}
-                for key in ["inprocess", "endpoint", "lmtp_server_kwargs", "inprocess_client_constructor"]:
+                full_args = {**this.kwargs, **self.decoder_args}
+                for key in ["inprocess", "endpoint", "lmtp_server_kwargs", "inprocess_client_constructor", "model"]:
                     full_args.pop(key, None)
 
                 return LMTPDcModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, 
