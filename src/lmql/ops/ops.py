@@ -694,7 +694,7 @@ class RegexOp(Node):
             )
 
         r = Regex(ex)
-        rd = r.d(strip_next_token(x)) # take derivative
+        rd = r.d(strip_next_token(x), verbose=False) # take derivative
         print(f"r={r.pattern} x={strip_next_token(x)} --> {rd.pattern if rd is not None else '[no drivative]'}")
         if rd is None:
             return False 

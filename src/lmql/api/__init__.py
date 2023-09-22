@@ -11,8 +11,10 @@ from .llm import LLM, set_default_model, get_default_model, model
 from .queries import query, F, query_from_string
 from .run import run_file, run_sync, run
 from .scoring import ScoringResult
+from .serve import serve
+from inspect import *
 
-async def generate(prompt: str, max_tokens: int, model: Optional[Union[LLM, str]] = None, **kwargs):
+async def generate(prompt: str, max_tokens: Optional[int] = None, model: Optional[Union[LLM, str]] = None, **kwargs):
     """
     Generates up to max_tokens tokens of text from the given model, using the given prompt.
 
@@ -21,7 +23,7 @@ async def generate(prompt: str, max_tokens: int, model: Optional[Union[LLM, str]
     model = LLM.from_descriptor(model)
     return await model.generate(prompt, max_tokens, **kwargs)
 
-def generate_sync(prompt: str, max_tokens: int, model=None, **kwargs):
+def generate_sync(prompt: str, max_tokens: Optional[int] = None, model=None, **kwargs):
     """
     Generates up to max_tokens tokens of text from the given model, using the given prompt.
 

@@ -113,6 +113,7 @@ To learn more about LMQL, select one of the following sections or navigate the d
     :maxdepth: 2
     :caption: 📦 Standard Library
     
+    lib/generations.md
     lib/chat.rst
     lib/output.md
 

@@ -164,7 +164,7 @@ def run_all_tests(g):
             import traceback
             # find last line and file
             tb = traceback.extract_tb(e.__traceback__)
-            tb = "\n".join(str(t) for t in tb)
+            tb = "\n".join(traceback.format_list(tb))
             termcolor.cprint("FAILED\n{}".format(tb), "red")
             print(e)
 

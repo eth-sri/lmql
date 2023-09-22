@@ -237,7 +237,12 @@ async def chat_api(**kwargs):
         stream_start = time.time()
 
         async with aiohttp.ClientSession() as session:
+            api_config = kwargs.get("api_config", {})
             endpoint, headers = get_endpoint_and_headers(kwargs)
+            
+            if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
+                print(f"openai complete: {kwargs}", flush=True)
+            
             async with session.post(
                     endpoint,
                     headers=headers,
@@ -374,8 +379,14 @@ async def completion_api(**kwargs):
         current_chunk = ""
         stream_start = time.time()
         
+
         async with aiohttp.ClientSession() as session:
+            api_config = kwargs.get("api_config", {})
             endpoint, headers = get_endpoint_and_headers(kwargs)
+            
+            if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
+                print(f"openai complete: {kwargs}", flush=True)
+
             async with session.post(
                     endpoint,
                     headers=headers,

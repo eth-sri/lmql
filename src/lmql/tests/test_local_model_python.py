@@ -1,7 +1,7 @@
 import lmql
 from lmql.tests.expr_test_utils import run_all_tests
 
-m = lmql.model("gpt2", inprocess=True)
+m = lmql.model("gpt2", inprocess=True, silent=True)
 
 @lmql.query
 def test_model_reference():
@@ -29,7 +29,7 @@ def test_local_string():
         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
     '''
 
-m2 = lmql.model("gpt2", cuda=True, inprocess=True)
+m2 = lmql.model("gpt2", cuda=True, inprocess=True, silent=True)
 
 @lmql.query
 def test_model_reference_cuda():

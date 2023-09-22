@@ -715,7 +715,7 @@ class PromptInterpreter:
             variable = state.variable
             
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
-            text_tokens = seq.input_ids[state.variable_offset:].tolist()
+            text_tokens = seq.input_ids[state.variable_offset:-1].tolist()
             text_diff = text[len(await seq.text(state.variable_offset, limit=-2, pretty=False)):]
             
             variable_value = text
@@ -784,7 +784,7 @@ class PromptInterpreter:
                 value_ids, program_ids = await asyncio.gather(*[self.tokenize(appended_value_prompt), self.tokenize(appended_program_prompt)])
                 
                 # update IDs in program state
-                program_state.variable_tokens[variable] = value_ids
+                state.program_state.variable_tokens[variable] = value_ids
 
                 assert len(seq.input_ids) - n_tokens_to_strip == variable_offset, f"error: variable offset is not correct. expected {len(seq.input_ids) - n_tokens_to_strip} but got {state.variable_offset}"
                 
@@ -897,7 +897,7 @@ class PromptInterpreter:
 
         # prepare dcmodel
         decoder_args = self.decoder_kwargs
-        self.model.decoder_args = decoder_args
+        self.model.adapter.decoder_args = {**decoder_args, **self.extra_kwargs}
         self.dcmodel: dc.DcModel = self.model.adapter.get_dclib_model()
 
         async def debug_out(decoder_step):
@@ -917,8 +917,6 @@ class PromptInterpreter:
 
         # prepare tokenizer
         self.tokenizer = self.model.get_tokenizer()
-
-        assert issubclass(type(self.dcmodel), dc.DcModel), "The provided dcmodel must be a subclass of DcModel"
 
         # alternative mode where we only extract the prompt string
         return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)

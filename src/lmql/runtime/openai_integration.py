@@ -196,11 +196,6 @@ class DclibOpenAiModel(DcModel):
             **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
-        if self.model_args.get("chatty_openai", False):
-            args = kwargs.copy()
-            # args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
-            print(f"openai score: {args}", flush=True)
-
         logprobs = []
         async for data in await openai.Completion.create(**kwargs):
             logprobs += data["logprobs"]["token_logprobs"]
@@ -337,11 +332,6 @@ class DclibOpenAiModel(DcModel):
 
         # TODO: we are now overestimate the number of tokens billed to the user since we are not account for stopping phrases for the sake of streaming
         self.count_billed_tokens(len(tokenized_input_ids) + kwargs.get("max_tokens") * batch_size, self.model_identifier)
-        
-        if self.model_args.get("chatty_openai", False):
-            args = kwargs.copy()
-            # args["prompt"] = str([await self.detokenize(kwargs["prompt"])])[2:-2]
-            print(f"openai complete: {args}", flush=True)
 
         buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
         t = b""
@@ -1017,6 +1007,9 @@ def openai_model(model_identifier, endpoint=None, mock=False, **kwargs) -> Model
 
         def get_dclib_model(self):
             full_args = {**kwargs, **self.decoder_args}
+            full_args.pop("model", None)
+            full_args.pop("mock", None)
+            full_args.pop("endpoint", None)
             return DclibOpenAiModel(self, self.get_tokenizer(), endpoint=endpoint, mock=mock, **full_args)
 
         async def tokenize(self, text):

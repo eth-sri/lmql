@@ -489,9 +489,6 @@ class lmtp_model:
                 return self._tokenizer
 
             def get_dclib_model(self):
-                bos_token_id = self.get_tokenizer().bos_token_id
-                eos_token_id = self.get_tokenizer().eos_token_id
-
                 inprocess_client_constructor = None
 
                 if this.inprocess:
@@ -500,8 +497,12 @@ class lmtp_model:
                 else:
                     lmtp_server_kwargs = None
 
+                full_args = {**this.kwargs}
+                for key in ["inprocess", "endpoint", "lmtp_server_kwargs", "inprocess_client_constructor"]:
+                    full_args.pop(key, None)
+
                 return LMTPDcModel(self, self.get_tokenizer(), inprocess=this.inprocess, endpoint=this.endpoint, lmtp_server_kwargs=lmtp_server_kwargs, 
-                                 inprocess_client_constructor=inprocess_client_constructor, **self.decoder_args)
+                                 inprocess_client_constructor=inprocess_client_constructor, **full_args)
 
             async def tokenize(self, text):
                 return self.get_tokenizer().tokenize(text, asbytes=True)

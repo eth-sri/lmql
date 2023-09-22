@@ -1,11 +1,14 @@
 import lmql
 
-# llm: lmql.LLM = lmql.model("openai/text-ada-001")
+m = lmql.model("openai/gpt-3.5-turbo-instruct")
 
-if __name__ == "__main__":
-    # greet = lmql.F("Hello[WHO]", model=llm, constraints="len(TOKENS(WHO)) < 10")
-    # print(greet().strip())
-    # print(llm.generate_sync("Hello", max_tokens=10).strip())
-    r = lmql.score_sync("Hello", [" There", " World", " Earth", " Universe", ", how are you"], model="local:gpt2")
-    print(r)
-    print(r.argmax())
+# simple generation
+m.generate_sync("Hello", max_tokens=10)
+# Hello, I am a 23 year old female.
+
+# sequence scoring
+m.score_sync("Hello", ["World", "Apples", "Oranges"])
+# lmql.ScoringResult(model='openai/gpt-3.5-turbo-instruct')
+# -World: -3.9417848587036133
+# -Apples: -15.26676321029663
+# -Oranges: -16.22640037536621

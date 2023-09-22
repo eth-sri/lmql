@@ -8,6 +8,12 @@ import lmql.runtime.dclib as dc
 import lmql.utils.nputil as nputil
 
 class ScoringResult:
+    """
+    Array-view on a set of sequences and their model scores.
+
+    Provides methods to aggregate scores and return the best continuation.
+    """
+
     def __init__(self, prompt, continuations, seqs: List[dc.seq], model_identifier: str):
         self.seqs = [s.expand() for s in seqs]
         self.prompt = prompt
@@ -41,21 +47,37 @@ class ScoringResult:
             raise ValueError("invalid aggregation: {}".format(agg))
 
     def logprobs(self, agg="sum"):
+        """
+        Returns softmax-normalized sequence logprobs per continuation.
+
+        Aggregates sequence scores by the provided 'agg' method:
+        """
         normalized = nputil.log_softmax(self.scores(agg))
         return normalized
 
     def probs(self, agg="sum"):
+        """
+        Returns softmax-normalized sequence probabilities per continuation.
+
+        Aggregates sequence scores by the provided 'agg' method:
+        """
         return np.exp(self.logprobs(agg))
 
     def argmax(self, agg="sum") -> str:
+        """
+        Returns the continuation with the highest score.
+        """
         return self.continuations[self.scores(agg=agg).argmax()]
 
-    def __str__(self):
-        
-        return "ScoringResult(model={})\n".format(self.model_identifier) + \
+    def __str__(self):        
+        return "lmql.ScoringResult(model='{}')\n".format(self.model_identifier) + \
             "\n".join([f"-{c}: {score}" for c,score in zip(self.continuations, self.scores(agg="sum"))])
 
 async def dc_score(model: dc.DcModel, prompt, values, **kwargs):
+    """
+    Internal implementation of lmql.score. For external use, use
+    lmql.score and lmql.LLM(..).score instead.
+    """
     if type(values) is str:
         values = [values]
 
