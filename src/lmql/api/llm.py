@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 from lmql.runtime.tokenizer import LMQLTokenizer
 import lmql.runtime.dclib as dc
+import os
 from lmql.models.aliases import model_name_aliases
 
 from .queries import query
@@ -93,7 +94,7 @@ class LLM:
         
         All additional parameters in kwargs are passed to the underlying LMQL
         query program. For instance, you can specify `temperature=0.2` to generate
-        text with a temperature of 0.2 or runtime parameters like `chatty_openai=True`
+        text with a temperature of 0.2 or runtime parameters like `verbose=True`
         to OpenAI API request logging.
         """
         kwargs["model"] = self
@@ -194,9 +195,15 @@ class LLM:
 
             # special case for 'llama.cpp'
             if model_identifier.startswith("llama.cpp:"):
-                if "tokenizer" not in kwargs:
-                    warnings.warn("By default LMQL uses the '{}' tokenizer for all llama.cpp models. To change this, set the 'tokenizer' argument of your lmql.model(...) object.".format("huggyllama/llama-7b", UserWarning))
-                kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
+                if "tokenizer" in kwargs:
+                    kwargs["tokenizer"] = kwargs["tokenizer"]
+                else:
+                    tokenizer_path = os.path.join(os.path.dirname(model_identifier.replace("llama.cpp:", "")), "tokenizer.model")
+                    if os.path.exists(tokenizer_path):
+                        kwargs["tokenizer"] = tokenizer_path
+                    else:
+                        warnings.warn("File tokenizer.model not present in the same folder as the model weights. Using default '{}' tokenizer for all llama.cpp models. To change this, set the 'tokenizer' argument of your lmql.model(...) object.".format("huggyllama/llama-7b", UserWarning))
+                        kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
 
             # determine endpoint URL
             if endpoint is None:

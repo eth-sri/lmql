@@ -299,6 +299,12 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             
             return LMQLTokenizer(model_identifier, loader=loader)
 
+    # check for llama.cpp tokenizer
+    if "tokenizer.model" in model_identifier:
+        from lmql.runtime.tokenizers.llama_cpp_tokenizer import LlamaCPPTokenizer
+        if LlamaCPPTokenizer.is_available(model_identifier):
+            return LMQLTokenizer(model_identifier, tokenizer_impl=LlamaCPPTokenizer(model_identifier))
+        
     # check for huggingface tokenizers
     from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
     import os

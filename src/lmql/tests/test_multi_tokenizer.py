@@ -6,7 +6,7 @@ import lmql
 from lmql.tests.expr_test_utils import run_all_tests
 
 RANDOM_GPT_OUTPUT = "safillardDean Service"
-RANDOM_LLAMA_OUTPUT = " był Organ quella Running"
+RANDOM_LLAMA_OUTPUT = "jl Eur Hansügel"
 
 @lmql.query(model=lmql.model("random", vocab="gpt2", seed=1))
 async def test_random_gpt():

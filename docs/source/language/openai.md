@@ -54,11 +54,11 @@ The `tokens` metric here refers to the number of tokens that were consumed and g
 
 #### API Request Logging
 
-Additionally, you may be interested in seeing the actual API requests that are made in the background. To show these, there is a decoder option `chatty_openai=True`, which enables verbose logging and will print all OpenAI request payloads console, e.g. a query like this:
+Additionally, you may be interested in seeing the actual API requests that are made in the background. To show these, there is a decoder option `verbose=True`, which enables verbose logging and will print all OpenAI request payloads console, e.g. a query like this:
 
 ```{lmql}
 name::chatty_openai
-argmax(chatty_openai=True) "Hello[WHO]" from "openai/text-ada-001" where STOPS_AT(WHO, "\n")
+argmax(verbose=True) "Hello[WHO]" from "openai/text-ada-001" where STOPS_AT(WHO, "\n")
 
 model-output::
 Completion with {'model': 'text-ada-001', 'prompt': \[550256, 15496], 'max_tokens': 64, 'temperature': 0, 'logprobs': 5, 'user': 'lmql', 'stream': True, 'echo': True}
@@ -68,12 +68,12 @@ Completion with {'model': 'text-ada-001', 'prompt': \[550256, 15496], 'max_token
 
 To integrate the OpenAI API with LMQL, we rely on speculative prediction, where LMQL applies token masking and stopping conditions less eagerly, to save API calls. 
 
-To achieve this, output is generated in chunks, where each chunk is verified to satisfy the constraints before generation continues. The chunk size can be configured by passing `openai_chunksize` parameter in the decoding clause like so:
+To achieve this, output is generated in chunks, where each chunk is verified to satisfy the constraints before generation continues. The chunk size can be configured by passing `chunksize` parameter in the decoding clause like so:
 
 ```{lmql}
 name::chunksize
 
-argmax(openai_chunksize=128)
+argmax(chunksize=128)
     "The quick brown fox jumps over the[COMPLETION]"
 from
     "openai/text-ada-001"
