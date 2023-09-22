@@ -2,7 +2,7 @@
 
 <div class="subtitle">A simple Python API for LMQL-based text generation and scoring.</div>
 
-The *Generations API* is a lightweight library with the goal of providing high-level access to LMQL core features, such as its inference backends, (constrained) generation, and scoring. The API was designed to be easy to use and does not require users to write any LMQL themselves.
+The *Generations API* is a lightweight library with the goal of providing high-level access to LMQL features, such as its inference backends, (constrained) generation, and scoring. The API was designed to be easy to use and does not require users to write any LMQL themselves.
 
 <div style="margin-bottom: -10pt"></div>
 
@@ -30,7 +30,7 @@ m.score_sync("Hello", ["World", "Apples", "Oranges"])
 
 The snippet above demonstrates the different components of the Generations API:
 
-- **`lmql.LLM`** At the core of the Generations API are `lmql.LLM` objects. Using the `lmql.model(...)` constructor, you can access a wide range of different models, as described in the [Models](../language/models.rst) chapter. This includes support for models running in the same process, in a separate worker process or API-based models.
+- **`lmql.LLM`** At the core of the Generations API are `lmql.LLM` objects. Using the `lmql.model(...)` constructor, you can access a wide range of different models, as described in the [Models](../language/models.rst) chapter. This includes support for models running in the same process, in a separate worker process or cloud-based models available via a API endpoint.
 
 - [**`lmql.LLM.generate(...)`**](#lmql-generate) is a simple function to generating text completions based on a given prompt. This can be helpful to quickly obtain single-step completions, or to generate a list of completions for a given prompt.
 
@@ -129,6 +129,8 @@ async def lmql.generate(
 `lmql.generate` generates text completions based on a given prompt and behaves just like [`LLM.generate`](#llm-generate), 
 with the provided `model` instance or model name.
 
+If no `model` is provided, the default model is used. See [`lmql.set_default_model`](#lmql-set_default_model) for more information.
+
 ## `lmql.generate_sync(...)`
 
 Synchronous version of [`lmql.generate`](#lmql-generate).
@@ -147,6 +149,8 @@ async def score(
 `lmql.score` scores different continuation `values` for a given `prompt` and behaves just like [`LLM.score`](#llm-score),
 with the provided `model` instance or model name.
 
+If no `model` is provided, the default model is used. See [`lmql.set_default_model`](#lmql-set_default_model) for more information.
+
 ## `lmql.score_sync(...)`
 
 Synchronous version of [`lmql.score`](#lmql-score).
@@ -157,6 +161,4 @@ Synchronous version of [`lmql.score`](#lmql-score).
 def set_default_model(model: Union[str, LLM])
 ```
 
-Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.
-
-This applies globally in the current process.
+Sets the model to be used when no `from` clause or `@lmql.query(model=<model>)` are specified in LMQL. The default model applies globally in the current process and affects both LMQL queries and Generation API methods like [`lmql.generate`](#lmql-generate) and [`lmql.score`](#lmql-score) functions.
