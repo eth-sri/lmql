@@ -355,7 +355,7 @@ Q: What are Large Language Models?<br/><br/>A good person to answer this questio
     expr = re.sub(r<span class="lmql-str">"[^0-9+\-*/().]"</span>, <span class="lmql-str">""</span>, expr)
     <span class="lmql-kw">return</span> eval(expr)
 
-<span class="lmql-kw">argmax</span>(openai_chunksize=64, max_len=2048)
+<span class="lmql-kw">argmax</span>(chunksize=64, max_len=2048)
     QUESTION = <span class="lmql-str">"Josh decides to try flipping
      <span style="color: grey">➥</span> a house.  He buys a house for $80,000
      <span style="color: grey">➥</span> and then puts in $50,000 in repairs.
@@ -493,7 +493,7 @@ Q: From which countries did the Norse originate?<br/>Action: Let's search Wikipe
 <span class="lmql-kw">def</span> assign(key, value): storage[key] = value; <span class="lmql-kw">return</span> f<span class="lmql-str">'{{{key}: "{value}"}}'</span>
 <span class="lmql-kw">def</span> get(key): <span class="lmql-kw">return</span> storage.get(key)
 
-<span class="lmql-kw">argmax</span>(n=1, openai_chunksize=128, max_len=2048, step_budget=4*2048)
+<span class="lmql-kw">argmax</span>(n=1, chunksize=128, max_len=2048, step_budget=4*2048)
     <span class="lmql-str"><anchor class="anchor-2">"""In your reasoning you can use actions.<label><div class="multiline">In the prompt, we explicitly instruct the model to make use of the <tt>assign</tt> and <tt>get</tt> actions.</div><div class="bridge"></div>
                 </label><div class="dot"></div></anchor>
      <span style="color: grey">➥</span> You do this as follows:
@@ -1017,7 +1017,7 @@ Review: We had a great stay. Hiking in the mountains was fabulous and the food i
       </div>
       <div class="column" style="text-align: left;">
         Site template adapted from <a href="http://nerfies.github.io/">Nerfies</a> by Keunhong Park et al. and uses <a href="https://bulma.io/">Bulma</a>.<br/>
-        Last updated on Fri, Sep 22, 1:49 PM (UTC)<br/>
+        Last updated on Fri, Sep 22, 4:44 PM (UTC)<br/>
       </div>
     </div>
   </div>
