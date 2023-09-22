@@ -50,7 +50,8 @@ class TransformersTokenizer:
         Translates a string into a list of tokens (sub-strings)
         """
         if asbytes:
-            return self.decode_tokens_bytes(self.tokenizer(text, add_special_tokens=add_special_tokens)["input_ids"])
+            ids = self(text, add_special_tokens=add_special_tokens)["input_ids"] 
+            return self.decode_tokens_bytes(ids)
         return self.tokenizer.tokenize(text, add_special_tokens=add_special_tokens)
 
     def decode_tokens_bytes(self, ids):

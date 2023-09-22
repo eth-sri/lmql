@@ -47,11 +47,11 @@ class LlamaCPPTokenizer:
             text_to_tokenize = dummy_token + text
             
             text_to_tokenize = text_to_tokenize
-            result = {"input_ids": self.tokenizer.encode(text_to_tokenize)}
-            if len(result["input_ids"]) <= 1 and dummy_token != "":
+            result = {"input_ids": self.tokenizer.Encode(text_to_tokenize, add_bos=True)}
+            if len(result["input_ids"]) <= 2 and dummy_token != "":
                 # "Tokenized text '{}' was merged with dummy token @ into '{}'".format(text_to_tokenize, [self.tokenizer.convert_ids_to_tokens(i) for i in result["input_ids"]])
                 continue
-            offset = 1 if len(dummy_token) > 0 else 0
+            offset = 2 if len(dummy_token) > 0 else 1
             result["input_ids"] = result["input_ids"][offset:]
             return result
 
