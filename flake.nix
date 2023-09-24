@@ -31,7 +31,7 @@
     };
     inherit (pkgs) lib;
     llamaDotCppPkg = llamaDotCppFlake.packages.${system}.default;
-    mkPoetryEnv = {llamaDotCppPkg ? null, wantHf ? false, wantReplicate ? false}:
+    mkPoetryEnv = {llamaDotCppPkg ? null, wantHf ? false, wantHfAccel ? false, wantHfGptq ? false, wantReplicate ? false}:
       let
         wantLlama = llamaDotCppPkg != null;
       in pkgs.poetry2nix.mkPoetryEnv {
@@ -47,15 +47,17 @@
         # huggingface tokenizers used for llama.cpp, replicate
         extras =
           lib.optionals wantLlama [ "llama" ] ++
-          lib.optionals (wantHf || wantLlama || wantReplicate) [ "hf" ] ++
+          lib.optionals (wantHf || wantHfAccel || wantHfGptq || wantLlama || wantReplicate) [ "hf" ] ++
+          lib.optionals wantHfAccel [ "hf-accel" ] ++
+          lib.optionals wantHfGptq [ "hf-gptq" ] ++
           lib.optionals wantReplicate [ "replicate" ];
       };
 
     poetryEnvBasic = mkPoetryEnv { };
-    poetryEnvHf = mkPoetryEnv { wantHf = true; };
+    poetryEnvHf = mkPoetryEnv { wantHf = true; wantHfAccel = true; wantHfGptq = ! pkgs.stdenv.isDarwin; };
     poetryEnvLlamaCpp = mkPoetryEnv { inherit llamaDotCppPkg; };
     poetryEnvReplicate = mkPoetryEnv { wantReplicate = true; };
-    poetryEnvAll = mkPoetryEnv { inherit llamaDotCppPkg; wantHf = true; wantReplicate = true; };
+    poetryEnvAll = mkPoetryEnv { inherit llamaDotCppPkg; wantHf = true; wantHfAccel = true; wantHfGptq = ! pkgs.stdenv.isDarwin; wantReplicate = true; };
 
     mkLmtpServerApp = {llamaDotCppPkg ? null, ...} @ opts: {
       type = "app";
@@ -128,7 +130,7 @@
         '';
 
         meta.mainProgram = "run";
-      };  in rec {
+      }; in {
     legacyPackages = pkgs;
     apps = rec {
       lmtp-server = lmtp-server-all;
@@ -136,7 +138,7 @@
       lmtp-server-hf = mkLmtpServerApp { wantHf = true; };
       lmtp-server-replicate = mkLmtpServerApp { wantReplicate = true; };
       lmtp-server-llamaCpp = mkLmtpServerApp { inherit llamaDotCppPkg; };
-      lmtp-server-all = mkLmtpServerApp { inherit llamaDotCppPkg; wantHf = true; wantReplicate = true; };
+      lmtp-server-all = mkLmtpServerApp { inherit llamaDotCppPkg; wantHf = true; wantHfAccel = true; wantHfGptq = ! pkgs.stdenv.isDarwin; wantReplicate = true; };
     };
     packages = rec {
       # If someone just says they want to "run LMQL", let's give them the friendly interface.

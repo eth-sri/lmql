@@ -17,16 +17,40 @@ let
   # The lazy version: Give up on building it from source altogether and use a binary
   preferWheel = { name, final, prev, pkg }: pkg.override { preferWheel = true; };
 
+  resolveDep = { name, final, prev, pkg } @ args: (dep: if builtins.isString dep then builtins.getAttr dep final else if builtins.isFunction dep then (dep args) else dep);
+
   # Add extra inputs needed to build from source; often things like setuptools or hatchling not included upstream
   addBuildInputs = extraBuildInputs: { name, final, prev, pkg } @ args:
     pkg.overridePythonAttrs (old: {
-      buildInputs = (old.buildInputs or []) ++ (builtins.map (dep: if builtins.isString dep then builtins.getAttr dep final else if builtins.isFunction dep then (dep args) else dep) extraBuildInputs);
+      buildInputs = (old.buildInputs or []) ++ (builtins.map (resolveDep args) extraBuildInputs);
+    });
+
+  # Not sure what pytorch is doing such that its libtorch_global_deps.so dependency on libstdc++ isn't detected by autoPatchelfFixup, but...
+  addLibstdcpp = libToPatch: { name, final, prev, pkg } @ args:
+    pkg.overridePythonAttrs (old: {
+      postFixup = (old.postFixup or "") + ''
+        while IFS= read -r -d "" tgt; do
+          cmd=( ${final.pkgs.patchelf}/bin/patchelf --add-rpath ${final.pkgs.stdenv.cc.cc.lib}/lib --add-needed libstdc++.so "$tgt" )
+          echo "Running: ''${cmd[*]@Q}" >&2
+          "''${cmd[@]}"
+        done < <(find "$out" -type f -name ${final.pkgs.lib.escapeShellArg libToPatch} -print0)
+      '';
     });
 
   # Add extra build-time inputs needed to build from source
   addNativeBuildInputs = extraBuildInputs: { name, final, prev, pkg } @ args:
     pkg.overridePythonAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or []) ++ (builtins.map (dep: if builtins.isString dep then builtins.getAttr dep final else if builtins.isFunction dep then (dep args) else dep) extraBuildInputs);
+      nativeBuildInputs = (old.nativeBuildInputs or []) ++ (builtins.map (resolveDep args) extraBuildInputs);
+    });
+
+  addPatchelfSearchPath = libSearchPathDeps: { name, final, prev, pkg } @ args:
+    let opsForDep = dep: ''
+      while IFS= read -r -d "" dir; do
+        addAutoPatchelfSearchPath "$dir"
+      done < <(find ${resolveDep args dep} -type f -name 'lib*.so' -printf '%h\0' | sort -zu)
+    '';
+    in pkg.overridePythonAttrs (old: {
+      prePatch = (old.prePatch or "") + (final.pkgs.lib.concatLines (builtins.map opsForDep libSearchPathDeps));
     });
 
   # Rust packages need extra build-time dependencies; and if the upstream repo didn't package a Cargo.lock file we need to add one for them
@@ -106,17 +130,22 @@ let
     accelerate           = composeOps [ withCudaInputs (addBuildInputs [ "filelock" "jinja2" "networkx" "setuptools" "sympy" ]) ];
     accessible-pygments  = addBuildInputs [ "setuptools" ];
     aiohttp-sse-client   = composeOps [ (addBuildInputs [ "pytest" "pytest-runner" "setuptools" ]) ];
+    auto-gptq            = composeOps [ withCudaInputs (addPatchelfSearchPath [ "torch" ]) ];
     cmake                = composeOps [ preferWheel (addBuildInputs ["setuptools" "scikit-build"]) ];
     llama-cpp-python     = composeOps [ llamaCppUseLlamaBuild (addBuildInputs [ "setuptools" ]) ];
+    optimum              = composeOps [ withCudaInputs (addBuildInputs [ "setuptools" ]) ];
+    pandas               = addBuildInputs [ "versioneer" "tomli" ];
+    peft                 = withCudaInputs;
     pandoc               = addBuildInputs [ "setuptools" ];
     pydata-sphinx-theme  = preferWheel;
+    rouge                = addBuildInputs [ "setuptools" ];
     safetensors          = preferWheel; # asRustBuild;
     shibuya              = addBuildInputs [ "setuptools" ];
     sphinx-book-theme    = preferWheel;
     sphinx-theme-builder = addBuildInputs [ "filit-core" ];
     tiktoken             = preferWheel; # asRustBuild;
     tokenizers           = preferWheel; # composeOps [ asRustBuild (addBuildInputs [openssl]) (addNativeBuildInputs [ pkg-config ]) ];
-    torch                = composeOps [ withCudaInputs (addBuildInputs [ "filelock" "jinja2" "networkx" "sympy" ])];
+    torch                = composeOps [ withCudaInputs (addBuildInputs [ "filelock" "jinja2" "networkx" "sympy" ]) (addLibstdcpp "libtorch_global_deps.so") ];
     urllib3              = addBuildInputs [ "hatchling" ];
   };
   buildOpsOverlay = (final: prev: builtins.mapAttrs (package: op: (op { inherit final prev; name = package; pkg = builtins.getAttr package prev; })) buildOps);
