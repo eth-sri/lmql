@@ -27,15 +27,17 @@ let
 
   # Not sure what pytorch is doing such that its libtorch_global_deps.so dependency on libstdc++ isn't detected by autoPatchelfFixup, but...
   addLibstdcpp = libToPatch: { name, final, prev, pkg } @ args:
-    pkg.overridePythonAttrs (old: {
-      postFixup = (old.postFixup or "") + ''
-        while IFS= read -r -d "" tgt; do
-          cmd=( ${final.pkgs.patchelf}/bin/patchelf --add-rpath ${final.pkgs.stdenv.cc.cc.lib}/lib --add-needed libstdc++.so "$tgt" )
-          echo "Running: ''${cmd[*]@Q}" >&2
-          "''${cmd[@]}"
-        done < <(find "$out" -type f -name ${final.pkgs.lib.escapeShellArg libToPatch} -print0)
-      '';
-    });
+    if final.pkgs.stdenv.isDarwin then
+      pkg.overridePythonAttrs (old: {
+        postFixup = (old.postFixup or "") + ''
+          while IFS= read -r -d "" tgt; do
+            cmd=( ${final.pkgs.patchelf}/bin/patchelf --add-rpath ${final.pkgs.stdenv.cc.cc.lib}/lib --add-needed libstdc++.so "$tgt" )
+            echo "Running: ''${cmd[*]@Q}" >&2
+            "''${cmd[@]}"
+          done < <(find "$out" -type f -name ${final.pkgs.lib.escapeShellArg libToPatch} -print0)
+        '';
+      })
+    else pkg;
 
   # Add extra build-time inputs needed to build from source
   addNativeBuildInputs = extraBuildInputs: { name, final, prev, pkg } @ args:
