@@ -1,4 +1,4 @@
-from typing import Any, Union, List
+from typing import Any, Union, List, Optional, Dict
 from abc import ABC, abstractmethod
 
 from lmql.runtime.tokenizer import LMQLTokenizer
@@ -62,21 +62,21 @@ class ModelAPIAdapter(ABC):
         Detokenizes the given input_ids and returns the detokenized text.
         """
         raise NotImplementedError()
+
 class LLM:
     """
-    An LMQL LLM is the core model object that is used to represent a access
-    language model and backend implementation.
+    An LMQL LLM is the core model object that is used to represent a language model and backend implementation.
     
     An LLM object can be used directly or passed to an LMQL query. For direct use,
     you can rely on the methods `generate` and `score` to generate text or score a list of
     potential continuations against a prompt.
     """
 
-    def __init__(self, model_identifier: str, adapter: ModelAPIAdapter = None, configuration_string: str = None):
+    def __init__(self, model_identifier: str, adapter: ModelAPIAdapter = None, configuration: Optional[Dict[str, Any]] = None):
         # identifier of the model, e.g. "openai/gpt-3.5-turbo-instruct"
         self.model_identifier = model_identifier
-        # string representation of the model configuration parameters passed when constructing this model
-        self.configuration_string = configuration_string
+        # model configuration parameters passed when constructing this model
+        self.configuration = configuration
         # adapter object that connects the LLM API to the backend
         self.adapter = adapter
 
@@ -140,7 +140,8 @@ class LLM:
         return asyncio.run(self.score(*args, **kwargs))
 
     def __str__(self):
-        return f"lmql.LLM({self.model_identifier}, {self.configuration_string})"
+        configuration_string = ", ".join([f"{k}={v}" for k, v in self.configuration.items()])
+        return f"lmql.LLM({self.model_identifier}, {configuration_string})"
     
     def __repr__(self):
         return str(self)
@@ -168,7 +169,8 @@ class LLM:
         
         # remember original name
         original_name = model_identifier
-        configuration_representation = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
+        # to be copied to the LLM(...) object for reference
+        configuration = kwargs.copy()
 
         # resolve default model
         if model_identifier == "<dynamic>":
@@ -182,7 +184,7 @@ class LLM:
 
             # hard-code openai/ namespace to be openai-API-based
             adapter = openai_model(model_identifier[7:], endpoint=endpoint, **kwargs)
-            return cls(original_name, adapter=adapter, configuration_string=configuration_representation)
+            return cls(original_name, adapter=adapter, configuration=configuration)
         else:
             from lmql.models.lmtp.lmtp_dcmodel import lmtp_model
             from lmql.models.lmtp.lmtp_dcinprocess import inprocess
@@ -219,7 +221,7 @@ class LLM:
             else:
                 Model = lmtp_model(model_identifier, endpoint=endpoint, **kwargs)
             
-            return cls(original_name, adapter=Model(), configuration_string=configuration_representation)
+            return cls(original_name, adapter=Model(), configuration=configuration)
 
 """
 The default model for workloads or queries that do not specify 
