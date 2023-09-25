@@ -332,6 +332,12 @@ class PromptClauseTransformation(FunctionCallTransformation):
         else:
             return self.generic_visit(expr)
 
+    # (remove redundant 'import lmql' statements)
+    def visit_Import(self, node: Import) -> Any:
+        if len(node.names) == 1 and node.names[0].name == "lmql":
+            return ast.parse("")
+        return node
+
     # translate id access to context
     def visit_Name(self, node: ast.Name):
         name = str(node.id)
@@ -788,7 +794,7 @@ class PythonFunctionWriter:
     def flush(self):
         if "lmql.lib" in self.in_memory_contents:
             # replace first import lmql
-            self.in_memory_contents = self.in_memory_contents.replace("import lmql\n", "import lmql\nimport lmql.lib\n")
+            self.in_memory_contents = self.in_memory_contents.replace("import lmql\n", "import lmql;import lmql.lib\n")
 
         self.file.write(self.in_memory_contents)
 
