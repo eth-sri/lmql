@@ -13,9 +13,13 @@ def rename_model_args(model_args):
     elif bits == 8:
         model_args["load_in_8bit"] = True
 
-    if dtype is not None:
+    if dtype is not None and (dtype != "4bit" or dtype != "8bit"):
         import torch
         model_args["torch_dtype"] = getattr(torch, dtype)
+    elif dtype == '4bit':
+        model_args["load_in_4bit"] = True
+    elif dtype == '8bit':
+        model_args["load_in_8bit"] = True
 
     if type(q_config) is set:
         q_config = {k: v for k, v in q_config.pop()}
