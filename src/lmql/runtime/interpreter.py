@@ -334,6 +334,8 @@ class PromptInterpreter:
         query_args_after_last_continue = query_args
         program_variables_after_last_continue = None
         prompt = state.prompt
+        recurring_variable_counter = state.recurring_variable_counter.copy()
+        distribution_reached = False
 
         query_head = state.query_head
 
@@ -359,12 +361,16 @@ class PromptInterpreter:
             # return context used for last continue_
             return query_head.context
         
-        # disable DecoderSequence.graph for the duration of executing the prompt
+        def format_buffer():
+            return [s if type(s) is str else s.name for s in stmt_buffer if s is not advance]
 
+        # disable DecoderSequence.graph for the duration of executing the prompt
         try:
             while variable is None and query_head.result is None:
                 if len(stmt_buffer) == 0 and variable is None:
                     await continue_for_more_prompt_stmts()
+                    if distribution_reached:
+                        assert len(stmt_buffer) == 0, "error: distribution variable must be the last statement in a prompt, but found {}".format(format_buffer())
 
                 s = stmt_buffer[0]
 
@@ -394,9 +400,9 @@ class PromptInterpreter:
                             variable_args["constraints"] = ops.FixedValueOp([ops.Var(variable)], variable_value, prompt_value)
 
                     # keep track of number of times a variable with this name has been decoded
-                    if variable not in state.recurring_variable_counter.keys():
-                        state.recurring_variable_counter[s.name] = -1
-                    state.recurring_variable_counter[s.name] += 1
+                    if variable not in recurring_variable_counter.keys():
+                        recurring_variable_counter[s.name] = -1
+                    recurring_variable_counter[s.name] += 1
                     
                     stmt_buffer = stmt_buffer[1:]
                     break
@@ -404,7 +410,8 @@ class PromptInterpreter:
                     # distribution variables are skipped here, as they are handled in a postprocessing step after returning an LMQL result
                     # self.query_head must terminate after this part of the prompt (ensure by validation)
                     stmt_buffer = stmt_buffer[1:]
-                    assert len([s for s in stmt_buffer if s is not advance]) == 0, "Distribution variables must be the last statement in a prompt, but is {}".format(stmt_buffer)
+                    assert len([s for s in stmt_buffer if s is not advance]) == 0, "error: distribution variable must be the last statement in a prompt, but found {}".format(format_buffer())
+                    distribution_reached = True
                     # this will consume the set_distribution call
                 elif s is advance:
                     query_head: InterpretationHead = query_head.copy()
@@ -433,7 +440,8 @@ class PromptInterpreter:
             variable_args=variable_args,
             stmt_buffer=stmt_buffer,
             query_head=query_head,
-            program_state=program_state
+            program_state=program_state,
+            recurring_variable_counter=recurring_variable_counter
         )
 
     def process_query_string(self, s: str, first=False):
@@ -632,6 +640,8 @@ class PromptInterpreter:
     async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace, text, where):
         if self.output_writer is not None:
            await self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
+        if hasattr(self.output_writer, "add_sequence_state"):
+            await self.output_writer.add_sequence_state(s)
 
     async def where_processor(self, seqs, additional_logits_processor_mask, **kwargs):
         zipped_task_inputs = zip(seqs, additional_logits_processor_mask, range(len(seqs)))
@@ -959,9 +969,13 @@ class PromptInterpreter:
         # get decoder function
         mode = decoder_args["decoder"].lower()
         # handle dynamically-set decoding (e.g. set via @lmql.query(decoder="beam", n=2))
+        derived_mode, extra_decoder_args = self.derive_decoder_args(self.extra_kwargs, decoder_args)
+        decoder_args = {**decoder_args, **extra_decoder_args}
+        
+        # use derived decoder, if not set explicitly
         if mode == "__dynamic__":
-            mode, extra_decoder_args = self.derive_decoder_args(self.extra_kwargs)
-            decoder_args = {**decoder_args, **extra_decoder_args}
+            mode = derived_mode
+        
         decoder_fct = dc.get_decoder(mode)
         self.validate_args(decoder_args, decoder_fct)
 
@@ -1053,6 +1067,10 @@ class PromptInterpreter:
 
                 for i,s in enumerate(result_sequences):
                     state = self.interpreter_state_from_user_data(s)
+                    
+                    if hasattr(self.output_writer, "add_sequence_state"):
+                        await self.output_writer.add_sequence_state(s)
+                        
                     if state.query_head.result is not None:
                         results.append(state.query_head.result)
                     else:
@@ -1072,7 +1090,10 @@ class PromptInterpreter:
                           "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
                           "openai_nonstop", "chunksize", "alpha", "verbose"]
 
-    def derive_decoder_args(self, extra_kwargs):
+    def derive_decoder_args(self, extra_kwargs, existing_args=None):
+        # if no existing args are provided, use no args
+        existing_args = existing_args or {}
+        
         # default is argmax
         decoder = extra_kwargs.get("decoder", "argmax")
         # if temperature is != 0, use 'sample'
@@ -1092,6 +1113,10 @@ class PromptInterpreter:
         for eda in PromptInterpreter.EXTRA_DECODER_ARGS:
             if eda in extra_kwargs.keys():
                 decoder_args[eda] = extra_kwargs[eda]
+            
+            # underscore prefixed args are only used if existing_args does not already contain the arg
+            if "_" + eda in extra_kwargs.keys() and not eda in existing_args.keys():
+                decoder_args[eda] = extra_kwargs["_" + eda]
 
         return decoder, decoder_args
     

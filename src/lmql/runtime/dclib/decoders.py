@@ -2,7 +2,6 @@ import asyncio
 import numpy as np
 from typing import List, Any, Union, Optional, Dict
 
-from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.dclib.dclib_array import DataArray, sum_scorer, alpha_length_normalized, alpha_length_normalized_det
 from lmql.runtime.dclib.dclib_seq import next_is_deterministic
 import lmql.runtime.dclib as dc

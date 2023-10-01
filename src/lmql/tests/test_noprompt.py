@@ -1,8 +1,7 @@
 import lmql
 from expr_test_utils import run_all_tests
-from lmql.runtime.tokenizer import load_tokenizer
 
-t = load_tokenizer("gpt2")
+t = lmql.tokenizer("gpt2")
 
 def token_diff(s1, s2):
     ids1 = t(s1)["input_ids"]

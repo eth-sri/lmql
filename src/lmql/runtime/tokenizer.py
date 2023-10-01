@@ -55,6 +55,12 @@ class LMQLTokenizer:
         if "FORCE_TIKTOKEN" in os.environ:
             assert type(self.tokenizer_impl) is TiktokenTokenizer
 
+    def __str__(self):
+        return "<LMQLTokenizer '{}'>".format(self.model_identifier)
+    
+    def __repr__(self):
+        return str(self)
+
     @property
     def model_vocab_size(self):
         """
@@ -70,7 +76,7 @@ class LMQLTokenizer:
         if self._tokenizer_impl is None:
             self.loader_thread.join()
         if self._tokenizer_impl is None:
-            raise TokenizerNotAvailableError("Failed to load suitable tokenizer for model '{}'".format(self.model_identifier))
+            raise TokenizerNotAvailableError("Failed to derive a suitable tokenizer from the provided model name '{}'. If your model requires a specific (well-known) tokenizer, make sure specify it via lmql.model(..., tokenizer='...').".format(self.model_identifier))
         return self._tokenizer_impl
     
     @property
@@ -262,7 +268,12 @@ class LMQLTokenizer:
         return segments
             
 
-def load_tokenizer(model_identifier, type="auto", **kwargs):
+def tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
+    """
+    Loads a LMQLTokenizer for the given model identifier. 
+
+    If type is 'auto', the tokenizer will be loaded from the most suitable available backend. Otherwise, the type can be one of 'hf' (huggingface transformers), 'tiktoken' (tiktoken) or 'auto' (default).
+    """
     cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
@@ -272,7 +283,7 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             model_identifier = model_identifier[len("tiktoken:"):]
 
         # map gpt-3.5-turbo* to gpt-3.5-turbo
-        if "turbo" in model_identifier:
+        if "3.5" in model_identifier and "turbo" in model_identifier:
             tiktoken_identifier = "gpt-3.5-turbo"
         else:
             tiktoken_identifier = model_identifier
@@ -350,7 +361,7 @@ if __name__ == "__main__":
     import torch
 
     model_identifier = sys.argv[1]
-    t = load_tokenizer(model_identifier)
+    t = tokenizer(model_identifier)
 
     to_tokenize = sys.argv[2]
 

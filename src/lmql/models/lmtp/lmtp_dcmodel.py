@@ -4,7 +4,7 @@ hosted model server, or a model running in a separate process.
 """
 
 from lmql.runtime.dclib.dclib_model import DcModel
-from lmql.runtime.tokenizer import load_tokenizer
+from lmql.runtime.tokenizer import tokenizer
 from .lmtp_async import LMTPAsyncClient
 import lmql.runtime.dclib as dc
 import asyncio
@@ -496,7 +496,7 @@ class lmtp_model:
 
             def get_tokenizer(self):
                 if self._tokenizer is None:
-                    self._tokenizer = load_tokenizer(this.tokenizer_identifier, **this.kwargs)
+                    self._tokenizer = tokenizer(this.tokenizer_identifier, **this.kwargs)
                 self.served_model = self
                 return self._tokenizer
 
