@@ -1,4 +1,3 @@
-from transformers import BitsAndBytesConfig
 import warnings
 
 
@@ -22,6 +21,7 @@ def rename_model_args(model_args):
         model_args["load_in_8bit"] = True
 
     if type(q_config) is set:
+        from transformers import BitsAndBytesConfig
         q_config = {k: v for k, v in q_config.pop()}
         model_args["quantization_config"] = BitsAndBytesConfig(**q_config)
     elif q_config is not None:
