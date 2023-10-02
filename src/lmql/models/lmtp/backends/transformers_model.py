@@ -71,7 +71,7 @@ class TransformersLLM(LMTPModel):
             "input_ids": input_ids,
             "do_sample": temperature > 0.0,
             "attention_mask": attention_mask,
-            "temperature": temperature,
+            **({"temperature": temperature} if temperature > 0.0 else {}),
             "max_new_tokens": max_new_tokens,
             "logits_processor": self.logits_processors(bias_tensor),
             "output_scores": True,
