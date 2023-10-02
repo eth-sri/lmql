@@ -321,6 +321,12 @@ class Scheduler:
 
     @staticmethod
     def gc(n: int = 2, timeout: int = 10):
+        """
+        Manually Scheduler garbage collection. Unloads models that have not been used
+        but only if there are more than n models loaded. This keeps the model around
+        even if it is not used for a while, but unloads it when another model is loaded.
+        """
+
         total = len(Scheduler._instances)
         not_needed = [k for k, v in Scheduler._instances.items() if len(v.users) == 0]
 
@@ -328,14 +334,6 @@ class Scheduler:
             for k in not_needed:
                 s = Scheduler._instances[k]
                 Scheduler._instances[k].dealloc()
-        
-        # total = len(Scheduler._instances)
-        
-        # if total >= n:
-        #     print("[Warning] {} models loaded, even though the configured limit is {}.".format(total, n), flush=True)
-            # print("Active Models:")
-            # for k, v in Scheduler._instances.items():
-            #     print("  ", k, "used by", v.users)
 
 Scheduler._instances = {}
 
