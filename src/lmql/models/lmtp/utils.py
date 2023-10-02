@@ -12,9 +12,12 @@ def rename_model_args(model_args):
     elif bits == 8:
         model_args["load_in_8bit"] = True
 
-    if dtype is not None and (dtype != "4bit" or dtype != "8bit"):
+    if dtype is not None and (dtype != "4bit" and dtype != "8bit"):
         import torch
-        model_args["torch_dtype"] = getattr(torch, dtype)
+        if type(dtype) is str:
+            model_args["torch_dtype"] = getattr(torch, dtype)
+        else:
+            model_args["torch_dtype"] = dtype
     elif dtype == '4bit':
         model_args["load_in_4bit"] = True
     elif dtype == '8bit':
