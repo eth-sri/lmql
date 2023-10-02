@@ -28,21 +28,15 @@ class LMTPWebSocketTransport:
     async def dumper(self):
         while True:
             try:
-                batch = [await self.queue.get()]
-                # while len(batch) < 1:
-                #     try:
-                #         batch.append(await asyncio.wait_for(self.queue.get(), timeout=0.1))
-                #     except asyncio.TimeoutError:
-                #         break
-                if len(batch) > 0:
-                    await self.ws.send_str("TOKEN" + " " + json.dumps(batch))
+                type, payload = await self.queue.get()
+                await self.ws.send_str(type + " " + json.dumps([payload]))
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 warnings.warn("LMTPWebSocketTransport.dumper error".format(e))
 
     async def send(self, type, payload):
-        await self.queue.put(payload)
+        await self.queue.put((type, payload))
 
     @staticmethod
     async def listen(ws, model_args, static):

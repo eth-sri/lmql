@@ -6,16 +6,16 @@ import numpy as np
 import lmql.utils.nputil as nputil
 
 class UniformRandomSamplingLLM(LMTPModel):
-    def __init__(self, seed=None, vocab=None, **kwargs):
+    def __init__(self, seed=None, tokenizer=None, **kwargs):
         self.seed = seed
         self.kwargs = kwargs
 
         if kwargs.get("verbose", False):
             print("['random' model using seed {}]".format(seed))
 
-        if vocab is not None:
+        if tokenizer is not None:
             from transformers import AutoTokenizer
-            tokenizer = AutoTokenizer.from_pretrained(vocab)
+            tokenizer = AutoTokenizer.from_pretrained(tokenizer)
             if kwargs.get("verbose", False):
                 print("['random' model using tokenizer {}]".format(tokenizer))
             self._eos_token_id = tokenizer.eos_token_id
@@ -23,6 +23,9 @@ class UniformRandomSamplingLLM(LMTPModel):
         else:
             self._eos_token_id = 50256
             self._vocab_size = 50257
+
+    def model_info(self):
+        return "UniformRandomSamplingLLM(seed={})".format(self.seed)
 
     @property
     def eos_token_id(self):

@@ -106,6 +106,9 @@ class TransformersTokenizer:
     def name(self):
         return "hf-" + self.model_identifier
     
+    def backend(self):
+        return "transformers " + type(self.tokenizer).__name__
+    
 class LlamaTransformersTokenizer(TransformersTokenizer):
     """Aligns the behavior of HF LlamaTokenizer with that of gpt tokenizers."""
 

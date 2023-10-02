@@ -14,6 +14,7 @@ import time
 import asyncio
 
 from lmql.runtime.stats import Stats
+from lmql.runtime.tracing import Tracer
 from lmql.models.model_info import model_info
 
 class OpenAIStreamError(Exception): pass
@@ -176,8 +177,8 @@ async def chat_api(**kwargs):
     prompt_tokens = tokenize(kwargs["prompt"][0], tokenizer=tokenizer, openai_byte_encoding=True)
 
     timeout = kwargs.pop("timeout", 1.5)
-    
     echo = kwargs.pop("echo")
+    tracer: Tracer = kwargs.pop("tracer", None)
 
     if echo:
         data = {
@@ -237,6 +238,12 @@ async def chat_api(**kwargs):
         async with aiohttp.ClientSession() as session:
             endpoint, headers = get_endpoint_and_headers(kwargs)
             
+            handle = tracer.event("openai.ChatCompletion", {
+                "endpoint": endpoint,
+                "headers": headers,
+                "kwargs": kwargs
+            })
+
             if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
                 print(f"openai complete: {kwargs}", flush=True)
             
@@ -306,7 +313,7 @@ async def chat_api(**kwargs):
                                     raise OpenAIStreamError(message + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
 
                             choices = []
-                            for c in data["choices"]:
+                            for i, c in enumerate(data["choices"]):
                                 delta = c["delta"]
                                 # skip non-content annotations for now
                                 if not "content" in delta:
@@ -323,6 +330,9 @@ async def chat_api(**kwargs):
                                             }
                                         })
                                     continue
+
+                                handle.add(f"result[{i}]", [delta])
+
                                 text = delta["content"]
                                 if len(text) == 0:
                                     continue
@@ -369,8 +379,8 @@ async def completion_api(**kwargs):
 
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
-
     timeout = kwargs.pop("timeout", 1.5)
+    tracer = kwargs.pop("tracer", None)
 
     assert not (LMQL_BROWSER and "logit_bias" in kwargs and "gpt-3.5-turbo" in kwargs["model"]), "gpt-3.5-turbo completion models do not support logit_bias in the LMQL browser distribution, because the required tokenizer is not available in the browser. Please use a local installation of LMQL to use logit_bias with gpt-3.5-turbo models."
 
@@ -383,6 +393,12 @@ async def completion_api(**kwargs):
         async with aiohttp.ClientSession() as session:
             api_config = kwargs.get("api_config", {})
             endpoint, headers = get_endpoint_and_headers(kwargs)
+
+            handle = tracer.event("openai.Completion", {
+                "endpoint": endpoint,
+                "headers": headers,
+                "kwargs": kwargs
+            })
             
             if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
                 print(f"openai complete: {kwargs}", flush=True)
@@ -452,6 +468,9 @@ async def completion_api(**kwargs):
                                     raise OpenAIRateLimitError(message + "local client capacity" + str(Capacity.reserved))
                                 else:
                                     raise OpenAIStreamError(message + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
+
+                            for i in range(len(data["choices"])):
+                                handle.add(f"result[{i}]", [data["choices"][i]["text"]])
 
                             yield data
                         

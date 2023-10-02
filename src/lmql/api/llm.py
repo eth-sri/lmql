@@ -2,6 +2,7 @@ from typing import Any, Union, List, Optional, Dict
 from abc import ABC, abstractmethod
 
 from lmql.runtime.tokenizer import LMQLTokenizer
+from lmql.runtime.tracing.tracer import traced
 import lmql.runtime.dclib as dc
 import os
 from lmql.models.aliases import model_name_aliases
@@ -103,7 +104,8 @@ class LLM:
             kwargs["chunksize"] = max_tokens
             max_tokens = max_tokens + 1
         
-        result = await generate_query(prompt, max_tokens=max_tokens, **kwargs)
+        name = "lmql.generate({}, {}, **{})".format(prompt, max_tokens, kwargs)
+        result = await generate_query(prompt, max_tokens=max_tokens, __name__=name, **kwargs)
 
         if len(result) == 0:
             raise ValueError("No result returned from query")
@@ -159,14 +161,17 @@ class LLM:
 
         assert isinstance(model_identifier, (str, LLM)), "model_identifier must be a string or LLM object"
 
+        # check for user-defined shorthands
+        model_identifier = resolve_user_shorthands(cls, model_identifier)
+
         # do nothing if already a descriptor
         if type(model_identifier) is LLM:
             return model_identifier
         
-        # check for model name aliases
+        # check for built-in model name aliases
         if model_identifier in model_name_aliases:
             model_identifier = model_name_aliases[model_identifier]
-        
+
         # remember original name
         original_name = model_identifier
         # to be copied to the LLM(...) object for reference
@@ -191,7 +196,7 @@ class LLM:
 
             # special case for 'random' model (see random_model.py)
             if model_identifier == "random":
-                kwargs["tokenizer"] = "gpt2" if "vocab" not in kwargs else kwargs["vocab"]
+                kwargs["tokenizer"] = "gpt2" if "tokenizer" not in kwargs else kwargs["tokenizer"]
                 kwargs["inprocess"] = True
                 kwargs["async_transport"] = True
 
@@ -250,28 +255,31 @@ def set_default_model(model: Union[str, LLM]):
     global default_model
     default_model = model
 
-def lazy_query(func):
+def lazy_query(name):
     """
     Lazily initializes a lmql.query(...) function. This is useful for functions
     that should only be initialized once they are called for the first time.
     """
-    from functools import wraps
-    query_func = None
+    def decorator(func):
+        from functools import wraps
+        query_func = None
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        nonlocal query_func
-        if query_func is None:
-            query_func = query(func)
-        return query_func(*args, **kwargs)
-    
-    return wrapper
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            nonlocal query_func
+            if query_func is None:
+                query_func = query(func)
+            query_func.__lmql_query_function__.name = "lmql.generate"
+            return query_func(*args, **kwargs)
+        
+        return wrapper
+    return decorator
 
 """
 Lazily initialized query to generate text from an LLM using the .generate(...) 
 and .generate_sync(...) methods.
 """
-@lazy_query
+@lazy_query("lmql.generate")
 async def generate_query(prompt, max_tokens=32):
     '''lmql
     if max_tokens is not None:
@@ -299,3 +307,43 @@ def model(model_identifier, **kwargs) -> LLM:
     """
     from lmql.api.llm import LLM
     return LLM.from_descriptor(model_identifier, **kwargs)
+
+
+def resolve_user_shorthands(self, model_name):
+    """
+    Utility function to resolve model shorthands.
+    """
+    # get ~/.cache/lmql/models file
+    import os
+    import ast
+
+    if not os.path.exists(os.path.expanduser("~/.lmql/models")):
+        return model_name
+
+    try:
+        with open(os.path.expanduser("~/.lmql/models"), "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                shorthand, replacement = line.split(" ", 1)
+                
+                if model_name == shorthand or model_name == "local:" + shorthand:
+                    # remember if we use the shorthand with local: prefix
+                    is_local = model_name.startswith("local:")
+                    
+                    if replacement.startswith("lmql.model("):
+                        # save lmql.model literal evaluation
+                        parsed = ast.parse(replacement).body[0].value
+                        args = ast.literal_eval(ast.unparse(parsed.args))
+                        if len(parsed.args) == 1:
+                            args = (args,)
+                        kwargs = {k.arg: ast.literal_eval(ast.unparse(k.value)) for k in parsed.keywords}
+                        kwargs["inprocess"] = is_local
+                        return model(*args, **kwargs)
+                    else:
+                        if is_local:
+                            replacement = "local:" + replacement
+                        return replacement.rstrip()
+    except Exception as e:
+        warnings.warn("Failed to read ~/.lmql/models shorthand file.", UserWarning)
+
+    return model_name

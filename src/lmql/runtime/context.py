@@ -21,8 +21,8 @@ def get_tokenizer():
     This value is set by context in the LMQL interpreter run() function, to enable 
     different tokenizers in sub-queries.
     """
-    assert len(_tokenizer.get()) > 0, "No tokenizer set in this context"
     _ensure_tokenizer()
+    assert len(_tokenizer.get()) > 0, "No tokenizer set in this context"
     return _tokenizer.get()[-1]
 
 def set_tokenizer(tokenizer):

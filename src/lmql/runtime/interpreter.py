@@ -31,6 +31,7 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.models.model_info import model_info
 from lmql.runtime.context import ContextTokenizer
+from lmql.runtime.tracing import trace, active_tracer, enable_tracing, certificate
 from lmql.api.llm import LLM
 
 from lmql.api.scoring import dc_score
@@ -225,6 +226,9 @@ class PromptInterpreter:
         self.model_identifier = force_model.model_identifier if isinstance(force_model, LLM) else force_model
         self.name = name
         self.tokenizer: LMQLTokenizer = None
+        
+        # whether an inference certificate should be generated
+        self.certificate = False
 
         # decoder configuration
         self.decoder = None
@@ -286,6 +290,10 @@ class PromptInterpreter:
             self.output_writer = kwargs["output_writer"]
         # store remaining flags
         self.extra_kwargs.update(kwargs)
+        
+        # check for 'traced_as' custom name
+        if "__name__" in kwargs:
+            self.name = self.extra_kwargs["__name__"]
 
     def set_decoder(self, method, **kwargs):
         # remove compiler-level flags
@@ -890,8 +898,30 @@ class PromptInterpreter:
         else:
             return input(*args)
 
+    @property
+    def qualified_name(self):
+        return self.name or "<function " + self.fct.__name__ + ">"
+
+    def enable_tracing_if_needed(self):
+        if self.extra_kwargs.get("certificate", False):
+            enable_tracing()
+            self.certificate = self.extra_kwargs.get("certificate")
+            return
+        
+        if self.decoder_kwargs is not None and self.decoder_kwargs.get("certificate", False):
+            enable_tracing()
+            self.certificate = self.decoder_kwargs.get("certificate")
+            return
+
+    @trace("PromptInterpreter.run")
     async def run(self, fct, *args, **kwargs):
         self.fct = fct
+
+        # enable tracing if needed (e.g. certificate=True or a file)
+        self.enable_tracing_if_needed()
+
+        # initialize tracer
+        active_tracer().name = self.qualified_name
 
         # intercept symbol table entry for input
         if "input" in kwargs.keys() and kwargs["input"] == input:
@@ -928,7 +958,10 @@ class PromptInterpreter:
         # prepare tokenizer
         self.tokenizer = self.model.get_tokenizer()
 
-        # alternative mode where we only extract the prompt string
+        # again check for tracing (if specified as decoder arg)
+        self.enable_tracing_if_needed()
+
+        # alternative execution mode where we only extract the initial prompt string
         return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)
         if return_prompt_string:
             return self.root_state.prompt
@@ -994,8 +1027,6 @@ class PromptInterpreter:
         if "cache" in decoder_args.keys():
             cache_value = decoder_args.pop("cache")
             if type(cache_value) is bool:
-                if cache_value == False:
-                    warnings.warn("info: disabling model output caching")
                 self.caching = cache_value
             elif type(cache_value) is str:
                 self.caching = True
@@ -1083,12 +1114,24 @@ class PromptInterpreter:
                 # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
 
+                # check if certificate is requested
+                if self.certificate != False:
+                    active_tracer().event("lmql.LMQLResult", results)
+
+                    if callable(self.certificate):
+                        self.certificate(certificate(active_tracer()))
+                    elif self.certificate is str:
+                        with open(self.certificate, "w") as f:
+                            f.write(certificate(active_tracer()))
+                    elif type(self.certificate) is bool: # must be True
+                        print(str(certificate(active_tracer())), flush=True)
+
                 return results
         
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
                           "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
-                          "openai_nonstop", "chunksize", "alpha", "verbose"]
+                          "openai_nonstop", "chunksize", "alpha", "verbose", "certificate"]
 
     def derive_decoder_args(self, extra_kwargs, existing_args=None):
         # if no existing args are provided, use no args

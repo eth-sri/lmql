@@ -157,7 +157,12 @@ class Stats:
         else:
             print("warning: cost_estimate(): unknown model {}".format(model))
             return -1
-
+        
+def trace_metric(request_kwargs, *args, method='add', **kwargs):
+    if "tracer" not in request_kwargs.keys():
+        return
+    # log metrics to tracer via the specified method
+    getattr(request_kwargs["tracer"], method)(*args, **kwargs)
 class ResponseStream:    
     def __init__(self, scheduler, kwargs, response, n, request_ids, maximum_retries=20, chaos = None, stats: Stats=None):
         self.scheduler: AsyncOpenAIAPI = scheduler
@@ -170,6 +175,9 @@ class ResponseStream:
 
         self.stats.requests += 1
         self.stats.sum_batch_size += n
+        
+        trace_metric(kwargs, "openai.requests", 1)
+        trace_metric(kwargs, "openai.batch_size", n)
 
         # task that always waits for new data in the response stream
         self.iteration_task = asyncio.create_task(self.iter_task())
@@ -198,6 +206,7 @@ class ResponseStream:
                     index = c["index"]
 
                     self.stats.tokens += len(c["logprobs"]["tokens"])
+                    trace_metric(self.kwargs, "openai.tokens", len(c["logprobs"]["tokens"]))
                     assert c is not None
                     self.slices[index].digest(c)
                     self.slices[index].finish_reason = c["finish_reason"]

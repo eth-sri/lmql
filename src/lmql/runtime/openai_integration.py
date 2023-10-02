@@ -20,6 +20,7 @@ from lmql.runtime.tokenizer import tokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
+from lmql.runtime.tracing import active_tracer
 from lmql.models.model_info import model_info
 from lmql.api.llm import ModelAPIAdapter
 from typing import Type
@@ -202,6 +203,7 @@ class DclibOpenAiModel(DcModel):
             "user": "lmql",
             "echo": True,
             **({"api_config": self.api_config} if self.api_config is not None else {}),
+            "tracer": active_tracer(),
             **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
@@ -305,6 +307,7 @@ class DclibOpenAiModel(DcModel):
             "stream": True,
             "echo": True,
             **({"api_config": self.api_config} if self.api_config is not None else {}),
+            "tracer": active_tracer(),
             **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
@@ -426,6 +429,10 @@ class DclibOpenAiModel(DcModel):
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
 
     async def expand_and_cache(self, s: DecoderSequence, completion_result: CompletionResult, sampling_mode, logprobs=1):
+        # wait at least for the first completion so 
+        # the cache is guaranteed to be ahead
+        res = await completion_result.buffer.get(0)
+
         async def token_stream():
             nonlocal sampling_mode, s, completion_result
             response_buffer = completion_result.buffer

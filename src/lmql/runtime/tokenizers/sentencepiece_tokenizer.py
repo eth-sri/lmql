@@ -1,4 +1,4 @@
-class LlamaCPPTokenizer:
+class SentencePieceTokenizer:
     def __init__(self, model_identifier):
         from sentencepiece import SentencePieceProcessor
         self.model_identifier = model_identifier
@@ -110,4 +110,7 @@ class LlamaCPPTokenizer:
     
     @property
     def name(self):
-        return "llama.cpp-" + self.model_identifier
+        return "sentencepiece-" + self.model_identifier
+    
+    def backend(self):
+        return "sentencepiece " + type(self.tokenizer).__name__

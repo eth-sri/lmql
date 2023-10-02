@@ -13,7 +13,11 @@ from .run import run_file, run_sync, run
 from .scoring import ScoringResult
 from .serve import serve
 from inspect import *
+
 from lmql.runtime.tokenizer import tokenizer
+
+from lmql.runtime.tracing.tracer import traced, Tracer
+from lmql.runtime.tracing.certificate import certificate
 
 async def generate(prompt: str, max_tokens: Optional[int] = None, model: Optional[Union[LLM, str]] = None, **kwargs):
     """

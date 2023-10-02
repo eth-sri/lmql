@@ -11,6 +11,7 @@ import asyncio
 import numpy as np
 import lmql.utils.nputil as nputil
 import lmql.runtime.masks as masks
+from lmql.runtime.tracing import active_tracer, Event
 from lmql.runtime.token_distribution import TokenDistribution
 from lmql.api.llm import ModelAPIAdapter
 
@@ -27,6 +28,8 @@ class LMTPDcModel(DcModel):
 
         # LMTP client object (can be inprocess, websocket, or an alternative like replicate)
         self.client = None
+        # model info as advertised by inference endpoint
+        self._model_info = None
         # asyncio task for client loop
         self._client_loop = None
         # set once self.client is set up
@@ -188,6 +191,13 @@ class LMTPDcModel(DcModel):
     def __del__(self):
         self.close_signal.set()
 
+    async def model_info(self):
+        if self._model_info is None or self._model_info == "<unavailable>":
+            self._model_info = (await self.client.request("MODEL_INFO", {
+                "model": self.model_identifier
+            }))["model_info"]
+        return self._model_info
+
     def make_logits(self, payload):
         scores = {}
         for t, score in payload["top_logprobs"].items():
@@ -243,7 +253,35 @@ class LMTPDcModel(DcModel):
             text = await self.detokenize(ids)
             print("lmtp generate: {} / {} ({} tokens)".format(ids, str([text])[1:-1], len(ids)))
 
-        return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
+        stream_event = active_tracer().event("lmtp.generate", {
+            "model": await self.model_info(),
+            "tokenizer": str(self.tokenizer),
+            "kwargs": {
+                "ids": ids,
+                "max_tokens": chunk_size,
+                "temperature": temperature,
+                "logit_bias": mask,
+                "top_logprobs": top_logprobs
+            }
+        })
+
+        # get token stream
+        token_stream = self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
+        
+        if active_tracer().active:
+            return self.traced_generate(token_stream, event=stream_event)
+
+        return token_stream
+
+    async def traced_generate(self, generate_iterator, event: Event):
+        first = True
+        async for item in generate_iterator:
+            if first:
+                event.update({"model": await self.model_info()})
+                first = False
+            
+            event.add("result", [item["token"]])
+            yield item
 
     async def argmax(self, sequences: dc.DataArray, **kwargs):
         return await self.sample(sequences, temperature=0.0, **kwargs)
@@ -493,6 +531,9 @@ class lmtp_model:
                 self.decoder_args = {}
 
                 self.num_queries = 0
+
+            def __str__(self):
+                return "<LMTPAdapterModel {}>".format(self.model_identifier)
 
             def get_tokenizer(self):
                 if self._tokenizer is None:

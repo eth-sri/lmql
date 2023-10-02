@@ -12,27 +12,38 @@ class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
         self.model_args = kwargs
+        self.loader = kwargs.pop("loader", None)
 
         self.max_batch_size = kwargs.pop("batch_size", 32)
 
         self.silent = kwargs.pop("silent", False)
 
-        if self.model_args.pop("loader", None) == "auto-gptq":
+        if not self.silent:
+            print("[Loading", self.model_identifier, "with", self.model_constructor() + "]", flush=True)
+
+        if self.loader == "auto-gptq":
             from auto_gptq import AutoGPTQForCausalLM
-            if not self.silent:
-                print("[Loading", self.model_identifier, "with", "AutoGPTQForCausalLM.from_quantized({})]".format(format_call(self.model_identifier, **self.model_args)), flush=True)
-            
             self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
         else:
-            from transformers import AutoModelForCausalLM
-            if not self.silent:
-                print("[Loading", self.model_identifier, "with", "AutoModelForCausalLM.from_pretrained({})]".format(format_call(self.model_identifier, **self.model_args)), flush=True)
-            
+            from transformers import AutoModelForCausalLM            
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
         
         if not self.silent:
             print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
+
+    def model_constructor(self):
+        if self.loader == "auto-gptq":
+            return "AutoGPTQForCausalLM.from_quantized({})".format(format_call(self.model_identifier, **self.model_args))
+        else:
+            return "AutoModelForCausalLM.from_pretrained({})]".format(format_call(self.model_identifier, **self.model_args))
+
+    def model_info(self):
+        return {
+            "model": self.model_identifier,
+            # use single quotes to avoid issues with JSON
+            "constructor": self.model_constructor().replace('"', "'"),
+        }
 
     @property
     def eos_token_id(self):

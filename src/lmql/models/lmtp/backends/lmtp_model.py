@@ -55,6 +55,13 @@ class LMTPModel:
         pass
         # load the model
 
+    def model_info(self):
+        """
+        Override to publish model configuration parameters as metadata
+        to LMTP clients.
+        """
+        return type(self).__name__
+
     def score(
         self,
         input_ids: np.ndarray,

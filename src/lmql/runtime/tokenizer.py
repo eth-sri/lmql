@@ -55,9 +55,12 @@ class LMQLTokenizer:
         if "FORCE_TIKTOKEN" in os.environ:
             assert type(self.tokenizer_impl) is TiktokenTokenizer
 
-    def __str__(self):
-        return "<LMQLTokenizer '{}'>".format(self.model_identifier)
+    def backend(self):
+        return self.tokenizer_impl.backend()
     
+    def __str__(self):
+        return "<LMQLTokenizer '{}' using {}>".format(self.model_identifier, self.backend())
+
     def __repr__(self):
         return str(self)
 
@@ -76,7 +79,7 @@ class LMQLTokenizer:
         if self._tokenizer_impl is None:
             self.loader_thread.join()
         if self._tokenizer_impl is None:
-            raise TokenizerNotAvailableError("Failed to derive a suitable tokenizer from the provided model name '{}'. If your model requires a specific (well-known) tokenizer, make sure specify it via lmql.model(..., tokenizer='...').".format(self.model_identifier))
+            raise TokenizerNotAvailableError("Failed to derive a suitable tokenizer from the provided name '{}'. If your model requires a specific (well-known) tokenizer, make sure to specify it via lmql.model(..., tokenizer='...').".format(self.model_identifier))
         return self._tokenizer_impl
     
     @property
@@ -310,11 +313,11 @@ def tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
             
             return LMQLTokenizer(model_identifier, loader=loader)
 
-    # check for llama.cpp tokenizer
+    # check for sentencepiece tokenizer
     if "tokenizer.model" in model_identifier:
-        from lmql.runtime.tokenizers.llama_cpp_tokenizer import LlamaCPPTokenizer
-        if LlamaCPPTokenizer.is_available(model_identifier):
-            return LMQLTokenizer(model_identifier, tokenizer_impl=LlamaCPPTokenizer(model_identifier))
+        from lmql.runtime.tokenizers.sentencepiece_tokenizer import SentencePieceTokenizer
+        if SentencePieceTokenizer.is_available(model_identifier):
+            return LMQLTokenizer(model_identifier, tokenizer_impl=SentencePieceTokenizer(model_identifier))
         
     # check for huggingface tokenizers
     from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer

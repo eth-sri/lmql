@@ -59,9 +59,9 @@ class LMTPMultiProcessingClientRef:
         self.client = client
         self.refs = 0
     
-    # forwarda ttribute access to generate, score
+    # forward attribute access to generate, score
     def __getattr__(self, name):
-        if name in ["generate", "score"]:
+        if name in ["generate", "score", "request"]:
             return getattr(self.client, name)
         return super().__getattr__(name)
 
@@ -99,13 +99,38 @@ class LMTPMultiProcessingClient:
         self.connection = c2
         
         self.stream_id = 0
+        # for streamed responses
         self.iterators = {}
+        # for non-streamed responses
+        self.request_futures = {}
 
         self.poll_task = asyncio.create_task(self.poll_messages())
         self.poll_running = asyncio.Event()
 
     def ref(self):
         return LMTPMultiProcessingClientRef(self).ref()
+
+    async def request(self, name, payload):
+        """
+        Sends a 'name' request to the subprocess and waits for a response (e.g. obtain model info).
+        """
+        self.stream_id += 1
+        payload = {
+            "stream_id": self.stream_id,
+            "model": self.model_identifier,
+            "data": payload
+        }
+        self.connection.send((name, payload))
+
+        # wait for response
+        fut = asyncio.Future()
+        self.request_futures[self.stream_id] = fut
+        try:
+            result = await asyncio.wait_for(fut, timeout=5)
+        except TimeoutError as e:
+            raise TimeoutError("LMTP request '{}' timed out after 5 seconds".format(name))
+        self._model_info = result
+        return result
 
     def __del__(self):
         if self.poll_task is not None and self.poll_running.is_set():
@@ -128,6 +153,11 @@ class LMTPMultiProcessingClient:
                         stream_id = d["stream_id"]
                         consumers = self.iterators.get(stream_id, [])
                         for q in consumers: q.put_nowait(d)
+                    elif type == "MSG":
+                        stream_id = d["stream_id"]
+                        fut = self.request_futures.pop(stream_id, None)
+                        if fut is not None:
+                            fut.set_result(d)
                 except Exception as e:
                     warnings.warn("failed to handle msg {}: {}".format(msg, e))
         except asyncio.CancelledError:
