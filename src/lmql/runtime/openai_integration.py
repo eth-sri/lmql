@@ -426,6 +426,10 @@ class DclibOpenAiModel(DcModel):
         return await asyncio.gather(*[get_buffer(i, s) for i, s in enumerate(seqs)])
 
     async def expand_and_cache(self, s: DecoderSequence, completion_result: CompletionResult, sampling_mode, logprobs=1):
+        # wait at least for the first completion so 
+        # the cache is guaranteed to be ahead
+        res = await completion_result.buffer.get(0)
+
         async def token_stream():
             nonlocal sampling_mode, s, completion_result
             response_buffer = completion_result.buffer
