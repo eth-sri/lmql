@@ -311,7 +311,19 @@ def model(model_identifier, **kwargs) -> LLM:
 
 def resolve_user_shorthands(self, model_name):
     """
-    Utility function to resolve model shorthands.
+    Resolves user-defined shorthands for model names.
+
+    User-defined shorthands are stored in ~/.lmql/models and can be used to expand
+    simple model identifiers to configured lmql.model(...) objects.
+
+    For instance, you can define a shorthand like this:
+
+    ```
+    # ~/.lmql/models
+    # this is a comment
+    llama lmql.model("llama.cpp:/Users/luca/Developer/llama.cpp/models/7B/ggml-model-q4_0.bin")
+    ```
+    
     """
     # get ~/.cache/lmql/models file
     import os
@@ -324,6 +336,8 @@ def resolve_user_shorthands(self, model_name):
         with open(os.path.expanduser("~/.lmql/models"), "r") as f:
             lines = f.readlines()
             for line in lines:
+                if line.strip().startswith("#"):
+                    continue
                 shorthand, replacement = line.split(" ", 1)
                 
                 if model_name == shorthand or model_name == "local:" + shorthand:
