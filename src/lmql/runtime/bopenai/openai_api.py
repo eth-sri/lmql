@@ -107,7 +107,7 @@ def get_azure_config(model, api_config):
         
         deployment_specific_api_key = f"OPENAI_API_KEY_{deployment.upper()}"
         api_key = api_config.get("api_key", None) or os.environ.get(deployment_specific_api_key, None) or os.environ.get("OPENAI_API_KEY", None)
-        assert api_key is not None, "Please specify the Azure API key as 'api_key' or environment variable OPENAI_API_KEY or OPENAI_API_KEY_<DEPLOYMENT>"
+        assert api_key is not None, "Please specify the Azure API key as 'api_key' or environment variable OPENAI_API_KEY or {}".format(deployment_specific_api_key)
         
         is_chat = api_type == "azure-chat"
 
@@ -241,6 +241,7 @@ async def chat_api(**kwargs):
             handle = tracer.event("openai.ChatCompletion", {
                 "endpoint": endpoint,
                 "headers": headers,
+                "tokenier": str(tokenizer),
                 "kwargs": kwargs
             })
 
@@ -392,11 +393,14 @@ async def completion_api(**kwargs):
 
         async with aiohttp.ClientSession() as session:
             api_config = kwargs.get("api_config", {})
+            tokenizer = api_config.get("tokenizer")
+
             endpoint, headers = get_endpoint_and_headers(kwargs)
 
             handle = tracer.event("openai.Completion", {
                 "endpoint": endpoint,
                 "headers": headers,
+                "tokenier": str(tokenizer),
                 "kwargs": kwargs
             })
             

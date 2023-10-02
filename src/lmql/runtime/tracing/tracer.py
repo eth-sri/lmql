@@ -1,3 +1,4 @@
+from typing import List, Union
 from contextvars import ContextVar
 from typing import Any
 import warnings
@@ -6,6 +7,18 @@ import json
 import dataclasses
 
 REDACT_KEYS = ["Authorization"]
+
+def add_extra_redact_keys(keys: Union[str, List[str]]):
+    """
+    Adds a new globally-enforced dictionary keys to redact from all traced 
+    dictionaries (applies recursively). The corresponding values will be
+    replaced by "<removed>".
+    """
+    if type(keys) is str:
+        keys = [keys]
+
+    global REDACT_KEYS
+    REDACT_KEYS += keys
 
 def redact_data(dict_data, redact):
     keys_to_redact = (redact if type(redact) is list else []) + REDACT_KEYS
