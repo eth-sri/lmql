@@ -126,7 +126,11 @@ class LlamaTransformersTokenizer(TransformersTokenizer):
         return super().tokenize(text, asbytes, add_special_tokens)
 
     def __call__(self, text, add_special_tokens=False):
-        for dummy_token in ["@", "^", ""]:
+        prepend_dummy_tokens = ["@", "^", ""]
+        # make sure that llama-specific INST tokens are tokenized as-is
+        if text.startswith("[INST]"): prepend_dummy_tokens = [""]
+
+        for dummy_token in prepend_dummy_tokens:
             text_to_tokenize = dummy_token + text
             
             text_to_tokenize = self.tokenizer.bos_token + text_to_tokenize
