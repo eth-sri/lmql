@@ -78,7 +78,7 @@ class ScoringResult:
 
     def __str__(self):        
         return "lmql.ScoringResult(model='{}')\n".format(self.model_identifier) + \
-            "\n".join([f"-{c}: {score}" for c,score in zip(self.continuations, self.scores(agg="sum"))])
+            "\n".join([f"-{str([c])[1:-1]}: {score}" for c,score in zip(self.continuations, self.scores(agg="sum"))])
 
 async def dc_score(model: dc.DcModel, prompt, values, **kwargs):
     """

@@ -37,7 +37,7 @@ async def test_llama_from_gpt():
 @lmql.query(model="chatgpt")
 async def cg():
     '''lmql
-    "Hello[WORLD]" where len(TOKENS(WORLD)) < 4
+    "Hello[WORLD]" where len(TOKENS(WORLD)) < 3
     return WORLD
     '''
 
@@ -46,8 +46,8 @@ async def test_gpt35():
     '''lmql
     "Hello[WORLD]" where len(TOKENS(WORLD)) == 4
     r = [WORLD, cg()]
-    assert r == [", I am a", "  Hello!"], "Expected {}, got {}".format(
-        [", I am a", "Hello!"],
+    assert r == [", I am a", " Hello!"], "Expected {}, got {}".format(
+        [", I am a", " Hello!"],
         r
     )
     return WORLD

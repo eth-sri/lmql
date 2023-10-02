@@ -15,8 +15,8 @@ from lmql.runtime.output_writer import headless, printing, silent, stream
 
 from typing import Optional, Union
 from functools import wraps
-
-def load(filepath=None, autoconnect=False, force_model=None, output_writer=None):
+    
+def load(filepath=None, force_model=None, output_writer=None):
     # compile query and obtain the where clause computational graph
     compiler = LMQLCompiler()
     module = compiler.compile(filepath)
@@ -37,7 +37,7 @@ def query_from_string(s, input_variables=None, is_async=True, output_writer=None
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(s)
-    module = load(temp_lmql_file, autoconnect=True, output_writer=output_writer or silent)
+    module = load(temp_lmql_file, output_writer=output_writer or silent)
     
     # lmql.query(str) does not capture function context
     scope = EmptyVariableScope()
@@ -127,7 +127,7 @@ def query(__fct__=None, input_variables=None, is_async=True, calling_frame=None,
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
     with open(temp_lmql_file, "w") as f:
         f.write(code)
-    module = load(temp_lmql_file, autoconnect=True, output_writer=silent)
+    module = load(temp_lmql_file, output_writer=silent)
 
     # get function signature
     is_async = inspect.iscoroutinefunction(fct)

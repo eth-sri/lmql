@@ -112,10 +112,10 @@ async def interactive_client():
 
     async with aiohttp.ClientSession() as session:
         async with session.ws_connect('http://workstation:8888') as ws:
-            from lmql.runtime.tokenizer import load_tokenizer
+            from lmql.runtime.tokenizer import tokenizer
 
             model = sys.argv[1]
-            tokenizer = load_tokenizer(model)
+            tokenizer = tokenizer(model)
 
             client = LMTPWebSocketClient(model, ws)
             client.connect()

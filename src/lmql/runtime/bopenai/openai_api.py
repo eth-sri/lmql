@@ -13,7 +13,6 @@ import json
 import time
 import asyncio
 
-from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.stats import Stats
 from lmql.models.model_info import model_info
 
@@ -72,13 +71,7 @@ async def complete(**kwargs):
 global tokenizers
 tokenizers = {}
 
-def tokenize(text, model, openai_byte_encoding=False):
-    global tokenizers
-    if not model in tokenizers:
-        tokenizer = load_tokenizer("tiktoken:" + model)
-        tokenizers[model] = tokenizer
-    else:
-        tokenizer = tokenizers[model]
+def tokenize(text, tokenizer, openai_byte_encoding=False):
     ids = tokenizer(text)["input_ids"]
     raw = tokenizer.decode_bytes(ids)
     if openai_byte_encoding:
@@ -175,9 +168,12 @@ async def chat_api(**kwargs):
     num_prompts = len(kwargs["prompt"])
     max_tokens = kwargs.get("max_tokens", 0)
     model = kwargs["model"]
+    api_config = kwargs.get("api_config", {})
+    tokenizer = api_config.get("tokenizer")
+    assert tokenizer is not None, "internal error: chat_api expects an 'api_config' with a 'tokenizer: LMQLTokenizer' mapping in your API payload"
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
-    prompt_tokens = tokenize(kwargs["prompt"][0], model=model, openai_byte_encoding=True)
+    prompt_tokens = tokenize(kwargs["prompt"][0], tokenizer=tokenizer, openai_byte_encoding=True)
 
     timeout = kwargs.pop("timeout", 1.5)
     
@@ -229,6 +225,8 @@ async def chat_api(**kwargs):
     del kwargs["prompt"]
     kwargs["messages"] = messages
     
+    needs_space = True # messages[-1]["content"][-1] != " "
+
     del kwargs["logprobs"]
 
     async with CapacitySemaphore(num_prompts * max_tokens):
@@ -237,7 +235,6 @@ async def chat_api(**kwargs):
         stream_start = time.time()
 
         async with aiohttp.ClientSession() as session:
-            api_config = kwargs.get("api_config", {})
             endpoint, headers = get_endpoint_and_headers(kwargs)
             
             if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
@@ -327,7 +324,10 @@ async def chat_api(**kwargs):
                                         })
                                     continue
                                 text = delta["content"]
-                                tokens = tokenize((" " if received_text == "" else "") + text, model=model, openai_byte_encoding=True)
+                                if len(text) == 0:
+                                    continue
+
+                                tokens = tokenize((" " if received_text == "" and needs_space else "") + text, tokenizer=tokenizer, openai_byte_encoding=True)
                                 received_text += text
 
                                 # convert tokens to OpenAI format
