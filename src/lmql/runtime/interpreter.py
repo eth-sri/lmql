@@ -1120,9 +1120,9 @@ class PromptInterpreter:
 
                     if callable(self.certificate):
                         self.certificate(certificate(active_tracer()))
-                    elif self.certificate is str:
+                    elif type(self.certificate) is str:
                         with open(self.certificate, "w") as f:
-                            f.write(certificate(active_tracer()))
+                            f.write(str(certificate(active_tracer())))
                     elif type(self.certificate) is bool: # must be True
                         print(str(certificate(active_tracer())), flush=True)
 
