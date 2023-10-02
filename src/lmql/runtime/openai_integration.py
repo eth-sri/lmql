@@ -634,8 +634,12 @@ class DclibOpenAiModel(DcModel):
         i = 0
         while i < len(s):
             if s[i:i+2] == "\\x":
-                r += [int(s[i+2:i+4], 16)]
-                i += 4
+                if len(s) < i+3:
+                    r += [ord(s[i])]
+                    i += 1
+                else:
+                    r += [int(s[i+2:i+4], 16)]
+                    i += 4
             else:
                 r += [ord(s[i])]
                 i += 1
