@@ -1,17 +1,12 @@
 import openai
-import traceback
 import asyncio
-import sys
 from dataclasses import dataclass
 import random
 import warnings
-import pickle
-import os
-import time
 from functools import total_ordering
-import warnings
 
-from .openai_api import complete, OpenAIRateLimitError, Capacity
+from lmql.models.model_info import model_info
+from .openai_api import complete, OpenAIRateLimitError, Capacity, is_chat_model
 
 global logit_bias_logging
 logit_bias_logging = True
@@ -24,7 +19,9 @@ class EmptyStreamError(Exception): pass
 class ChaosException(openai.APIError): pass
 class APIShutDownException(RuntimeError): pass
 
-class OpenAILogitBiasLimitationWarning(Warning): pass
+class OpenAIAPIWarning(Warning): pass
+class OpenAILogitBiasLimitationWarning(OpenAIAPIWarning): pass
+
 class MaximumRetriesExceeded(Exception): 
     def __init__(self, error: Exception, retries: int):
         self.error = error
@@ -86,7 +83,8 @@ class Batcher:
             buckets.setdefault(identifier, []).append(t)
         
         for bucket in buckets.values():
-            if "turbo" in bucket[0]["model"]:
+            kwargs = bucket[0]
+            if is_chat_model(kwargs):
                 for t in bucket:
                     self.queued_requests.append(make_request_args([t]))
                 continue
@@ -188,7 +186,7 @@ class ResponseStream:
             self.response = aiter(self.response)
             async for data in self.response:
                 if self.chaos is not None and random.random() > (1.0 - self.chaos):
-                    raise ChaosException()
+                    raise ChaosException("OpenAI API: ChaosException probabilistically triggered by chaos value {}".format(self.chaos))
                 
                 if not "choices" in data.keys():
                     print("No choices in data", data)
@@ -206,7 +204,6 @@ class ResponseStream:
             for c in self.slices:
                 c.finish()
         except Exception as e:
-            print("Failed with", e)
             for c in self.slices:
                 c.error(e)
 
@@ -498,7 +495,8 @@ class ResponseStreamSliceIterator:
                 # if the stream of our self.slice errors out, we can recover by creating a new 
                 # stream via a new call to openai.Completion.create
                 attempt: RecoveryAttempt = data
-                warnings.warn(f"OpenAI API: Underlying stream of OpenAI complete() call failed with error\n\n{attempt.error} ({type(attempt.error)})\n\nRetrying... (attempt: {self.retries})", source=attempt.error)
+                warnings.warn(f"OpenAI API: Underlying stream of OpenAI complete() call failed with error\n\n{attempt.error} ({type(attempt.error)})\n\nRetrying... (attempt: {self.retries})", 
+                              category=OpenAIAPIWarning, source=attempt.error)
                 self.retries += 1
                 # if we have exceeded the maximum number of retries, raise the error
                 if self.retries > attempt.maximum_retries:
@@ -582,36 +580,14 @@ class AsyncOpenAIAPI:
 
         self.stats = Stats()
         self.nostream = False
-        
-        # INTERNAL OPTION only. In theory we can do caching but there are consequences
-        # deterministic sampling, large cache size, cache loading startup time, etc.
-        # also, when exposed to clients, this should be implemented on a per query level, not per batches
-        self.use_cache = False
-
+    
         self.tokenizer = None
-        
-        self.cache = {}
-        self.cache_dir = "."
         self.futures = set()
-        self.restore_cache()
 
         self.first_token_latency = 0
 
     def reset_latency_stats(self):
         self.first_token_latency = 0
-
-    def restore_cache(self):
-        if not self.use_cache:
-            return
-        cache_file = "openai.completions.cache"
-        if os.path.exists(os.path.join(self.cache_dir, cache_file)):
-            with open(os.path.join(self.cache_dir, cache_file), "rb") as f:
-                self.cache = pickle.load(f)
-    
-    def save_cache(self):
-        cache_file = "openai.completions.cache"
-        with open(os.path.join(self.cache_dir, cache_file), "wb") as f:
-            pickle.dump(self.cache, f)
 
     def start_stats_logger(self):
         self.stats_logger = asyncio.create_task(self.stats_logger_worker())
@@ -687,7 +663,7 @@ class AsyncOpenAIAPI:
                 while True:
                     try:
                         if retries != self.maximum_retries:
-                            warnings.warn("Retrying {} more times".format(retries))
+                            warnings.warn("Retrying {} more times".format(retries), category=OpenAIAPIWarning)
                             await asyncio.sleep(0.5)
                         task = asyncio.create_task(self._create(**kwargs))
                         res = await asyncio.wait_for(task, timeout=5.5)
@@ -697,7 +673,7 @@ class AsyncOpenAIAPI:
                             raise e
                         self.stats.errors += 1
                         retries -= 1            
-                        warnings.warn("OpenAI: " + str(e) + ' "' + str(type(e)) + '"')
+                        warnings.warn("OpenAI: " + str(e) + ' "' + str(type(e)) + '"', category=OpenAIAPIWarning)
                         # do not retry if the error is definitive (API configuration error)
                         if "api.env" in str(e): raise e
                         # handle definitive errors
@@ -711,7 +687,7 @@ class AsyncOpenAIAPI:
                             raise e
                         if type(e) is TimeoutError or type(e) is OpenAIRateLimitError:
                             t = (2.0 * random.random()) ** (self.maximum_retries - retries)
-                            warnings.warn("Backing off for {} seconds".format(t))
+                            warnings.warn("Backing off for {} seconds".format(t), category=OpenAIAPIWarning)
                             await asyncio.sleep(t)
             except asyncio.CancelledError as e:
                 break
@@ -738,7 +714,7 @@ class AsyncOpenAIAPI:
             request_id = self.request_ctr
             self.request_ctr += 1
         else:
-            warnings.warn("OpenAI request with ID {} failed (timeout or other error) and will be retried".format(request_id), UserWarning)
+            warnings.warn("OpenAI request with ID {} failed (timeout or other error) and will be retried".format(request_id), category=OpenAIAPIWarning)
         
         kwargs = {"future": result_fut, "request_id": request_id, **kwargs}
         

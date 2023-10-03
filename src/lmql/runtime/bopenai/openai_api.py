@@ -62,8 +62,15 @@ def is_azure_chat(kwargs):
         return os.environ.get("OPENAI_API_TYPE", "azure") == "azure-chat"
     return ("api_type" in api_config and "azure-chat" in api_config.get("api_type", ""))
 
+def is_chat_model(kwargs):
+    model = kwargs.get("model", None)
+    
+    return model_info(model).is_chat_model or \
+           is_azure_chat(kwargs) or \
+           kwargs.get("api_config", {}).get("chat_model", False)
+
 async def complete(**kwargs):
-    if model_info(kwargs["model"]).is_chat_model or is_azure_chat(kwargs):
+    if is_chat_model(kwargs):
         async for r in chat_api(**kwargs): yield r
     else:
         async for r in completion_api(**kwargs): yield r

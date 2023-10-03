@@ -125,9 +125,12 @@ class DclibOpenAiModel(DcModel):
         
         # prepare API config args for OpenAI API calling layer
         kwargs["tokenizer"] = tokenizer
-        self.api_config = {**({"endpoint": endpoint}  if endpoint is not None else {}), **kwargs}
-        
-        self.timeout = kwargs.get("chunk_timeout", 1.5 if not self.mock else 4.5)
+        self.api_config = {
+            **({"endpoint": endpoint}  if endpoint is not None else {}),
+            **kwargs
+        }
+
+        self.timeout = kwargs.get("chunk_timeout", 2.5 if not self.mock else 4.5)
 
         self.stats = Stats("openai")
         openai.AsyncConfiguration.set_tokenizer(self.tokenize)
@@ -428,84 +431,76 @@ class DclibOpenAiModel(DcModel):
     async def expand_and_cache(self, s: DecoderSequence, completion_result: CompletionResult, sampling_mode, logprobs=1):
         # wait at least for the first completion so 
         # the cache is guaranteed to be ahead
-        res = await completion_result.buffer.get(0)
+        _res = await completion_result.buffer.get(0)
 
         async def token_stream():
             nonlocal sampling_mode, s, completion_result
             response_buffer = completion_result.buffer
             
-            try:
-                tokens = []
-                scores = []
+            tokens = []
+            scores = []
 
-                while True:
-                    try:
-                        if await response_buffer.empty():
-                            break
-                        res = await response_buffer.get(0)
-                        
-                        # prepare top_entries
-                        top_entries = {}
-                        topprobs = res["logprobs"]["top_logprobs"]
-                        if topprobs is not None and logprobs > 1:
-                            topk_tokens = list(topprobs.items())
-                            topk_tokens = [(tok, score) for (tok_str, score), tok in zip(topk_tokens, [s for s,_ in topk_tokens])]
-                            topk_tokens += [(tokens[0], scores)]
-                            topk_tokens = list(dict.fromkeys(topk_tokens))
-                            topk_tokens = sorted(topk_tokens, key=lambda x: x[1], reverse=True)
-                            topk_tokens = topk_tokens[:logprobs]
-                            top_entries = {tok: score for tok, score in topk_tokens}
-
-                        scores = {}
-                        for t, s in top_entries:
-                            scores[t] = s
-                        if sampling_mode == "top-1":
-                            scores[res["logprobs"]["tokens"]] = res["logprobs"]["token_logprobs"]
-
-                        top_entries = list(sorted(scores.items(), key=lambda x: x[1], reverse=True))
-                        tokens = [t for t, _ in top_entries]
-                        scores = [s for _, s in top_entries]
-                        edge_type = ["top-{}".format(i+1) for i in range(len(tokens))]
-
-                        # for non argmax sampling modes, add the sampled token to the beginning of the list
-                        if sampling_mode != "top-1":
-                            tokens = [res["logprobs"]["tokens"]] + tokens
-                            scores = [res["logprobs"]["token_logprobs"]] + scores
-                            edge_type = [sampling_mode] + edge_type
-
-                        # convert tokens to bytes
-                        tokens = self.convert(tokens)
-
-                        # future continuation
-                        response_buffer = response_buffer[1:]
-                        continuation = CompletionResult(response_buffer, completion_result.continuation_type, completion_result.logit_mask_or_fixed_id)
-
-                        if continuation.continuation_type is None:
-                            edge_type = None
-
-                        user_data = {
-                            "openai-continuations": {
-                                continuation.continuation_type: continuation
-                            }
-                        }
-
-                        if "sample-id" in sampling_mode:
-                            user_data["dc-edge-type"] = sampling_mode
-
-                        # print("token stream gives", result_id, tokens, scores, edge_type, flush=True)
-
-                        scores = [0.0 if str(s) == "[]" else s for s in scores]
-
-                        yield (s, tokens, scores, edge_type, user_data)
-                    except IndexError:
+            while True:
+                try:
+                    if await response_buffer.empty():
                         break
-                # print("fully expanded speculativate continuation:", [await self.detokenize(tokens)], flush=True)
-                # if len(tokens) > 1:
-                #     await self.cache(s, tokens, scores, edge_type)
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                print("error in expand_and_cache worker:", e, flush=True)
+                    res = await response_buffer.get(0)
+                    
+                    # prepare top_entries
+                    top_entries = {}
+                    topprobs = res["logprobs"]["top_logprobs"]
+                    if topprobs is not None and logprobs > 1:
+                        topk_tokens = list(topprobs.items())
+                        topk_tokens = [(tok, score) for (tok_str, score), tok in zip(topk_tokens, [s for s,_ in topk_tokens])]
+                        topk_tokens += [(tokens[0], scores)]
+                        topk_tokens = list(dict.fromkeys(topk_tokens))
+                        topk_tokens = sorted(topk_tokens, key=lambda x: x[1], reverse=True)
+                        topk_tokens = topk_tokens[:logprobs]
+                        top_entries = {tok: score for tok, score in topk_tokens}
+
+                    scores = {}
+                    for t, s in top_entries:
+                        scores[t] = s
+                    if sampling_mode == "top-1":
+                        scores[res["logprobs"]["tokens"]] = res["logprobs"]["token_logprobs"]
+
+                    top_entries = list(sorted(scores.items(), key=lambda x: x[1], reverse=True))
+                    tokens = [t for t, _ in top_entries]
+                    scores = [s for _, s in top_entries]
+                    edge_type = ["top-{}".format(i+1) for i in range(len(tokens))]
+
+                    # for non argmax sampling modes, add the sampled token to the beginning of the list
+                    if sampling_mode != "top-1":
+                        tokens = [res["logprobs"]["tokens"]] + tokens
+                        scores = [res["logprobs"]["token_logprobs"]] + scores
+                        edge_type = [sampling_mode] + edge_type
+
+                    # convert tokens to bytes
+                    tokens = self.convert(tokens)
+
+                    # future continuation
+                    response_buffer = response_buffer[1:]
+                    continuation = CompletionResult(response_buffer, completion_result.continuation_type, completion_result.logit_mask_or_fixed_id)
+
+                    if continuation.continuation_type is None:
+                        edge_type = None
+
+                    user_data = {
+                        "openai-continuations": {
+                            continuation.continuation_type: continuation
+                        }
+                    }
+
+                    if "sample-id" in sampling_mode:
+                        user_data["dc-edge-type"] = sampling_mode
+
+                    # print("token stream gives", result_id, tokens, scores, edge_type, flush=True)
+
+                    scores = [0.0 if str(s) == "[]" else s for s in scores]
+                    yield (s, tokens, scores, edge_type, user_data)
+                except IndexError:
+                    break
+        
         self.register_token_stream(token_stream)
 
     async def argmax(self, sequences, **kwargs):
