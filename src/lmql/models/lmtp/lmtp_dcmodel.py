@@ -171,12 +171,13 @@ class LMTPDcModel(DcModel):
             raise RuntimeError("LMTP client encountered an error: {}".format(self.error))
 
         if self.client is None:
-            if self.inprocess:
-                self._client_loop = asyncio.create_task(self.inprocess_client_loop())
-            elif self.use_replicate:
-                self._client_loop = asyncio.create_task(self.replicate_client_loop())
-            else:
-                self._client_loop = asyncio.create_task(self.ws_client_loop())
+            if self._client_loop is None:
+                if self.inprocess:
+                    self._client_loop = asyncio.create_task(self.inprocess_client_loop(), name="lmtp_inprocess_client_loop")
+                elif self.use_replicate:
+                    self._client_loop = asyncio.create_task(self.replicate_client_loop(), name="lmtp_replicate_client_loop")
+                else:
+                    self._client_loop = asyncio.create_task(self.ws_client_loop(), name="lmtp_ws_client_loop")
         
         await self.connected_signal.wait()
         

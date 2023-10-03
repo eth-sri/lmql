@@ -579,6 +579,7 @@ class AsyncOpenAIAPI:
         
         self.complete_request_queue = asyncio.Queue()
         self.complete_request_workers = [asyncio.create_task(self.complete_request_worker(self.complete_request_queue)) for i in range(5)]
+        self.loop = None
 
         self.stats_logger = None 
         
@@ -659,6 +660,10 @@ class AsyncOpenAIAPI:
                 pass # if no more event loop is around, no need to wait for the workers to finish
 
     async def api_complete_worker(self, queue):
+        assert self.loop is None or self.loop == asyncio.get_running_loop(), "api_complete_worker() called from different event loop"
+
+        self.loop = asyncio.get_running_loop()
+        
         while True:
             self.futures = set([f for f in self.futures if not f.done()])
             while Capacity.reserved >= Capacity.total * 0.8:
@@ -740,6 +745,9 @@ class AsyncOpenAIAPI:
         assert "prompt" in kwargs, f"bopenai requires prompt to be set"
 
         loop = asyncio.get_running_loop()
+
+        assert loop == self.loop or self.loop is None, "complete() called from different event loop: {} vs {}".format(loop, self.loop)
+
         result_fut = loop.create_future()
         self.futures.add(result_fut)
 

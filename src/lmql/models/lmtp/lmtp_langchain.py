@@ -20,6 +20,7 @@ from langchain.schema import LLMResult
 
 import lmql
 from lmql.runtime.tokenizer import LMQLTokenizer
+from lmql.runtime.loop import run_in_loop
 
 if TYPE_CHECKING:
     from tenacity import RetryCallState

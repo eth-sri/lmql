@@ -6,11 +6,12 @@ from lmql.runtime.tracing.tracer import traced
 import lmql.runtime.dclib as dc
 import os
 from lmql.models.aliases import model_name_aliases
+from lmql.runtime.loop import run_in_loop
 
 from .queries import query
 from .scoring import dc_score
+
 import warnings
-import asyncio
 
 class ModelAPIAdapter(ABC):
     """
@@ -121,7 +122,7 @@ class LLM:
         If in an async context, use `await generate(...)` instead or
         make sure nested_asyncio is installed and enabled.
         """
-        return asyncio.run(self.generate(*args, **kwargs))
+        return run_in_loop(self.generate(*args, **kwargs))
 
     async def score(self, prompt: str, values: Union[str, List[str]], **kwargs):
         """
@@ -132,14 +133,15 @@ class LLM:
         to score a list of continuations against the prompt of the current query context.
         """
         dcmodel = self.adapter.get_dclib_model()
-        with dc.ContextTokenizer(self.adapter.get_tokenizer()):
-            return await dc_score(dcmodel, prompt, values, **kwargs)
+        with traced(str(self) + ".score"):
+            with dc.ContextTokenizer(self.adapter.get_tokenizer()):
+                return await dc_score(dcmodel, prompt, values, **kwargs)
 
     def score_sync(self, *args, **kwargs):
         """
         Syncronous version of `score(...)`.
         """
-        return asyncio.run(self.score(*args, **kwargs))
+        return run_in_loop(self.score(*args, **kwargs))
 
     def __str__(self):
         configuration_string = ", ".join([f"{k}={v}" for k, v in self.configuration.items()])

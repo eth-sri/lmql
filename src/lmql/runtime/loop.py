@@ -63,3 +63,16 @@ def main(query_fct, *args, **kwargs):
     asyncio.set_event_loop(loop)
 
     return loop.run_until_complete(query_fct(*args, **kwargs))
+
+
+def run_in_loop(fct):
+    import asyncio
+
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError as e:
+        return asyncio.run(fct)
+
+    asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(fct)

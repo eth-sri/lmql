@@ -22,10 +22,17 @@ async def test_llm_generate():
 
 async def test_llm_multi_generate():
     llm = lmql.model("random", seed=123)
-    result = await llm.generate(["Test", "Test"], max_tokens=10, temperature=0.2, n=2)
+    result = await llm.generate("Test", max_tokens=10, temperature=0.2, n=2)
     assert type(result) is list and len(result) == 2
     for r in result:
         assert type(r) is str and len(r) > 0
+
+async def test_llm_generate_two_sequential():
+    llm = lmql.model("openai/text-ada-001", seed=123)
+    result1 = await llm.generate("Test", max_tokens=10)
+    result2 = await llm.generate("Test", max_tokens=10)
+    assert type(result1) is str and len(result1) > 0
+    assert type(result2) is str and len(result2) > 0
 
 def test_score_sync():
     lmql.set_default_model(lmql.model("random", seed=123))

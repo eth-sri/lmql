@@ -34,8 +34,8 @@ class InferenceCertificate:
                 "time": time.strftime("%Y-%m-%d %H:%M:%S %z")
                } if not child else {}),
             **({"events": self.process_events()} if len(self.tracer.events) > 0 else {}),
-            **({"metrics": self.tracer.metrics} if len(self.tracer.metrics) > 0 else {}),
-            **({"children": [certificate(c).asdict(child=True) for c in self.tracer.children]} if len(self.tracer.children) > 0 else {})
+            **({"children": [certificate(c).asdict(child=True) for c in self.tracer.children]} if len(self.tracer.children) > 0 else {}),
+            **({"metrics": self.tracer.metrics} if len(self.tracer.metrics) > 0 else {})
         }
 
     def __str__(self) -> str:
