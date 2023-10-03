@@ -12,7 +12,6 @@ from multiprocessing.connection import Connection
 from .lmtp_client import *
 from .lmtp_inference_server import TokenSession
 
-
 async def multiprocessing_main_async(pipe: Connection, kwargs):
     transport = LMTPMultiprocessingTransport(pipe)
     session = TokenSession(transport, kwargs)
@@ -36,6 +35,9 @@ async def multiprocessing_main_async(pipe: Connection, kwargs):
 
 
 def multiprocessing_main(pipe: Connection, kwargs):
+    global multiprocessing_worker
+    multiprocessing_worker = True
+    
     asyncio.run(multiprocessing_main_async(pipe, kwargs))
 
 class LMTPMultiprocessingTransport:
@@ -82,6 +84,12 @@ class LMTPMultiProcessingClient:
     def __init__(self, model_identifier, **kwargs):
         ensure_picklable(kwargs, "lmtp.inprocess kwargs must be pickleable as it has to be sent to a subprocess")
         self.model_identifier = model_identifier
+
+        if multiprocessing.current_process().name != "MainProcess":
+            import sys
+            sys.stderr.write("Error: Detected an access to a lmql.model(..., inprocess=True)/local:<MODEL> inside the multiprocessing worker process itself. This is not supported and may lead to unexpected behavior.\n\nTo avoid this, please make sure to not call lmql.model(..., inprocess=True) on the top level of your script, but only inside functions or the __main__ block.")
+            sys.stderr.flush()
+            assert False
 
         (c2, c1) = multiprocessing.Pipe(duplex=True)
         self.subprocess = multiprocessing.Process(target=multiprocessing_main, args=(c1,kwargs), 

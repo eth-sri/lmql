@@ -86,6 +86,11 @@ To learn more about LMQL, select one of the following sections or navigate the d
        Use LMQL with a range of inference backends, including llama.cpp,
        `transformers`, and OpenAI.
       
+    .. grid-item-card:: 💻 Generations API
+       :link: lib/generations.md
+
+       Start using LMQL via a lightweight Python API, before diving deep into the language.
+      
 
 .. toctree::
   :hidden:
@@ -111,8 +116,9 @@ To learn more about LMQL, select one of the following sections or navigate the d
 .. toctree::
     :hidden:
     :maxdepth: 2
-    :caption: 📦 Standard Library
+    :caption: 📦 Library
     
+    lib/generations.md
     lib/chat.rst
     lib/output.md
 

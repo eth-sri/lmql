@@ -1,8 +1,7 @@
 import lmql
 from lmql.tests.expr_test_utils import run_all_tests
-from lmql.runtime.tokenizer import load_tokenizer
 
-t = load_tokenizer("gpt2")
+t = lmql.tokenizer("gpt2")
 
 def token_diff(s1, s2):
     ids1 = t(s1)["input_ids"]
@@ -89,8 +88,8 @@ async def test_later_var_token_constrained():
 @lmql.query
 async def test_stops_before_exact_token_len():
     '''lmql
-    argmax(max_len=256, openai_chunksize=4)
-        "A rhyme named '[NAME]':\n"
+    argmax(max_len=256, chunksize=4)
+        "A rhyme named '[NAME]':\n" where len(TOKENS(NAME)) == 4
         assert not "'" in NAME
         "Verse: [RHYME]\n"
         assert tlen(RHYME) == 4

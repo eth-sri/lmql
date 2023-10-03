@@ -15,7 +15,6 @@ from lmql.ops.follow_map import FollowMap
 from lmql.ops.token_set import VocabularyMatcher, has_tail, tset
 from lmql.ops.follow_map import fmap
 from lmql.runtime.interrupt import interrupt
-from lmql.runtime.model_registry import LMQLModelRegistry
 from lmql.runtime.multi_head_interpretation import (InterpretationHead,
                                                     InterpretationHeadDone,
                                                     InterpreterCall)
@@ -30,8 +29,12 @@ from lmql.language.qstrings import qstring_to_stmts, TemplateVariable, Distribut
 from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
-from lmql.runtime.model_registry import LMQLModelRegistry
-from lmql.models.model import model, LMQLModel
+from lmql.models.model_info import model_info
+from lmql.runtime.context import ContextTokenizer
+from lmql.api.llm import LLM
+
+from lmql.api.scoring import dc_score
+from lmql.api import score
 
 from lmql.ops.token_set import tset
 import lmql.ops.ops as ops
@@ -187,6 +190,11 @@ class LMQLContext:
 
         return LMQLResult(self.state.prompt, await self.get_all_vars(),self.interpreter.distribution_variable, self.interpreter.distribution_values)
 
+    async def score(self, values, **kwargs):
+        model = kwargs.get("model", None)
+        if model is not None:
+            return await score(self.prompt, values, **kwargs)
+        return await dc_score(self.interpreter.dcmodel, self.prompt, values, **kwargs)
 
 @dataclass
 class LMQLResult:
@@ -214,7 +222,7 @@ class PromptInterpreter:
     def __init__(self, context=None, force_model=None, name="<root>") -> None:
         # model-specific components
         self.model = force_model
-        self.model_identifier = force_model
+        self.model_identifier = force_model.model_identifier if isinstance(force_model, LLM) else force_model
         self.name = name
         self.tokenizer: LMQLTokenizer = None
 
@@ -286,54 +294,30 @@ class PromptInterpreter:
         self.decoder_kwargs = kwargs
         self.decoder_kwargs["decoder"] = method
 
-        if "backend" in kwargs:
-            LMQLModelRegistry.backend_configuration = kwargs["backend"]
-
-    def set_model(self, model_name):
-        model_args = {}
-
-        if type(model_name) is str:
-            model_name = model(model_name)
-
-        assert isinstance(model_name, LMQLModel), "Not a supported LMQL model '{}' of type '{}'".format(model_name, type(model_name))
-        model_object = model_name
-
-        if model_name.model is not None:
-            model_object = model_name.model
-            # if model_object is a type reference, instantiate it
-            if callable(model_object):
-                model_object = model_object()
-
-            self.model_identifier = model_object.model_identifier
-            self.model = model_object
-
-            # setup the VocabularyMatcher to use the concrete vocabulary of the model
-            VocabularyMatcher.init(self.model.get_tokenizer())
-
-            return
-        else:
-            model_name = model_object.model_identifier
-            model_args = model_object.kwargs
-
-        if self.model is None:
-            self.model = model_name
-            self.model_identifier = model_name
-        elif type(self.model_identifier) is not str:
-            self.model_identifier = self.model.model_identifier
-
-        client = LMQLModelRegistry.get(self.model, **model_args)
-
-        if callable(client):
-            client = client()
+    def set_model(self, model_handle: Union[str, LLM]):
+        if model_handle == "<dynamic>" and self.model is not None:
+            model_handle = self.model
+        
+        # check if a model is already set (forced by caller)
+        if self.model is not None:
+            model_handle = self.model
+        
+        model_handle = LLM.from_descriptor(model_handle)
+        self.model_identifier = model_handle.model_identifier
 
         # setup the VocabularyMatcher to use the concrete vocabulary of the model
-        VocabularyMatcher.init(client.get_tokenizer())
+        VocabularyMatcher.init(model_handle.get_tokenizer())
         
         # for OpenAI models we optimize for compact logit masks
         if self.model_identifier.startswith("openai/"):
             self.prefers_compact_mask = True
 
-        self.model = client
+        self.model = model_handle
+
+        # prepare dcmodel
+        decoder_args = self.decoder_kwargs
+        self.model.adapter.decoder_args = {**decoder_args, **self.extra_kwargs}
+        self.dcmodel: dc.DcModel = self.model.adapter.get_dclib_model()
 
     async def advance(self, state: PromptState):
         if state.variable is not None:
@@ -350,6 +334,8 @@ class PromptInterpreter:
         query_args_after_last_continue = query_args
         program_variables_after_last_continue = None
         prompt = state.prompt
+        recurring_variable_counter = state.recurring_variable_counter.copy()
+        distribution_reached = False
 
         query_head = state.query_head
 
@@ -375,17 +361,21 @@ class PromptInterpreter:
             # return context used for last continue_
             return query_head.context
         
-        # disable DecoderSequence.graph for the duration of executing the prompt
+        def format_buffer():
+            return [s if type(s) is str else s.name for s in stmt_buffer if s is not advance]
 
+        # disable DecoderSequence.graph for the duration of executing the prompt
         try:
             while variable is None and query_head.result is None:
                 if len(stmt_buffer) == 0 and variable is None:
                     await continue_for_more_prompt_stmts()
+                    if distribution_reached:
+                        assert len(stmt_buffer) == 0, "error: distribution variable must be the last statement in a prompt, but found {}".format(format_buffer())
 
                 s = stmt_buffer[0]
 
                 if type(s) is str:
-                    s = self.process_query_string(s)
+                    s = self.process_query_string(s, first=len(prompt) == 0)
                     prompt += s
                     stmt_buffer = stmt_buffer[1:]
                     query_args = None
@@ -410,9 +400,9 @@ class PromptInterpreter:
                             variable_args["constraints"] = ops.FixedValueOp([ops.Var(variable)], variable_value, prompt_value)
 
                     # keep track of number of times a variable with this name has been decoded
-                    if variable not in state.recurring_variable_counter.keys():
-                        state.recurring_variable_counter[s.name] = -1
-                    state.recurring_variable_counter[s.name] += 1
+                    if variable not in recurring_variable_counter.keys():
+                        recurring_variable_counter[s.name] = -1
+                    recurring_variable_counter[s.name] += 1
                     
                     stmt_buffer = stmt_buffer[1:]
                     break
@@ -420,7 +410,8 @@ class PromptInterpreter:
                     # distribution variables are skipped here, as they are handled in a postprocessing step after returning an LMQL result
                     # self.query_head must terminate after this part of the prompt (ensure by validation)
                     stmt_buffer = stmt_buffer[1:]
-                    assert len([s for s in stmt_buffer if s is not advance]) == 0, "Distribution variables must be the last statement in a prompt, but is {}".format(stmt_buffer)
+                    assert len([s for s in stmt_buffer if s is not advance]) == 0, "error: distribution variable must be the last statement in a prompt, but found {}".format(format_buffer())
+                    distribution_reached = True
                     # this will consume the set_distribution call
                 elif s is advance:
                     query_head: InterpretationHead = query_head.copy()
@@ -449,13 +440,18 @@ class PromptInterpreter:
             variable_args=variable_args,
             stmt_buffer=stmt_buffer,
             query_head=query_head,
-            program_state=program_state
+            program_state=program_state,
+            recurring_variable_counter=recurring_variable_counter
         )
 
-    def process_query_string(self, s: str):
-        if not ("turbo" in self.model_identifier or "gpt-4" in self.model_identifier or "chatgpt" in self.model_identifier):
-            # replace all r"<lmql:(.*?)\/>" tags with ((\1))
-            s = re.sub(r"<lmql:(.*?)\/>", r"((\1)):", s)
+    def process_query_string(self, s: str, first=False):
+        if not model_info(self.model_identifier).is_chat_model:
+            # check if this is the first token in the prompt and it is a tag
+            first_tag = s.startswith("<lmql:") and first
+            # replace <lmql:ROLE/> with ((ROLE)):
+            s = re.sub(r"<lmql:(.*?)\/>", r"\n((\1)):", s)
+            # strip off leading newline if it was added due to a tag
+            if first_tag: s = s[1:]
         s = unescape_qstring(s)
         return s
 
@@ -522,6 +518,7 @@ class PromptInterpreter:
                 variable = variable.split(":before",1)[0]
 
             text = await s.text(variable_offset, pretty=False)
+            text_tokens = s.input_ids[variable_offset:].tolist()
             diff_text = text[len(await s.text(variable_offset, limit=-1, pretty=False)):]
 
             # run applicable inline ops (sub interpreters)
@@ -529,13 +526,13 @@ class PromptInterpreter:
 
             # current context
             program_state: ProgramState = state.program_state.copy()
-            program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc")
+            program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
             program_state.subinterpreter_results = subvalid
             program_state.prompt = state.prompt
 
             # follow context
             follow_program_state: ProgramState = state.program_state.copy()
-            follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc")
+            follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
             follow_program_state.subinterpreter_results = subfollow
             follow_program_state.prompt = state.prompt
 
@@ -643,6 +640,8 @@ class PromptInterpreter:
     async def debugger_output(self, state: PromptState, s: dc.DecoderSequence, valid, is_final, mask, stopping_phrases, program_variables, trace, text, where):
         if self.output_writer is not None:
            await self.output_writer.add_interpreter_head_state(state.variable, 0, state.prompt + text, where, trace, valid, is_final, mask, len(s.input_ids), program_variables)
+        if hasattr(self.output_writer, "add_sequence_state"):
+            await self.output_writer.add_sequence_state(s)
 
     async def where_processor(self, seqs, additional_logits_processor_mask, **kwargs):
         zipped_task_inputs = zip(seqs, additional_logits_processor_mask, range(len(seqs)))
@@ -731,11 +730,12 @@ class PromptInterpreter:
             variable = state.variable
             
             text = (await seq.text(offset=state.variable_offset, limit=-1, pretty=False))
+            text_tokens = seq.input_ids[state.variable_offset:-1].tolist()
             text_diff = text[len(await seq.text(state.variable_offset, limit=-2, pretty=False)):]
             
             variable_value = text
             # set raw variable value
-            program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin")
+            program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin", tokens=text_tokens)
 
             where = state.full_where_condition(self)
 
@@ -774,7 +774,7 @@ class PromptInterpreter:
             
             appended_value_prompt = prompt[prompt_length_before:]
 
-            #  advance to next variable in prompt program (appends intermediate instructions to prompt)
+            #  advance to next variable in prompt program (appends intermediate instructions to prompt in addition to the just decoded variable value)
             assert not assert_no_advance, f"error: prompt interpreter tried to advance query program even though assert_no_advance was set"
 
             state = state.updated(variable=variable, prompt=prompt, program_state=program_state)
@@ -797,6 +797,9 @@ class PromptInterpreter:
             if old_prompt != prompt:
                 n_tokens_to_strip = len(seq.input_ids) - variable_offset
                 value_ids, program_ids = await asyncio.gather(*[self.tokenize(appended_value_prompt), self.tokenize(appended_program_prompt)])
+                
+                # update IDs in program state
+                state.program_state.variable_tokens[variable] = value_ids
 
                 assert len(seq.input_ids) - n_tokens_to_strip == variable_offset, f"error: variable offset is not correct. expected {len(seq.input_ids) - n_tokens_to_strip} but got {state.variable_offset}"
                 
@@ -907,11 +910,6 @@ class PromptInterpreter:
             tail=None)
         self.root_state = await self.advance(self.root_state)
 
-        # prepare dcmodel
-        decoder_args = self.decoder_kwargs
-        self.model.decoder_args = decoder_args
-        self.dcmodel: dc.DcModel = self.model.get_dclib_model()
-
         async def debug_out(decoder_step):
             if PromptInterpreter.main != self:
                 return
@@ -930,8 +928,6 @@ class PromptInterpreter:
         # prepare tokenizer
         self.tokenizer = self.model.get_tokenizer()
 
-        assert issubclass(type(self.dcmodel), dc.DcModel), "The provided dcmodel must be a subclass of DcModel"
-
         # alternative mode where we only extract the prompt string
         return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)
         if return_prompt_string:
@@ -948,7 +944,7 @@ class PromptInterpreter:
         # make sure that the initial prompt is not considered part of a variable
         self.root_state = self.root_state.updated(variable_offset=n)
 
-        decoder_args = decoder_args.copy()
+        decoder_args = self.decoder_kwargs.copy()
 
         # pass processor as decoder argument
         decoder_args["modern_logits_processor"] = self.where_processor
@@ -973,9 +969,13 @@ class PromptInterpreter:
         # get decoder function
         mode = decoder_args["decoder"].lower()
         # handle dynamically-set decoding (e.g. set via @lmql.query(decoder="beam", n=2))
+        derived_mode, extra_decoder_args = self.derive_decoder_args(self.extra_kwargs, decoder_args)
+        decoder_args = {**decoder_args, **extra_decoder_args}
+        
+        # use derived decoder, if not set explicitly
         if mode == "__dynamic__":
-            mode, extra_decoder_args = self.derive_decoder_args(self.extra_kwargs)
-            decoder_args = {**decoder_args, **extra_decoder_args}
+            mode = derived_mode
+        
         decoder_fct = dc.get_decoder(mode)
         self.validate_args(decoder_args, decoder_fct)
 
@@ -1015,76 +1015,85 @@ class PromptInterpreter:
         # set step budget at least to max_len
         step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
 
-        try:
-            import time
+        with ContextTokenizer(self.model.get_tokenizer()):
+            try:
+                import time
 
-            self.decoder_step = 0
-            average_step_time = None
-            start = time.time()
-            async for _ in decoder_fct(prompt, **decoder_args):
+                self.decoder_step = 0
+                average_step_time = None
+                start = time.time()
+
+                async for _ in decoder_fct(prompt, **decoder_args):
+                    await debug_out(self.decoder_step)
+                    self.decoder_step += 1
+
+                    if step_budget is not None and self.decoder_step >= step_budget:
+                        warnings.warn("warning: step budget exceeded")
+                        break
+
+                    if interrupt.check():
+                        interrupt.clear()
+                        raise InterruptedError("lmql.runtime.interrupt")
+                    
+                    average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
+
+                    if "performance_stats" in decoder_args:
+                        if self.decoder_step % 10 == 0:
+                            Stats.print_all()
+                            print("step", self.decoder_step, "time", average_step_time)
+
+                    start = time.time()
+                
+                assert False, "decoder {} did not finish with dc.finish(), which means no result sequences were returned. \n\nThe reason for this may be a too small max_len value (max_len={}) ".format(decoder_args["decoder"], decoder_args["max_len"])
+                    
+            except dc.FinishException as fe:
+                # one last call to debug_out to get the final state
                 await debug_out(self.decoder_step)
+                # if dc.finish is used, the decoder sets the sequences it considers 
+                # finished (return them to prompt interpreter)
+                result_sequences = fe.result_sequences
+                
+                billable_tokens = 0
+                for s in result_sequences:
+                    upper = len(s.input_ids)
+                    has_deterministic_tail = False
+                    while s.deterministic[upper-1] and upper >= 0:
+                        upper -= 1
+                        has_deterministic_tail = True
+                    # +1 for the eos token
+                    billable_tokens += upper + (1 if has_deterministic_tail else 0)
+                
+                results = []
+
+                for i,s in enumerate(result_sequences):
+                    state = self.interpreter_state_from_user_data(s)
+                    
+                    if hasattr(self.output_writer, "add_sequence_state"):
+                        await self.output_writer.add_sequence_state(s)
+                        
+                    if state.query_head.result is not None:
+                        results.append(state.query_head.result)
+                    else:
+                        state = await self.advance(state)
+                        assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
+
+                        assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), decoder_args["decoder"])
+                        results.append(state.query_head.result)
+                
+                # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
 
-                if step_budget is not None and self.decoder_step >= step_budget:
-                    warnings.warn("warning: step budget exceeded")
-                    break
-
-                if interrupt.check():
-                    interrupt.clear()
-                    raise InterruptedError("lmql.runtime.interrupt")
-                
-                average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
-
-                if "performance_stats" in decoder_args:
-                    if self.decoder_step % 10 == 0:
-                        Stats.print_all()
-                        print("step", self.decoder_step, "time", average_step_time)
-
-                start = time.time()
-            
-            assert False, "decoder {} did not finish with dc.finish(), which means no result sequences were returned. \n\nThe reason for this may be a too small max_len value (max_len={}) ".format(decoder_args["decoder"], decoder_args["max_len"])
-                
-        except dc.FinishException as fe:
-            # one last call to debug_out to get the final state
-            await debug_out(self.decoder_step)
-            # if dc.finish is used, the decoder sets the sequences it considers 
-            # finished (return them to prompt interpreter)
-            result_sequences = fe.result_sequences
-            
-            billable_tokens = 0
-            for s in result_sequences:
-                upper = len(s.input_ids)
-                has_deterministic_tail = False
-                while s.deterministic[upper-1] and upper >= 0:
-                    upper -= 1
-                    has_deterministic_tail = True
-                # +1 for the eos token
-                billable_tokens += upper + (1 if has_deterministic_tail else 0)
-            
-            results = []
-
-            for i,s in enumerate(result_sequences):
-                state = self.interpreter_state_from_user_data(s)
-                if state.query_head.result is not None:
-                    results.append(state.query_head.result)
-                else:
-                    state = await self.advance(state)
-                    assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
-
-                    assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), decoder_args["decoder"])
-                    results.append(state.query_head.result)
-            
-            # set decoder step +1, for all stats logging that happens in postprocessing
-            self.decoder_step += 1
-
-            return results
+                return results
         
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
                           "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
-                          "openai_nonstop", "chunksize", "alpha"]
+                          "openai_nonstop", "chunksize", "alpha", "verbose"]
 
-    def derive_decoder_args(self, extra_kwargs):
+    def derive_decoder_args(self, extra_kwargs, existing_args=None):
+        # if no existing args are provided, use no args
+        existing_args = existing_args or {}
+        
         # default is argmax
         decoder = extra_kwargs.get("decoder", "argmax")
         # if temperature is != 0, use 'sample'
@@ -1104,6 +1113,10 @@ class PromptInterpreter:
         for eda in PromptInterpreter.EXTRA_DECODER_ARGS:
             if eda in extra_kwargs.keys():
                 decoder_args[eda] = extra_kwargs[eda]
+            
+            # underscore prefixed args are only used if existing_args does not already contain the arg
+            if "_" + eda in extra_kwargs.keys() and not eda in existing_args.keys():
+                decoder_args[eda] = extra_kwargs["_" + eda]
 
         return decoder, decoder_args
     
@@ -1221,7 +1234,7 @@ class SubInterpreter(PromptInterpreter):
         self.initial_subprompt_ids = None
         
         self.model = model
-        self.model_identifier = model_identifier
+        self.model_identifier = model_identifier.model_identifier if isinstance(model_identifier, LLM) else model_identifier
 
     def set_model(self, model):
         # ignore set_model for subinterpreters
@@ -1248,9 +1261,7 @@ class SubInterpreter(PromptInterpreter):
             name = self.name[4:] if self.name.startswith("sub:") else self.name
             warnings.warn("warning: the decoder configuration of nested query '{}' is ignored. Nested queries cannot specify their own decoder.".format(name))
 
-        self.initial_subprompt_ids = await self.tokenize(self.root_state.prompt)
-        self.n = len(self.initial_subprompt_ids)
-
+        self.n = parent_offset
         self.root_state = self.root_state.updated(variable_offset=self.n)
 
     def run(self, prompt, **kwargs):

@@ -45,7 +45,7 @@ a Handlebars-like syntax. To highlight the benefits of LMQL and Guidance, we com
 | Tree-based Token Caching | ✅ [(Blog)](https://lmql.ai/blog/release-0.0.6.html) | - |
 | Transformers Key-Value Caching | *In Development* | ✅ ([`guidance` acceleration](https://github.com/microsoft/guidance#guidance-acceleration-notebook)) |
 | Cache Persistence across multiple runs | ✅ [(Blog)](https://lmql.ai/blog/release-0.0.6.html#persisting-the-cache) | - |
-| Token Healing | *In Development* | [✅](https://github.com/microsoft/guidance#token-healing-notebook) |
+| Token Healing | *Planned* | [✅](https://github.com/microsoft/guidance#token-healing-notebook) |
 | Eager Constraint Evaluation and Short-Circuiting | ✅ [(Blog)](https://lmql.ai/blog/release-0.0.6.html#short-circuiting-long-constraints) | - |
 | **Library Integration** | | |
 | Langchain | LMQL queries can be used seamlessly as [LangChain `Chain` objects](./langchain.ipynb#Using-LMQL-from-LangChain) | - |

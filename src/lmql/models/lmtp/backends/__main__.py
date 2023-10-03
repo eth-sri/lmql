@@ -3,7 +3,7 @@ import numpy as np
 
 from lmql.models.lmtp.backends import LMTPModel
 from lmql.models.lmtp.lmtp_scheduler import TokenStreamer
-from lmql.runtime.tokenizer import load_tokenizer
+import lmql
 
 import transformers
 
@@ -11,7 +11,7 @@ import transformers
 if __name__ == "__main__":
     backend = sys.argv[1]
     model: LMTPModel = LMTPModel.load(backend)
-    t = load_tokenizer("huggyllama/llama-7b")
+    t = lmql.tokenizer("huggyllama/llama-7b")
 
     s = sys.argv[2]
     input_ids = [t.bos_token_id] + t(s)["input_ids"]

@@ -7,12 +7,7 @@ module.exports = { queries: [
             // hello world
             name: "👋 Hello World",
             description: "Who This?",
-            code: `argmax 
-    "Say 'this is a test':[RESPONSE]" 
-from 
-    "openai/text-ada-001" 
-where 
-    len(TOKENS(RESPONSE)) < 10`,
+            code: ` "Say 'this is a test':[RESPONSE]" where len(TOKENS(RESPONSE)) < 10`,
             state: 'precomputed/hello.json'
          },
          {
@@ -256,7 +251,7 @@ def calc(expr):
     expr = re.sub(r"[^0-9\+\\-*/\(\)\.]", "", expr)
     return eval(expr)
 
-argmax(openai_chunksize=64, max_len=2048)
+argmax(chunksize=64, max_len=2048)
     QUESTION = "Josh decides to try flipping a house.  He buys a house for $80,000 and then puts in $50,000 in repairs.  This increased the value of the house by 150%.  How much profit did he make?"
     # few shot samples
     "{gsm8k_samples()}"
@@ -311,7 +306,7 @@ storage = {}
 def assign(key, value): storage[key] = value; return f'{{{key}: "{value}"}}'
 def get(key): return storage.get(key)
 
-argmax(n=1, openai_chunksize=128, max_len=2048, step_budget=4*2048)
+argmax(n=1, chunksize=128, max_len=2048, step_budget=4*2048)
     """In your reasoning you can use actions. You do this as follows:
     \`action_name(<args>) # result: <inserted result>\`
     To remember things, you can use 'assign'/'get':

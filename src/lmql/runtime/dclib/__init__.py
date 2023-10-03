@@ -1,4 +1,10 @@
-from .dclib_global import *
+"""
+dclib is a library for LLM decoding algorithms.
+
+See decoders.py for the actual decoder implementations.
+"""
+
+from ..context import *
 from .dclib_array import *
 from .dclib_model import *
 from .dclib_seq import *

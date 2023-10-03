@@ -1,8 +1,8 @@
+import lmql
 from lmql.ops.token_set import *
-from lmql.runtime.tokenizer import load_tokenizer
 from lmql.tests.expr_test_utils import run_all_tests
 
-VocabularyMatcher.init(load_tokenizer("gpt2"))
+VocabularyMatcher.init(lmql.tokenizer("gpt2"))
 
 def test_simple():
     p1 = ntset("eos")

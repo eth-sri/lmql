@@ -406,3 +406,7 @@ span.tag {
 .note.latest .admonition-title {
     font-size: 0.8em;
 }
+
+.globaltoc li ul {
+    margin-bottom: 5pt;
+}

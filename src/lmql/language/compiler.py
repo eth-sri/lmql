@@ -11,6 +11,7 @@ from typing import Any
 import lmql.runtime.lmql_runtime as lmql_runtime
 from lmql.language.fragment_parser import (FragmentParserError,
                                            LanguageFragmentParser,
+                                           LMQLDistributionClause,
                                            double_unescape_str,
                                            LMQLDecoderConfiguration, LMQLQuery)
 from lmql.language.qstrings import (DistributionVariable, FExpression,
@@ -19,7 +20,7 @@ from lmql.language.qstrings import (DistributionVariable, FExpression,
 from lmql.language.validator import LMQLValidationError, LMQLValidator
 from lmql.ops.ops import lmql_operation_registry
 from lmql.runtime.dclib import get_all_decoders
-from lmql.runtime.model_registry import model_name_aliases
+from lmql.models.aliases import model_name_aliases
 
 OPS_NAMESPACE = "lmql.ops"
 LIB_NAMESPACE = "lmql.lib"
@@ -90,8 +91,9 @@ class PromptScope(ast.NodeVisitor):
         self.prologue_vars = set()
         self.free_vars = set()
         self.written_vars = set()
-
         self.defined_constraints = set()
+
+        self.query = None
 
     def scope_prologue(self, query: LMQLQuery):
         if query.prologue is None: return
@@ -110,6 +112,8 @@ class PromptScope(ast.NodeVisitor):
 
         # collect defined vars in prologue
         self.scope_prologue(query)
+
+        self.query = query
 
         # collect defined vars in prompt
         for p in query.prompt: 
@@ -144,6 +148,16 @@ class PromptScope(ast.NodeVisitor):
             self.scope_Constant(node.values[0])
             for constraint in node.values[1:]:
                 self.visit_where(constraint)
+        elif is_query_string_with_distribution(node):
+            assert len(node.values) == 2, "compiler error: distribution clause must be an expression of shape 'distribution VAR in [val1, val2, ...]'"
+            distribution_in_clause = node.values[1]
+            assert isinstance(distribution_in_clause, ast.Compare), "compiler error: distribution clause must be an expression of shape 'distribution VAR in [val1, val2, ...]'"
+            var = distribution_in_clause.left
+            assert isinstance(var, ast.Name), "compiler error: distribution clause must be an expression of shape 'distribution VAR in [val1, val2, ...]'"
+            self.distribution_vars = set([var.id])
+            assert len(distribution_in_clause.comparators) == 1, "compiler error: distribution clause must be an expression of shape 'distribution VAR in [val1, val2, ...]'"
+            self.query.distribution = LMQLDistributionClause(var.id, distribution_in_clause.comparators[0])
+            self.scope_Constant(node.values[0])
         else:
             super().generic_visit(node)
 
@@ -276,6 +290,12 @@ def is_query_string_with_constraints(node: ast.BoolOp):
     left_most_operand = node.values[0]
     return type(left_most_operand) is ast.Constant and type(left_most_operand.value) is str and isinstance(node.op, ast.And)
 
+def is_query_string_with_distribution(node: ast.BoolOp):
+    if len(node.values) < 1:
+        return False
+    left_most_operand = node.values[0]
+    return type(left_most_operand) is ast.Constant and type(left_most_operand.value) is str and isinstance(node.op, ast.Or)
+
 def attr(s):
     names = s.split(".")
     element = ast.Name(names[0], ast.Load())
@@ -332,6 +352,12 @@ class PromptClauseTransformation(FunctionCallTransformation):
         else:
             return self.generic_visit(expr)
 
+    # (remove redundant 'import lmql' statements)
+    def visit_Import(self, node: Import) -> Any:
+        if len(node.names) == 1 and node.names[0].name == "lmql":
+            return ast.parse("")
+        return node
+
     # translate id access to context
     def visit_Name(self, node: ast.Name):
         name = str(node.id)
@@ -351,6 +377,9 @@ class PromptClauseTransformation(FunctionCallTransformation):
             elif len(node.values[1:]) == 0:
                 constraints_expression = None
             return self.transform_Constant(left_most_operand, constraints = constraints_expression)
+        elif is_query_string_with_distribution(node):
+            left_most_operand = node.values[0]
+            return self.transform_Constant(left_most_operand)
         return self.generic_visit(node)
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
@@ -788,7 +817,7 @@ class PythonFunctionWriter:
     def flush(self):
         if "lmql.lib" in self.in_memory_contents:
             # replace first import lmql
-            self.in_memory_contents = self.in_memory_contents.replace("import lmql\n", "import lmql\nimport lmql.lib\n")
+            self.in_memory_contents = self.in_memory_contents.replace("import lmql\n", "import lmql;import lmql.lib\n")
 
         self.file.write(self.in_memory_contents)
 
@@ -928,6 +957,4 @@ class LMQLCompiler:
 
             return LMQLModule(output_file, lmql_code=lmql_code, output_variables=[v for v in scope.defined_vars])
         except FragmentParserError as e:
-            sys.stderr.write("error: " + str(e) + "\n")
-            sys.exit(1)
-
+            raise RuntimeError("parsing error: {}.\nFailed when parsing:\n {}".format(e, lmql_code))

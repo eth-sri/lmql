@@ -4,7 +4,6 @@ from typing import List, Union
 
 from .dclib_array import DataArray
 from .dclib_rewrite import DcModelRewriteMixin
-from .dclib_global import stats
 from .dclib_seq import DecoderSequence, detseq, deepcopy, deepmerge, DecoderSequence, DeterministicDecoderSequence, Continuation
 import numpy as np
 from lmql.utils import nputil

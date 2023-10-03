@@ -1,11 +1,18 @@
 import lmql
 from expr_test_utils import run_all_tests
 
+t = lmql.tokenizer("gpt2")
+
+def token_diff(s1, s2):
+    ids1 = t(s1)["input_ids"]
+    ids2 = t(s2)["input_ids"]
+    return ids2[len(ids1):]
+
 @lmql.query(model=lmql.model("random", seed=123))
 def test_noprompt():
     '''lmql
     "[RESPONSE]" where len(TOKENS(RESPONSE)) < 10
-    assert RESPONSE == " strides nutssa fallout Augustine frog malnutrition teasing", f"Expected fixed random value but got {[RESPONSE]}"
+    assert RESPONSE == " strides nutssa fallout Augustine frog malnutrition teasing stare", f"Expected fixed random value but got {[RESPONSE]}"
     '''
 
 @lmql.query(model=lmql.model("random", seed=123))

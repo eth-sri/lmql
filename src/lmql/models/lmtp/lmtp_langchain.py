@@ -18,8 +18,8 @@ from langchain.callbacks.manager import (
 from langchain.llms.utils import enforce_stop_tokens
 from langchain.schema import LLMResult
 
-from lmql.runtime.tokenizer import LMQLTokenizer, load_tokenizer
-from lmql.runtime.model_registry import LMQLModelRegistry
+import lmql
+from lmql.runtime.tokenizer import LMQLTokenizer
 
 if TYPE_CHECKING:
     from tenacity import RetryCallState
@@ -232,7 +232,7 @@ class LMTP(LLM):
 
     def _get_tokenizer(self) -> LMQLTokenizer:
         if self.tokenizer is None:
-            self.tokenizer = LMQLModelRegistry.get(self.model).get_tokenizer()
+            self.tokenizer = lmql.model(self.model).get_tokenizer()
         return self.tokenizer
 
     def _call(

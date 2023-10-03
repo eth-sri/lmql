@@ -164,6 +164,7 @@ class LanguageFragmentParser:
 
         self.prologue_transform()
         self.inline_where_transform()
+        self.inline_distribution_transform()
         self.ast_parse()
         self.syntax_validation()
         self.ast_transform()
@@ -177,7 +178,14 @@ class LanguageFragmentParser:
             lookahead = prompt_tokens[i+1]
             if tok.type == tokenize.STRING and lookahead.type == tokenize.NAME and lookahead.string == "where":
                 prompt_tokens[i+1] = tokenize.TokenInfo(type=tokenize.OP, string="and", start=lookahead.start, end=lookahead.end, line=lookahead.line)
-        
+    
+    def inline_distribution_transform(self):
+        prompt_tokens = self.query.prompt_str
+        for i in range(len(prompt_tokens) - 1):
+            tok = prompt_tokens[i]
+            lookahead = prompt_tokens[i+1]
+            if tok.type == tokenize.STRING and lookahead.type == tokenize.NAME and lookahead.string == "distribution":
+                prompt_tokens[i+1] = tokenize.TokenInfo(type=tokenize.OP, string="or", start=lookahead.start, end=lookahead.end, line=lookahead.line)
 
     def prologue_transform(self):
         # translate prologue tokens into str
@@ -241,13 +249,17 @@ class LanguageFragmentParser:
     def digest(self, tok):
         if self.state == "start":
             if tok.type == tokenize.NAME:
+                # detect .<decoder_name> as property access, which should not be 
+                # interpreted as a decoder keyword
+                is_property_access = len(self.query.prologue) > 0 and self.query.prologue[-1].type == tokenize.OP and self.query.prologue[-1].string == "."
+
                 # when we encounter the first decoder keyword, we switch to the query parsing state
-                if tok.string.lower() in get_all_decoders():
+                if tok.string.lower() in get_all_decoders() and not is_property_access:
                     self.query.decode_str += [tok]
                     self.state = "decode"
                     return
             
-            if is_keyword(tok, "where"):
+            if is_keyword(tok, "where") or is_keyword(tok, "distribution"):
                 self.query.prompt_str = self.query.prologue + [tok]
                 self.query.prologue = []
                 self.state = "prompt"
@@ -275,7 +287,7 @@ class LanguageFragmentParser:
                 if self.query.prompt_str[-1].type != tokenize.STRING:
                     self.state = "where"
                     return
-            
+                
             if is_keyword(tok, "FROM"):
                 self.state = "from"
                 return
@@ -283,8 +295,9 @@ class LanguageFragmentParser:
                 self.state = "scoring"
                 return
             if is_keyword(tok, "DISTRIBUTION"):
-                self.state = "distribution"
-                return
+                if self.query.prompt_str[-1].type != tokenize.STRING:
+                    self.state = "distribution"
+                    return
             
             # if last token is NAME and current is str
             if len(self.query.prompt_str) > 0 and self.query.prompt_str[-1].type == tokenize.NAME and \

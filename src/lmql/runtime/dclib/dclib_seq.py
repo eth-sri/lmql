@@ -6,7 +6,7 @@ from lmql.utils import nputil
 
 from dataclasses import dataclass
 
-from .dclib_global import get_tokenizer
+from lmql.runtime.context import get_tokenizer
 from .dclib_array import DataArray, Continuation, topk, alpha_length_normalized, alpha_length_normalized_det
 
 detokenize_seqs = True

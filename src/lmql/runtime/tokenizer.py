@@ -55,6 +55,12 @@ class LMQLTokenizer:
         if "FORCE_TIKTOKEN" in os.environ:
             assert type(self.tokenizer_impl) is TiktokenTokenizer
 
+    def __str__(self):
+        return "<LMQLTokenizer '{}'>".format(self.model_identifier)
+    
+    def __repr__(self):
+        return str(self)
+
     @property
     def model_vocab_size(self):
         """
@@ -70,7 +76,7 @@ class LMQLTokenizer:
         if self._tokenizer_impl is None:
             self.loader_thread.join()
         if self._tokenizer_impl is None:
-            raise TokenizerNotAvailableError("Failed to load suitable tokenizer for model '{}'".format(self.model_identifier))
+            raise TokenizerNotAvailableError("Failed to derive a suitable tokenizer from the provided model name '{}'. If your model requires a specific (well-known) tokenizer, make sure specify it via lmql.model(..., tokenizer='...').".format(self.model_identifier))
         return self._tokenizer_impl
     
     @property
@@ -262,16 +268,30 @@ class LMQLTokenizer:
         return segments
             
 
-def load_tokenizer(model_identifier, type="auto", **kwargs):
+def tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
+    """
+    Loads a LMQLTokenizer for the given model identifier. 
+
+    If type is 'auto', the tokenizer will be loaded from the most suitable available backend. Otherwise, the type can be one of 'hf' (huggingface transformers), 'tiktoken' (tiktoken) or 'auto' (default).
+    """
     cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
     # check for tiktoken
-    if type in ["auto", "tiktoken"]:
+    if type in ["auto", "tiktoken"] or model_identifier.startswith("tiktoken:"):
+        if model_identifier.startswith("tiktoken:"):
+            model_identifier = model_identifier[len("tiktoken:"):]
+
+        # map gpt-3.5-turbo* to gpt-3.5-turbo
+        if "3.5" in model_identifier and "turbo" in model_identifier:
+            tiktoken_identifier = "gpt-3.5-turbo"
+        else:
+            tiktoken_identifier = model_identifier
+
         tiktoken_available = False
         # for GPT models we force non-HF tokenizers (tiktoken or python-backed)
         try:
-            if TiktokenTokenizer.is_available(model_identifier):
+            if TiktokenTokenizer.is_available(tiktoken_identifier):
                 tiktoken_available = True
         except:
             tiktoken_available = False
@@ -280,9 +300,9 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             def loader():
                 if cache_file_exists(cache_path):
                     with cachefile(cache_path, "rb") as f:
-                        return LMQLTokenizer(model_identifier, pickle.load(f))
+                        return LMQLTokenizer(tiktoken_identifier, pickle.load(f))
                 else:
-                    t = TiktokenTokenizer(model_identifier)
+                    t = TiktokenTokenizer(tiktoken_identifier)
 
                     with cachefile(cache_path, "wb") as f:
                         pickle.dump(t, f)
@@ -290,6 +310,12 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
             
             return LMQLTokenizer(model_identifier, loader=loader)
 
+    # check for llama.cpp tokenizer
+    if "tokenizer.model" in model_identifier:
+        from lmql.runtime.tokenizers.llama_cpp_tokenizer import LlamaCPPTokenizer
+        if LlamaCPPTokenizer.is_available(model_identifier):
+            return LMQLTokenizer(model_identifier, tokenizer_impl=LlamaCPPTokenizer(model_identifier))
+        
     # check for huggingface tokenizers
     from lmql.runtime.tokenizers.hf_tokenizer import TransformersTokenizer
     import os
@@ -316,7 +342,7 @@ def load_tokenizer(model_identifier, type="auto", **kwargs):
         
         return LMQLTokenizer(model_identifier, tokenizer_impl=PythonBackedTokenizer(model_identifier))
     
-    raise TokenizerNotAvailableError("Failed to locate a suitable tokenizer implementation for '{}' (if you are not using GPT models, please install the 'transformers' package)".format(model_identifier))
+    raise TokenizerNotAvailableError("Failed to locate a suitable tokenizer implementation for '{}' (Make sure your current environment provides a tokenizer backend like 'transformers', 'tiktoken' or 'llama.cpp' for this model)".format(model_identifier))
 
 def get_vocab(tokenizer):
     if hasattr(tokenizer, "vocab"):
@@ -335,7 +361,7 @@ if __name__ == "__main__":
     import torch
 
     model_identifier = sys.argv[1]
-    t = load_tokenizer(model_identifier)
+    t = tokenizer(model_identifier)
 
     to_tokenize = sys.argv[2]
 

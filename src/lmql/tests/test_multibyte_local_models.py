@@ -1,7 +1,7 @@
 import lmql
 from lmql.tests.expr_test_utils import run_all_tests
 
-m = lmql.model("local:gpt2", cuda=True)
+m = lmql.model("local:gpt2", cuda=True, silent=True)
 
 @lmql.query
 async def test_special_characters1():

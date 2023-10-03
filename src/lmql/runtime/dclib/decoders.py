@@ -2,7 +2,6 @@ import asyncio
 import numpy as np
 from typing import List, Any, Union, Optional, Dict
 
-from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.dclib.dclib_array import DataArray, sum_scorer, alpha_length_normalized, alpha_length_normalized_det
 from lmql.runtime.dclib.dclib_seq import next_is_deterministic
 import lmql.runtime.dclib as dc
@@ -209,13 +208,13 @@ async def beam_search(prompt_ids: np.ndarray, n=4, max_len=None, **kwargs):
 dc.decoder(beam_search, "beam")
 
 @dc.decoder
-async def beam_var(prompt_ids: np.ndarray, n=4, max_len=None, inject_stop=False, prune=None, return_first=False, **kwargs):
+async def beam_var(prompt_ids: np.ndarray, n=4, max_len=None, inject_stop=False, prune=None, return_first=False, alpha=0.7, **kwargs):
     s = Stats("beam_var")
 
     n = kwargs.get("num_beams", n)
     max_len = max_len or 2048
     model = dc.model(**kwargs)
-    alpha = kwargs.get("alpha", 0.7)
+    alpha = kwargs.get("alpha", alpha)
     scorer = alpha_length_normalized_det(alpha=alpha)
 
     # keep track of active beams and finished sequences

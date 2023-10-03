@@ -94,7 +94,7 @@ class NestedQueryMethods:
         return ANSWER.strip() 
         '''
 
-    @lmql.query(model=lmql.model("random", seed=123))
+    @lmql.query(model=lmql.model("random", seed=124))
     def question(self):
         '''lmql
         """Q: Why is the sky blue?
@@ -105,7 +105,8 @@ class NestedQueryMethods:
 def test_nested_queries():
     q = NestedQueryMethods()
     r = q.question()
-    assert r[0] == "Pla stuntsvasive uspsribeicester defenders netted profoundly centos", f"Expected fixed random value but got {r}"
+    assert r[0] == "Hi parrender 277 capit posteriorboston chuck神 heal", f"Expected fixed random value but got {r}"
 
 if __name__ == "__main__":
     run_all_tests(globals())
+ 

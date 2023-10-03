@@ -3,6 +3,11 @@ import torch
 from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
 import numpy as np
 
+def format_call(model_name, **kwargs):
+    if len(kwargs) == 0:
+        return f'"{model_name}"'
+    return f'"{model_name}", {", ".join([f"{k}={v}" for k, v in kwargs.items()])}'
+
 class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
@@ -10,16 +15,23 @@ class TransformersLLM(LMTPModel):
 
         self.max_batch_size = kwargs.pop("batch_size", 32)
 
+        self.silent = kwargs.pop("silent", False)
+
         if self.model_args.pop("loader", None) == "auto-gptq":
             from auto_gptq import AutoGPTQForCausalLM
-            print("[Loading", self.model_identifier, "with", f"AutoGPTQForCausalLM.from_quantized({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+            if not self.silent:
+                print("[Loading", self.model_identifier, "with", "AutoGPTQForCausalLM.from_quantized({})]".format(format_call(self.model_identifier, **self.model_args)), flush=True)
+            
             self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
         else:
             from transformers import AutoModelForCausalLM
-            print("[Loading", self.model_identifier, "with", f"AutoModelForCausalLM.from_pretrained({self.model_identifier}, {str(self.model_args)[1:-1]})]", flush=True)
+            if not self.silent:
+                print("[Loading", self.model_identifier, "with", "AutoModelForCausalLM.from_pretrained({})]".format(format_call(self.model_identifier, **self.model_args)), flush=True)
+            
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
         
-        print("[", self.model_identifier, " ready on device ", self.model.device, 
+        if not self.silent:
+            print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
 
     @property
@@ -59,7 +71,7 @@ class TransformersLLM(LMTPModel):
             "input_ids": input_ids,
             "do_sample": temperature > 0.0,
             "attention_mask": attention_mask,
-            "temperature": temperature,
+            **({"temperature": temperature} if temperature > 0.0 else {}),
             "max_new_tokens": max_new_tokens,
             "logits_processor": self.logits_processors(bias_tensor),
             "output_scores": True,

@@ -9,6 +9,7 @@ from lmql.ops.node import *
 from lmql.ops.inline_call import InlineCallOp
 from lmql.ops.booleans import *
 from lmql.ops.regex import Regex
+from lmql.models.model_info import model_info
 
 lmql_operation_registry = {}
 
@@ -193,7 +194,7 @@ class IntOp(Node):
                 ("*", False)
             )
 
-        if "turbo" in context.runtime.model_identifier or "gpt-4" in context.runtime.model_identifier:
+        if model_info(context.runtime.model_identifier).is_chat_model:
             if not all([c in "0123456789" for c in v]):
                 return fmap(
                     ("*", False)
@@ -252,23 +253,27 @@ class TokensOp(Node):
     def forward(self, x, context, **kwargs):
         if x is None: return None
         if x == "": return []
-
-        return tuple(context.runtime.model.sync_tokenize(x))
+        
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of TOKENS must be a direct reference to a template variable."
+        tokens = context.get_tokens(var_op.name)
+        return tuple(tokens)
 
     def follow(self, v, context=None, **kwargs):
         if v is None: return None
         contains_next_token = v != strip_next_token(v)
 
-        if not contains_next_token:
-            tokens = tuple(context.runtime.model.sync_tokenize(v))
-            return tokens
-        v = strip_next_token(v)
-        tokens = tuple(context.runtime.model.sync_tokenize(v))
+        var_op: Var = self.predecessors[0]
+        assert type(var_op) is Var, "The first argument of TOKENS must be a direct reference to a template variable."
+        tokens = context.get_tokens(var_op.name)
 
-        return fmap(
-            ("eos", tokens),
-            ("*", (*tokens, NextToken))
-        )
+        if not contains_next_token:
+            return tokens
+        else:
+            return fmap(
+                ("eos", tokens),
+                ("*", (*tokens, NextToken))
+            )
 
     def final(self, x, context, operands=None, result=None, **kwargs):
         return x[0]
@@ -689,7 +694,7 @@ class RegexOp(Node):
             )
 
         r = Regex(ex)
-        rd = r.d(strip_next_token(x)) # take derivative
+        rd = r.d(strip_next_token(x), verbose=False) # take derivative
         print(f"r={r.pattern} x={strip_next_token(x)} --> {rd.pattern if rd is not None else '[no drivative]'}")
         if rd is None:
             return False 

@@ -1,8 +1,10 @@
 import lmql
-import ast
+
 from .prompts.wiki_prompt import EXAMPLES as WIKI_EXAMPLES
 from .prompts.inline_use import INLINE_USE_PROMPT
 from .prompts.inline_code import INLINE_CODE_PROMPT
+
+import warnings
 
 from dataclasses import dataclass
 
@@ -95,6 +97,8 @@ async def fct_call(fcts):
             print("unknown action", [action], list(action_fcts.keys()))
             " Unknown action: {action}{DELIMITER_END}"
             result = ""
+            if CALL.lstrip().startswith("<<"):
+                warnings.warn("Detected a rare failure case where LMQL Actions function calling does not work as intended. Please share your query with the LMQL developers, so we can fix this.", RuntimeWarning)
             return "(error)"
         else:
             try:
@@ -113,8 +117,7 @@ async def inline_segment(fcts):
     if not SEGMENT.endswith(DELIMITER):
         return SEGMENT
     else:
-        "[CALL]" where fct_call(CALL, fcts) and len(TOKENS(CALL)) > 0
-        result = CALL.split("|", 1)[1]
+        "[CALL: fct_call(fcts)]" where len(TOKENS(CALL)) > 0
         return SEGMENT[:-len(DELIMITER)] + CALL + DELIMITER_END
     '''
 

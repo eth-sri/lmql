@@ -9,6 +9,7 @@ class ProgramState:
         self.variable_diffs = {}
         self.variable_scores = {}
         self.variable_monotonicity = {}
+        self.variable_tokens = {}
 
         # python scope of local variables (also user-defined ones)
         self.python_scope = {}
@@ -30,12 +31,15 @@ class ProgramState:
     def __setitem__(self, key, value):
         self.set(key, value)
 
-    def set(self, name, value, program_value=None, scores=None, diff=None, montonicity="var"):
+    def set(self, name, value, program_value=None, scores=None, diff=None, montonicity="var", tokens=None):
         self.variable_values[name] = value
         self.variable_program_values[name] = program_value if program_value is not None else value
         self.variable_diffs[name] = diff
         self.variable_scores[name] = scores
         self.variable_monotonicity[name] = montonicity
+        
+        if tokens is not None:
+            self.variable_tokens[name] = tokens 
 
     def get(self, name, default=None):
         return self.variable_values.get(name, default)
@@ -43,6 +47,9 @@ class ProgramState:
     def get_program_value(self, name, default=None):
         return self.variable_program_values.get(name, default)
     
+    def get_tokens(self, name):
+        return self.variable_tokens.get(name, None)
+
     def get_diff(self, name, default=None):
         return self.variable_diffs.get(name, default)
 
@@ -56,6 +63,7 @@ class ProgramState:
         s.variable_monotonicity = self.variable_monotonicity.copy()
         s.variable_diffs = self.variable_diffs.copy()
         s.variable_scores = self.variable_scores.copy()
+        s.variable_tokens = self.variable_tokens.copy()
         s.runtime = self.runtime
         s.python_scope = self.python_scope
         return s

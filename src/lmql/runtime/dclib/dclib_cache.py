@@ -89,6 +89,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         return mc
     
     @property
+    def model_identifier(self):
+        return self.delegate.model_identifier
+
+    @property
     def tokenizer(self):
         return self.delegate.tokenizer
 
@@ -139,14 +143,18 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
     async def get_keys(self, s: DecoderSequence, edge_type: str, **kwargs):
         kwargs = {**self.delegate.model_args, **kwargs}
+        reuse_context = kwargs.get("cache_reuse_context", set())
 
         keys = []
 
         # check for sample-id
-        if s.data("dc-edge-type"):
+        if s.data("dc-edge-type") and edge_type is not None:
+            dc_edge_type = s.data("dc-edge-type")
             # if the edge type aligns with dc-edge-type, use that instead (includes a unique sample id if available)
-            if s.data("dc-edge-type").startswith(edge_type):
-                edge_type = s.data("dc-edge-type")
+            if dc_edge_type.startswith(edge_type):
+                if not dc_edge_type in reuse_context:
+                    reuse_context.add(dc_edge_type)
+                    edge_type = dc_edge_type
 
         # compute logits mask
         mask = (await self.get_mask(s, **kwargs)).logits_mask[0]
@@ -265,7 +273,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             temperature = kwargs.get('temperature', 1.0)
             sampling_mode = "top-1" if temperature == 0.0 else "sample-{}".format(temperature)
 
-            cache_entries = [await self.get_cache(s, sampling_mode, user_data=True, **kwargs) for s in seqs]
+            # make sure that each uniquely sampled trajectory in the cache, cannot be used
+            # twice as a result of sampling (e.g. when sampling multiple times from the same sequence)
+            cache_reuse_context = set()
+            
+            cache_entries = [await self.get_cache(s, sampling_mode, user_data=True, cache_reuse_context=cache_reuse_context, **kwargs) for s in seqs]
             cached_cont = [e[1] for e in cache_entries]
             cache_keys = [e[0] for e in cache_entries]
             
@@ -396,7 +408,11 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         self.calls += 1
         sq, tokens, scores = await anext(self.delegate.score_tokens([sq], [tok], noscore=noscore))
         self.save_cached(sq.input_ids, tokens, scores, user_data)
-        
+
+    async def score_tokens(self, *args, **kwargs):
+        async for s in self.delegate.score_tokens(*args, **kwargs):
+            yield s
+
     def save_cached(self, ids: List[bytes], tokens, scores, user_data):
         # add cache entries along pre-scored trajectory
         for tok, score in zip(tokens, scores):

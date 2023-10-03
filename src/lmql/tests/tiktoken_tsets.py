@@ -1,14 +1,14 @@
+import lmql
 from lmql.ops.token_set import *
-from lmql.runtime.tokenizer import load_tokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.tests.expr_test_utils import run_all_tests
 
-t = load_tokenizer("text-davinci-003")
+t = lmql.tokenizer("text-davinci-003")
 assert type(t.tokenizer_impl) is TiktokenTokenizer
 VocabularyMatcher.init(t)
 
 def test_simple():
-    t = load_tokenizer("text-davinci-003")
+    t = lmql.tokenizer("text-davinci-003")
 
     # simple eos    # 
     s = tset("eos")
