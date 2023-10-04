@@ -3,8 +3,11 @@ from lmql.runtime.dclib.dclib_seq import DecoderSequence
 import numpy as np
 import pickle
 import os
+import sys
 from typing import List, Union, Any
 from dataclasses import dataclass
+import warnings
+import traceback
 
 from .dclib_array import DataArray
 from .dclib_seq import DecoderSequence, Continuation, DeterministicDecoderSequence, deepcopy, deepmerge, detseq
@@ -48,6 +51,11 @@ class CacheFile:
         with open(self.filename, "wb") as f:
             pickle.dump(existing_cache, f)
 
+class CacheWarning(Warning):
+    """
+    Warnings raised for cache related issues.
+    """
+    pass
 
 class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     delegate: DcModel
@@ -61,7 +69,10 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         assert delegate.cache_delegate is None, "cannot cache a model that is already cached by another cache_delegate"
         delegate.cache_delegate = mc
 
+        # keep track of incoming streams of tokens
+        # from the underlying model
         mc.token_streams = []
+        mc.token_stream_errors = []
         
         mc.cache = {}
         mc.user_data_cache = {}
@@ -508,6 +519,9 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
     def register_token_stream(self, token_iterator: callable):
         async def token_consumer(itr):
+            # keep track of the last error
+            error = None
+
             try:
                 ids = None
                 keys = None
@@ -578,10 +592,17 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             fut.set_result(None)
                             del self.cache[k]
             except Exception as e:
-                print("DcCachedModel: token_consumer failed with:", e)
-                import traceback
-                traceback.print_exc()
-                raise e
+                error = e
+            
+            if error is not None:
+                try:
+                    msg = "CachedDcModel: underlying model {} raised an exception during generation and will thus not be cached: {} '{}'".format(self.delegate, type(error), str(error))
+                    warnings.warn(msg, category=CacheWarning)
+                except Exception as e:
+                    traceback.print_exc(file=sys.stdout)
+                    self.token_stream_errors.append(e)
+
+                sys.stdout.flush()
 
         self.token_streams = [s for s in self.token_streams if not s.done()]
 
