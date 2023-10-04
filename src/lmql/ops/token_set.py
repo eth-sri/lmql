@@ -162,6 +162,8 @@ class VocabularyMatcher:
             for id, subtoken in self.vocab.items():
                 if r.is_prefix(subtoken):
                     mask[id] = True
+            if r.is_prefix(''):
+                mask[self.eos_token_id] = True
         else:
             pattern = re.compile(regex, re.UNICODE)
             for id, subtoken in self.vocab.items():
