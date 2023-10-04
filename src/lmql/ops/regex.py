@@ -144,7 +144,7 @@ def _consume_char(char, seq, verbose=False, indent=0):
         assert isinstance(sseq, (sre_parse.SubPattern, list))
         sseq = list(sseq)
         dsseq, is_consumed = _consume_char(char, sseq, verbose=verbose, indent=indent+2)
-        if not is_consumed:
+        if not is_consumed and len(seq) > 1:
             rest = _subgroups(seq[1:], groupid, remove=True)
             return _consume_char(char, rest, verbose=verbose, indent=indent+2)
         if dsseq is None:
@@ -270,8 +270,8 @@ class Regex:
     def is_empty(self):
         return self.pattern == ''
 
-    def is_prefix(self, text):
-        seq = self._consume(text)
+    def is_prefix(self, text, verbose=False):
+        seq = self._consume(text, verbose=verbose)
         return (seq is not None)
 
     def d(self, text, verbose=False):
@@ -297,7 +297,13 @@ if __name__ == "__main__":
     
     assert Regex(r"[1-9]*").fullmatch("")
     assert not Regex(r"[1-9]+").fullmatch("")
+    assert Regex(r"([0-9])+").fullmatch("22")
+    assert not Regex(r"([0-9])+").fullmatch("a")
 
+    assert Regex(r"[1-9]*").is_prefix("")
+    assert Regex(r"[1-9]+").is_prefix("")
+    assert Regex(r"([0-9])+").is_prefix("22")
+    assert not Regex(r"([0-9])+").is_prefix("a")
 
     assert Regex(r"abc").d("a").compare_pattern(r"bc")
     assert Regex(r"abc").d("ab").compare_pattern(r"c")
