@@ -44,7 +44,7 @@ class GenerateCall:
 class GenerateBatch:
     input_ids: list
     attention_mask: list
-    
+
     temperature: float
     max_tokens: int
     logit_biases: list
@@ -53,22 +53,22 @@ class GenerateBatch:
 
     is_score: bool = False
     scoring_offsets: list = None
-    
+
     @classmethod
     def from_calls(cls, calls):
         input_ids = [c.prompt for c in calls]
         max_len = max(len(ids) for ids in input_ids)
-        
+
         attention_mask = [[0] * (max_len - len(ids)) + [1] * len(ids) for ids in input_ids]
         input_ids = [[0] * (max_len - len(ids)) + ids for ids in input_ids]
-        
+
         temperature = calls[0].kwargs.get("temperature", 0.0)
         max_tokens = max(c.kwargs.get("max_tokens", 32) for c in calls)
         logit_biases = [c.logit_bias or {} for c in calls]
-        
+
         is_score = any(c.kwargs.get("score", False) for c in calls)
         assert not is_score or all(c.kwargs.get("score", False) for c in calls), "cannot mix score and non-score calls in batch"
-        
+
         if is_score:
             scoring_offsets = []
             for i, c in enumerate(calls):
@@ -91,7 +91,7 @@ class GenerateBatch:
 class ScoreStreamer:
     def log_token(self, batch: GenerateBatch, all_scores, **kwargs):
         batch_size = all_scores.shape[0]
-        
+
         for i in range(batch_size):
             offset = batch.scoring_offsets[i]
             scores = all_scores[i][offset:]
@@ -118,7 +118,7 @@ class TokenStreamer:
 
     def log_token(self, input_ids, scores, last=False, **kwargs):
         batch_size = input_ids.shape[0]
-        
+
         last_tokens = input_ids[:, -1]
         last_scores = scores[-1]
 
@@ -153,12 +153,12 @@ class TokenStreamer:
                 "finish_reason": ("stop" if last_tokens[i].item() == self.eos_token_id else "length" if last else None),
                 "top_logprobs": top_logprobs
             }
-            
+
             self.batch.calls[i].put(token_payload)
 
 class Scheduler:
     """
-    A scheduler that takes calls to generate and batches them together. 
+    A scheduler that takes calls to generate and batches them together.
 
     Can be shared among multiple clients, make sure to call unregister(<user>) when done,
     to allow the scheduler to shut down when no longer needed.
@@ -167,10 +167,10 @@ class Scheduler:
         self.model_identifier = model_identifier
         if model_args is None: self.model_args = {}
         else: self.model_args = model_args
-        
+
         self.queue = Queue()
         self.kill_event = threading.Event()
-        
+
         self.sync = sync
 
         if not self.sync:
@@ -201,7 +201,7 @@ class Scheduler:
         for c in calls:
             mode = c.generation_mode()
             batches_by_mode.setdefault(mode, []).append(c)
-        
+
         # split batches that are too large
         fitting_batches = []
         for mode, batches in batches_by_mode.items():
@@ -233,7 +233,7 @@ class Scheduler:
                 continue
 
             self.process_batch(model)
-    
+
     def worker(self):
         """
         Can be used when not self.sync, in place of async_worker.
@@ -256,18 +256,18 @@ class Scheduler:
         for batch in self.batches(model.max_batch_size):
             try:
                 b = GenerateBatch.from_calls(batch)
-                
+
                 if b.is_score:
                     kwargs = b.generate_args()
                     input_ids = kwargs["input_ids"]
                     attention_mask = kwargs["attention_mask"]
-                    
+
                     scores = model.score(input_ids, attention_mask)
                     ScoreStreamer().log_token(b, scores)
                 else:
                     streamer = TokenStreamer(b, model.eos_token_id)
                     kwargs = b.generate_args()
-                    
+
                     kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)
                     kwargs["attention_mask"] = np.array(kwargs["attention_mask"], dtype=np.int32)
 
@@ -279,7 +279,7 @@ class Scheduler:
                     c.error("failed to generate tokens '" + str(e) + "'")
 
     @staticmethod
-    def instance(model_identifier, model_args, user, only_existing=False, sync=False):
+    def instance(model_identifier, model_args, user, only_existing=False, sync=False, n_models_in_memory=2):
         identifier = (model_identifier, pickle.dumps(model_args).hex())
 
         if identifier not in Scheduler._instances:
@@ -289,14 +289,14 @@ class Scheduler:
 
         s = Scheduler._instances[identifier]
         s.last_use = time.time()
-        
+
         if user is not None:
             s.users.add(user)
 
-        Scheduler.gc() # unload any unused models
-    
+        Scheduler.gc(n=n_models_in_memory) # unload any unused models
+
         return s
-    
+
     def unregister(self, user):
         if user in self.users:
             self.users.remove(user)
@@ -305,9 +305,9 @@ class Scheduler:
     def dealloc(self):
         print("[Unloading ", self.model_identifier, "]", flush=True, sep="")
         identifier = (self.model_identifier, pickle.dumps(self.model_args).hex())
-        
+
         Scheduler._instances.pop(identifier)
-        
+
         self.kill_event.set()
         self.worker_thread.join()
 
@@ -331,7 +331,7 @@ Scheduler._instances = {}
 
 class TokenSession:
     """
-    A LMTP token session, which is a single user generating tokens with a fixed model, 
+    A LMTP token session, which is a single user generating tokens with a fixed model,
     using several token streams in parallel and varying sampling configurations.
     """
     def __init__(self, transport, model_args, static=False, longrunning=False):
@@ -363,10 +363,10 @@ class TokenSession:
                 scored = kwargs.pop("scored")
                 stream_id = kwargs.pop("stream_id")
                 self.used_models.add(model)
-                
+
                 kwargs["score"] = True
                 # full sequence to score
-                full_ids = prompt + scored 
+                full_ids = prompt + scored
                 # determines the offset from which on the scoring starts in full_ids
                 kwargs["scoring_offset"] = len(prompt)
 
@@ -385,7 +385,7 @@ class TokenSession:
             self.token_queue.put({
                 "stream_id": stream_id,
                 "error": str(e)
-            })        
+            })
 
     async def queue_loop(self):
         try:
@@ -403,12 +403,12 @@ class TokenSession:
 
     def close(self):
         self.queue_processor.cancel()
-        
+
         for m in self.used_models:
             try:
                 scheduler = Scheduler.instance(m, model_args=self.model_args, user=None, only_existing=self.static)
                 scheduler.unregister(self)
-                
+
                 if self.longrunning:
                     scheduler.gc()
                 else:
