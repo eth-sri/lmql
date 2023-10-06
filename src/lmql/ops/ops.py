@@ -675,6 +675,7 @@ def remainder(seq: str, phrase: str):
 
 @LMQLOp("REGEX")
 class RegexOp(Node):
+
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
         x = args[0]
@@ -690,7 +691,7 @@ class RegexOp(Node):
         
         if x == strip_next_token(x):
             return fmap(
-                ("*", Regex(ex).fullmatch(x))
+                ("*", Regex(ex).fullmatch(strip_next_token(x)))
             )
 
         r = Regex(ex)
@@ -700,13 +701,13 @@ class RegexOp(Node):
             return False 
         elif rd.is_empty(): # derivative is empty -> full match; therefore we must end
             return fmap(
-                ("eos", True)
+                ("eos", None)
             )
         else: # only permit tokens form the regex derivative
-            return fmap(
-                (tset(rd.pattern, regex=True, prefix=True), True),
-                #('*', False)
+            f = fmap(
+                (tset(rd.pattern, regex=True, prefix=True), True), # includes EOS if the regex is fulfilled greedily
             )
+            return f
 
     def final(self, ops_final, result=None, operands=None, **kwargs):
         if ops_final[0] == "fin": return "fin"
