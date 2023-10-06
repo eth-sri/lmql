@@ -35,7 +35,7 @@ def query_from_string(s, input_variables=None, is_async=True, output_writer=None
 
     import inspect
     temp_lmql_file = tempfile.mktemp(suffix=".lmql")
-    with open(temp_lmql_file, "w") as f:
+    with open(temp_lmql_file, "w", encoding="utf-8") as f:
         f.write(s)
     module = load(temp_lmql_file, output_writer=output_writer or silent)
     
