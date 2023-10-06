@@ -207,6 +207,15 @@ class LMQLResult:
     @property
     def requires_distribution_postprocessing(self):
         return self.distribution_variable is not None
+    
+    # for legacy support where decoders like 'argmax' returned a list of a single 
+    # element instead of a single element (override [0] behavior)
+    def __getitem__(self, key):
+        if not key == 0:
+            print("access", key)
+            return super().__getitem__(key)
+        warnings.warn("Deprecated result[0] access on a query result detected. Since 0.7, an argmax/sample query function with a single result returns a LMQLResult object instead of a list of a single element. Please use the results directly and not via result[0]. In the future, this will raise an error.", DeprecationWarning)
+        return self
 
 @dataclass
 class TokenMask:
@@ -1082,6 +1091,10 @@ class PromptInterpreter:
                 
                 # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
+
+                # if allowed by decoder, unpack singular results
+                if fe.singular and len(results) == 1:
+                    return results[0]
 
                 return results
         

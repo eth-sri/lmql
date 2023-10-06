@@ -31,9 +31,12 @@ def chain(lmql_query_function, output_keys=None):
                     return {k:v for k,v in r.variables.items()}
                 return r
 
-            res = [convert_result(r) for r in res]
-
-            if len(res) == 1:
+            if type(res) is list:
+                res = [convert_result(r) for r in res]
+            else:
+                res = convert_result(res)
+            
+            if len(res) == 1 and type(res) is list:
                 res = res[0]
 
             return res

@@ -283,7 +283,7 @@ class LMTPDcModel(DcModel):
 
             next_token_ids = np.array([t['token'] for t in tokens], dtype=np.int64)
             next_token_scores = np.array([t['logprob'] for t in tokens], dtype=np.float32)
-            next_logits = np.array([self.make_logits(t) for t in tokens], dtype=np.float32)
+            next_logits = [self.make_logits(t) for t in tokens]
 
             next_tokens = np.array([self.tokenizer.decode_bytes([t])[0] for t in next_token_ids])
 

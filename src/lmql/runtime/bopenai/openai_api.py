@@ -16,6 +16,7 @@ import asyncio
 from lmql.runtime.stats import Stats
 from lmql.models.model_info import model_info
 
+class OpenAIAPILimitationError(Exception): pass
 class OpenAIStreamError(Exception): pass
 class OpenAIRateLimitError(OpenAIStreamError): pass
 
@@ -27,6 +28,11 @@ Capacity.reserved = 0
 stream_semaphore = None
 
 api_stats = Stats("openai-api")
+
+# models that do not support 'logprobs' and 'echo' by OpenAI limitations
+MODELS_WITHOUT_ECHO_LOGPROBS = [
+    "gpt-3.5-turbo-instruct"
+]
 
 class CapacitySemaphore:
     def __init__(self, capacity):
@@ -381,6 +387,36 @@ async def completion_api(**kwargs):
 
     assert not (LMQL_BROWSER and "logit_bias" in kwargs and "gpt-3.5-turbo" in kwargs["model"]), "gpt-3.5-turbo completion models do not support logit_bias in the LMQL browser distribution, because the required tokenizer is not available in the browser. Please use a local installation of LMQL to use logit_bias with gpt-3.5-turbo models."
 
+    model = kwargs["model"]
+    echo = kwargs.get("echo", False)
+    api_config = kwargs.get("api_config", {})
+    tokenizer = api_config.get("tokenizer")
+
+    if model in MODELS_WITHOUT_ECHO_LOGPROBS and echo:
+        if max_tokens == 0:
+            raise OpenAIAPILimitationError("The underlying requests to the OpenAI API with model '{}' are blocked by OpenAI's API limitations. Please use a different model to leverage this form of querying (e.g. distribution clauses or scoring).".format(model))
+
+        kwargs["echo"] = False
+        batch_prompt_tokens = [tokenize(prompt, tokenizer=tokenizer, openai_byte_encoding=True) for prompt in kwargs["prompt"]]
+
+        if echo:
+            data = {
+                "choices": [
+                    {
+                        "text": kwargs["prompt"][i],
+                        "index": i,
+                        "finish_reason": None,
+                        "logprobs": {
+                            "text_offset": [0 for t in prompt_tokens],
+                            "token_logprobs": [0.0 for t in prompt_tokens],
+                            "tokens": prompt_tokens,
+                            "top_logprobs": [{t: 0.0} for t in prompt_tokens]
+                        }
+                    }
+                for i,prompt_tokens in enumerate(batch_prompt_tokens)]
+            }
+            yield data
+
     async with CapacitySemaphore(num_prompts * max_tokens):
         
         current_chunk = ""
@@ -388,7 +424,6 @@ async def completion_api(**kwargs):
         
 
         async with aiohttp.ClientSession() as session:
-            api_config = kwargs.get("api_config", {})
             endpoint, headers = get_endpoint_and_headers(kwargs)
             
             if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):

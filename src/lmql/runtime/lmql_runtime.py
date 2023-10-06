@@ -244,7 +244,7 @@ class LMQLQueryFunction:
         interpreter.dcmodel.close()
 
         # for lmql.F we assume 'argmax' and unpack the result
-        if "is_f_function" in interpreter.extra_kwargs:
+        if "is_f_function" in interpreter.extra_kwargs and type(results) is list and len(results) == 1:
             results = results[0]
 
         return results

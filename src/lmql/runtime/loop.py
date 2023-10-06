@@ -12,6 +12,7 @@ in this case.
 """
 
 from typing import List, Dict, Any
+import termcolor
 
 global lmql_loop
 lmql_loop = None
@@ -31,12 +32,18 @@ def call_sync(lmql_query_function, *args, **kwargs):
 
     task = lmql_query_function.__acall__(*args, **kwargs)
     error = None
-    
+     
     try:
         res = loop.run_until_complete(task)
     except RuntimeError as e:
         if "This event loop is already running" in str(e) or "Cannot run the event loop while another loop is running" in str(e):
-            error = AssertionError("LMQL queries cannot be called synchronously from within an async context. Please use async queries and await them instead.")
+            # try nested event loop
+            error = RuntimeError("LMQL queries cannot be called synchronously from within an async context. Consider one of the following options:\n\n" + 
+            termcolor.colored(" - [Async Queries] ", color="red") + "Declare your query function with `async def` and then call it with `await`.\n\n" + 
+            termcolor.colored(" - [Nested Loops / Jupyter Notebooks] ", color="red") + "Install and use nest_asyncio to allow nested event loops:\n" +
+            "      import nest_asyncio\n" +
+            "      nest_asyncio.apply()\n"
+            )
         else:
             error = e
         asyncio.ensure_future(task).cancel()

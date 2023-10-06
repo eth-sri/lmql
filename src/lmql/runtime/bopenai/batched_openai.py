@@ -6,7 +6,7 @@ import warnings
 from functools import total_ordering
 
 from lmql.models.model_info import model_info
-from .openai_api import complete, OpenAIRateLimitError, Capacity, is_chat_model
+from .openai_api import complete, OpenAIRateLimitError, Capacity, is_chat_model, OpenAIAPILimitationError
 
 global logit_bias_logging
 logit_bias_logging = True
@@ -568,6 +568,7 @@ class AsyncOpenAIAPI:
         
         self.complete_request_queue = asyncio.Queue()
         self.complete_request_workers = [asyncio.create_task(self.complete_request_worker(self.complete_request_queue)) for i in range(5)]
+        self.worker_loops = set()
 
         self.stats_logger = None 
         
@@ -654,6 +655,8 @@ class AsyncOpenAIAPI:
         return False
 
     async def complete_request_worker(self, queue: asyncio.Queue):
+        self.worker_loops.add(asyncio.get_running_loop())
+        
         while True:
             try:
                 kwargs = await queue.get()
@@ -670,6 +673,8 @@ class AsyncOpenAIAPI:
                         break
                     except Exception as e:
                         if type(e) is AssertionError:
+                            raise e
+                        if type(e) is OpenAIAPILimitationError:
                             raise e
                         self.stats.errors += 1
                         retries -= 1            
@@ -706,9 +711,15 @@ class AsyncOpenAIAPI:
     async def complete(self, request_id=None, **kwargs):
         assert "prompt" in kwargs, f"bopenai requires prompt to be set"
 
+        # check for workers
+        if len(self.complete_request_workers) == 0:
+            raise APIShutDownException(f"bopenai requires at least one worker to be running to issue new complete requests.")
+
         loop = asyncio.get_running_loop()
         result_fut = loop.create_future()
         self.futures.add(result_fut)
+
+        assert loop in self.worker_loops, f"bopenai requires the event loop to be running in one of the worker threads"
 
         if request_id is None:
             request_id = self.request_ctr
