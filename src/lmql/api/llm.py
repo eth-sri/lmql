@@ -241,6 +241,20 @@ def get_default_model() -> Union[str, LLM]:
     global default_model
     return default_model
 
+def get_default_scoring_model() -> Union[str, LLM]:
+    """
+    Returns the default model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified and 
+    the workload is a scoring workload.
+
+    This applies globally in the current process.
+    """
+    global default_model
+    if default_model == "openai/gpt-3.5-turbo-instruct":
+        # we cannot use 3.5 instruct, because OpenAI blocks scoring for that model 
+        # on an API level
+        return "openai/text-davinci-003"
+    return default_model
+
 def set_default_model(model: Union[str, LLM]):
     """
     Sets the model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified.

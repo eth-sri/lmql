@@ -6,7 +6,7 @@ functionality of LMQL without actually writing any LMQL code.
 from typing import Union, Optional
 import asyncio
 
-from .llm import LLM, set_default_model, get_default_model, model
+from .llm import LLM, set_default_model, get_default_model, model, get_default_scoring_model
 
 from .queries import query, F, query_from_string
 from .run import run_file, run_sync, run
@@ -38,7 +38,10 @@ async def score(prompt, values, model: Optional[Union[str, LLM]] = None, **kwarg
     """
     Returns a ScoringResult object containing the score of the given prompt concatenated with each of the given values.
     """
-    model = LLM.from_descriptor(model)
+    if model is None:
+        model = get_default_scoring_model()
+    else:
+        model = LLM.from_descriptor(model)
     return await model.score(prompt, values, **kwargs)
 
 def score_sync(prompt, values, *args, model=None, **kwargs) -> ScoringResult:

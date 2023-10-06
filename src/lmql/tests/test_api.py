@@ -62,7 +62,7 @@ def test_llm_openai():
         print("Skipping test_api.test_llm_openai because no OpenAI API configuration could be found.")
         return
 
-    m = lmql.model("openai/gpt-3.5-turbo-instruct", silent=True)
+    m = lmql.model("openai/text-davinci-003", silent=True)
     assert m.score_sync("Hello", ["World", "Test"]).argmax() == "World"
 
 if __name__ == "__main__":
