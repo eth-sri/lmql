@@ -191,7 +191,11 @@ class LLM:
 
             # special case for 'random' model (see random_model.py)
             if model_identifier == "random":
-                kwargs["tokenizer"] = "gpt2" if "vocab" not in kwargs else kwargs["vocab"]
+                if "tokenizer" in kwargs:
+                    kwargs["tokenizer"] = kwargs["tokenizer"]
+                    kwargs["vocab"] = kwargs["tokenizer"]
+                else:
+                    kwargs["tokenizer"] = "gpt2" if "vocab" not in kwargs else kwargs["vocab"]
                 kwargs["inprocess"] = True
                 kwargs["async_transport"] = True
 

@@ -50,7 +50,7 @@ def test_do_sync(test_llm):
 
 if __name__ == "__main__":
     if not "RUN_LC_TESTS" in os.environ:
-        print("Skipping LMTP tests because RUN_LC_TESTS is not set")
+        print("Skipping LMTP LangChain integration tests because RUN_LC_TESTS is not set")
         sys.exit(0)
 
     # only run this file with pytest

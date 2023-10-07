@@ -1101,7 +1101,9 @@ class PromptInterpreter:
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
                           "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
-                          "openai_nonstop", "chunksize", "alpha", "verbose"]
+                          "openai_nonstop", "chunksize", "alpha", "verbose",
+                          # extra decoding args
+                          "top_k", "top_p", "repetition_penalty", "frequency_penalty", "presence_penalty"]
 
     def derive_decoder_args(self, extra_kwargs, existing_args=None):
         # if no existing args are provided, use no args

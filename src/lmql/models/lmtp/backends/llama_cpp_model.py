@@ -38,7 +38,7 @@ class LlamaCppModel(LMTPModel):
     
     def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
-                 bias_tensor, streamer: TokenStreamer) -> LMTPModelResult:
+                 bias_tensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
         token_scores = []
         sequence = []
 
@@ -55,7 +55,8 @@ class LlamaCppModel(LMTPModel):
         for i, token in zip(range(max_new_tokens), self.llm.generate(input_ids,
                                                             temp=temperature,
                                                             stopping_criteria=llama_streamer, 
-                                                            logits_processor=logits_processor)):
+                                                            logits_processor=logits_processor,
+                                                            **kwargs)):
             assert i + len(input_ids) < self.llm.n_ctx(), "The requested number of tokens exceeds the llama.cpp model's context size. Please specify a higher n_ctx value."
             sequence += [token]
             sq_ar = np.array(sequence)

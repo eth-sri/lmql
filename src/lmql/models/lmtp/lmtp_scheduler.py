@@ -37,8 +37,14 @@ class GenerateCall:
     def generation_mode(self):
         is_score = self.kwargs.get("score", False)
         if is_score: return "score"
+        
+        key_args = self.kwargs.copy()
+        key_args.pop("max_tokens", None)
+        key_args.pop("top_logprobs", None)
+        key_args.setdefault("temperature", 0.0)
+        
         # string that describes the generation mode for this call (same string = can run in batch)
-        return f"{self.kwargs.get('temperature', 0.0)}"
+        return "generate-" + "-".join("{}-{}".format(k, v) for k, v in sorted(key_args.items()))
 
 @dataclass
 class GenerateBatch:
@@ -53,6 +59,7 @@ class GenerateBatch:
 
     is_score: bool = False
     scoring_offsets: list = None
+    kwargs: dict = None
     
     @classmethod
     def from_calls(cls, calls):
@@ -77,7 +84,13 @@ class GenerateBatch:
         else:
             scoring_offsets = None
 
-        return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets)
+        # other kwargs (e.g. top_k, repetition_penalty, etc.)
+        kwargs = calls[0].kwargs.copy()
+        kwargs.pop("max_tokens", None)
+        kwargs.pop("top_logprobs", None)
+        kwargs.pop("temperature", None)
+
+        return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets, kwargs)
 
     def generate_args(self):
         return {
@@ -85,7 +98,8 @@ class GenerateBatch:
             "attention_mask": self.attention_mask,
             "temperature": self.temperature,
             "max_new_tokens": self.max_tokens,
-            "bias_tensor": self.logit_biases if len(self.logit_biases) > 0 else None
+            "bias_tensor": self.logit_biases if len(self.logit_biases) > 0 else None,
+            **self.kwargs
         }
 
 class ScoreStreamer:

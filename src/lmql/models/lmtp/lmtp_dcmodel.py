@@ -56,6 +56,12 @@ class LMTPDcModel(DcModel):
         if inprocess:
             self.inprocess_client_constructor = inprocess_client_constructor
 
+        EXTRA_DECODING_PARAMETERS = ["top_p", "top_k", "repetition_penalty", "presence_penalty", "length_penalty", "frequency_penalty"]
+        # API decoding parameters
+        self.extra_decoding_parameters = {
+            **{p: kwargs[p] for p in EXTRA_DECODING_PARAMETERS if p in kwargs}
+        }
+
         # model statistics
         self.requests = 0
         self.tokens = 0
@@ -243,7 +249,7 @@ class LMTPDcModel(DcModel):
             text = await self.detokenize(ids)
             print("lmtp generate: {} / {} ({} tokens)".format(ids, str([text])[1:-1], len(ids)))
 
-        return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
+        return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
 
     async def argmax(self, sequences: dc.DataArray, **kwargs):
         return await self.sample(sequences, temperature=0.0, **kwargs)

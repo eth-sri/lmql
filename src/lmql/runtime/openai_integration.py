@@ -130,6 +130,17 @@ class DclibOpenAiModel(DcModel):
             **kwargs
         }
 
+        # API decoding parameters
+        self.extra_decoding_parameters = {
+            **({"top_p": kwargs.get("top_p")} if "top_p" in kwargs else {}),
+            **({"frequency_penalty": kwargs.get("frequency_penalty")} if "frequency_penalty" in kwargs else {}),
+            **({"presence_penalty": kwargs.get("presence_penalty")} if "presence_penalty" in kwargs else {}),
+        }
+        if "top_k" in kwargs:
+            warnings.warn("'top_k' is not supported by the OpenAI API and will thus be ignored.", openai.OpenAIAPIWarning)
+        if "repetition_penalty" in kwargs:
+            warnings.warn("'repetition_penalty' is not supported by the OpenAI API and will thus be ignored.", openai.OpenAIAPIWarning)
+
         self.timeout = kwargs.get("chunk_timeout", 2.5 if not self.mock else 4.5)
 
         self.stats = Stats("openai")
@@ -309,6 +320,7 @@ class DclibOpenAiModel(DcModel):
             "echo": True,
             **({"api_config": self.api_config} if self.api_config is not None else {}),
             **({"timeout": self.timeout} if self.timeout is not None else {}),
+            **self.extra_decoding_parameters
         }
 
         mode = completion_call.mode

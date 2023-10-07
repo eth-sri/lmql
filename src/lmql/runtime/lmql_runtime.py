@@ -295,10 +295,7 @@ def compiled_query(output_variables=None, group_by=None):
 async def call(fct, *args, **kwargs):
     if type(fct) is LMQLQueryFunction or (hasattr(fct, "__lmql_query_function__") and fct.__lmql_query_function__.is_async):
         result = await fct(*args, **kwargs)
-        if len(result) == 1: 
-            return result[0]
-        else: 
-            return result
+        return result
     if inspect.iscoroutinefunction(fct):
         return await fct(*args, **kwargs)
     else:
