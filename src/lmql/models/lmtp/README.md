@@ -66,6 +66,24 @@ The following `MESSAGE_TYPE` values are supported:
 
     The resulting token stream looks just like a generation stream, however, without the `top_logprobs` attribute.
 
+* `MODEL_INFO` This message can be sent by a client to request metadata about the hosted model from the inference process. The response is a `MSG` message with the same `stream_id` and a `model_info` attribute.
+    ```json
+    MODEL_INFO {
+        "stream_id": 1,
+        "model": "gpt2-medium@,
+        "data": {...}
+    }
+    ```
+* `MSG` This message is used for server-to-client communication, when a request does not require a streamed response but a single message. For example, the `MODEL_INFO` request is answered with a `MSG` message: 
+    ```json
+    MSG {
+        "stream_id": 1, 
+        "model_info": {
+            "model": "gpt2-medium", 
+            "constructor": "AutoModelForCausalLM.from_pretrained('gpt2-medium')",
+        }
+    }
+    ```
 ## Testing this Implementation
 
 To test this implementation, first install the `main` branch of `lmql` and then run the following commands:
