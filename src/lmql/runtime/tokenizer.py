@@ -280,11 +280,15 @@ def tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
     cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
 
     if cache_identifier not in runtime_tokenizers:
-        runtime_tokenizers[cache_identifier] = load_tokenizer(model_identifier, type, **kwargs)
-    
-    return runtime_tokenizers[cache_identifier]
+        t = _load_tokenizer(model_identifier, type, **kwargs)
+        runtime_tokenizers[cache_identifier] = t
+    else:
+        t = runtime_tokenizers[cache_identifier]
 
-def load_tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
+    return t
+
+def _load_tokenizer(model_identifier, type, **kwargs) -> LMQLTokenizer:
+    # use lmql.tokenizer(...) instead of this, to make use of instance caching
     cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 
