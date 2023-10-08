@@ -12,6 +12,8 @@
             return;
         }
 
+        const chat = document.querySelector('.chat');
+
         let wasThinking = isThinking;
         setThinking(false)
 
@@ -20,11 +22,17 @@
             let existingMessage = document.querySelector(`.message#${id}`)
             // content 
             let content = existingMessage.querySelector('.message-content');
+            // check if scrolled to bottom
+            let isScrolledToBottom = chat.scrollHeight - chat.clientHeight <= chat.scrollTop + 1;
+
             content.innerHTML = message;
+            
+            if (isScrolledToBottom) {
+                chat.scrollTop = chat.scrollHeight;
+            }
             return;
         }
 
-        const chat = document.querySelector('.chat');
         const messageElement = document.createElement('div');
         messageElement.classList.add('message');
         messageElement.classList.add(type);

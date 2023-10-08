@@ -7,7 +7,7 @@ module.exports = { queries: [
             // hello world
             name: "👋 Hello World",
             description: "Who This?",
-            code: ` "Say 'this is a test':[RESPONSE]" where len(TOKENS(RESPONSE)) < 10`,
+            code: `"Say 'this is a test':[RESPONSE]" where len(TOKENS(RESPONSE)) < 10`,
             state: 'precomputed/hello.json'
          },
          {

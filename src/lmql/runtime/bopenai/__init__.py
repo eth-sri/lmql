@@ -1,4 +1,4 @@
-from .batched_openai import AsyncOpenAIAPI, async_buffer, response_buffer
+from .batched_openai import AsyncOpenAIAPI, async_buffer, response_buffer, OpenAIAPIWarning
 import openai as openai
 
 # redirects to openai.*

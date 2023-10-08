@@ -208,6 +208,15 @@ class LMQLResult:
     @property
     def requires_distribution_postprocessing(self):
         return self.distribution_variable is not None
+    
+    # for legacy support where decoders like 'argmax' returned a list of a single 
+    # element instead of a single element (override [0] behavior)
+    def __getitem__(self, key):
+        if not key == 0:
+            print("access", key)
+            return super().__getitem__(key)
+        warnings.warn("Deprecated result[0] access on a query result detected. Since 0.7, an argmax/sample query function with a single result returns a LMQLResult object instead of a list of a single element. Please use the results directly and not via result[0]. In the future, this will raise an error.", DeprecationWarning)
+        return self
 
 @dataclass
 class TokenMask:
@@ -1114,7 +1123,7 @@ class PromptInterpreter:
                 # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
 
-                # check if certificate is requested
+                # check if a certificate was requested
                 if self.certificate != False:
                     active_tracer().event("lmql.LMQLResult", results)
 
@@ -1125,13 +1134,19 @@ class PromptInterpreter:
                             f.write(str(certificate(active_tracer())))
                     elif type(self.certificate) is bool: # must be True
                         print(str(certificate(active_tracer())), flush=True)
+                
+                # if allowed by decoder, unpack singular results
+                if fe.singular and len(results) == 1:
+                    return results[0]
 
                 return results
         
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
                           "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
-                          "openai_nonstop", "chunksize", "alpha", "verbose", "certificate"]
+                          "openai_nonstop", "chunksize", "alpha", "verbose", "certificate", 
+                          # extra decoding args
+                          "top_k", "top_p", "repetition_penalty", "frequency_penalty", "presence_penalty"]
 
     def derive_decoder_args(self, extra_kwargs, existing_args=None):
         # if no existing args are provided, use no args

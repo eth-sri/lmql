@@ -9,6 +9,15 @@ def test_generate_sync():
     result = lmql.generate_sync("Test", max_tokens=10)
     assert type(result) is str and len(result) > 0
 
+def test_generate_sync_multi():
+    lmql.set_default_model(lmql.model("random", seed=123))
+
+    result1 = lmql.generate_sync("Test", max_tokens=10)
+    assert type(result1) is str and len(result1) > 0
+
+    result2 = lmql.generate_sync("Test2", max_tokens=10)
+    assert type(result2) is str and len(result2) > 0
+
 async def test_generate():
     lmql.set_default_model(lmql.model("random", seed=123))
 
@@ -69,7 +78,7 @@ def test_llm_openai():
         print("Skipping test_api.test_llm_openai because no OpenAI API configuration could be found.")
         return
 
-    m = lmql.model("openai/gpt-3.5-turbo-instruct", silent=True)
+    m = lmql.model("openai/text-davinci-003", silent=True)
     assert m.score_sync("Hello", ["World", "Test"]).argmax() == "World"
 
 if __name__ == "__main__":

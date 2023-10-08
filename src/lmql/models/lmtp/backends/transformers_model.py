@@ -8,6 +8,17 @@ def format_call(model_name, **kwargs):
         return f'"{model_name}"'
     return f'"{model_name}", {", ".join([f"{k}={v}" for k, v in kwargs.items()])}'
 
+def merge(kwargs1, kwargs2, prioritize="left"):
+    for k, v in kwargs2.items():
+        if k in kwargs1:
+            if prioritize == "left":
+                continue
+            else: # right
+                kwargs1[k] = v
+        else:
+            kwargs1[k] = v
+    return kwargs1
+
 class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
@@ -74,22 +85,25 @@ class TransformersLLM(LMTPModel):
     
     def generate(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, 
                  temperature: float, max_new_tokens: int, 
-                 bias_tensor: torch.FloatTensor, streamer: TokenStreamer) -> LMTPModelResult:
+                 bias_tensor: torch.FloatTensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
         input_ids = torch.tensor(input_ids).to(self.model.device)
         attention_mask = torch.tensor(attention_mask).to(self.model.device)
         
-        kwargs = {
+        generate_args = {
             "input_ids": input_ids,
             "do_sample": temperature > 0.0,
             "attention_mask": attention_mask,
-            "temperature": temperature,
+            **({"temperature": temperature} if temperature > 0.0 else {}),
             "max_new_tokens": max_new_tokens,
             "logits_processor": self.logits_processors(bias_tensor),
             "output_scores": True,
             "return_dict_in_generate": True
         }
 
-        result = self.model.generate(**kwargs, stopping_criteria=[TokenStreamerDisguisedAsStoppingCriterion(streamer)], 
+        # factor in optional user-provided kwargs
+        merge(generate_args, kwargs, prioritize="left")
+
+        result = self.model.generate(**generate_args, stopping_criteria=[TokenStreamerDisguisedAsStoppingCriterion(streamer)], 
                                      eos_token_id=self.eos_token_id, pad_token_id=self.eos_token_id)
 
         return LMTPModelResult(sequences=result.sequences, scores=result.scores)

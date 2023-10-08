@@ -59,6 +59,12 @@ class LMTPDcModel(DcModel):
         if inprocess:
             self.inprocess_client_constructor = inprocess_client_constructor
 
+        EXTRA_DECODING_PARAMETERS = ["top_p", "top_k", "repetition_penalty", "presence_penalty", "length_penalty", "frequency_penalty"]
+        # API decoding parameters
+        self.extra_decoding_parameters = {
+            **{p: kwargs[p] for p in EXTRA_DECODING_PARAMETERS if p in kwargs}
+        }
+
         # model statistics
         self.requests = 0
         self.tokens = 0
@@ -188,9 +194,13 @@ class LMTPDcModel(DcModel):
     # on deinit
     def close(self):
         self.close_signal.set()
+        if self._client_loop is not None:
+            self._client_loop.cancel()
 
     def __del__(self):
         self.close_signal.set()
+        if self._client_loop is not None:
+            self._client_loop.cancel()
 
     async def model_info(self):
         if self._model_info is None or self._model_info == "<unavailable>":
@@ -267,7 +277,7 @@ class LMTPDcModel(DcModel):
         })
 
         # get token stream
-        token_stream = self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
+        token_stream = self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
         
         if active_tracer().active:
             return self.traced_generate(token_stream, event=stream_event)
@@ -322,7 +332,7 @@ class LMTPDcModel(DcModel):
 
             next_token_ids = np.array([t['token'] for t in tokens], dtype=np.int64)
             next_token_scores = np.array([t['logprob'] for t in tokens], dtype=np.float32)
-            next_logits = np.array([self.make_logits(t) for t in tokens], dtype=np.float32)
+            next_logits = [self.make_logits(t) for t in tokens]
 
             next_tokens = np.array([self.tokenizer.decode_bytes([t])[0] for t in next_token_ids])
 

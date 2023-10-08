@@ -1,7 +1,7 @@
 import lmql
 from lmql.tests.expr_test_utils import run_all_tests
 
-m = lmql.model("gpt2", inprocess=True, silent=True)
+m = lmql.model("local:gpt2", inprocess=True, silent=True)
 
 @lmql.query
 def test_model_reference():
@@ -17,6 +17,19 @@ def test_model_reference():
     '''
 
 @lmql.query
+def test_same_reuse():
+    '''lmql
+    import lmql
+
+    argmax(chunk_timeout=10.0)
+        """Hello[WHO]"""
+    from
+        lmql.model("local:gpt2", inprocess=True, silent=True)
+    where
+        STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10
+    '''
+
+@lmql.query
 def test_local_string():
     '''lmql
     import lmql
@@ -24,6 +37,7 @@ def test_local_string():
     argmax(chunk_timeout=10.0)
         """Hello[WHO]"""
     from
+        # trigger new model to be loaded since parameters inprocess and silent are different
         "local:gpt2"
     where
         STOPS_AT(WHO, "\n") and len(TOKENS(WHO)) < 10

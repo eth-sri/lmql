@@ -132,10 +132,13 @@ class LLM:
         When inside an LMQL query, you can also use `context.score(...)` in the same way,
         to score a list of continuations against the prompt of the current query context.
         """
-        dcmodel = self.adapter.get_dclib_model()
-        with traced(str(self) + ".score"):
-            with dc.ContextTokenizer(self.adapter.get_tokenizer()):
-                return await dc_score(dcmodel, prompt, values, **kwargs)
+        try:
+            dcmodel = self.adapter.get_dclib_model()
+            with traced(str(self) + ".score"):
+                with dc.ContextTokenizer(self.adapter.get_tokenizer()):
+                    return await dc_score(dcmodel, prompt, values, **kwargs)
+        finally:
+            dcmodel.close()
 
     def score_sync(self, *args, **kwargs):
         """
@@ -198,7 +201,11 @@ class LLM:
 
             # special case for 'random' model (see random_model.py)
             if model_identifier == "random":
-                kwargs["tokenizer"] = "gpt2" if "tokenizer" not in kwargs else kwargs["tokenizer"]
+                if "tokenizer" in kwargs:
+                    kwargs["tokenizer"] = kwargs["tokenizer"]
+                    kwargs["vocab"] = kwargs["tokenizer"]
+                else:
+                    kwargs["tokenizer"] = "gpt2" if "vocab" not in kwargs else kwargs["vocab"]
                 kwargs["inprocess"] = True
                 kwargs["async_transport"] = True
 
@@ -246,6 +253,20 @@ def get_default_model() -> Union[str, LLM]:
     This applies globally in the current process.
     """
     global default_model
+    return default_model
+
+def get_default_scoring_model() -> Union[str, LLM]:
+    """
+    Returns the default model instance to be used when no 'from' clause or @lmql.query(model=<model>) are specified and 
+    the workload is a scoring workload.
+
+    This applies globally in the current process.
+    """
+    global default_model
+    if default_model == "openai/gpt-3.5-turbo-instruct":
+        # we cannot use 3.5 instruct, because OpenAI blocks scoring for that model 
+        # on an API level
+        return "openai/text-davinci-003"
     return default_model
 
 def set_default_model(model: Union[str, LLM]):

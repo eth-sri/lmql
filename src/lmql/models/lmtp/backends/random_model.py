@@ -40,7 +40,7 @@ class UniformRandomSamplingLLM(LMTPModel):
     
     def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
-                 bias_tensor, streamer: TokenStreamer) -> LMTPModelResult:
+                 bias_tensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
         if self.seed is not None:
             seed = input_ids.sum() + self.seed
             rng = np.random.RandomState(seed)

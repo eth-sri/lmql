@@ -724,21 +724,26 @@ def named(seqs: List[DecoderSequence] = None, name=None):
     return seqs
 
 class FinishException(Exception):
-    def __init__(self, result_sequences: List[DecoderSequence]):
+    def __init__(self, result_sequences: List[DecoderSequence], singular=False):
         super().__init__()
         self.result_sequences = result_sequences
+        self.singular = singular
 
-def finish(ar: Union[DataArray, List[DecoderSequence], DecoderSequence], **kwargs):
+def finish(ar: Union[DataArray, List[DecoderSequence], DecoderSequence], singular=False):
     """
     Terminates the decoding process and returns the provided (array of) sequences as the final
     result sequences in order of the underlying array/list. 1
+
+    :param ar: The array of sequences to return as the final result.
+    :param singular: If True, the results of the decoding process can be considered a single sequence. Set False for
+                     decoders like beam search, where multiple sequences can be returned.
     """
     if type(ar) is DecoderSequence:
-        raise FinishException([ar])
+        raise FinishException([ar], singular=singular)
     elif type(ar) is list:
-        raise FinishException(ar)
+        raise FinishException(ar, singular=singular)
     else:
-        raise FinishException(list(ar.flatten().sequences.values())[0])
+        raise FinishException(list(ar.flatten().sequences.values())[0], singular=singular)
 
 def token_unique(ar: DataArray, prefer=None, flatten=False):
     """

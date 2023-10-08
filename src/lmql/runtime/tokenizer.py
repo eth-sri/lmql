@@ -9,6 +9,7 @@ import pickle
 import numpy as np
 import warnings
 from typing import Optional
+from weakref import WeakValueDictionary
 
 from lmql.runtime.caching import cache_file_exists, cachefile
 
@@ -269,14 +270,24 @@ class LMQLTokenizer:
             offset = m.end()
         segments.append(s[offset:])
         return segments
-            
+
+runtime_tokenizers = WeakValueDictionary()
 
 def tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
     """
-    Loads a LMQLTokenizer for the given model identifier. 
+    Loads an LMQLTokenizer for the given model identifier. 
 
     If type is 'auto', the tokenizer will be loaded from the most suitable available backend. Otherwise, the type can be one of 'hf' (huggingface transformers), 'tiktoken' (tiktoken) or 'auto' (default).
     """
+    global runtime_tokenizers
+    cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
+
+    if cache_identifier not in runtime_tokenizers:
+        runtime_tokenizers[cache_identifier] = load_tokenizer(model_identifier, type, **kwargs)
+    
+    return runtime_tokenizers[cache_identifier]
+
+def load_tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
     cache_identifier = model_identifier.replace("/", "-").replace(":", "__")
     cache_path = f"tokenizer-{cache_identifier}.pkl"
 

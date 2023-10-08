@@ -105,7 +105,7 @@ class NestedQueryMethods:
 def test_nested_queries():
     q = NestedQueryMethods()
     r = q.question()
-    assert r[0] == "Hi parrender 277 capit posteriorboston chuck神 heal", f"Expected fixed random value but got {r}"
+    assert r == "Hi parrender 277 capit posteriorboston chuck神 heal", f"Expected fixed random value but got {r}"
 
 if __name__ == "__main__":
     run_all_tests(globals())

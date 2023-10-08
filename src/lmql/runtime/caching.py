@@ -6,7 +6,7 @@ import os
 import pathlib
 import warnings
 
-CACHE_VERSION = 5
+CACHE_VERSION = 7
 CACHE_DIR = pathlib.Path.home() / ".cache" / "lmql"
 
 def prepare_cache_access():

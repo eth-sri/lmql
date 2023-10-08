@@ -106,6 +106,12 @@ class DcModel(DcModelRewriteMixin):
     def report_stats(self, printer, decoder_step=None):
         self.model.report_stats(printer, decoder_step)
 
+    def close(self):
+        """
+        Implementations should close any open resources here.
+        """
+        pass
+
 def model(model=None, **kwargs) -> DcModel:
     if "dcmodel" in kwargs:
         return kwargs["dcmodel"]
