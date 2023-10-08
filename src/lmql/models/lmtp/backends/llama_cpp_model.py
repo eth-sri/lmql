@@ -22,10 +22,12 @@ class LlamaCppModel(LMTPModel):
         self.llm = Llama(model_path=model_identifier[len("llama.cpp:"):], logits_all=True, **kwargs)
 
     def model_info(self):
+        import llama_cpp
         return {
             "model_identifier": self.model_identifier[len("llama.cpp:"):],
             "model_type": "llama.cpp",
-            "constructor": "Llama(model_path='{}'{})".format(self.model_identifier[len("llama.cpp:"):], ", " + ", ".join(["{}={}".format(k, v) for k,v in self.kwargs.items()]) if len(self.kwargs) > 0 else "")
+            "constructor": "Llama(model_path='{}'{})".format(self.model_identifier[len("llama.cpp:"):], ", " + ", ".join(["{}={}".format(k, v) for k,v in self.kwargs.items()]) if len(self.kwargs) > 0 else ""),
+            "llama-cpp-python": llama_cpp.__version__,
         }
 
     def eos_token_id(self):

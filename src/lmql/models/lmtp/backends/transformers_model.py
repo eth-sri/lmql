@@ -26,7 +26,7 @@ class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
         self.model_args = kwargs
-        self.loader = kwargs.pop("loader", None)
+        self.loader = kwargs.pop("loader", "transformers")
 
         self.max_batch_size = kwargs.pop("batch_size", 32)
 
@@ -148,6 +148,7 @@ class TransformersLLM(LMTPModel):
     def model_info(self):
         return {
             "model": self.model_identifier,
+            "model_type": self.loader,
             # use single quotes to avoid issues with JSON
             "constructor": self.model_constructor().replace('"', "'"),
             **self.version_info()
