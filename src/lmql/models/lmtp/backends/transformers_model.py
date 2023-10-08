@@ -19,6 +19,9 @@ def merge(kwargs1, kwargs2, prioritize="left"):
             kwargs1[k] = v
     return kwargs1
 
+# store version info about e.g. 'transformers' package
+version_info = {}
+
 class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
@@ -42,19 +45,6 @@ class TransformersLLM(LMTPModel):
         if not self.silent:
             print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
-
-    def model_constructor(self):
-        if self.loader == "auto-gptq":
-            return "AutoGPTQForCausalLM.from_quantized({})".format(format_call(self.model_identifier, **self.model_args))
-        else:
-            return "AutoModelForCausalLM.from_pretrained({})]".format(format_call(self.model_identifier, **self.model_args))
-
-    def model_info(self):
-        return {
-            "model": self.model_identifier,
-            # use single quotes to avoid issues with JSON
-            "constructor": self.model_constructor().replace('"', "'"),
-        }
 
     @property
     def eos_token_id(self):
@@ -125,6 +115,43 @@ class TransformersLLM(LMTPModel):
                 return torch.log_softmax(scores + bias_tensors, dim=-1)
 
         return [BatchLogitsProcessor()]
+
+    def model_constructor(self):
+        if self.loader == "auto-gptq":
+            return "AutoGPTQForCausalLM.from_quantized({})".format(format_call(self.model_identifier, **self.model_args))
+        else:
+            return "AutoModelForCausalLM.from_pretrained({})]".format(format_call(self.model_identifier, **self.model_args))
+
+    def version_info(self):
+        global version_info
+        
+        if len(version_info) == 0:
+            if self.loader == "auto-gptq":
+                import auto_gptq
+                version_info = {
+                    "auto_gptq": auto_gptq.__version__
+                }
+            else:
+                import transformers
+                version_info = {
+                    "transformers": transformers.__version__
+                }
+
+                # check for bitsandbytes
+                try:
+                    import bitsandbytes
+                    version_info["bitsandbytes"] = bitsandbytes.__version__
+                except ImportError:
+                    pass
+        return version_info
+
+    def model_info(self):
+        return {
+            "model": self.model_identifier,
+            # use single quotes to avoid issues with JSON
+            "constructor": self.model_constructor().replace('"', "'"),
+            **self.version_info()
+        }
 
 class TokenStreamerDisguisedAsStoppingCriterion:
     def __init__(self, token_streamer: TokenStreamer):

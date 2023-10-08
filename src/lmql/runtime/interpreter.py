@@ -1125,7 +1125,7 @@ class PromptInterpreter:
 
                 # check if a certificate was requested
                 if self.certificate != False:
-                    active_tracer().event("lmql.LMQLResult", results)
+                    active_tracer().event("lmql.LMQLResult", results, skip_none=True)
 
                     if callable(self.certificate):
                         self.certificate(certificate(active_tracer()))

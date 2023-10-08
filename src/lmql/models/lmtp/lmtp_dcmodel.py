@@ -265,22 +265,23 @@ class LMTPDcModel(DcModel):
             text = await self.detokenize(ids)
             print("lmtp generate: {} / {} ({} tokens)".format(ids, str([text])[1:-1], len(ids)))
 
-        stream_event = active_tracer().event("lmtp.generate", {
-            "model": await self.model_info(),
-            "tokenizer": str(self.tokenizer),
-            "kwargs": {
-                "ids": ids,
-                "max_tokens": chunk_size,
-                "temperature": temperature,
-                "logit_bias": mask,
-                "top_logprobs": top_logprobs
-            }
-        })
-
         # get token stream
         token_stream = self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
         
         if active_tracer().active:
+            stream_event = active_tracer().event("lmtp.generate", {
+                "model": await self.model_info(),
+                "tokenizer": str(self.tokenizer),
+                "kwargs": {
+                    "ids": ids,
+                    "max_tokens": chunk_size,
+                    "temperature": temperature,
+                    **({"logit_bias": mask} if mask is not None else {}),
+                    "top_logprobs": top_logprobs,
+                    **self.extra_decoding_parameters
+                }
+            })
+
             return self.traced_generate(token_stream, event=stream_event)
 
         return token_stream

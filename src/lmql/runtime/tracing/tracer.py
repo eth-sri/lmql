@@ -20,6 +20,14 @@ def add_extra_redact_keys(keys: Union[str, List[str]]):
     global REDACT_KEYS
     REDACT_KEYS += keys
 
+def remove_none_keys(dict_data):
+    if type(dict_data) is dict:
+        return {k: remove_none_keys(v) for k, v in dict_data.items() if v is not None}
+    elif type(dict_data) is list:
+        return [remove_none_keys(v) for v in dict_data]
+    else:
+        return dict_data
+
 def redact_data(dict_data, redact):
     keys_to_redact = (redact if type(redact) is list else []) + REDACT_KEYS
 
@@ -55,7 +63,7 @@ class Tracer:
 
         self.active = True
 
-    def event(self, name, data, redact=None):
+    def event(self, name, data, redact=None, skip_none=False):
         try:
             # check for dataclasses
             if dataclasses.is_dataclass(data):
@@ -63,7 +71,13 @@ class Tracer:
             # check for list of dataclasses
             elif type(data) is list and len(data) > 0 and dataclasses.is_dataclass(data[0]):
                 data = [dataclasses.asdict(d) for d in data]
-            s = json.dumps(redact_data(data, redact))
+            
+            # process event data
+            if skip_none:
+                data = remove_none_keys(data)
+            data = redact_data(data, redact)
+            
+            s = json.dumps(data)
             data = json.loads(s)
         except:
             warnings.warn("Tracer: cannot log or trace non-serializable data: {}".format(data), RuntimeWarning)
@@ -123,13 +137,19 @@ class NullTracer:
         self.active = False
     
     def __getattribute__(self, __name: str) -> Any:
-        if __name in ["name", "__dict__", "parent", "active"]:
+        if __name in ["name", "__dict__", "parent", "active", "__str__", "__repr__"]:
             return super().__getattribute__(__name)
         return self
     
     def __call__(self, *args, **kwargs):
         # do nothing
         return self
+    
+    def __str__(self):
+        return "<lmql.NullTracer '{}'>".format(self.name)
+    
+    def __repr__(self):
+        return str(self)
 
 # context var for the current tracer
 _tracer = ContextVar("logger")

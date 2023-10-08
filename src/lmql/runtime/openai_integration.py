@@ -321,7 +321,6 @@ class DclibOpenAiModel(DcModel):
             "stream": True,
             "echo": True,
             **({"api_config": self.api_config} if self.api_config is not None else {}),
-            "tracer": active_tracer(),
             **({"timeout": self.timeout} if self.timeout is not None else {}),
             **self.extra_decoding_parameters
         }
@@ -359,6 +358,9 @@ class DclibOpenAiModel(DcModel):
 
         # TODO: we are now overestimate the number of tokens billed to the user since we are not account for stopping phrases for the sake of streaming
         self.count_billed_tokens(len(tokenized_input_ids) + kwargs.get("max_tokens") * batch_size, self.model_identifier)
+
+        # make sure to pass a tracer
+        kwargs["tracer"] = active_tracer()
 
         buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
         t = b""
