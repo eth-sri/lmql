@@ -217,6 +217,7 @@ class LMTPDcModel(DcModel):
         scores = scores.items()
 
         logits = np.ones(self.tokenizer.vocab_range) * self.truncation_threshold
+        # logits = TokenDistribution()
         logits[[t for t, _ in scores]] = [s for _, s in scores]
 
         return logits

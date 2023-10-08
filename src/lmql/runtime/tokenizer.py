@@ -80,7 +80,7 @@ class LMQLTokenizer:
         if self._tokenizer_impl is None:
             self.loader_thread.join()
         if self._tokenizer_impl is None:
-            raise TokenizerNotAvailableError("Failed to derive a suitable tokenizer from the provided name '{}'. If your model requires a specific (well-known) tokenizer, make sure to specify it via lmql.model(..., tokenizer='...').".format(self.model_identifier))
+            tokenizer_not_found_error(self.model_identifier)
         return self._tokenizer_impl
     
     @property
@@ -356,6 +356,9 @@ def load_tokenizer(model_identifier, type="auto", **kwargs) -> LMQLTokenizer:
         
         return LMQLTokenizer(model_identifier, tokenizer_impl=PythonBackedTokenizer(model_identifier))
     
+    tokenizer_not_found_error(model_identifier)
+
+def tokenizer_not_found_error(model_identifier):
     raise TokenizerNotAvailableError("Failed to locate a suitable tokenizer implementation for '{}' (Make sure your current environment provides a tokenizer backend like 'transformers', 'tiktoken' or 'llama.cpp' for this model)".format(model_identifier))
 
 def get_vocab(tokenizer):
