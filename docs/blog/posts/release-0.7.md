@@ -1,11 +1,11 @@
 ---
-date: 2023-09-23 10:10:00
+date: 2023-10-10 10:10:00
 title: LMQL 0.7 brings Procedural Prompt Programming
 ---
 
 # LMQL 0.7 brings Procedural Prompt Programming
 
-<span class="date">September 23, 2023</span>
+<span class="date">October 10, 2023</span>
 
 Today, we are releasing LMQL 0.7. This series is the biggest update since the original release, including many community contributions. Next to several new main-line features like nested queries, the Generations API and the Chat API, it also includes several *experimental preview features*, allowing you to experiment with new incoming functionality before it is fully released.
 
