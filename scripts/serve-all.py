@@ -50,21 +50,6 @@ if not os.path.exists("docs/build/html/index.html"):
 serve_docs = subprocess.Popen(["python", "-m", "http.server", "8082"], cwd="docs/build/html", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 processes.append(serve_docs)
 
-# autobuild blog
-# onchange ../../docs/build/html/blog/*.html -- node generate.js
-summary += "Blog on " + termcolor.colored("http://localhost:8080/blog\n\n", "green")
-autobuild_blog_p = subprocess.Popen(["onchange", "../../docs/build/html/blog/*.html", "--", "node", "generate.js"], cwd="web/blog")
-processes.append(autobuild_blog_p)
-
-# autobuild web/
-# onchange "index.template.html" "**/*.js" "**/*.css" "**/*.md" -e "./index.html" -- node generate.js
-autobuild_web_p = subprocess.Popen(["onchange", "index.template.html", "**/*.js", "**/*.css", "**/*.md", "-e", "./index.html", "--", "node", "generate.js"], cwd="web")
-processes.append(autobuild_web_p)
-
-# autobuild web/actions
-auto_build_actions_p = subprocess.Popen(["onchange", "**/*.js", "**/*.css", "**/*.md", "**/*.html", "**/*.pd", "**/*.json", "-e", "./index.html", "--", "node", "generate.js"], cwd="web/actions")
-processes.append(auto_build_actions_p)
-
 while True:
     try:
         print(summary)
@@ -75,7 +60,7 @@ while True:
         elif command == "bb": # browser build
             print(termcolor.colored("Building browser playground...", "yellow"))
             # run bash deploy.sh in web/
-            subprocess.run(["bash", "deploy.sh"], cwd="web")
+            subprocess.run(["bash", "deploy.sh"], cwd="scripts/browser-build")
             print(termcolor.colored("Done!", "green"))
         elif command == "docs-clean":
             # docs/ make clean

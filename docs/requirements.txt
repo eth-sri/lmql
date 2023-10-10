@@ -5,3 +5,4 @@ nbsphinx==0.9.1
 IPython
 shibuya
 sphinx_design
+sphinx-notfound-page

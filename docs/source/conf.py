@@ -26,7 +26,8 @@ extensions = [
     "lmql_snippets",
     "warn_about_latest",
     "nbsphinx",
-    "sphinx_design"
+    "sphinx_design",
+    "notfound.extension",
 ]
 
 myst_enable_extensions = ["colon_fence"]
@@ -81,4 +82,9 @@ html_theme_options = {
             "url": "https://discord.gg/7eJP4fcyNT"
         }
     ]
+}
+
+notfound_context = {
+    'title': 'Page not found',
+    'body': '<script>window.location.href = "https://lmql.ai/docs/" + window.location.pathname;</script>',
 }
