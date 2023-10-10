@@ -79,7 +79,6 @@
 
       patchPhase  = ''
         find . -type d -name browser-build -exec rm -rf -- {} +
-        rm -f -- public/doc-snippets
       '';
 
       DISABLE_ESLINT_PLUGIN = "true";
