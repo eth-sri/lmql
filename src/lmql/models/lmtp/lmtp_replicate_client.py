@@ -46,7 +46,7 @@ class LMTPReplicateClient:
         if self.model_validated:
             return
 
-        if not self.model_version:        
+        if not self.model_version:
             async with self.session.get(f'https://api.replicate.com/v1/models/{self.model_identifier}',
                     headers={
                         'Authorization': f'Token {self.api_key}',
@@ -109,7 +109,7 @@ class LMTPReplicateClient:
                         warnings.warn(f'Misformatted content received from Replicate task: {line!r}')
                         continue
                     cmd, item_json = line.split(' ', 1)
-                    if cmd != 'TOKEN':
+                    if cmd != 'TOKEN' and cmd != 'MSG':
                         warnings.warn(f"Unknown command {cmd!r} in line {line!r} -- protocol version mismatch? {cmd!r}")
                         continue
                     item = json.loads(item_json)
@@ -117,6 +117,26 @@ class LMTPReplicateClient:
                         # FIXME: Is it appropriate for this to kill the whole batch, not just the single stream?
                         raise LMTPStreamError(item["error"])
                     yield item
+
+                    # messages are single-item streams
+                    if cmd == "MSG":
+                        break
+
+    async def request(self, name, payload):
+        """
+        Requests metadata about the configuration 
+        of the currently running model.
+        """
+        self.stream_id += 1
+        payload = {
+            "stream_id": self.stream_id,
+            "model": self.model_identifier,
+            "data": payload
+        }
+        async for result in self.submit_batch([[name, payload]]):
+            return result
+
+        raise ValueError(f"Request {name} failed to return a result")
 
     async def generate(self, prompt, **kwargs):
         self.stream_id += 1

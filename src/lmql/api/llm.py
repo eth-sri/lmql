@@ -218,6 +218,10 @@ class LLM:
                         warnings.warn("File tokenizer.model not present in the same folder as the model weights. Using default '{}' tokenizer for all llama.cpp models. To change this, set the 'tokenizer' argument of your lmql.model(...) object.".format("huggyllama/llama-7b", UserWarning))
                         kwargs["tokenizer"] = kwargs.get("tokenizer", "huggyllama/llama-7b")
 
+            if model_identifier.startswith("replicate:"):
+                model_identifier = model_identifier[10:]
+                endpoint = "replicate:" + model_identifier
+
             # determine endpoint URL
             if endpoint is None:
                 endpoint = "localhost:8080"

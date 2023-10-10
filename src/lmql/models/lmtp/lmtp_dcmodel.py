@@ -78,10 +78,9 @@ class LMTPDcModel(DcModel):
         self.client = None
 
     async def replicate_client_loop(self):
-        import aiohttp
-        from .lmtp_replicate_client import LMTPReplicateClient
-
         try:
+            import aiohttp
+            from .lmtp_replicate_client import LMTPReplicateClient
             async with aiohttp.ClientSession() as session:
                 self.client = LMTPReplicateClient(self.model.model_identifier, session, self.endpoint,
                     **(self.lmtp_server_kwargs or {})
@@ -93,6 +92,7 @@ class LMTPDcModel(DcModel):
             self.error_signal.set()
             self.error = str(e)
             self.connected_signal.set()
+            print("Failed to initial replicate.com connection:", e, flush=True)
 
     async def ws_client_loop(self):
         import aiohttp
