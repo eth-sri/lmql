@@ -457,17 +457,20 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
 
         while not (len(active) == 0 or (len(top_variable_done) == b and dc.max_score(active, scorer=nw_score) < dc.min_score(top_variable_done, scorer=nw_score))):
             # inner variable decoding (beam_sample with 2*n beams and branching factor n)
-            if sample:
-                active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
-            else:
-                kwargs.pop("temperature", None)
-                active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
+            kwargs.pop("temperature", None)
+            active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
             
             for s in active.flatten().items():
                 # s.data("eos_score", s.score
                 s.data("eos_score", regular_scorer(s.logprobs))
 
+            eos_scores_before = active.data("eos_score").flatten().items()
+
             active = await model.rewrite(active)
+
+            # make sure eos_scores survive rewrite
+            for s, eos_score in zip(active.flatten().items(), eos_scores_before):
+                s.data("eos_score", eos_score)
 
             active, variable_done = (active + variable_done).separate_by(is_active_variable)
             active = dc.topk(active, b)
