@@ -22,6 +22,12 @@ export default defineConfig({
     [
       "script",
       {
+        src: "https://static.cloudflareinsights.com/beacon.min.js?token=f7d2a6b1a0624c51ae4dab9a4239b77d&spa=false"
+      }
+    ],
+    [
+      "script",
+      {
         async: true,
         src: "https://buttons.github.io/buttons.js"
       }
