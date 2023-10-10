@@ -898,7 +898,7 @@ class LMQLCompiler:
     def compile(self, filepath):
         try:
             # parse file
-            with open(filepath) as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 contents = f.read()
             lmql_code = preprocess_text(contents)
             buf = StringIO(lmql_code)
