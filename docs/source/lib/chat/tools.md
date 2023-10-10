@@ -1,1 +1,0 @@
-# Integrating Tools and Chat Plugins

@@ -1,0 +1,75 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "lmql-code",
+	"patterns": [
+		{
+			"include": "source.python#comments"
+		},
+		{
+			"include": "source.lmql#strings"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "source.python#statement"
+		},
+		{
+			"include": "source.python#expression"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.lmql",
+					"match": "\\b(BEAM|beam|ARGMAX|argmax|SAMPLE|incontext|BEST_K|best_k|BEAM_VAR|beam_var|VAR|var|sample|FROM|from|WHERE|where|DISTRIBUTION|distribution|class|def)\\b"
+				}
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"begin": "'",
+					"end": "'",
+					"name": "string.quoted.single",
+					"patterns": [
+						{
+							"include": "#qstrings"
+						}
+					]
+				},
+				{
+					"begin": "\"",
+					"end": "\"",
+					"name": "string.quoted.double",
+					"patterns": [
+						{
+							"include": "#qstrings"
+						}
+					]
+				},
+			]
+		},
+		"qstrings": {
+			"patterns": [
+				{
+					"begin": "\\[",
+					"end": "\\]",
+					"name": "entity.name.class"
+				},
+				{
+					"begin": "\\{",
+					"end": "\\}",
+					"contentName": "entity.name.class",
+					"patterns": [
+						{
+							"include": "source.python#f-expression"
+						}
+					]
+				}
+			]
+		}
+	},
+	"scopeName": "source.lmql"
+}
