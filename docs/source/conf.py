@@ -86,5 +86,20 @@ html_theme_options = {
 
 notfound_context = {
     'title': 'Page not found',
-    'body': '<script>window.location.href = "https://lmql.ai/docs/" + window.location.pathname;</script>',
+    'body': """
+    <script>
+    let path = window.location.pathname;
+    // strip of /en/stable and /en/latest
+    // other replacements
+    // scripted_prompts -> scripted-prompting.html
+    path = path.replace(/scripted_prompts\.html/, "scripted-prompting.html");
+    // functions -> nestedqueries
+    path = path.replace(/functions\.html/, "nestedqueries.html");
+    // quickstart -> index
+    path = path.replace(/quickstart\.html/, "index.html");
+    path = path.replace(/\/en\/(stable|latest)\//, "/");
+    
+    window.location = "https://lmql.ai/docs" + path;
+    </script>
+    """,
 }
