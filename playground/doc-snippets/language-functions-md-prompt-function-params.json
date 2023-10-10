@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "@lmql.query\ndef one_of(choices: list):\n    '''lmql\n    \"Among {choices}, what do you consider \\\n    most likely? [ANSWER]\" where ANSWER in choices\n    return ANSWER\n    '''\n\n\"Q: What is the capital of France? \\\n[ANSWER: one_of(['Paris', 'London', 'Berlin'])]\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

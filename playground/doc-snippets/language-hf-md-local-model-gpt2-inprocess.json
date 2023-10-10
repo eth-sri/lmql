@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "import lmql\n\nargmax\n    \"Hello[WHO]\"\nfrom\n    lmql.model(\"local:gpt2\", cuda=True)\nwhere\n    STOPS_AT(WHO, \"\\n\") and len(TOKENS(WHO)) < 10", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

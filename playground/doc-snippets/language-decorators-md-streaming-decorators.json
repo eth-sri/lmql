@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "from lmql.runtime.program_state import ProgramState\n\n@lmql.decorators.streaming\ndef stream(value: str, context: ProgramState):\n    \"\"\"Decorator to stream the variable value\"\"\"\n    print(\"VALUE\", [value])\n\n\"Enumerate the alphabet without spaces:[@stream TEST]\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

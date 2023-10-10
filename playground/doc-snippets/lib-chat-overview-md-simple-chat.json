@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "from lmql.lib.chat import message\n\nargmax \n    while True:\n        \"{:user} {await input()}\"\n        \"{:assistant} [@message ANSWER]\"\nfrom\n   \"chatgpt\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "def screaming(value):\n    \"\"\"Decorator to convert a string to uppercase\"\"\"\n    return value.upper()\n\n\"Say 'this is a test':[@screaming TEST]\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

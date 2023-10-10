@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "argmax \"Hello[WHO]\" from lmql.model(\"local:gpt2\")", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}

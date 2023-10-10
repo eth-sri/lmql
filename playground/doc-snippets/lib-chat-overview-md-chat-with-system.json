@@ -1,1 +1,0 @@
-{"lmql-editor-contents": "from lmql.lib.chat import message\n\nargmax \n    \"{:system} You are a marketing chatbot for the\\\n     language model query language (LMQL).\"\n    while True:\n        \"{:user} {await input()}\"\n        \"{:assistant} [ANSWER]\"\nfrom\n   \"chatgpt\"", "decoder-graph": "{\"nodes\": [], \"edges\": []}"}
