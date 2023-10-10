@@ -23,7 +23,8 @@ class UniformRandomSamplingLLM(LMTPModel):
         else:
             self._eos_token_id = 50256
             self._vocab_size = 50257
-            print("['random' model using tokenizer gpt2]".format(tokenizer))
+            if kwargs.get("verbose", False):
+                print("['random' model using tokenizer gpt2]")
 
     def model_info(self):
         return "UniformRandomSamplingLLM(seed={})".format(self.seed)

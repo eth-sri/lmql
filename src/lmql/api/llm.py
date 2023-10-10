@@ -203,6 +203,8 @@ class LLM:
             if model_identifier == "random":
                 if "tokenizer" in kwargs:
                     kwargs["vocab"] = kwargs["tokenizer"]
+                else:
+                    kwargs["tokenizer"] = "gpt2"
                 kwargs["inprocess"] = True
                 kwargs["async_transport"] = True
 
