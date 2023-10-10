@@ -15,13 +15,14 @@ echo "🌎  Building website..."
 pushd ../docs
 
 # create docs/latest copy (skip symlink)
+rm -rf docs/latest # remove symlink
 # create copy of current 'latest' state
 cp -r docs docs-latest
 # checkout old state for docs/
 git fetch origin stable-docs --depth 1
 git checkout origin/stable-docs docs
+rm -rf docs/latest # remove symlink
 # move latest docs back in
-rm -rf docs/latest
 mv docs-latest docs/latest
 # build docs
 
