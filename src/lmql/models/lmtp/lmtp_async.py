@@ -60,8 +60,34 @@ class LMTPAsyncClient:
         self.stream_id = 0
         self.iterators = {}
 
+        # for non-streamed responses
+        self.request_futures = {}
+        
         self.poll_task = asyncio.create_task(self.poll_messages())
         self.poll_running = asyncio.Event()
+
+    async def request(self, name, payload):
+        """
+        Requests metadata about the configuration 
+        of the currently running model.
+        """
+        self.stream_id += 1
+        payload = {
+            "stream_id": self.stream_id,
+            "model": self.model_identifier,
+            "data": payload
+        }
+        self.cmd_queue.put_nowait((name, payload))
+
+        # wait for response
+        fut = asyncio.Future()
+        self.request_futures[self.stream_id] = fut
+        try:
+            result = await asyncio.wait_for(fut, timeout=5)
+        except TimeoutError as e:
+            raise TimeoutError("LMTP request '{}' timed out after 5 seconds".format(name))
+        self._model_info = result
+        return result
 
     def __del__(self):
         if self.poll_task is not None and self.poll_running.is_set():
@@ -84,6 +110,13 @@ class LMTPAsyncClient:
                         stream_id = d["stream_id"]
                         consumers = self.iterators.get(stream_id, [])
                         for q in consumers: q.put_nowait(d)
+                    elif type == "MSG":
+                        stream_id = d["stream_id"]
+                        consumer = self.request_futures.pop(stream_id, None)
+                        if consumer is not None:
+                            consumer.set_result(d)
+                    else:
+                        print("lmtp_async: unknown msg type", type)
                 except Exception as e:
                     warnings.warn("failed to handle msg {}: {}".format(msg, e))
         except asyncio.CancelledError:

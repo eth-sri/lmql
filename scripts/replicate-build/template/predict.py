@@ -82,13 +82,13 @@ class Predictor(cog.BasePredictor):
                         prev_warned.add(local_id)
                     continue
 
-                if response_type != 'TOKEN':
+                if response_type != 'TOKEN' and response_type != 'MSG':
                     print(f'WARNING: Unrecognized response type {response_type!r}; may need to be updated', file=sys.stderr)
 
                 response_data['stream_id'] = orig_id
 
                 yield f'{response_type!s} {json.dumps(response_data)}\n'
-                if response_data.get("finish_reason") is not None:
+                if response_data.get("finish_reason") is not None or response_type == 'MSG':
                     open_ids.discard(local_id)
                 if "error" in response_data:
                     if local_id is not None:

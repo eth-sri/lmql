@@ -35,10 +35,12 @@ def cmd_run():
 
     parser = argparse.ArgumentParser(description="Runs a LMQL program.")
     parser.add_argument("lmql_file", type=str, help="path to the LMQL file to run")
-    parser.add_argument("--no-clear", action="store_true", dest="no_clear", help="don't clear inbetween printing results")
-    parser.add_argument("--no-realtime", action="store_true", dest="no_realtime", help="don't print text as it's being generated")
     parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="don't print anything")
     parser.add_argument("--time", action="store_true", dest="time", help="Time the query.")
+    parser.add_argument("--certificate", type=str, default="False", help="Create a inference certificate for the executed query (True to print, path to save on disk)")
+
+    parser.add_argument("--no-clear", action="store_true", dest="no_clear", help="don't clear inbetween printing results (deprectated, use --quiet instead)")
+    parser.add_argument("--no-realtime", action="store_true", dest="no_realtime", help="don't print text as it's being generated (deprectated, use --quiet instead)")
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -52,11 +54,24 @@ def cmd_run():
     writer.clear = not args.no_clear
     writer.print_output = not args.no_realtime
 
+    # parse 'certificate'
+    certificate = False
+    if args.certificate.lower() == "true":
+        certificate = True
+    elif args.certificate.lower() != "false":
+        certificate = args.certificate
+
+    kwargs = {
+        "output_writer": writer,
+        "certificate": certificate,
+        "__name__": "<lmql run '{}'>".format(args.lmql_file)
+    }
+
     if os.path.exists(absolute_path):
-        results = asyncio.run(lmql.run_file(absolute_path, output_writer=writer))
+        results = asyncio.run(lmql.run_file(absolute_path, **kwargs))
     else:
         code = args.lmql_file
-        results = asyncio.run(lmql.run(code, output_writer=writer))
+        results = asyncio.run(lmql.run(code, **kwargs))
     
     if type(results) is not list:
         results = [results]
@@ -78,7 +93,7 @@ def cmd_run():
                     print(" - {} {}".format(label, prob))
 
     if args.time:
-        print("Query took:", time.time() - start)
+        print("Query took:", time.time() - start, "seconds")
 
 def ensure_node_install():
     try:

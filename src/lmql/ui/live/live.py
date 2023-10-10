@@ -80,7 +80,7 @@ async def lmql(code, *args, web=False):
 
     output_writer = LiveDebuggerOutputWriter(web=web)
 
-    result = await lmql.run(code, output_writer=output_writer, model=model)
+    result = await lmql.run(code, output_writer=output_writer, model=model, __name__="<playground query>")
 
     for r in (result if type(result) is list else [result]):
         if r is None:

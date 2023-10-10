@@ -20,8 +20,34 @@ class LMTPWebSocketClient:
         self.stream_id = 0
         self.model_identifier = model_identifier
 
-        self.handler = None
+        # for streamed responses
         self.iterators = {}
+        # for non-streamed responses
+        self.request_futures = {}
+
+    async def request(self, name, payload):
+        """
+        Requests metadata about the configuration 
+        of the currently running model.
+        """
+        self.stream_id += 1
+        payload = {
+            "stream_id": self.stream_id,
+            "model": self.model_identifier,
+            "data": payload
+        }
+        await self.ws.send_str("{} {}".format(name, json.dumps(payload)))
+
+        # wait for response
+        fut = asyncio.Future()
+        self.request_futures[self.stream_id] = fut
+        try:
+            result = await asyncio.wait_for(fut, timeout=5)
+        except TimeoutError as e:
+            raise TimeoutError("LMTP request '{}' timed out after 5 seconds".format(name))
+
+        self._model_info = result
+        return result
 
     async def generate(self, prompt, **kwargs):
         self.stream_id += 1
@@ -92,6 +118,15 @@ class LMTPWebSocketClient:
                 stream_id = d["stream_id"]
                 consumers = self.iterators.get(stream_id, [])
                 for q in consumers: q.put_nowait(d)
+        elif cmd == "MSG":
+            data = json.loads(args)
+            
+            for d in data:
+                stream_id = d["stream_id"]
+
+                fut = self.request_futures.pop(stream_id, None)
+                if fut is not None:
+                    fut.set_result(d)
         else:
             warnings.warn("Unknown command: {}".format(cmd))
 

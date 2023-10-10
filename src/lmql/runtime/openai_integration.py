@@ -20,6 +20,7 @@ from lmql.runtime.tokenizer import tokenizer
 from lmql.runtime.tokenizers.tiktoken_tokenizer import TiktokenTokenizer
 from lmql.utils import nputil
 from lmql.runtime.token_distribution import TokenDistribution
+from lmql.runtime.tracing import active_tracer
 from lmql.models.model_info import model_info
 from lmql.api.llm import ModelAPIAdapter
 from typing import Type
@@ -216,6 +217,7 @@ class DclibOpenAiModel(DcModel):
             "user": "lmql",
             "echo": True,
             **({"api_config": self.api_config} if self.api_config is not None else {}),
+            "tracer": active_tracer(),
             **({"timeout": self.timeout} if self.timeout is not None else {}),
         }
 
@@ -356,6 +358,9 @@ class DclibOpenAiModel(DcModel):
 
         # TODO: we are now overestimate the number of tokens billed to the user since we are not account for stopping phrases for the sake of streaming
         self.count_billed_tokens(len(tokenized_input_ids) + kwargs.get("max_tokens") * batch_size, self.model_identifier)
+
+        # make sure to pass a tracer
+        kwargs["tracer"] = active_tracer()
 
         buffer = (await openai.async_buffer(await openai.Completion.create(**kwargs), tokenizer=self.tokenize_list))
         t = b""
