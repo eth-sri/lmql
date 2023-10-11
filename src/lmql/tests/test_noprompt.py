@@ -12,7 +12,7 @@ def token_diff(s1, s2):
 def test_noprompt():
     '''lmql
     "[RESPONSE]" where len(TOKENS(RESPONSE)) < 10
-    assert RESPONSE == " strides nutssa fallout Augustine frog malnutrition teasing stare", f"Expected fixed random value but got {[RESPONSE]}"
+    assert RESPONSE == " Protocol radi programmes Lump Zerg garg Cann troopsantasy", f"Expected fixed random value but got {[RESPONSE]}"
     '''
 
 @lmql.query(model=lmql.model("random", seed=123))
@@ -24,7 +24,7 @@ async def noprompt_beam():
 
 async def test_noprompt_beam():
     rs = await noprompt_beam()
-    assert [r.variables['RESPONSE'] for r in rs] == [' strides stridesSepSep', ' strides stridesSepSep unidentified'], f"Expected fixed random value but got {[r.variables['RESPONSE'] for r in rs]}"
+    assert [r.variables['RESPONSE'] for r in rs] == [' Protocol', ' Protocol radi'], f"Expected fixed random value but got {[r.variables['RESPONSE'] for r in rs]}"
 
 @lmql.query(model="openai/text-ada-001")
 def test_noprompt_openai():
@@ -38,7 +38,7 @@ def test_noprompt_openai():
 def test_noprompt_with_constraints():
     '''lmql
     "[RESPONSE]" where RESPONSE in ["YES", "NO"]
-    assert RESPONSE == "YES", f"Expected 'YES' got {[RESPONSE]}"
+    assert RESPONSE == "NO", f"Expected 'NO' got {[RESPONSE]}"
     '''
 
 @lmql.query
@@ -52,7 +52,7 @@ def nested_query():
 def test_noprompt_with_nested_query():
     '''lmql
     "[RESPONSE: nested_query]"
-    assert RESPONSE == "YES", f"Expected 'YES' got {[RESPONSE]}"
+    assert RESPONSE == "NO", f"Expected 'YES' got {[RESPONSE]}"
     '''
 
 @lmql.query

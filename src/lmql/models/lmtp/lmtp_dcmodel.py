@@ -261,7 +261,7 @@ class LMTPDcModel(DcModel):
         # convert seq to input IDs
         ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
         
-        if len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
+        if len(ids) == 0 or (len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id):
             ids = [self.tokenizer.bos_token_id] + ids
         
         # derive max_tokens
