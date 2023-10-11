@@ -180,11 +180,14 @@ async def chat_api(**kwargs):
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
-    max_tokens = kwargs.get("max_tokens", 0)
     model = kwargs["model"]
     api_config = kwargs.get("api_config", {})
     tokenizer = api_config.get("tokenizer")
     assert tokenizer is not None, "internal error: chat_api expects an 'api_config' with a 'tokenizer: LMQLTokenizer' mapping in your API payload"
+    
+    max_tokens = kwargs.get("max_tokens", 0)
+    if max_tokens == -1:
+        kwargs.pop("max_tokens")
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
     prompt_tokens = tokenize(kwargs["prompt"][0], tokenizer=tokenizer, openai_byte_encoding=True)
@@ -254,7 +257,7 @@ async def chat_api(**kwargs):
             handle = tracer.event("openai.ChatCompletion", {
                 "endpoint": endpoint,
                 "headers": headers,
-                "tokenier": str(tokenizer),
+                "tokenizer": str(tokenizer),
                 "kwargs": kwargs
             })
 
@@ -392,9 +395,16 @@ async def completion_api(**kwargs):
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
-    max_tokens = kwargs.get("max_tokens", 0)
     timeout = kwargs.pop("timeout", 1.5)
     tracer = kwargs.pop("tracer", None)
+    
+    max_tokens = kwargs.get("max_tokens")
+    # if no token limit is set, use 1024 as a generous chunk size
+    # (completion models require max_tokens to be set)
+    if max_tokens == -1: 
+        # not specifying anything will use default chunk size 16
+        # specifying a higher value may error on some models
+        kwargs["max_tokens"] = 1024
 
     assert not (LMQL_BROWSER and "logit_bias" in kwargs and "gpt-3.5-turbo" in kwargs["model"]), "gpt-3.5-turbo completion models do not support logit_bias in the LMQL browser distribution, because the required tokenizer is not available in the browser. Please use a local installation of LMQL to use logit_bias with gpt-3.5-turbo models."
 
@@ -428,7 +438,7 @@ async def completion_api(**kwargs):
             }
             yield data
 
-    async with CapacitySemaphore(num_prompts * max_tokens):
+    async with CapacitySemaphore(num_prompts):
         
         current_chunk = ""
         stream_start = time.time()

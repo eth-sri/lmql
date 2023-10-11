@@ -37,9 +37,6 @@ class UniformRandomSamplingLLM(LMTPModel):
     def vocab_size(self):
         return self._vocab_size
 
-    # def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-    #     return super().score(input_ids, attention_mask, **model_kwargs)
-    
     def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:

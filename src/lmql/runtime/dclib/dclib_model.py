@@ -1,6 +1,6 @@
 import asyncio
 from collections import namedtuple
-from typing import List, Union
+from typing import List, Union, Any
 
 from .dclib_array import DataArray
 from .dclib_rewrite import DcModelRewriteMixin
@@ -12,6 +12,14 @@ from dataclasses import dataclass
 import sys
 
 from lmql.runtime.stats import Stats
+
+@dataclass
+class TokenMask:
+    logits_mask: np.ndarray
+    user_data: List[Any]
+    # hint at number of tokens to generate for the current variable 
+    # (-1: until eos, 0: no hint, >0: specific number of tokens)
+    max_tokens_hints: List[int]
 
 class CacheDelegate:
     def register_token_stream(self, fut: callable):
@@ -74,13 +82,10 @@ class DcModel(DcModelRewriteMixin):
         return await self.model.tokenize(*args, **kwargs)
 
     async def compute_logits_mask(self, input_ids, user_data, is_constrained, seqs, required=False, **kwargs):
-        if "modern_logits_processor" in kwargs:
-            processor = kwargs["modern_logits_processor"]
-            mask = await processor(seqs, additional_logits_processor_mask=is_constrained, **kwargs)
-            return mask
-
-        assert not required, "compute_logits_mask() cannot produce a token mask, as the provided kwargs do not contain a logits processor. Please make sure to pass a logits processor to decoding function you are using."
-        return namedtuple("LogitsMaskResult", ["logits_mask", "user_data"])([None], user_data)
+        assert "modern_logits_processor" in kwargs, "modern_logits_processor is required for compute_logits_mask"
+        processor = kwargs["modern_logits_processor"]
+        mask = await processor(seqs, additional_logits_processor_mask=is_constrained, **kwargs)
+        return mask
 
     async def argmax(self, sequences, **kwargs):
         """

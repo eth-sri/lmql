@@ -13,6 +13,7 @@ from lmql.runtime.postprocessing.conditional_prob import \
     ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
 from lmql.api.inspect import is_query
+from lmql.runtime.formatting import format, tag
 
 class LMQLInputVariableScope:
     def __init__(self, f, calling_frame):
@@ -264,12 +265,6 @@ def context_call(fct_name, *args, **kwargs):
 
 def interrupt_call(fct_name, *args, **kwargs):
     return ("interrupt:" + fct_name, args, kwargs)
-
-def f_escape(s):
-    return str(s).replace("[", "[[").replace("]", "]]")
-
-def tag(t):
-    return f"<lmql:{t}/>"
 
 def compiled_query(output_variables=None, group_by=None):
     if output_variables is None:

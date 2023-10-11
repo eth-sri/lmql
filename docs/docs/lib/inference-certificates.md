@@ -40,7 +40,7 @@ say_hello(certificate="my-certificate.json")
                     "Authorization": "<removed>",
                     "Content-Type": "application/json"
                 },
-                "tokenier": "<LMQLTokenizer 'gpt-3.5-turbo-instruct' using tiktoken <Encoding 'cl100k_base'>>",
+                "tokenizer": "<LMQLTokenizer 'gpt-3.5-turbo-instruct' using tiktoken <Encoding 'cl100k_base'>>",
                 "kwargs": {
                     "model": "gpt-3.5-turbo-instruct",
                     "prompt": [
@@ -117,8 +117,10 @@ with lmql.traced("my-context") as t:
 
 This produces one certificate for all calls made in the defined context, where each query is represented as a separate item in the list of `children` certificates. Recorded events are are nested in child certificates. Additionally, an aggregated `metrics` object ranging over all (recursive) calls is included in the top-level certificate.
 
-## Certificate Callbacks
+## Certificate Callbacks And Return Values
 
-As an alternative to directly writing certificates to a file, the `certificate` argument can also be used to specify a callback function that is called with the generated certificate as an argument. This can be used to integrate certificate generation into custom workflows.
+As an alternative to directly writing certificates to a file, certificates can also be handled via a callback or returned as a function return value.
+
+To specify a callback function that is called with the generated certificate as an argument, specify it as the `certificate=<FCT>` argument.
 
 The callback is provided with a single `certificate` object, which is of type `lmql.InferenceCertificate`. The certificate can be directly serialized to JSON using string conversion, i.e., `str(certificate)`.
