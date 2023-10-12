@@ -141,7 +141,7 @@ def calc(expr): ...
 "A: [REASONING]" where inline_use(REASONING, [wiki, calc])
 ```
 
-To learn more about LMQL Actions, please refer to the [separate preview announcement here](https://lmql.ai/actions).
+A future release will bring more documentation and details on Actions, including how to use and customize it for your use cases. Until then we invite everyone to try and hack with the current implementation, fully contained in [`actions.py`](https://github.com/eth-sri/lmql/blob/main/src/lmql/lib/actions.py).
 
 ### Regex Constraints <span class="beta badge">Preview</span>
 
