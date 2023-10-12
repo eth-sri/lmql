@@ -229,18 +229,20 @@ class LMTPDcModel(DcModel):
             chunk_size = self.model.chunk_size
         kwargs = {**self.model_args, **kwargs}
 
+        # get token masks from interpreter
         constrained_seqs = np.array([s.is_query_constrained], dtype=np.bool_)
         logits_mask_result = await self.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
-
         mask = logits_mask_result.logits_mask[0]
-
+        
         assert kwargs.get("num_samples", 1) == 1, "LMTP does not support num_samples > 1 right now. Please, duplicate your dc.seq to obtain multiple sampled continuations."
 
+        # merge interpreter user data with previous/decoder data
         if s.user_data is None:
             s.user_data = {}
         s.user_data = dc.deepmerge(dc.deepcopy(s.user_data), logits_mask_result.user_data[0])
         s.user_data["set_by"] = "where"
 
+        # convert token mask to LMTP format
         if mask is not None:
             num_allowed = masks.mask_num_allowed(mask)
             if num_allowed == 1:
@@ -255,17 +257,23 @@ class LMTPDcModel(DcModel):
             mask_value = 100 if invert else -100
             mask = {int(idx): mask_value for idx in np.nonzero(masked)[0]}
 
+        # convert seq to input IDs
         ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
         
-        if len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
+        if len(ids) == 0 or (len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id):
             ids = [self.tokenizer.bos_token_id] + ids
+        
+        # derive max_tokens
+        max_tokens = logits_mask_result.max_tokens_hints[0] or chunk_size
+        # if '-1', generation is not limited
+        if max_tokens == -1: max_tokens = 128
 
         if self.verbose:
             text = await self.detokenize(ids)
-            print("lmtp generate: {} / {} ({} tokens)".format(ids, str([text])[1:-1], len(ids)))
+            print("lmtp generate: {} / {} ({} tokens, temperature={}, max_tokens={})".format(ids, str([text])[1:-1], len(ids), temperature, max_tokens))
 
         # get token stream
-        token_stream = self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
+        token_stream = self.client.generate(ids, max_tokens=max_tokens, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
         
         if active_tracer().active:
             stream_event = active_tracer().event("lmtp.generate", {
@@ -273,7 +281,7 @@ class LMTPDcModel(DcModel):
                 "tokenizer": str(self.tokenizer),
                 "kwargs": {
                     "ids": ids,
-                    "max_tokens": chunk_size,
+                    "max_tokens": max_tokens,
                     "temperature": temperature,
                     **({"logit_bias": mask} if mask is not None else {}),
                     "top_logprobs": top_logprobs,

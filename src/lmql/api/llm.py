@@ -105,7 +105,7 @@ class LLM:
             kwargs["chunksize"] = max_tokens
             max_tokens = max_tokens + 1
         
-        name = "lmql.generate({}, {}, **{})".format(prompt, max_tokens, kwargs)
+        name = "lmql.generate".format("...", max_tokens, kwargs)
         result = await generate_query(prompt, max_tokens=max_tokens, __name__=name, **kwargs)
 
         if len(result) == 0:
@@ -312,7 +312,7 @@ async def generate_query(prompt, max_tokens=32):
         "{prompt}[RESPONSE]" where len(TOKENS(RESPONSE)) < max_tokens
     else:
         "{prompt}[RESPONSE]"
-    return context.prompt
+    return RESPONSE
     '''
 
 def model(model_identifier, **kwargs) -> LLM:

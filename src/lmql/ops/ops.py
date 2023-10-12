@@ -8,6 +8,7 @@ from lmql.ops.node import *
 
 from lmql.ops.inline_call import InlineCallOp
 from lmql.ops.booleans import *
+from lmql.ops.max_token_hints import *
 from lmql.ops.regex import Regex
 from lmql.models.model_info import model_info
 
@@ -79,6 +80,11 @@ def DynamicTypeDispatch(name, type_map):
                 return None
             return self.get_handler(kwargs.get("operands")).final(*args, **kwargs)
         
+        def token_hint(self):
+            if self.delegate is not None:
+                return self.delegate.token_hint()
+            return super().token_hint()
+
         def __str__(self):
             if self.delegate is not None:
                 return str(self.delegate)
@@ -373,6 +379,33 @@ class Lt(Node):
             r = transition_table[op1][op2]
         
         return r
+    
+    def token_hint(self):
+        """
+        Checks if this Lt operation, imposes an upper limit on the
+        number of tokens that can be generated.
+        """
+        num = [n for n in self.predecessors if type(n) is int]
+        len_op = [n for n in self.predecessors if isinstance(n, LenOp)]
+        if len(num) != 1 or len(len_op) != 1:
+            return super().token_hint()
+
+        limit = num[0]
+
+        # if limit is not rhs, it is a lower bound, not a limit
+        if limit != self.predecessors[1]:
+            return super().token_hint()
+
+        tokens_op = [n for n in len_op[0].predecessors if isinstance(n, TokensOp)]
+        if len(tokens_op) != 1:
+            return super().token_hint()
+        
+        var = [n for n in tokens_op[0].predecessors if isinstance(n, Var)]
+
+        if len(var) != 1:
+            return super().token_hint()
+        
+        return {var[0].name: limit - 1}
 
 def Gt(preds): return Lt(list(reversed(preds)))
 
@@ -488,6 +521,29 @@ class EqOpInt(Node):
             return "fin"
         
         return "var"
+    
+    def token_hint(self):
+        """
+        Checks if this Eq operation imposes an exact limit on the
+        number of tokens that can be generated.
+        """
+        num = [n for n in self.predecessors if type(n) is int]
+        len_op = [n for n in self.predecessors if isinstance(n, LenOp)]
+        if len(num) != 1 or len(len_op) != 1:
+            return super().token_hint()
+
+        limit = num[0]
+
+        tokens_op = [n for n in len_op[0].predecessors if isinstance(n, TokensOp)]
+        if len(tokens_op) != 1:
+            return super().token_hint()
+        
+        var = [n for n in tokens_op[0].predecessors if isinstance(n, Var)]
+
+        if len(var) != 1:
+            return super().token_hint()
+        
+        return {var[0].name: limit}
 
 EqOp = DynamicTypeDispatch("EqOp", (
     ((int, int), EqOpInt),

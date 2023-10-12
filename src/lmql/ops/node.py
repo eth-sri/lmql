@@ -28,6 +28,13 @@ class Node:
     def __nodelabel__(self):
         return str(type(self))
     
+    def token_hint(self):
+        """
+        Hint for the number of tokens that need to be generated until
+        this operation forces EOS (0 for no hint, -1 for no constraints, >0 for specific number)
+        """
+        return {}
+
     def postprocess_var(self, var_name):
         """
         Returns true if this operations provides postprocessing semantics for complete values for the given variable name.
@@ -251,6 +258,17 @@ def strip_next_token(x):
     if x.endswith(NextToken):
         x = x[:-len(NextToken)]
     return x
+
+def token_hint(op, variable_name):
+    if op is None:
+        # unconstrained generation
+        return -1
+    
+    if is_node(op):
+        hints = op.token_hint()
+        return hints.get(variable_name, 0)
+    
+    return 0 # no hint (no information about no. of tokens to allow)
 
 class postprocessed_value:
     def __init__(self, value):

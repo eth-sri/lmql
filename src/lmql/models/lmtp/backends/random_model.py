@@ -7,7 +7,7 @@ import lmql.utils.nputil as nputil
 
 class UniformRandomSamplingLLM(LMTPModel):
     def __init__(self, seed=None, vocab=None, **kwargs):
-        self.seed = seed
+        self.seed = seed or 0
         self.kwargs = kwargs
 
         if kwargs.get("verbose", False):
@@ -37,24 +37,18 @@ class UniformRandomSamplingLLM(LMTPModel):
     def vocab_size(self):
         return self._vocab_size
 
-    # def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-    #     return super().score(input_ids, attention_mask, **model_kwargs)
-    
     def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
-        if self.seed is not None:
-            seed = input_ids.sum() + self.seed
-            rng = np.random.RandomState(seed)
-        else:
-            rng = np.random.RandomState()
-        
         scores = []
         
         if bias_tensor is not None:
             bias_tensor = self.make_bias_tensor(bias_tensor, self.vocab_size)
 
         for i in range(max_new_tokens):
+            seed = input_ids.sum() + self.seed
+            rng = np.random.RandomState(seed)
+
             logits = np.zeros([len(input_ids), self.vocab_size])
             
             if bias_tensor is not None:
@@ -65,12 +59,15 @@ class UniformRandomSamplingLLM(LMTPModel):
 
             next_ids = np.array([rng.choice(logits.shape[-1], size=1, p=probs[i]) for i in range(len(probs))]).reshape(-1,1)
 
-            for i,j in enumerate(next_ids):
-                logits[i, j.item()] += 1e-2
+            for k,j in enumerate(next_ids):
+                logits[k, j.item()] += 1e-2
             
             scores += [nputil.log_softmax(logits, axis=-1)]
             input_ids = np.concatenate([input_ids, next_ids], axis=-1)
             
+            if i+1 >= max_new_tokens:
+                break
+
             streamer(input_ids, scores)
 
         return LMTPModelResult(sequences=input_ids, scores=scores)

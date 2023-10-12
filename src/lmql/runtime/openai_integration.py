@@ -311,10 +311,14 @@ class DclibOpenAiModel(DcModel):
         logprobs = completion_call.kwargs.get("logprobs", 5)
         noscore = completion_call.kwargs.get("noscore", False)
 
+        # max tokens is either hinted by the constraints or (when 0), derived
+        # from the configured chunk size
+        max_tokens = completion_call.kwargs.get("max_tokens_hint") or self.model.chunk_size
+
         kwargs = {
             "model": self.model.model_identifier,
             "prompt": prompt_str, # no more batching at this point
-            "max_tokens": self.model.chunk_size,
+            "max_tokens": max_tokens,
             "temperature": temperature,
             "logprobs": logprobs,
             "user": "lmql",
@@ -356,9 +360,6 @@ class DclibOpenAiModel(DcModel):
             if not self.model.nostop:
                 kwargs.update({"stop": completion_call.stopping_phrases[:4]})
 
-        # TODO: we are now overestimate the number of tokens billed to the user since we are not account for stopping phrases for the sake of streaming
-        self.count_billed_tokens(len(tokenized_input_ids) + kwargs.get("max_tokens") * batch_size, self.model_identifier)
-
         # make sure to pass a tracer
         kwargs["tracer"] = active_tracer()
 
@@ -396,11 +397,13 @@ class DclibOpenAiModel(DcModel):
             sampling_modes = ["top-1" for _ in range(len(seqs))]
         
         async def get_buffer(i, s):
-            with self.stats.timer("logit_masks"):
-                # print("completion_buffer", s)
-                constrained_seqs = np.array([s.is_query_constrained], dtype=np.bool_)
-                logits_mask_result = await self.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
-                logits_mask = logits_mask_result.logits_mask[0]
+            constrained_seqs = np.array([s.is_query_constrained], dtype=np.bool_)
+            logits_mask_result = await self.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
+            logits_mask = logits_mask_result.logits_mask[0]
+
+            # check for constraint-based token limit (e.g. no constraints specified at all or 
+            # specific token length constraints)
+            kwargs["max_tokens_hint"] = logits_mask_result.max_tokens_hints[0]
 
             # update user data with new information obtained when computing logits masks
             if s.user_data is None:
