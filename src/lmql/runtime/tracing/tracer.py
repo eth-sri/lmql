@@ -176,7 +176,9 @@ def active_tracer() -> Tracer:
     different tracers in sub-queries.
     """
     _ensure_tracer()
-    assert len(_tracer.get()) > 0, "No tracer set in this context"
+    if len(_tracer.get()) == 0:
+        warnings.warn("An LMQL tracer was requested in a context without active tracer. This indicates that some internal LLM calls may not be traced correctly.")
+        return NullTracer("null")
     return _tracer.get()[-1]
 
 def set_tracer(tracer):

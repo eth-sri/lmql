@@ -7,10 +7,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from lmql.ops.ops import *
+from lmql.runtime.context import Context
 from lmql.runtime.langchain import chain, call_sync
 from lmql.runtime.output_writer import silent
-from lmql.runtime.postprocessing.conditional_prob import \
-    ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
 from lmql.api.inspect import is_query
 from lmql.runtime.formatting import format, tag
@@ -232,14 +231,6 @@ class LMQLQueryFunction:
         finally:
             if PromptInterpreter.main == interpreter:
                 PromptInterpreter.main = None
-
-        # applies distribution postprocessor if required
-        results = await (ConditionalDistributionPostprocessor(interpreter).process(results))
-
-        # apply remaining postprocessors
-        if self.postprocessors is not None:
-            for postprocessor in self.postprocessors:
-                results = await postprocessor.process(results, self.output_writer)
         
         interpreter.print_stats()
         interpreter.dcmodel.close()

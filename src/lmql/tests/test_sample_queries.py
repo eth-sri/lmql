@@ -73,6 +73,7 @@ async def main():
                 print(error_buffer.getvalue())
                 print(e)
                 print(termcolor.colored("[FAIL]", "red"), f"({time.time() - s:.2f}s)")
+                sys.exit(1)
 
 
 if __name__ == "__main__":

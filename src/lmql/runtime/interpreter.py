@@ -3,6 +3,7 @@ import inspect
 from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple, Set
+from lmql.runtime.postprocessing.conditional_prob import ConditionalDistributionPostprocessor
 import numpy as np
 import warnings
 
@@ -1125,6 +1126,9 @@ class PromptInterpreter:
                 
                 # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
+
+                # applies distribution postprocessor if required
+                results = await (ConditionalDistributionPostprocessor(self).process(results))
 
                 # check if a certificate was requested
                 if self.certificate != False:
