@@ -9,7 +9,7 @@
       <slot name="subtitle"></slot>
     </h2>
     <div class="buttons">
-    <a class="primary btn" href="/guide/">
+    <a class="primary btn" href="/docs/">
       Get Started
     </a>
     <a class="btn" href="https://github.com/eth-sri/lmql#contribute')">
