@@ -44,7 +44,12 @@ export default defineConfig({
       { text: '▶ Playground', link: '/playground/', target: '_blank' },
     ],
     search: {
-      provider: 'local'
+      provider: 'algolia',
+      options: {
+        appId: 'TCP95GVDMD',
+        apiKey: 'f7b4c9cd024536f8085f160045c3aafe',
+        indexName: 'lmql'
+      }
     },
     logo: '/lmql.svg',
     sidebar: createSidebars(),
