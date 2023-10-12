@@ -6,8 +6,9 @@ from lmql.utils import nputil
 
 from dataclasses import dataclass
 
-from lmql.runtime.context import get_tokenizer
+from lmql.runtime.context import get_tokenizer, get_truncation_threshold
 from .dclib_array import DataArray, Continuation, topk, alpha_length_normalized, alpha_length_normalized_det
+import warnings
 
 detokenize_seqs = True
 
@@ -82,7 +83,9 @@ class DecoderGraph:
 
 class DecoderSequence:
     def __init__(self, input_ids_or_str, logprobs=None, deterministic=None, stop_phrase=None, predecessor=None, user_data=None, sticky_user_data_keys=None, epsilon_node=False, internal=False):
-        assert all([p > DecoderSequence.truncation_threshold for p in logprobs]) if logprobs is not None else True
+        if logprobs is not None:
+            if not all([p > get_truncation_threshold() for p in logprobs]):
+                warnings.warn("logprobs contain values below the current logprob truncation threshold {t}, which may cause unexpected behavior. Consider increasing the truncation threshold via lmql.model(..., truncation_threshold=...).".format(t=get_truncation_threshold()))
 
         if type(input_ids_or_str) == str:
             assert False, "constructing dc.seq() directly from string is not supported anymore"
@@ -430,11 +433,11 @@ class DecoderSequence:
         next_tokens = nputil.ensure_iterable(next_tokens)
         next_token_scores = nputil.ensure_iterable(next_token_scores)
         
-        tokens = [t for t, s in zip(next_tokens, next_token_scores) if s > DecoderSequence.truncation_threshold]
-        scores = [s for s in next_token_scores if s > DecoderSequence.truncation_threshold]
+        tokens = [t for t, s in zip(next_tokens, next_token_scores) if s > get_truncation_threshold()]
+        scores = [s for s in next_token_scores if s > get_truncation_threshold()]
 
         if len(tokens) == 0:
-            print("WARNING: all continuation token fall below truncation threshold. This is likely due to a too small truncation factor. Try increasing it. Continuing with the top 1 token.")
+            print("WARNING: all continuation token fall below the current logprob truncation threshold {t}. This is likely due to a too low truncation threshold. Please increase the truncation threshold via lmql.model(..., truncation_threshold=...).".format(t=get_truncation_threshold()))
             tokens = [t for t, s in zip(next_tokens, next_token_scores)][:1]
             scores = [s for s in next_token_scores][:1]
         next_tokens = np.stack(tokens, axis=0)
@@ -443,10 +446,7 @@ class DecoderSequence:
         return Continuation(next_tokens, next_token_scores, user_data)
 # global counter for all sequences created in this process for identification purposes
 DecoderSequence.seq_ctr = 0
-
 DecoderSequence.graph = None
-# tokens with a logprob lower than this will be ignored and not expanded during decoding
-DecoderSequence.truncation_threshold = -3e38
 
 def resolve_path(d, path):
     if d is None:
@@ -661,8 +661,8 @@ class DeterministicDecoderSequence(DecoderSequence):
             score = self.next_logprobs[0]
         else:
             score = raw_logits[predetermined_token]
-            if score < DecoderSequence.truncation_threshold:
-                print("warning: a deterministic token scored below the truncation threshold ({})".format(DecoderSequence.truncation_threshold))
+            if score < get_truncation_threshold():
+                print("warning: a deterministically inserted token scored below the logprob truncation threshold {t}. Consider increasing the truncation threshold via lmql.model(..., truncation_threshold=...).".format(t=get_truncation_threshold()))
         
         return Continuation(predetermined_token, score, user_data)
     
@@ -681,9 +681,6 @@ def is_lmql_valid(s):
 
 def set_record_graph():
     DecoderSequence.graph = DecoderGraph()
-
-def set_truncation_threshold(threshold):
-    DecoderSequence.truncation_threshold = threshold
 
 def detseq(
     ids: np.ndarray,

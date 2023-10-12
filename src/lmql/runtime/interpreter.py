@@ -30,7 +30,7 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.models.model_info import model_info
-from lmql.runtime.context import ContextTokenizer
+from lmql.runtime.context import Context
 from lmql.runtime.tracing import trace, active_tracer, enable_tracing, certificate
 from lmql.api.llm import LLM
 
@@ -1048,14 +1048,13 @@ class PromptInterpreter:
         if self.caching:
             self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids, cache_file=self.cache_file, show_speculative=self.show_speculative)
         decoder_args["dcmodel"] = self.dcmodel
-        dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 
         assert len(prompt_ids) < decoder_args["max_len"], "The initial prompt already exceeds the provided max_len. Please increase the max_len or reduce the initial prompt (Initial prompt: '{}', max_len: {})".format(len(prompt_ids), decoder_args["max_len"])
 
         # set step budget at least to max_len
         step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
 
-        with ContextTokenizer(self.model.get_tokenizer()):
+        with Context(self.model.get_tokenizer(), self.dcmodel.truncation_threshold):
             try:
                 import time
 

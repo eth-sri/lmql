@@ -36,7 +36,7 @@ class DcModel(DcModelRewriteMixin):
         model: The model to use for inference.
         bos_token_id: The token id to use for the beginning of a sequence.
         eos_token_id: The token id to use for the end of a sequence.
-        truncation_threshold: The threshold to use for logit truncation (cf. DecoderSequence.truncation_threshold). Logits below this threshold are considered to be -inf and will never be considered as next token.
+        truncation_threshold: The threshold to use for logit truncation. Logits below this threshold are considered to be -inf and will never be considered as next token.
         """
         self.model = model
         self.tokenizer = tokenizer

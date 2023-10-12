@@ -135,7 +135,7 @@ class LLM:
         try:
             dcmodel = self.adapter.get_dclib_model()
             with traced(str(self) + ".score"):
-                with dc.ContextTokenizer(self.adapter.get_tokenizer()):
+                with dc.Context(self.adapter.get_tokenizer(), dcmodel.truncation_threshold):
                     return await dc_score(dcmodel, prompt, values, **kwargs)
         finally:
             dcmodel.close()

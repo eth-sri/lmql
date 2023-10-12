@@ -1,46 +1,62 @@
 """
-Thread/Async-local context in the LMQL runtime.
+Thread/Async-local context information in the LMQL runtime.
+
+Implicit access to an LMQLTokenizer for the current context (e.g. to detokenize input IDs).
+
+Handles nested/sub-queries by maintaining a stack of context objects.
 """
 
 from lmql.runtime.stats import Stats
 from contextvars import ContextVar
 
-_tokenizer = ContextVar("tokenizer")
-_tokenizer.set([])
+_context = ContextVar("tokenizer")
+_context.set([])
 
-def _ensure_tokenizer():
+def _ensure_dc_context():
     try:
-        _tokenizer.get()
+        _context.get()
     except LookupError:
-        _tokenizer.set([])
-    
+        _context.set([])
+
 def get_tokenizer():
     """
     Returns the LMQLTokenizer instance that is currently active in this context.
 
     This value is set by context in the LMQL interpreter run() function, to enable 
-    different tokenizers in sub-queries.
+    different tokenizers across nested, sub or parallel queries.
     """
-    _ensure_tokenizer()
-    assert len(_tokenizer.get()) > 0, "No tokenizer set in this context"
-    return _tokenizer.get()[-1]
+    _ensure_dc_context()
+    assert len(_context.get()) > 0, "No tokenizer set in this context"
+    return _context.get()[-1].tokenizer
 
-def set_tokenizer(tokenizer):
-    _ensure_tokenizer()
-    _tokenizer.set(_tokenizer.get() + [tokenizer])
+def get_truncation_threshold():
+    """
+    Returns the logprob threshold for truncating logits in the current decoding context.
 
-def pop_tokenizer():
-    _ensure_tokenizer()
-    _tokenizer.set(_tokenizer.get()[:-1])
+    This value is set by context in the LMQL interpreter run() function, to enable
+    different thresholds across nested, sub or parallel queries.
+    """
+    _ensure_dc_context()
+    assert len(_context.get()) > 0, "No tokenizer set in this context"
+    return _context.get()[-1].truncation_threshold
 
-class ContextTokenizer:
-    def __init__(self, tokenizer):
+def set_context(tokenizer):
+    _ensure_dc_context()
+    _context.set(_context.get() + [tokenizer])
+
+def pop_context():
+    _ensure_dc_context()
+    _context.set(_context.get()[:-1])
+
+class Context:
+    def __init__(self, tokenizer, truncation_threshold=-3e38):
         self.tokenizer = tokenizer
+        self.truncation_threshold = truncation_threshold
 
     def __enter__(self):
-        set_tokenizer(self.tokenizer)
-        return self.tokenizer
+        set_context(self)
+        return self
     
     def __exit__(self, exc_type, exc_value, traceback):
-        pop_tokenizer()
+        pop_context()
         return False

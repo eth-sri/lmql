@@ -21,7 +21,7 @@ import sys
 import traceback
 
 class LMTPDcModel(DcModel):
-    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, verbose=False, **kwargs):
+    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, verbose=False, **kwargs):
         super().__init__(model, tokenizer, truncation_threshold, init_workers, **kwargs)
 
         self.model.chunk_size = kwargs.get("chunksize", 16)
@@ -216,8 +216,7 @@ class LMTPDcModel(DcModel):
         scores[int(payload["token"])] = payload["logprob"]
         scores = scores.items()
 
-        logits = np.ones(self.tokenizer.vocab_range) * self.truncation_threshold
-        # logits = TokenDistribution()
+        logits = TokenDistribution()
         logits[[t for t, _ in scores]] = [s for _, s in scores]
 
         return logits
