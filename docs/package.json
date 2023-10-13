@@ -1,0 +1,22 @@
+{
+  "name": "lmql-web",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "highlight.js": "^11.8.0",
+    "promptdown": "*",
+    "terminal-codes-to-html": "^0.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "*",
+    "onchange": "*",
+    "vitepress": "^1.0.0-rc.10"
+  },
+  "scripts": {
+    "docs:dev": "concurrently 'onchange **/*.ipynb .vitepress/notebooks.js -- node .vitepress/notebooks.js .' 'vitepress dev .'",
+    "docs:build": "node .vitepress/notebooks.js . && vitepress build .",
+    "docs:preview": "vitepress preview ."
+  }
+}

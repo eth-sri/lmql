@@ -3,12 +3,14 @@ import inspect
 from collections import namedtuple
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple, Set
+from lmql.runtime.postprocessing.conditional_prob import ConditionalDistributionPostprocessor
 import numpy as np
 import warnings
 
 import re
 import lmql.ops.ops as ops
 import lmql.runtime.dclib as dc
+from lmql.runtime.dclib.dclib_model import TokenMask
 from lmql.language.qstrings import (DistributionVariable, TemplateVariable,
                                     qstring_to_stmts)
 from lmql.ops.follow_map import FollowMap
@@ -30,7 +32,8 @@ from lmql.utils.nputil import replace_inf_nan_with_str
 
 from lmql.ops.token_set import VocabularyMatcher, has_tail
 from lmql.models.model_info import model_info
-from lmql.runtime.context import ContextTokenizer
+from lmql.runtime.context import Context
+from lmql.runtime.tracing import trace, active_tracer, enable_tracing, certificate
 from lmql.api.llm import LLM
 
 from lmql.api.scoring import dc_score
@@ -90,7 +93,7 @@ class PromptState(NamedTuple):
     # view on query_args that only contains variable arguments that apply to the current variable
     variable_args: Optional[Dict[str, Any]]
 
-    # only set after processing where clause
+    # only availebl after processing where clause
     valid: Optional[bool]
     final: Optional[str] 
     mask : Optional[Any]
@@ -217,11 +220,6 @@ class LMQLResult:
         warnings.warn("Deprecated result[0] access on a query result detected. Since 0.7, an argmax/sample query function with a single result returns a LMQLResult object instead of a list of a single element. Please use the results directly and not via result[0]. In the future, this will raise an error.", DeprecationWarning)
         return self
 
-@dataclass
-class TokenMask:
-    logits_mask: np.ndarray
-    user_data: List[Any]
-
 class PromptInterpreter:
     """
     The PromptInterpreter is the main entry point for an LMQL query. It handles program execution, 
@@ -234,6 +232,9 @@ class PromptInterpreter:
         self.model_identifier = force_model.model_identifier if isinstance(force_model, LLM) else force_model
         self.name = name
         self.tokenizer: LMQLTokenizer = None
+        
+        # whether an inference certificate should be generated
+        self.certificate = False
 
         # decoder configuration
         self.decoder = None
@@ -295,6 +296,10 @@ class PromptInterpreter:
             self.output_writer = kwargs["output_writer"]
         # store remaining flags
         self.extra_kwargs.update(kwargs)
+        
+        # check for 'traced_as' custom name
+        if "__name__" in kwargs:
+            self.name = self.extra_kwargs["__name__"]
 
     def set_decoder(self, method, **kwargs):
         # remove compiler-level flags
@@ -479,7 +484,7 @@ class PromptInterpreter:
         return state_dict
 
     async def where_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, return_follow_map=False, **kwargs):
-        mask, logit_mask, state = await self.where_step_for_sequence(s, needs_masking, seqidx, return_follow_map=return_follow_map, **kwargs)
+        mask, logit_mask, state, max_tokens_hint = await self.where_step_for_sequence(s, needs_masking, seqidx, return_follow_map=return_follow_map, **kwargs)
 
         # check for tail and prescore
         if hasattr(self.dcmodel, "prescore_tokens") and (not type(s) is dc.DeterministicDecoderSequence or len(s.next_ids) == 0):
@@ -488,13 +493,13 @@ class PromptInterpreter:
                 if len(tail_ids) > 0:
                     await self.dcmodel.prescore_tokens(s, tail_ids, noscore=kwargs.get("noscore", False))
 
-        return logit_mask, state
+        return logit_mask, state, max_tokens_hint
 
     async def where_step_for_sequence(self, s: dc.DecoderSequence, needs_masking, seqidx, return_follow_map=False, **kwargs):
         state = self.interpreter_state_from_user_data(s)
         
         if not needs_masking:
-            return None, None, self.interpreter_state_user_data(state)
+            return None, None, self.interpreter_state_user_data(state), 0
 
         is_done = state.query_head.result is not None
 
@@ -510,6 +515,7 @@ class PromptInterpreter:
 
         text = ""
         where = self.where
+        max_tokens_hint = 0
 
         if is_done:
             mask = tset("eos")
@@ -531,7 +537,10 @@ class PromptInterpreter:
             diff_text = text[len(await s.text(variable_offset, limit=-1, pretty=False)):]
 
             # run applicable inline ops (sub interpreters)
-            subvalid, subfollow, state = await self.subinterpreter_results(s, variable, text, diff_text, state, is_before, **kwargs)
+            subvalid, subfollow, state, sub_max_token_hints = await self.subinterpreter_results(s, variable, text, diff_text, state, is_before, **kwargs)
+
+            # update hint for max_tokens to generate for current var
+            max_tokens_hint = ops.most_restrictive_hint([sub_max_token_hints, max_tokens_hint])
 
             # current context
             program_state: ProgramState = state.program_state.copy()
@@ -600,21 +609,25 @@ class PromptInterpreter:
                         mask=mask,
                         program_state=program_state,
                         stopping_phrases=stopping_phrases,
-                        where=await self.where_graph_with_trace(where, trace, follow_trace)
+                        where=await self.where_graph_with_trace(where, trace, follow_trace),
         )
+
+        # extract hint of maximum number of tokens to generate for 'variable' from 
+        # the where clause (e.g. upper bounds or no maximum for unbounded variables)
+        max_tokens_hint = ops.most_restrictive_hint([ops.token_hint(where, variable), max_tokens_hint])
 
         if has_tail(mask):
             state = state.updated(tail = mask.tail)
 
         if return_follow_map:
-            return mask, follow_map, self.interpreter_state_user_data(state)
+            return mask, follow_map, self.interpreter_state_user_data(state), max_tokens_hint
 
         # truncate mask to remove LMQL specific token IDs
         logit_mask = self.tokenizer.truncate_to_model_dim(logit_mask)
 
         # no mask, no logits processing
         if logit_mask is None:
-            return None, None, self.interpreter_state_user_data(state)
+            return None, None, self.interpreter_state_user_data(state), max_tokens_hint
         
         # translate boolean mask to logit bias mask
         if len(mask) == 1:
@@ -622,7 +635,7 @@ class PromptInterpreter:
         else:
             logit_mask = np.logical_not(logit_mask) * np.finfo(np.float32).min
         
-        return mask, logit_mask, self.interpreter_state_user_data(state)
+        return mask, logit_mask, self.interpreter_state_user_data(state), max_tokens_hint
 
     async def where_graph_with_trace(self, where, trace, follow_trace):
         from lmql.utils.graph import CytoscapeGraphWriter
@@ -655,9 +668,9 @@ class PromptInterpreter:
     async def where_processor(self, seqs, additional_logits_processor_mask, **kwargs):
         zipped_task_inputs = zip(seqs, additional_logits_processor_mask, range(len(seqs)))
         token_mask_tasks = [self.where_for_sequence(s, needs_masking, seqidx, **kwargs) for s,needs_masking, seqidx in zipped_task_inputs]
-        results = [(mask, user_data) for mask, user_data in await asyncio.gather(*token_mask_tasks)]
+        results = [(mask, user_data, max_tokens_hint) for mask, user_data, max_tokens_hint in await asyncio.gather(*token_mask_tasks)]        
         
-        return TokenMask([r[0] for r in results], [r[1] for r in results])
+        return TokenMask([r[0] for r in results], [r[1] for r in results], [r[2] for r in results])
 
     async def rewrite_for_sequence(self, seq: dc.DecoderSequence, needs_rewrite, assert_no_advance=False):
         if not needs_rewrite and not seq.is_done():
@@ -899,8 +912,30 @@ class PromptInterpreter:
         else:
             return input(*args)
 
+    @property
+    def qualified_name(self):
+        return self.name or "<function " + self.fct.__name__ + ">"
+
+    def enable_tracing_if_needed(self):
+        if self.extra_kwargs.get("certificate", False):
+            enable_tracing()
+            self.certificate = self.extra_kwargs.get("certificate")
+            return
+        
+        if self.decoder_kwargs is not None and self.decoder_kwargs.get("certificate", False):
+            enable_tracing()
+            self.certificate = self.decoder_kwargs.get("certificate")
+            return
+
+    @trace("PromptInterpreter.run")
     async def run(self, fct, *args, **kwargs):
         self.fct = fct
+
+        # enable tracing if needed (e.g. certificate=True or a file)
+        self.enable_tracing_if_needed()
+
+        # initialize tracer
+        active_tracer().name = self.qualified_name
 
         # intercept symbol table entry for input
         if "input" in kwargs.keys() and kwargs["input"] == input:
@@ -937,7 +972,10 @@ class PromptInterpreter:
         # prepare tokenizer
         self.tokenizer = self.model.get_tokenizer()
 
-        # alternative mode where we only extract the prompt string
+        # again check for tracing (if specified as decoder arg)
+        self.enable_tracing_if_needed()
+
+        # alternative execution mode where we only extract the initial prompt string
         return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)
         if return_prompt_string:
             return self.root_state.prompt
@@ -1003,8 +1041,6 @@ class PromptInterpreter:
         if "cache" in decoder_args.keys():
             cache_value = decoder_args.pop("cache")
             if type(cache_value) is bool:
-                if cache_value == False:
-                    warnings.warn("info: disabling model output caching")
                 self.caching = cache_value
             elif type(cache_value) is str:
                 self.caching = True
@@ -1017,14 +1053,13 @@ class PromptInterpreter:
         if self.caching:
             self.dcmodel = dc.CachedDcModel(self.dcmodel, prompt_ids, cache_file=self.cache_file, show_speculative=self.show_speculative)
         decoder_args["dcmodel"] = self.dcmodel
-        dc.set_truncation_threshold(self.dcmodel.truncation_threshold)
 
         assert len(prompt_ids) < decoder_args["max_len"], "The initial prompt already exceeds the provided max_len. Please increase the max_len or reduce the initial prompt (Initial prompt: '{}', max_len: {})".format(len(prompt_ids), decoder_args["max_len"])
 
         # set step budget at least to max_len
         step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
 
-        with ContextTokenizer(self.model.get_tokenizer()):
+        with Context(self.model.get_tokenizer(), self.dcmodel.truncation_threshold):
             try:
                 import time
 
@@ -1092,6 +1127,28 @@ class PromptInterpreter:
                 # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
 
+                # applies distribution postprocessor if required
+                results = await (ConditionalDistributionPostprocessor(self).process(results))
+
+                # check if a certificate was requested
+                if self.certificate != False:
+                    active_tracer().event("lmql.LMQLResult", results, skip_none=True)
+
+                    if callable(self.certificate):
+                        self.certificate(certificate(active_tracer()))
+                    elif type(self.certificate) is str:
+                        if self.certificate == "return_dict":
+                            cert = certificate(active_tracer())
+                            results = [{
+                                "result": r,
+                                "certificate": cert
+                            } for r in results]
+                        else:
+                            with open(self.certificate, "w") as f:
+                                f.write(str(certificate(active_tracer())))
+                    elif type(self.certificate) is bool: # must be True
+                        print(str(certificate(active_tracer())), flush=True)
+                
                 # if allowed by decoder, unpack singular results
                 if fe.singular and len(results) == 1:
                     return results[0]
@@ -1101,7 +1158,9 @@ class PromptInterpreter:
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
                           "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
-                          "openai_nonstop", "chunksize", "alpha", "verbose"]
+                          "openai_nonstop", "chunksize", "alpha", "verbose", "certificate", 
+                          # extra decoding args
+                          "top_k", "top_p", "repetition_penalty", "frequency_penalty", "presence_penalty"]
 
     def derive_decoder_args(self, extra_kwargs, existing_args=None):
         # if no existing args are provided, use no args
@@ -1167,6 +1226,7 @@ class PromptInterpreter:
         subfollow = {}
         subvalid = {}
         subinterpreters = []
+        max_tokens_hints = 0
 
         for ic in inline_calls:
             si = ic.subinterpreter(self, calling_state.prompt)
@@ -1201,7 +1261,7 @@ class PromptInterpreter:
                     updated_offset_state = state.updated(variable_offset=len(s.input_ids))
                     s.user_data = dc.deepmerge(s.user_data, si.interpreter_state_user_data(updated_offset_state))
 
-                follow_map, updated_user_data = await si.where_for_sequence(s, True, 0, return_follow_map=True, **kwargs)
+                follow_map, updated_user_data, max_tokens_hints = await si.where_for_sequence(s, True, 0, return_follow_map=True, **kwargs)
                 
                 if updated_user_data is not None:
                     s.user_data = dc.deepmerge(s.user_data, updated_user_data)
@@ -1228,7 +1288,7 @@ class PromptInterpreter:
 
         calling_state = calling_state.updated(subinterpreters=subinterpreters)
         
-        return subvalid, subfollow, calling_state
+        return subvalid, subfollow, calling_state, max_tokens_hints
 
 PromptInterpreter.main = None
 

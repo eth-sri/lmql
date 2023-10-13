@@ -26,19 +26,25 @@ class GenerateCall:
     result_queue: Queue
 
     def put(self, token):
-        self.result_queue.put(token)
+        self.result_queue.put(("TOKEN", token))
 
     def error(self, msg):
-        self.result_queue.put({
+        self.result_queue.put(("TOKEN", {
             "stream_id": self.stream_id,
             "error": msg
-        })
+        }))
 
     def generation_mode(self):
         is_score = self.kwargs.get("score", False)
         if is_score: return "score"
+        
+        key_args = self.kwargs.copy()
+        key_args.pop("max_tokens", None)
+        key_args.pop("top_logprobs", None)
+        key_args.setdefault("temperature", 0.0)
+        
         # string that describes the generation mode for this call (same string = can run in batch)
-        return f"{self.kwargs.get('temperature', 0.0)}"
+        return "generate-" + "-".join("{}-{}".format(k, v) for k, v in sorted(key_args.items()))
 
 @dataclass
 class GenerateBatch:
@@ -53,6 +59,7 @@ class GenerateBatch:
 
     is_score: bool = False
     scoring_offsets: list = None
+    kwargs: dict = None
     
     @classmethod
     def from_calls(cls, calls):
@@ -77,7 +84,13 @@ class GenerateBatch:
         else:
             scoring_offsets = None
 
-        return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets)
+        # other kwargs (e.g. top_k, repetition_penalty, etc.)
+        kwargs = calls[0].kwargs.copy()
+        kwargs.pop("max_tokens", None)
+        kwargs.pop("top_logprobs", None)
+        kwargs.pop("temperature", None)
+
+        return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets, kwargs)
 
     def generate_args(self):
         return {
@@ -85,7 +98,8 @@ class GenerateBatch:
             "attention_mask": self.attention_mask,
             "temperature": self.temperature,
             "max_new_tokens": self.max_tokens,
-            "bias_tensor": self.logit_biases if len(self.logit_biases) > 0 else None
+            "bias_tensor": self.logit_biases if len(self.logit_biases) > 0 else None,
+            **self.kwargs
         }
 
 class ScoreStreamer:
@@ -182,6 +196,12 @@ class Scheduler:
         self.users = set()
         self.last_use = time.time()
 
+        # set once initialized
+        self._model_info = "<unavailable>"
+
+    def model_info(self):
+        return self._model_info
+
     def put(self, call: GenerateCall):
         self.queue.put(call)
 
@@ -223,6 +243,7 @@ class Scheduler:
         """
 
         model = LMTPModel.load(self.model_identifier, **self.model_args)
+        self._model_info = model.model_info()
 
         while True:
             if self.kill_event.is_set():
@@ -246,6 +267,7 @@ class Scheduler:
         """
 
         model = LMTPModel.load(self.model_identifier, **self.model_args)
+        self._model_info = model.model_info()
 
         while True:
             if self.kill_event.is_set():
@@ -336,7 +358,7 @@ class TokenSession:
     """
     def __init__(self, transport, model_args, static=False, longrunning=False):
         self.transport = transport
-        self.token_queue = Queue()
+        self.output_stream = Queue()
         self.queue_processor = asyncio.create_task(self.queue_loop())
         self.used_models = set()
         self.model_args = model_args
@@ -346,10 +368,9 @@ class TokenSession:
 
     async def handle(self, cmd, kwargs):
         stream_id = kwargs.get("stream_id")
+        model = kwargs.pop("model")
 
         try:
-            model = kwargs.pop("model")
-
             if cmd == "GENERATE":
                 prompt = kwargs.pop("prompt")
                 stream_id = kwargs.pop("stream_id")
@@ -357,7 +378,7 @@ class TokenSession:
                 self.used_models.add(model)
 
                 scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
-                scheduler.put(GenerateCall(prompt, logit_bias, kwargs, stream_id, self.token_queue))
+                scheduler.put(GenerateCall(prompt, logit_bias, kwargs, stream_id, self.output_stream))
             elif cmd == "SCORE":
                 prompt = kwargs.pop("prompt")
                 scored = kwargs.pop("scored")
@@ -371,28 +392,34 @@ class TokenSession:
                 kwargs["scoring_offset"] = len(prompt)
 
                 scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
-                scheduler.put(GenerateCall(full_ids, {}, kwargs, stream_id, self.token_queue))
+                scheduler.put(GenerateCall(full_ids, {}, kwargs, stream_id, self.output_stream))
+            elif cmd == "MODEL_INFO":
+                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
+                self.output_stream.put(("MSG", {
+                    "stream_id": stream_id,
+                    "model_info": scheduler.model_info()
+                }))
             else:
                 raise Exception("Unknown command: {}".format(cmd))
         except LMTPCannotLoadModelByPolicy as e:
             print("Client requested model that is not loaded and server is not configured to load it on demand.", flush=True)
-            self.token_queue.put({
+            self.output_stream.put(("MSG", {
                 "stream_id": stream_id,
                 "error": "The requested model is not loaded and the server is not configured to load it on demand."
-            })
+            }))
         except Exception as e:
             print("Error in lmtp_server.TokenSession.handle", e, flush=True)
-            self.token_queue.put({
+            self.output_stream.put(("MSG", {
                 "stream_id": stream_id,
                 "error": str(e)
-            })        
+            }))
 
     async def queue_loop(self):
         try:
             while True:
                 try:
-                    token = self.token_queue.get_nowait()
-                    await self.transport.send("TOKEN", token)
+                    msg_type, token = self.output_stream.get_nowait()
+                    await self.transport.send(msg_type, token)
                 except QueueEmpty:
                     await asyncio.sleep(0.01)
         except asyncio.CancelledError:

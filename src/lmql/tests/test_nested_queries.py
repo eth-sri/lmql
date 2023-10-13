@@ -12,7 +12,7 @@ def test_cot_fct():
         """
 
     "Q: It is August 12th, 2020. What date was it 100 days ago? [ANSWER: chain_of_thought]"
-    assert ANSWER == "TrailsGaza 66", f"test_cot_fct: Expected fixed random value but got {[ANSWER]}"
+    assert ANSWER == "Trails.................. partic", f"test_cot_fct: Expected fixed random value but got {[ANSWER]}"
     '''
 
 @lmql.query(model=lmql.model("random", seed=123))
@@ -28,7 +28,7 @@ def test_no_return():
     "A list of things not to forget to pack for your \
     next trip:\n[ITEMS: items_list(4)]"
 
-    assert ITEMS == '-overty roof ISIS\n- seal sugars ones\n-hof catalyst freed\n- cmd adventuresonto\n', f"Expected fixed random value but got {[ITEMS]}"
+    assert ITEMS == '-overtyospel===\n-oteric expanded Costs\n- compelling Best mayors\n- pdfPriorimmer\n', f"Expected fixed random value but got {[ITEMS]}"
     '''
 
 @lmql.query
@@ -42,14 +42,14 @@ def dateformat():
 def test_multi_nested():
     '''lmql
     "Q: When was Obama born? [ANSWER: dateformat]\n"
-    assert ANSWER == "amongst handshake chatting passenger", f"Expected fixed random value but got {[ANSWER]} for first question"
+    assert ANSWER == "amongst nor governingpowder", f"Expected fixed random value but got {[ANSWER]} for first question"
     "Q: When was Bruno Mars born? [ANSWER: dateformat]\n"
-    assert ANSWER == "closely.」 tournament rollout", f"Expected fixed random value but got {[ANSWER]} for second question"
+    assert ANSWER == "latitude sexualityesqueexamination", f"Expected fixed random value but got {[ANSWER]} for second question"
     "Q: When was Dua Lipa born? [ANSWER: dateformat]\n"
-    assert ANSWER == "basedWidgetinst699", f"Expected fixed random value but got {[ANSWER]} for third question"
+    assert ANSWER == "ilitation tackled oriented Helmet", f"Expected fixed random value but got {[ANSWER]} for third question"
 
     "Out of these, who was born last?[LAST]" where len(TOKENS(LAST)) == 2
-    assert LAST == "arel Hands", f"Expected fixed random value but got {[LAST]}"
+    assert LAST == "503iton", f"Expected fixed random value but got {[LAST]}"
     '''
 
 @lmql.query
@@ -105,7 +105,7 @@ class NestedQueryMethods:
 def test_nested_queries():
     q = NestedQueryMethods()
     r = q.question()
-    assert r == "Hi parrender 277 capit posteriorboston chuck神 heal", f"Expected fixed random value but got {r}"
+    assert r == "Ke drying ornduration roses inherently advertisements saddailyisode", f"Expected fixed random value but got {r}"
 
 if __name__ == "__main__":
     run_all_tests(globals())

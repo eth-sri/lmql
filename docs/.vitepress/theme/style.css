@@ -1,0 +1,630 @@
+/**
+ * Customize default theme styling by overriding CSS variables:
+ * https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css
+ */
+
+/**
+ * Colors
+ *
+ * Each colors have exact same color scale system with 3 levels of solid
+ * colors with different brightness, and 1 soft color.
+ * 
+ * - `XXX-1`: The most solid color used mainly for colored text. It must
+ *   satisfy the contrast ratio against when used on top of `XXX-soft`.
+ *
+ * - `XXX-2`: The color used mainly for hover state of the button.
+ *
+ * - `XXX-3`: The color for solid background, such as bg color of the button.
+ *   It must satisfy the contrast ratio with pure white (#ffffff) text on
+ *   top of it.
+ *
+ * - `XXX-soft`: The color used for subtle background such as custom container
+ *   or badges. It must satisfy the contrast ratio when putting `XXX-1` colors
+ *   on top of it.
+ *
+ *   The soft color must be semi transparent alpha channel. This is crucial
+ *   because it allows adding multiple "soft" colors on top of each other
+ *   to create a accent, such as when having inline code block inside
+ *   custom containers.
+ *
+ * - `default`: The color used purely for subtle indication without any
+ *   special meanings attched to it such as bg color for menu hover state.
+ *
+ * - `brand`: Used for primary brand colors, such as link text, button with
+ *   brand theme, etc.
+ *
+ * - `tip`: Used to indicate useful information. The default theme uses the
+ *   brand color for this by default.
+ *
+ * - `warning`: Used to indicate warning to the users. Used in custom
+ *   container, badges, etc.
+ *
+ * - `danger`: Used to show error, or dangerous message to the users. Used
+ *   in custom container, badges, etc.
+ * -------------------------------------------------------------------------- */
+
+ :root {
+  --vp-c-default-1: var(--vp-c-gray-1);
+  --vp-c-default-2: var(--vp-c-gray-2);
+  --vp-c-default-3: var(--vp-c-gray-3);
+  --vp-c-default-soft: var(--vp-c-gray-soft);
+
+  --vp-c-brand-1: var(--vp-c-indigo-1);
+  --vp-c-brand-2: var(--vp-c-indigo-2);
+  --vp-c-brand-3: var(--vp-c-indigo-3);
+  --vp-c-brand-soft: var(--vp-c-indigo-soft);
+
+  --vp-c-tip-1: var(--vp-c-brand-1);
+  --vp-c-tip-2: var(--vp-c-brand-2);
+  --vp-c-tip-3: var(--vp-c-brand-3);
+  --vp-c-tip-soft: var(--vp-c-brand-soft);
+
+  --vp-c-warning-1: var(--vp-c-yellow-1);
+  --vp-c-warning-2: var(--vp-c-yellow-2);
+  --vp-c-warning-3: var(--vp-c-yellow-3);
+  --vp-c-warning-soft: var(--vp-c-yellow-soft);
+
+  --vp-c-danger-1: var(--vp-c-red-1);
+  --vp-c-danger-2: var(--vp-c-red-2);
+  --vp-c-danger-3: var(--vp-c-red-3);
+  --vp-c-danger-soft: var(--vp-c-red-soft);
+}
+
+/**
+ * Component: Button
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: var(--vp-c-white);
+  --vp-button-brand-bg: var(--vp-c-brand-3);
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: var(--vp-c-white);
+  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: var(--vp-c-white);
+  --vp-button-brand-active-bg: var(--vp-c-brand-1);
+}
+
+/**
+ * Component: Home
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #bd34fe 30%,
+    #41d1ff
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #bd34fe 50%,
+    #47caff 50%
+  );
+  --vp-home-hero-image-filter: blur(40px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(56px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(72px);
+  }
+}
+
+/**
+ * Component: Custom Block
+ * -------------------------------------------------------------------------- */
+
+:root {
+  --vp-custom-block-tip-border: transparent;
+  --vp-custom-block-tip-text: var(--vp-c-text-1);
+  --vp-custom-block-tip-bg: var(--vp-c-brand-soft);
+  --vp-custom-block-tip-code-bg: var(--vp-c-brand-soft);
+  --vp-code-block-bg: rgb(36, 39, 45);
+
+  --vp-code-copy-code-bg: rgb(32, 33, 39);
+  --vp-code-copy-code-border-color: #2e2e32;
+  --vp-code-copy-code-hover-bg: #1b1b1f;
+  --vp-code-copy-code-hover-border-color: #2e2e32;
+  --vp-code-copy-code-active-text: rgba(235, 235, 245, 0.6);
+}
+
+/**
+ * Component: Algolia
+ * -------------------------------------------------------------------------- */
+
+.DocSearch {
+  --docsearch-primary-color: var(--vp-c-brand-1) !important;
+}
+
+.VPImage.logo {
+  width: 12pt;
+}
+
+body {
+  padding-bottom: 200pt;
+}
+
+span.lang {
+  display: none;
+}
+
+img.invert {
+  filter: invert(90%);
+}
+
+html.dark img.invert {
+  filter: invert(10%);
+}
+
+pre code {
+  color: rgba(255, 255, 255, 0.874) !important;
+}
+
+pre, .vp-doc div[class*='language-'], .vp-block {
+  background: var(--vp-code-block-bg) !important;
+  /* --vp-code-block-bg: rgb(240, 240, 240); */
+}
+
+html.dark pre, html.dark .vp-doc div[class*='language-'], .vp-block {
+  background: var(--vp-code-block-bg) !important;
+  /* --vp-code-block-bg: rgb(45, 45, 45); */
+}
+
+.hljs-comment {
+  opacity: 0.6;
+}
+
+.hljs-string {
+  color: #a7d884;
+}
+
+.hljs-meta {
+  color: #68edf2;
+}
+
+.hljs-built_in, .hljs-keyword {
+  color: #c678dd;
+}
+
+.hljs-placeholder {
+  color: #68edf2;
+}
+
+.hljs-subst {
+  color: #f4955d;
+}
+
+html.dark .promptdown.promptdown-compiled, .promptdown.promptdown-compiled {
+  opacity: 1.0;
+  line-height: 1.0 !important;
+  padding: 10pt !important;
+
+  /* transform: scale(0.98); */
+  transform-origin: top center;
+  background: transparent !important;
+}
+
+pre.promptdown>p {
+  margin: 0;
+}
+
+pre.promptdown>h1 {
+  margin: 0;
+  line-height: 1.0em;
+  text-transform: uppercase;
+  margin-bottom: 5pt;
+  opacity: 0.6;
+}
+
+.language-promptdown button.copy {
+  display: none;
+}
+
+.language-promptdown .promptdown button.promptdown-button-replay {
+  top: 8pt;
+  right: 8pt;
+  border-radius: 15pt;
+}
+
+.language-promptdown {
+  --vp-code-block-bg: none;
+  border-radius: 0 !important;
+  /* transform: scale(0.98); */
+  transform-origin: top center;
+  text-align: left;
+}
+
+pre {
+  border-radius: 6pt;
+}
+
+h1 {
+  font-size: 1.4em;
+  font-weight: bold;
+  margin-bottom: 10pt;
+}
+
+span.badge {
+  background-color: #007bff;
+  border-radius: 2pt;
+  transform: scale(0.6);
+  transform-origin: center left;
+  display: inline-block;
+  line-height: 1.2em;
+  padding: 2pt 4pt;
+  position: relative;
+  top: 0pt;
+  /* margin-left: 5pt; */
+  color: white;
+}
+
+h1 span.badge {
+  transform: scale(0.45);
+  margin-left: 3pt;
+}
+
+div.subtitle {
+  font-size: 14pt;
+  color: grey;
+  font-weight: 500;
+  margin-bottom: 25pt;
+  margin-top: -5pt;
+}
+
+.VPDoc:not(.has-sidebar):not(.has-aside) h1 {
+  font-size: 2.5rem;
+}
+
+.VPDoc:not(.has-sidebar):not(.has-aside) .content {
+  max-width: 830pt !important; /* <-- update your values */
+}
+
+.VPDoc:not(.has-sidebar):not(.has-aside) .container {
+  max-width: 830pt !important;
+}
+
+.VPDoc:not(.has-sidebar) .content {
+  max-width: 1130pt !important; /* <-- update your values */
+}
+
+.VPDoc:not(.has-sidebar) .content .content-container {
+  max-width: 830pt
+}
+
+.VPDoc:not(.has-sidebar) .container {
+  max-width: 1130pt !important;
+}
+
+html.dark p strong {
+  font-weight: 1200;
+  text-decoration: underline;
+}
+
+span.date {
+  font-size: 0.8em;
+  color: grey;
+  display: block;
+}
+
+pre.promptdown, pre.promptdown.promptdown-compiled,
+html.dark pre.promptdown, html.dark pre.promptdown.promptdown-compiled {
+  /* first line indent */
+  text-indent: 0pt !important;
+  line-height: 1.2em !important;
+}
+
+.banner {
+  background-color: #007bff;
+  color: white;
+  font-weight: bold;
+  padding: 2pt 5pt;
+  border-radius: 2pt;
+  max-width: calc(100vw - 40pt);
+  margin: auto;
+  width: 730pt;
+  position: relative;
+  bottom: -20pt;
+}
+
+@media (max-width: 800px) {
+  .banner {
+    margin-left: 5pt;
+    max-width: calc(100vw - 20pt);
+  }
+}
+
+.banner a {
+  text-decoration: underline;
+}
+
+pre .window-controls {
+  margin-bottom: 10pt;
+  margin-left: -10pt;
+  margin-top: -5pt;
+}
+
+pre {
+  position: relative;
+}
+
+pre .window-controls .window-control {
+  background: white;
+  width: 10pt;
+  height: 10pt;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 5pt;
+}
+
+pre .window-controls .window-control:nth-child(1) {
+  background: #ff5f56;
+}
+
+pre .window-controls .window-control:nth-child(2) {
+  background: #ffbd2e;
+}
+
+pre .window-controls .window-control:nth-child(3) {
+  background: #27c93f;
+}
+
+html.dark .language-grammar, .language-grammar,
+html.dark .language-grammar pre.hljs, .language-grammar pre.hljs {
+  --vp-code-block-bg: none;
+  background-color: transparent !important;
+  background: none !important;
+  color: var(--vp-c-text-1) !important;
+  font-size: 14pt;
+  margin: 0 !important;
+  margin-left: -20pt;
+  white-space: pre-wrap;
+}
+
+.language-grammar pre code {
+  color: var(--vp-c-text-1) !important;
+  white-space: pre !important; 
+  margin: 0 !important;
+  margin-left: -15pt !important;
+}
+
+
+.language-grammar .hljs-comment {
+  opacity: 0.6;
+  color: var(--vp-c-text-1);
+}
+
+.language-grammar .hljs-string {
+  color: var(--vp-c-text-1);
+  color: var(--vp-c-danger-1);
+}
+
+.language-grammar .hljs-meta {
+  color: var(--vp-c-text-1);
+}
+
+.language-grammar .hljs-built_in, .language-grammar .hljs-keyword {
+  color: var(--vp-c-text-1);
+  font-weight: bold;
+}
+
+.language-grammar .hljs-placeholder {
+  color: var(--vp-c-text-1);
+}
+
+.language-grammar .hljs-subst {
+  color: var(--vp-c-text-1);
+}
+
+.language-grammar a[href^="#python-fragments"] {
+    text-decoration: none;
+    color: var(--vp-c-text-2);
+}
+
+.language-grammar {
+  --vp-code-copy-code-border-color: var(--vp-c-divider);
+  --vp-code-copy-code-bg: var(--vp-c-bg-soft);
+  --vp-code-copy-code-hover-border-color: var(--vp-c-divider);
+  --vp-code-copy-code-hover-bg: var(--vp-c-bg);
+  --vp-code-copy-code-active-text: var(--vp-c-text-2);
+}
+
+.github-star {
+  transform: scale(1.3) !important;
+}
+
+.language-lmql .inline-lmql-delim {
+  opacity: 0.2;
+}
+
+.language-truncated {
+  max-height: 200pt; 
+  overflow: hidden;
+}
+
+.info.show .language-truncated {
+  max-height: none;
+}
+
+.info.show button.btn.expand {
+  display: none;
+}
+
+html.dark .info button.btn.expand {
+  background-color: var(--vp-c-gray-soft);
+  border-color: var(--vp-c-gray-soft);
+}
+
+html.dark .info button.btn.expand:hover {
+  border-color: var(--vp-c-gray-2);
+}
+
+.info button.btn.expand {
+  text-align: center;
+  width: 100%;
+  font-size: 10pt;
+  font-weight: bold;
+  margin-top: 0pt;
+}
+
+.language-output::before {
+  content: "Console Output";
+  font-size: 10pt;
+  font-weight: bold;
+  opacity: 0.4;
+  text-align: right;
+  position: absolute;
+  display: block;
+  top: 2pt;
+  right: 5pt;
+  margin-bottom: -2em;
+}
+
+.language-result::before {
+  content: "Result";
+  font-size: 10pt;
+  font-weight: bold;
+  opacity: 0.4;
+  text-align: right;
+  position: absolute;
+  top: 2pt;
+  right: 8pt;
+  margin-bottom: -2em;
+}
+
+.language-output {
+  border: 0.5pt solid rgb(204, 201, 201);
+}
+
+.language-output, .language-result {
+  white-space: pre-wrap !important;
+  color: var(--vp-c-text-1);
+  --vp-code-block-bg: transparent !important;
+  transform: scale(0.98);
+  position: relative;
+  border-radius: 7pt !important;
+
+  --vp-code-copy-code-border-color: var(--vp-c-divider);
+  --vp-code-copy-code-bg: var(--vp-c-bg-soft);
+  --vp-code-copy-code-hover-border-color: var(--vp-c-divider);
+  --vp-code-copy-code-hover-bg: var(--vp-c-bg);
+  --vp-code-copy-code-active-text: var(--vp-c-text-2);
+}
+
+.language-output button.copy, .language-result button.copy {
+  display: none;
+}
+
+.language-result {
+  --vp-code-block-bg: rgba(202, 202, 202, 0.061) !important;
+}
+
+.language-output pre code,
+.language-output pre,
+.language-output .hljs-comment,
+.language-output .hljs-string,
+.language-output .hljs-meta,
+.language-output .hljs-built_in,
+.language-output .hljs-keyword,
+.language-output .hljs-placeholder,
+.language-output .hljs-subst,
+.language-result pre code,
+.language-result pre,
+.language-result .hljs-comment,
+.language-result .hljs-string,
+.language-result .hljs-meta,
+.language-result .hljs-built_in,
+.language-result .hljs-keyword,
+.language-result .hljs-placeholder,
+.language-result .hljs-subst {
+  color: var(--vp-c-text-1) !important;
+  white-space: pre-wrap !important;
+}
+
+img.inline-logo {
+  display: inline-block;
+  height: 1em;
+  position: relative;
+  top: 0.15em;
+  left: 0.1em;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12pt;
+}
+
+.grid-item-card {
+  flex: 1 1 200pt;
+  margin: 5pt;
+  border-radius: 6pt;
+  overflow: hidden;
+  border: 0.5pt solid rgba(204, 201, 201, 0.732);
+  background: transparent;
+  position: relative;
+  padding: 10pt;
+  font-size: 12pt;
+  max-width: 48%;
+}
+
+.grid-item-card h3 {
+  font-size: 12pt;
+  margin: 0;
+  padding: 0;
+}
+
+.grid-item-card a {
+  text-decoration: none;
+  color: var(--vp-c-text-1);
+  transition-duration: 0.1s !important;
+}
+
+.grid-item-card a p {
+  margin: 0;
+  margin-top: 5pt;
+  font-size: 12pt;
+  font-weight: normal;
+}
+
+.btn {
+  padding: 4pt 10pt;
+  font-size: 1.0em;
+  background-color: rgb(220, 220, 220);
+  border-radius: 4pt;
+  font-weight: bold;
+  margin: 20pt 5pt 5pt 0pt;
+  border: 2pt solid rgb(220, 220, 220);
+}
+
+.btn:hover {
+  border: 2pt solid rgb(192, 190, 190);
+}
+
+.btn.primary, .btn.primary:hover {
+  background-color: #007bff;
+  border: 2pt solid #007bff;
+  color: white;
+}
+
+figure img {
+  border-radius: 4pt;
+}
+
+/* link to /docs/stable/ */
+nav a[href^="/docs/stable/"] {
+  border-radius: 4pt;
+  /* padding-left: 5pt; */
+  font-size: 8pt;
+}
+
+nav a[href^="/docs/stable/"] p {
+  /* color: white !important; */
+}

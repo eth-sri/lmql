@@ -48,9 +48,15 @@ def test_do_sync(test_llm):
     r = test_llm.predict(*ARGS, **KWARGS)
     assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "predict result is not as expected"
 
+def test_do_repeated_sync(test_llm):
+    r = test_llm.predict(*ARGS, **KWARGS)
+    assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "Call 1: predict result is not as expected"
+    r = test_llm.predict(*ARGS, **KWARGS)
+    assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "Call 2: predict result is not as expected"
+
 if __name__ == "__main__":
     if not "RUN_LC_TESTS" in os.environ:
-        print("Skipping LMTP tests because RUN_LC_TESTS is not set")
+        print("Skipping LMTP LangChain integration tests because RUN_LC_TESTS is not set")
         sys.exit(0)
 
     # only run this file with pytest

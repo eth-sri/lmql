@@ -11,6 +11,7 @@ import asyncio
 import numpy as np
 import lmql.utils.nputil as nputil
 import lmql.runtime.masks as masks
+from lmql.runtime.tracing import active_tracer, Event
 from lmql.runtime.token_distribution import TokenDistribution
 from lmql.api.llm import ModelAPIAdapter
 
@@ -20,13 +21,15 @@ import sys
 import traceback
 
 class LMTPDcModel(DcModel):
-    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e+38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, verbose=False, **kwargs):
+    def __init__(self, model, tokenizer, endpoint, inprocess=False, truncation_threshold=-3e38, init_workers=True, lmtp_server_kwargs=None, inprocess_client_constructor=None, verbose=False, **kwargs):
         super().__init__(model, tokenizer, truncation_threshold, init_workers, **kwargs)
 
         self.model.chunk_size = kwargs.get("chunksize", 16)
 
         # LMTP client object (can be inprocess, websocket, or an alternative like replicate)
         self.client = None
+        # model info as advertised by inference endpoint
+        self._model_info = None
         # asyncio task for client loop
         self._client_loop = None
         # set once self.client is set up
@@ -56,6 +59,12 @@ class LMTPDcModel(DcModel):
         if inprocess:
             self.inprocess_client_constructor = inprocess_client_constructor
 
+        EXTRA_DECODING_PARAMETERS = ["top_p", "top_k", "repetition_penalty", "presence_penalty", "length_penalty", "frequency_penalty"]
+        # API decoding parameters
+        self.extra_decoding_parameters = {
+            **{p: kwargs[p] for p in EXTRA_DECODING_PARAMETERS if p in kwargs}
+        }
+
         # model statistics
         self.requests = 0
         self.tokens = 0
@@ -69,10 +78,9 @@ class LMTPDcModel(DcModel):
         self.client = None
 
     async def replicate_client_loop(self):
-        import aiohttp
-        from .lmtp_replicate_client import LMTPReplicateClient
-
         try:
+            import aiohttp
+            from .lmtp_replicate_client import LMTPReplicateClient
             async with aiohttp.ClientSession() as session:
                 self.client = LMTPReplicateClient(self.model.model_identifier, session, self.endpoint,
                     **(self.lmtp_server_kwargs or {})
@@ -84,6 +92,7 @@ class LMTPDcModel(DcModel):
             self.error_signal.set()
             self.error = str(e)
             self.connected_signal.set()
+            print("Failed to initial replicate.com connection:", e, flush=True)
 
     async def ws_client_loop(self):
         import aiohttp
@@ -168,12 +177,13 @@ class LMTPDcModel(DcModel):
             raise RuntimeError("LMTP client encountered an error: {}".format(self.error))
 
         if self.client is None:
-            if self.inprocess:
-                self._client_loop = asyncio.create_task(self.inprocess_client_loop())
-            elif self.use_replicate:
-                self._client_loop = asyncio.create_task(self.replicate_client_loop())
-            else:
-                self._client_loop = asyncio.create_task(self.ws_client_loop())
+            if self._client_loop is None:
+                if self.inprocess:
+                    self._client_loop = asyncio.create_task(self.inprocess_client_loop(), name="lmtp_inprocess_client_loop")
+                elif self.use_replicate:
+                    self._client_loop = asyncio.create_task(self.replicate_client_loop(), name="lmtp_replicate_client_loop")
+                else:
+                    self._client_loop = asyncio.create_task(self.ws_client_loop(), name="lmtp_ws_client_loop")
         
         await self.connected_signal.wait()
         
@@ -184,9 +194,20 @@ class LMTPDcModel(DcModel):
     # on deinit
     def close(self):
         self.close_signal.set()
+        if self._client_loop is not None:
+            self._client_loop.cancel()
 
     def __del__(self):
         self.close_signal.set()
+        if self._client_loop is not None:
+            self._client_loop.cancel()
+
+    async def model_info(self):
+        if self._model_info is None or self._model_info == "<unavailable>":
+            self._model_info = (await self.client.request("MODEL_INFO", {
+                "model": self.model_identifier
+            }))["model_info"]
+        return self._model_info
 
     def make_logits(self, payload):
         scores = {}
@@ -195,7 +216,7 @@ class LMTPDcModel(DcModel):
         scores[int(payload["token"])] = payload["logprob"]
         scores = scores.items()
 
-        logits = np.ones(self.tokenizer.vocab_range) * self.truncation_threshold
+        logits = TokenDistribution()
         logits[[t for t, _ in scores]] = [s for _, s in scores]
 
         return logits
@@ -208,18 +229,20 @@ class LMTPDcModel(DcModel):
             chunk_size = self.model.chunk_size
         kwargs = {**self.model_args, **kwargs}
 
+        # get token masks from interpreter
         constrained_seqs = np.array([s.is_query_constrained], dtype=np.bool_)
         logits_mask_result = await self.compute_logits_mask(s.input_ids.reshape(1, -1), [s.user_data], constrained_seqs, [s], **kwargs)
-
         mask = logits_mask_result.logits_mask[0]
-
+        
         assert kwargs.get("num_samples", 1) == 1, "LMTP does not support num_samples > 1 right now. Please, duplicate your dc.seq to obtain multiple sampled continuations."
 
+        # merge interpreter user data with previous/decoder data
         if s.user_data is None:
             s.user_data = {}
         s.user_data = dc.deepmerge(dc.deepcopy(s.user_data), logits_mask_result.user_data[0])
         s.user_data["set_by"] = "where"
 
+        # convert token mask to LMTP format
         if mask is not None:
             num_allowed = masks.mask_num_allowed(mask)
             if num_allowed == 1:
@@ -234,16 +257,51 @@ class LMTPDcModel(DcModel):
             mask_value = 100 if invert else -100
             mask = {int(idx): mask_value for idx in np.nonzero(masked)[0]}
 
+        # convert seq to input IDs
         ids = self.tokenizer.convert_bytes_to_ids(s.input_ids)
         
-        if len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id:
+        if len(ids) == 0 or (len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id):
             ids = [self.tokenizer.bos_token_id] + ids
+        
+        # derive max_tokens
+        max_tokens = logits_mask_result.max_tokens_hints[0] or chunk_size
+        # if '-1', generation is not limited
+        if max_tokens == -1: max_tokens = 128
 
         if self.verbose:
             text = await self.detokenize(ids)
-            print("lmtp generate: {} / {} ({} tokens)".format(ids, str([text])[1:-1], len(ids)))
+            print("lmtp generate: {} / {} ({} tokens, temperature={}, max_tokens={})".format(ids, str([text])[1:-1], len(ids), temperature, max_tokens))
 
-        return self.client.generate(ids, max_tokens=chunk_size, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs)
+        # get token stream
+        token_stream = self.client.generate(ids, max_tokens=max_tokens, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
+        
+        if active_tracer().active:
+            stream_event = active_tracer().event("lmtp.generate", {
+                "model": await self.model_info(),
+                "tokenizer": str(self.tokenizer),
+                "kwargs": {
+                    "ids": ids,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                    **({"logit_bias": mask} if mask is not None else {}),
+                    "top_logprobs": top_logprobs,
+                    **self.extra_decoding_parameters
+                }
+            })
+
+            return self.traced_generate(token_stream, event=stream_event)
+
+        return token_stream
+
+    async def traced_generate(self, generate_iterator, event: Event):
+        first = True
+        async for item in generate_iterator:
+            if first:
+                event.update({"model": await self.model_info()})
+                first = False
+            
+            event.add("result", [item["token"]])
+            yield item
 
     async def argmax(self, sequences: dc.DataArray, **kwargs):
         return await self.sample(sequences, temperature=0.0, **kwargs)
@@ -493,6 +551,9 @@ class lmtp_model:
                 self.decoder_args = {}
 
                 self.num_queries = 0
+
+            def __str__(self):
+                return "<LMTPAdapterModel {}>".format(self.model_identifier)
 
             def get_tokenizer(self):
                 if self._tokenizer is None:

@@ -7,12 +7,12 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from lmql.ops.ops import *
+from lmql.runtime.context import Context
 from lmql.runtime.langchain import chain, call_sync
 from lmql.runtime.output_writer import silent
-from lmql.runtime.postprocessing.conditional_prob import \
-    ConditionalDistributionPostprocessor
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
 from lmql.api.inspect import is_query
+from lmql.runtime.formatting import format, tag
 
 class LMQLInputVariableScope:
     def __init__(self, f, calling_frame):
@@ -231,14 +231,6 @@ class LMQLQueryFunction:
         finally:
             if PromptInterpreter.main == interpreter:
                 PromptInterpreter.main = None
-
-        # applies distribution postprocessor if required
-        results = await (ConditionalDistributionPostprocessor(interpreter).process(results))
-
-        # apply remaining postprocessors
-        if self.postprocessors is not None:
-            for postprocessor in self.postprocessors:
-                results = await postprocessor.process(results, self.output_writer)
         
         interpreter.print_stats()
         interpreter.dcmodel.close()
@@ -265,12 +257,6 @@ def context_call(fct_name, *args, **kwargs):
 def interrupt_call(fct_name, *args, **kwargs):
     return ("interrupt:" + fct_name, args, kwargs)
 
-def f_escape(s):
-    return str(s).replace("[", "[[").replace("]", "]]")
-
-def tag(t):
-    return f"<lmql:{t}/>"
-
 def compiled_query(output_variables=None, group_by=None):
     if output_variables is None:
         output_variables = []
@@ -295,10 +281,7 @@ def compiled_query(output_variables=None, group_by=None):
 async def call(fct, *args, **kwargs):
     if type(fct) is LMQLQueryFunction or (hasattr(fct, "__lmql_query_function__") and fct.__lmql_query_function__.is_async):
         result = await fct(*args, **kwargs)
-        if len(result) == 1: 
-            return result[0]
-        else: 
-            return result
+        return result
     if inspect.iscoroutinefunction(fct):
         return await fct(*args, **kwargs)
     else:

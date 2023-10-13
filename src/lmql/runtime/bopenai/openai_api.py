@@ -14,6 +14,7 @@ import time
 import asyncio
 
 from lmql.runtime.stats import Stats
+from lmql.runtime.tracing import Tracer
 from lmql.models.model_info import model_info
 
 class OpenAIAPILimitationError(Exception): pass
@@ -119,7 +120,7 @@ def get_azure_config(model, api_config):
         
         deployment_specific_api_key = f"OPENAI_API_KEY_{deployment.upper()}"
         api_key = api_config.get("api_key", None) or os.environ.get(deployment_specific_api_key, None) or os.environ.get("OPENAI_API_KEY", None)
-        assert api_key is not None, "Please specify the Azure API key as 'api_key' or environment variable OPENAI_API_KEY or OPENAI_API_KEY_<DEPLOYMENT>"
+        assert api_key is not None, "Please specify the Azure API key as 'api_key' or environment variable OPENAI_API_KEY or {}".format(deployment_specific_api_key)
         
         is_chat = api_type == "azure-chat"
 
@@ -179,18 +180,21 @@ async def chat_api(**kwargs):
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
-    max_tokens = kwargs.get("max_tokens", 0)
     model = kwargs["model"]
     api_config = kwargs.get("api_config", {})
     tokenizer = api_config.get("tokenizer")
     assert tokenizer is not None, "internal error: chat_api expects an 'api_config' with a 'tokenizer: LMQLTokenizer' mapping in your API payload"
+    
+    max_tokens = kwargs.get("max_tokens", 0)
+    if max_tokens == -1:
+        kwargs.pop("max_tokens")
 
     assert "logit_bias" not in kwargs.keys(), f"Chat API models do not support advanced constraining of the output, please use no or less complicated constraints."
     prompt_tokens = tokenize(kwargs["prompt"][0], tokenizer=tokenizer, openai_byte_encoding=True)
 
     timeout = kwargs.pop("timeout", 1.5)
-    
     echo = kwargs.pop("echo")
+    tracer: Tracer = kwargs.pop("tracer", None)
 
     if echo:
         data = {
@@ -250,6 +254,13 @@ async def chat_api(**kwargs):
         async with aiohttp.ClientSession() as session:
             endpoint, headers = get_endpoint_and_headers(kwargs)
             
+            handle = tracer.event("openai.ChatCompletion", {
+                "endpoint": endpoint,
+                "headers": headers,
+                "tokenizer": str(tokenizer),
+                "kwargs": kwargs
+            })
+
             if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
                 print(f"openai complete: {kwargs}", flush=True)
             
@@ -319,7 +330,7 @@ async def chat_api(**kwargs):
                                     raise OpenAIStreamError(message + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
 
                             choices = []
-                            for c in data["choices"]:
+                            for i, c in enumerate(data["choices"]):
                                 delta = c["delta"]
                                 # skip non-content annotations for now
                                 if not "content" in delta:
@@ -336,6 +347,9 @@ async def chat_api(**kwargs):
                                             }
                                         })
                                     continue
+
+                                handle.add(f"result[{i}]", [delta])
+
                                 text = delta["content"]
                                 if len(text) == 0:
                                     continue
@@ -381,9 +395,16 @@ async def completion_api(**kwargs):
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
-    max_tokens = kwargs.get("max_tokens", 0)
-
     timeout = kwargs.pop("timeout", 1.5)
+    tracer = kwargs.pop("tracer", None)
+    
+    max_tokens = kwargs.get("max_tokens")
+    # if no token limit is set, use 1024 as a generous chunk size
+    # (completion models require max_tokens to be set)
+    if max_tokens == -1: 
+        # not specifying anything will use default chunk size 16
+        # specifying a higher value may error on some models
+        kwargs["max_tokens"] = 1024
 
     assert not (LMQL_BROWSER and "logit_bias" in kwargs and "gpt-3.5-turbo" in kwargs["model"]), "gpt-3.5-turbo completion models do not support logit_bias in the LMQL browser distribution, because the required tokenizer is not available in the browser. Please use a local installation of LMQL to use logit_bias with gpt-3.5-turbo models."
 
@@ -417,14 +438,24 @@ async def completion_api(**kwargs):
             }
             yield data
 
-    async with CapacitySemaphore(num_prompts * max_tokens):
+    async with CapacitySemaphore(num_prompts):
         
         current_chunk = ""
         stream_start = time.time()
         
 
         async with aiohttp.ClientSession() as session:
+            api_config = kwargs.get("api_config", {})
+            tokenizer = api_config.get("tokenizer")
+
             endpoint, headers = get_endpoint_and_headers(kwargs)
+
+            handle = tracer.event("openai.Completion", {
+                "endpoint": endpoint,
+                "headers": headers,
+                "tokenizer": str(tokenizer),
+                "kwargs": kwargs
+            })
             
             if api_config.get("verbose", False) or os.environ.get("LMQL_VERBOSE", "0") == "1" or api_config.get("chatty_openai", False):
                 print(f"openai complete: {kwargs}", flush=True)
@@ -494,6 +525,9 @@ async def completion_api(**kwargs):
                                     raise OpenAIRateLimitError(message + "local client capacity" + str(Capacity.reserved))
                                 else:
                                     raise OpenAIStreamError(message + " (after receiving " + str(n_chunks) + " chunks. Current chunk time: " + str(time.time() - last_chunk_time) + " Average chunk time: " + str(sum_chunk_times / max(1, n_chunks)) + ")", "Stream duration:", time.time() - stream_start)
+
+                            for i in range(len(data["choices"])):
+                                handle.add(f"result[{i}]", [data["choices"][i]["text"]])
 
                             yield data
                         

@@ -127,3 +127,7 @@ class PythonBackedTokenizer:
     @property
     def name(self):
         return "python:" + "gpt3_tokenizer"
+    
+    def backend(self):
+        import gpt3_tokenizer
+        return "<module gpt3_tokenizer>"

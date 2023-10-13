@@ -13,8 +13,12 @@ from .run import run_file, run_sync, run
 from .scoring import ScoringResult
 from .serve import serve
 from inspect import *
+
 from lmql.runtime.tokenizer import tokenizer
-from .warnings import *
+from lmql.runtime.loop import run_in_loop
+
+from lmql.runtime.tracing.tracer import traced, Tracer
+from lmql.runtime.tracing.certificate import certificate, InferenceCertificate
 
 async def generate(prompt: str, max_tokens: Optional[int] = None, model: Optional[Union[LLM, str]] = None, **kwargs):
     """
@@ -32,7 +36,7 @@ def generate_sync(prompt: str, max_tokens: Optional[int] = None, model=None, **k
     Like generate(), but runs synchronously and thus cannot be parallelized with other async code.
     When in an async context, use generate() instead.
     """
-    return asyncio.run(generate(prompt, max_tokens, model, **kwargs))
+    return run_in_loop(generate(prompt, max_tokens, model, **kwargs))
 
 async def score(prompt, values, model: Optional[Union[str, LLM]] = None, **kwargs) -> ScoringResult:
     """
@@ -49,4 +53,4 @@ def score_sync(prompt, values, *args, model=None, **kwargs) -> ScoringResult:
     Like score(), but runs synchronously and thus cannot be parallelized with other async code.
     When in an async context, use score() instead.
     """
-    return asyncio.run(score(prompt, values, *args, model=model, **kwargs))
+    return run_in_loop(score(prompt, values, *args, model=model, **kwargs))

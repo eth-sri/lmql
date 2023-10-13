@@ -13,6 +13,7 @@ dependencies:
   - pip:
     - astunparse
     - openai
+    - tiktoken
     - termcolor
     - transformers==4.28.1
     - pandas

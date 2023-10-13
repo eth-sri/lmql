@@ -31,7 +31,7 @@ As demonstrated by this file, also try to implement your tests using `lmql.model
 your test code can be run without actually using an LLM or external API, and that it can be re-run
 deterministically.
 
-**[Optional] Web Build Testing:** If you are working on a feature that is available in the web playground of LMQL (e.g. also works with API-based (OpenAI) models only), you can also test the web build with `scripts/serve-all.py`, by typing `bb` for browser build into the script's prompt. This will build and serve the WebAssembly/Pyodide version of LMQL on `http://localhost:8081/playground/`. Please see `web/deploy.sh` for the build process and requirements of the web playground, which may require you to install additional dependencies. 
+**[Optional] Web Build Testing:** If you are working on a feature that is available in the web playground of LMQL (e.g. also works with API-based (OpenAI) models only), you can also test the web build with `scripts/serve-all.py`, by typing `bb` for browser build into the script's prompt. This will build and serve the WebAssembly/Pyodide version of LMQL on `http://localhost:8081/playground/`. Please see `scripts/deploy-web.sh` for the build process and requirements of the web playground, which may require you to install additional dependencies. 
 
 ## Licensing
 

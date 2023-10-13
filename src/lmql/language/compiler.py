@@ -202,7 +202,7 @@ class PromptScope(ast.NodeVisitor):
                     warnings.warn(f"Warning: distribution variable {qexpr.name} is decorated with {qexpr.decorator_exprs}, but decorators are ignored for distribution variables.")
                 return DistributionVariable(qexpr.name)
             if type(qexpr) is FExpression:
-                return FExpression(f"lmql.lmql_runtime.f_escape({qexpr.expr})")
+                return FExpression(f"lmql.lmql_runtime.format({qexpr.expr})")
             elif type(qexpr) is TagExpression:
                 return TagExpression(f"lmql.lmql_runtime.tag(\"{qexpr.tag[1:]}\")")
             elif type(qexpr) is TemplateVariable:
@@ -898,7 +898,7 @@ class LMQLCompiler:
     def compile(self, filepath):
         try:
             # parse file
-            with open(filepath) as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 contents = f.read()
             lmql_code = preprocess_text(contents)
             buf = StringIO(lmql_code)

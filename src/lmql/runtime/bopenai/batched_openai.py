@@ -155,7 +155,12 @@ class Stats:
         else:
             print("warning: cost_estimate(): unknown model {}".format(model))
             return -1
-
+        
+def trace_metric(request_kwargs, *args, method='add', **kwargs):
+    if "tracer" not in request_kwargs.keys():
+        return
+    # log metrics to tracer via the specified method
+    getattr(request_kwargs["tracer"], method)(*args, **kwargs)
 class ResponseStream:    
     def __init__(self, scheduler, kwargs, response, n, request_ids, maximum_retries=20, chaos = None, stats: Stats=None):
         self.scheduler: AsyncOpenAIAPI = scheduler
@@ -168,6 +173,9 @@ class ResponseStream:
 
         self.stats.requests += 1
         self.stats.sum_batch_size += n
+        
+        trace_metric(kwargs, "openai.requests", 1)
+        trace_metric(kwargs, "openai.batch_size", n)
 
         # task that always waits for new data in the response stream
         self.iteration_task = asyncio.create_task(self.iter_task())
@@ -196,6 +204,7 @@ class ResponseStream:
                     index = c["index"]
 
                     self.stats.tokens += len(c["logprobs"]["tokens"])
+                    trace_metric(self.kwargs, "openai.tokens", len(c["logprobs"]["tokens"]))
                     assert c is not None
                     self.slices[index].digest(c)
                     self.slices[index].finish_reason = c["finish_reason"]
@@ -568,6 +577,7 @@ class AsyncOpenAIAPI:
         
         self.complete_request_queue = asyncio.Queue()
         self.complete_request_workers = [asyncio.create_task(self.complete_request_worker(self.complete_request_queue)) for i in range(5)]
+        
         self.worker_loops = set()
 
         self.stats_logger = None 
@@ -716,10 +726,11 @@ class AsyncOpenAIAPI:
             raise APIShutDownException(f"bopenai requires at least one worker to be running to issue new complete requests.")
 
         loop = asyncio.get_running_loop()
+
         result_fut = loop.create_future()
         self.futures.add(result_fut)
 
-        assert loop in self.worker_loops, f"bopenai requires the event loop to be running in one of the worker threads"
+        assert loop in self.worker_loops, f"bopenai requires the current event loop to be running in one of the worker threads"
 
         if request_id is None:
             request_id = self.request_ctr

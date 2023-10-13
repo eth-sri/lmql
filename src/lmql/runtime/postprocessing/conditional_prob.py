@@ -29,17 +29,10 @@ class ConditionalDistributionPostprocessor:
 
     async def process(self, results):
         model: dc.DcModel = self.interpreter.dcmodel
-        # optional unpacker for singular results
-        unpack = lambda v: v
-
-        # unpack singular results after processing
-        if type(results) is not list:
-            results = [results]
-            unpack = lambda v: v[0]
 
         # check if distribution is required
         if not any(r is not None and hasattr(r, "distribution_variable") and r.distribution_variable is not None for r in results):
-            return unpack(results)
+            return results
 
         if len(results) > 1:
             if "top1_distribution" in self.interpreter.decoder_kwargs and self.interpreter.decoder_kwargs["top1_distribution"]:
@@ -77,4 +70,4 @@ class ConditionalDistributionPostprocessor:
             result.variables[f"P({distribution_variable})"] = [(value, prob) for value, prob, _ in distribution]
             result.variables[f"log P({distribution_variable})"] = [(value, prob) for value, prob, _ in log_distribution]
 
-        return unpack(results[0])
+        return results

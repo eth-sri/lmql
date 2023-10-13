@@ -990,6 +990,7 @@ const ModelResultText = styled.div`
   .system-message {
     display: none;
     text-align: center;
+    background: none !important;
   }
 
   div .tag {
