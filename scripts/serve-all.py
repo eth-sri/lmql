@@ -54,11 +54,6 @@ while True:
         elif command == "docs-clean":
             # docs/ make clean
             subprocess.run(["make", "clean", "html"], cwd="docs")
-        elif command == "web-clean":
-            # rm -rf web-deploy/*
-            subprocess.run(["rm", "-rf", "web-deploy/*"])
-            # rm web/browser-build/temp
-            subprocess.run(["rm", "-rf", "web/browser-build/temp"])
         else:
             print(termcolor.colored("Unknown command!", "red"))
     except KeyboardInterrupt:
