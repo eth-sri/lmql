@@ -65,19 +65,10 @@ lmql chat chat.lmql
 
 Once the server is running, you can access the chatbot at the provided local URL. 
 
-```{toctree}
-:hidden:
-
-./chat/overview
-```
-
-```{figure} https://github.com/eth-sri/lmql/assets/17903049/334e9ab4-aab8-448d-9dc0-c53be8351e27
-:name: lmql-chat
-:alt: A simple chatbot using the LMQL chat UI
-:align: center
-
-A simple chatbot using the LMQL Chat UI.
-```
+<figure align="center" style="width: 100%; margin: auto;" alt="Screenshot of the model dropdown in the playground">
+    <img style="min-height: 100pt" src="https://github.com/eth-sri/lmql/assets/17903049/334e9ab4-aab8-448d-9dc0-c53be8351e27" alt="Screenshot of the model dropdown in the playground"/>
+    <figcaption>A simple chatbot using the LMQL Chat UI.</figcaption>
+</figure>
 
 In this interface, you can interact with your chatbot by typing into the input field at the bottom of the screen. The chatbot will then respond to your input, while also considering the system prompt that you provide in your program. On the right, you can inspect the full internal prompt of your program, including the generated prompt statements and the model output. This allows you at all times, to understand what exact input the model received and how it responded to it.
 

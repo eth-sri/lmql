@@ -15,23 +15,14 @@ To locally serve an LMQL chat endpoint and user interface, simply run the follow
 lmql chat <path-to-lmql-file>.lmql
 ```
 
-This will serve a web interface on `http://localhost:8089`, and automatically open it in your default browser. You can now start chatting with your custom LMQL chat application. The internal trace on the right-hand side always displays the complete current prompt, reflecting the current state of your chat application.
+This will serve a web interface on `http://localhost:8089`, and automatically open it in your default browser. You can now start chatting with your custom LMQL chat application. The internal trace on the right-hand side (shown below), always displays the complete (conversational) prompt, reflecting the current state of your chat application.
 
 Note that changing the `.lmql` file will **not** automatically reload the server, so you will have to restart the server manually to see the changes.
 
-```{toctree}
-:hidden:
-
-./chat/overview
-```
-
-```{figure} https://github.com/eth-sri/lmql/assets/17903049/334e9ab4-aab8-448d-9dc0-c53be8351e27
-:name: lmql-chat
-:alt: A simple chatbot using the LMQL chat UI
-:align: center
-
-A simple chatbot using the LMQL Chat UI.
-```
+<figure align="center" style="width: 100%; margin: auto;" alt="A simple chatbot using the LMQL Chat UI.">
+    <img style="min-height: 100pt" src="https://github.com/eth-sri/lmql/assets/17903049/334e9ab4-aab8-448d-9dc0-c53be8351e27" alt="A simple chatbot using the LMQL Chat UI."/>
+    <br/><figcaption>A simple chatbot launched via <code>lmql chat</code>.</figcaption>
+</figure>
 
 ## Using `chatserver` 
 
@@ -49,12 +40,12 @@ Note that when passing a query function directly, you have to always provide a `
 
 Chat relies on a [decorator-based](../../language/decorators.md) output streaming. More specifically, only model output variables that are annotated as `@message` are streamed and shown to the user in the chat interface. This allows for a clean separation of model output and chat output, and eneables hidden/internal reasoning. 
 
-To use `@message` with your [custom output writer](../output.ipynb), make sure to inherit from `lmql.lib.chat`'s `ChatMessageOutputWriter`, which offers additional methods for specifically handling and streaming `@message` variables.
+To use `@message` with your [custom output writer](../output.html), make sure to inherit from `lmql.lib.chat`'s `ChatMessageOutputWriter`, which offers additional methods for specifically handling and streaming `@message` variables.
 
 ## More Advanced Usage
 
 For more advanced serving scenarios, e.g. when integrating Chat into your own web applications, please refer to the very minimal implementation of `chatserver` in [`src/lmql/ui/chat/__init__.py`](https://github.com/eth-sri/lmql/blob/main/src/lmql/ui/chat/__init__.py). This implementation is very minimal and can be easily adapted to your own needs and infrastructure. The corresponding web UI is implemented in [`src/lmql/ui/chat/assets/`](https://github.com/eth-sri/lmql/blob/main/src/lmql/ui/chat/assets/) and offers a good starting point for your own implementation and UI adaptations on the client side.
 
-For other forms of output streaming e.g. via HTTP or SSE, see also the chapter on [Output Streaming](../output.ipynb)
+For other forms of output streaming e.g. via HTTP or SSE, see also the chapter on [Output Streaming](../output.html)
 
 **Disclaimer**: The LMQL chat server is a simple code template that does not include any security features, authentication or cost control. It is intended for local development and testing only, and should not be used as-is in production environments. Before deploying your own chat application, make sure to implement the necessary security measures, cost control and authentication mechanisms.

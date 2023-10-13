@@ -5,13 +5,10 @@ order: 3
 
 While user-facing question-answering is the main goal of LLM-based chatbots, performance can be considerably improved by implementing internal reasoning and reflection mechanisms. In this chapter, we will discuss the implementation of such mechanisms in LMQL Chat.
 
-```{figure} https://github.com/eth-sri/lmql/assets/17903049/cb609b5c-8984-414a-a3b6-b3fa6f8ab6bb
-:name: lmql-chat
-:alt: A chatbot with internal reasoning capabilities.
-:align: center
-
-A chatbot with internal reasoning capabilities.
-```
+<figure align="center" style="width: 100%; margin: auto;" alt="Screenshot of the model dropdown in the playground">
+    <img style="min-height: 100pt" src="https://github.com/eth-sri/lmql/assets/17903049/cb609b5c-8984-414a-a3b6-b3fa6f8ab6bb" alt="Screenshot of the model dropdown in the playground"/>
+    <figcaption>A chatbot that relies on internal reasoning.</figcaption>
+</figure>
 
 Building on the simple chat application implemented in [](./overview.md), we extend the chat loop as follows:
 
