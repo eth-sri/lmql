@@ -1,4 +1,4 @@
-name: Run Tests and Publish Wheel
+name: Test Release to test.pypi.org
 
 on: 
   workflow_dispatch:
