@@ -1,6 +1,9 @@
 include src/lmql/ui/*
 recursive-include src/lmql/ui/playground/ *
+recursive-exclude src/lmql/ui/playground/build/ *
+recursive-include src/lmql/lib/chat/assets/ *
 recursive-include src/lmql/ui/live/ *
 recursive-exclude src/lmql/ui/live/node_modules/ *
+recursive-exclude src/lmql/ui/live/ *.tokens
 recursive-exclude src/lmql/ui/playground/node_modules/ *
 recursive-exclude src/lmql/ui/vscode/ *
