@@ -2,7 +2,7 @@
 title: ⛓️ Constrained LLMs
 ---
 
-LMQL's support for constrained generation enables robust interfacing, to integrate LLMs safely into your applications.<a href="../../docs/constraints.html">Learn More →</a>
+LMQL's support for constrained generation enables robust interfacing, to integrate LLMs safely into your applications.<a href="../../docs/language/constraints.html">Learn More →</a>
 
 %SPLIT%
 ```lmql
