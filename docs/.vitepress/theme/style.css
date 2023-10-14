@@ -337,7 +337,7 @@ html.dark pre.promptdown, html.dark pre.promptdown.promptdown-compiled {
 @media (max-width: 800px) {
   .banner {
     margin: 0pt;
-    max-width: calc(100vw - 12pt);
+    max-width: calc(100vw);
     border-radius: 0pt;
   }
 }
