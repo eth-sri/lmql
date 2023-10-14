@@ -9,8 +9,8 @@ on:
 
 
 jobs:
-    publish:
-      runs-on: lmql-release-test
+    release-test-wheel:
+      runs-on: ubuntu-latest
       steps:
           - uses: actions/checkout@v3
           - name: Setup Fresh Virtual Environment
