@@ -220,6 +220,10 @@ html.dark .cards>a:hover {
     .feature {
         flex-direction: column !important;
         margin-top: 20pt !important;
+
+        width: calc(100vw - 15pt) !important;
+        overflow-x: hidden;
+        overflow-y: visible;
     }
 
     .feature>div:first-child {
@@ -252,10 +256,22 @@ html.dark .cards>a:hover {
     }
 
     .feature pre.promptdown,
-    .feature pre.promptdown.promptdown-compiled {
-        width: auto;
-        max-width: 100vw;
+    .feature pre.promptdown.promptdown-compiled,
+    html.dark .feature pre.promptdown,
+    html.dark .feature pre.promptdown.promptdown-compiled {
+        width: calc(100vw - 30pt);
+        max-width: calc(100vw - 30pt);
+        font-size: 12pt;
+        margin-left: -5pt;
+        padding: 0;
+        margin-right: 0pt;
+        
     }
+
+    .feature pre.promptdown .promptdown-var {
+        line-break: word !important;
+    }
+
 }
 
 .feature.code pre {
@@ -265,6 +281,7 @@ html.dark .cards>a:hover {
     white-space: pre-wrap;
 
     box-shadow: 0pt 0pt 80pt rgba(0, 0, 0, 0.272);
+    font-size: 10pt;
 }
 
 
@@ -291,6 +308,21 @@ html.dark .cards>a:hover {
     .feature.code {
         margin-top: -30pt !important;
         font-size: 11pt;
+        padding: 2pt !important;
+        overflow-y: hidden;
+    }
+
+    .feature.code pre {
+        overflow-x: auto;
+        white-space: pre;
+        margin: 0;
+        padding: 10pt 10pt;
+        max-width: calc(100vw - 20pt);
+        font-size: 9pt;
+    }
+    
+    .feature.code pre .window-controls {
+        display: none;
     }
 }
 

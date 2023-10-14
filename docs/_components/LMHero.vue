@@ -93,6 +93,7 @@ html.dark .btn.primary, html.dark .btn.primary:hover {
   .hero {
     margin: 70pt 0pt !important;
     align-items: flex-start !important;
+    max-width: 200pt;
   }
 
   .hero button {
