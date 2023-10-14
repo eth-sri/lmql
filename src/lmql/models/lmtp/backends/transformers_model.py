@@ -144,7 +144,6 @@ class TransformersLLM(LMTPModel):
                     # use pip to get version (doesn not have __version__ attribute)
                     import subprocess
                     result = subprocess.run(["pip", "show", "bitsandbytes"], capture_output=True)
-                    print(result)
                     if result.returncode == 0:
                         version_info["bitsandbytes"] = result.stdout.decode("utf-8").split("\n")[1].split(":")[1].strip()
                 except:
