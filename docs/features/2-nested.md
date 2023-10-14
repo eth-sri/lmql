@@ -8,7 +8,7 @@ LMQL now supports nested queries, enabling modularized local instructions and re
 
 <br/>
 
-<a class="btn" href="../guide/language/nestedqueries.html">
+<a class="btn" href="../docs/language/nestedqueries.html">
 Learn more
 </a>
 
