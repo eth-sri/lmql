@@ -472,7 +472,13 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
                 # s.data("eos_score", s.score
                 s.data("eos_score", regular_scorer(s.logprobs))
 
+            eos_scores_before = active.data("eos_score").flatten().items()
+
             active = await model.rewrite(active)
+
+            # make sure eos_scores survive rewrite
+            for s, eos_score in zip(active.flatten().items(), eos_scores_before):
+                s.data("eos_score", eos_score)
 
             active, variable_done = (active + variable_done).separate_by(is_active_variable)
             active = dc.topk(active, b)

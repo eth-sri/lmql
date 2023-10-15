@@ -66,7 +66,7 @@ class LlamaCppModel(LMTPModel):
                                                             stopping_criteria=llama_streamer, 
                                                             logits_processor=logits_processor,
                                                             **kwargs)):
-            assert i + len(input_ids) < self.llm.n_ctx(), "The requested number of tokens exceeds the llama.cpp model's context size. Please specify a higher n_ctx value."
+            assert i + len(input_ids) < self.llm.n_ctx(), f"The requested number of tokens exceeds the llama.cpp model's specified context size {self.llm.n_ctx()}. Please specify a higher n_ctx value or use a shorter prompt."
             sequence += [token]
             sq_ar = np.array(sequence)
             ts_ar = np.stack(token_scores, axis=0)
