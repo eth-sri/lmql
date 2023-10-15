@@ -65,6 +65,16 @@ async def multi_kw_default(s: str = 'default', a: int = 12):
         "chatgpt"
     '''
 
+# multi kw with n>1 decoder
+@lmql.query(model=lmql.model("random", seed=123))
+async def multi_kw_multiplicity(s: str = 'default', a: int = 12):
+    '''lmql
+    sample(n=2)
+    
+    "Hi [COMPLETION]" where len(TOKENS(COMPLETION)) == 2
+    return s, a
+    '''
+
 async def test_query_args():
     agent = Agent()
     
@@ -80,50 +90,62 @@ async def test_query_args():
     # assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
 
     # positional, keyword, self
-    s, a, ag, captured = (await agent.interact(input_value, a=a_value, output_writer=lmql.stream("ANSWER")))[0]
+    s, a, ag, captured = (await agent.interact(input_value, a=a_value, output_writer=lmql.stream("ANSWER")))
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert a == a_value, f"Expected {a_value}, got {a}"
     assert ag == agent, f"Expected {agent}, got {a}"
     assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
 
     # positional, default, self
-    s, a, ag, captured = (await agent.interact(input_value, output_writer=lmql.stream("ANSWER")))[0]
+    s, a, ag, captured = (await agent.interact(input_value, output_writer=lmql.stream("ANSWER")))
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert a == 12, f"Expected 12, got {a}"
     assert ag == agent, f"Expected {agent}, got {a}"
     assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
 
     # positional only
-    s = (await positional_only(input_value))[0]
+    s = (await positional_only(input_value))
     assert s == input_value, f"Expected {input_value}, got {s}"
 
     # default only
-    s = (await default_only())[0]
+    s = (await default_only())
     assert s == 'default', f"Expected 'default', got {s}"
 
     # kw only but set
-    s = (await default_only(s=input_value))[0]
+    s = (await default_only(s=input_value))
     assert s == input_value, f"Expected {input_value}, got {s}"
 
     # positional and default
-    s, a = (await positional_and_default(input_value))[0]
+    s, a = (await positional_and_default(input_value))
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert a == 12, f"Expected 12, got {a}"
 
     # multi kw default
-    s, a = (await multi_kw_default())[0]
+    s, a = (await multi_kw_default())
     assert s == 'default', f"Expected 'default', got {s}"
     assert a == 12, f"Expected 12, got {a}"
 
     # multi kw default but set
-    s, a = (await multi_kw_default(s=input_value))[0]
+    s, a = (await multi_kw_default(s=input_value))
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert a == 12, f"Expected 12, got {a}"
 
     # capture
-    s, captured = (await capture(input_value))[0]
+    s, captured = (await capture(input_value))
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
+
+    # capture with decoder n=2 (should be ignored)
+    s, captured = (await capture(input_value, decoder="beam", n=2))
+    assert s == input_value, f"Expected {input_value}, got {s}"
+    assert captured == CONSTANT, f"Expected {CONSTANT}, got {captured}"
+
+    # multi_kw_multiplicity
+    results = (await multi_kw_multiplicity(s=input_value, a=a_value))
+    assert len(results) == 2, f"Expected 2 results, got {len(results)}"
+    for s, a in results:
+        assert s == input_value, f"Expected {input_value}, got {s}"
+        assert a == a_value, f"Expected {a_value}, got {a}"
 
 # multi kw default
 @lmql.query

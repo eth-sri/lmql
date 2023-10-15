@@ -101,19 +101,7 @@ function createSidebars() {
       collapsed: false,
       base: docs_path + 'development',
       items: sidebar(docs_dir + "development")
-    },
-    {
-      text: '',
-      collapsable: false,
-      collapsed: false,
-      items: [
-        {
-          text: docs_dir.includes("latest") ? 'Switch to Stable' : 'Switch to Latest',
-          link: docs_dir.includes("latest") ? '/docs/' : '/docs/latest/',
-          path: docs_dir.includes("latest") ? '/docs/' : '/docs/latest/',
-        }
-      ]
-    },
+    }
   ]
   sb["docs/"] = docsBar("docs/", "/docs/")
   sb["docs/latest/"] = docsBar("docs/latest/", "/docs/latest/")

@@ -337,7 +337,7 @@ html.dark pre.promptdown, html.dark pre.promptdown.promptdown-compiled {
 @media (max-width: 800px) {
   .banner {
     margin: 0pt;
-    max-width: calc(100vw - 12pt);
+    max-width: calc(100vw);
     border-radius: 0pt;
   }
 }
@@ -619,13 +619,40 @@ figure img {
   border-radius: 4pt;
 }
 
-/* link to /docs/stable/ */
-nav a[href^="/docs/stable/"] {
-  border-radius: 4pt;
-  /* padding-left: 5pt; */
-  font-size: 8pt;
+#version-switcher {
+  opacity: 0.9;
+  text-align: center;
+  font-size: 0.9em;
+  margin-top: -5pt;
+  color: var(--vp-c-text-2);
 }
 
-nav a[href^="/docs/stable/"] p {
-  /* color: white !important; */
+#version-switcher .version {
+  display: inline-block;
+  border-radius: 4pt;
+  padding: 0pt 5pt;
+  margin-left: 2pt;
+}
+
+#version-switcher .version:hover {
+  background-color: var(--vp-c-gray-soft);
+  color: var(--vp-c-text-1);
+}
+
+#version-switcher .version.active {
+  background-color: #007bff;
+  color: white;
+}
+
+#version-switcher label {
+  margin-right: 2pt;
+  color: var(--vp-c-text-2);
+}
+
+a:hover #version-switcher label {
+  color: var(--vp-c-text-2);
+}
+
+#version-switcher a.version:not(.active):hover {
+  cursor: pointer;
 }

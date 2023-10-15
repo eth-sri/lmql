@@ -220,14 +220,16 @@ html.dark .cards>a:hover {
     .feature {
         flex-direction: column !important;
         margin-top: 20pt !important;
-
         width: calc(100vw - 15pt) !important;
-        overflow-x: hidden;
-        overflow-y: visible;
+        
     }
 
     .feature>div:first-child {
         margin-right: 0;
+    }
+
+    .feature.code {
+        width: 100vw !important;
     }
 
     .feature>code {
@@ -246,13 +248,12 @@ html.dark .cards>a:hover {
     .feature.middle {
         width: calc(100vw - 10pt);
         padding: 0pt 10pt !important;
-        margin: 0pt;
     }
 
     .feature.middle>div {
-        max-width: 100%;
-        margin-left: 20pt;
+        max-width: 100vw;
         text-align: left;
+        margin: 0 !important;
     }
 
     .feature pre.promptdown,
@@ -271,7 +272,6 @@ html.dark .cards>a:hover {
     .feature pre.promptdown .promptdown-var {
         line-break: word !important;
     }
-
 }
 
 .feature.code pre {
@@ -302,6 +302,7 @@ html.dark .cards>a:hover {
     max-width: 480pt;
     font-size: 12pt;
     line-height: 1.4;
+    z-index: 100;
 }
 
 @media (max-width: 800px) {
@@ -309,18 +310,20 @@ html.dark .cards>a:hover {
         margin-top: -30pt !important;
         font-size: 11pt;
         padding: 2pt !important;
-        overflow-y: hidden;
+        max-width: calc(100vw - 20pt);
+        overflow: hidden !important;
     }
 
     .feature.code pre {
-        overflow-x: auto;
         white-space: pre;
         margin: 0;
         padding: 10pt 10pt;
-        max-width: calc(100vw - 20pt);
         font-size: 9pt;
+        max-width: calc(100vw - 20pt);
+        box-shadow: none;
+        overflow-x: scroll;
     }
-    
+
     .feature.code pre .window-controls {
         display: none;
     }

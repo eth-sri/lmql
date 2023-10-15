@@ -19,6 +19,9 @@ class InterpretationHeadDone(Exception):
     def __init__(self, result):
         self.result = result
 
+# symbol to represent a 'None' result, as compared to a non-terminated interpretation head
+class NoneResult: pass
+
 class InterpretationHead:
     def __init__(self, fct, context, args=None, kwargs=None, trace=None, continue_last=False):
         # stateless configuration
@@ -124,7 +127,7 @@ class InterpretationHead:
         elif type(self.current_args) is tuple and len(self.current_args) == 2 and self.current_args[0] == "result":
             # consider ("result", <expr>) yields as return statements
             # this avoids a dependency on this file from LMQL compiled modules
-            self.result = self.current_args[1]
+            self.result = self.current_args[1] or NoneResult
             raise InterpretationHeadDone(self.result)
         else:
             assert False, f"unexpected yield self.current_args from compiled function: {self.current_args}"
