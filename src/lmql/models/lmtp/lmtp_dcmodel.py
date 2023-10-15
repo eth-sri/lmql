@@ -225,8 +225,6 @@ class LMTPDcModel(DcModel):
         yield {"token": token, "logprob": score, "top_logprobs": {token: score}}
 
     async def generate(self, s, temperature, top_logprobs = 1, chunk_size=None, **kwargs):
-        if chunk_size is None:
-            chunk_size = self.model.chunk_size
         kwargs = {**self.model_args, **kwargs}
 
         # get token masks from interpreter
@@ -264,9 +262,11 @@ class LMTPDcModel(DcModel):
             ids = [self.tokenizer.bos_token_id] + ids
         
         # derive max_tokens
-        max_tokens = logits_mask_result.max_tokens_hints[0] or chunk_size
-        # if '-1', generation is not limited
-        if max_tokens == -1: max_tokens = 128
+        hint = logits_mask_result.max_tokens_hints[0]
+        if "chunksize" in kwargs.keys():
+            max_tokens = min(hint, kwargs["chunksize"]) if hint != -1 else kwargs["chunksize"]
+        else:
+            max_tokens = hint or self.model.chunk_size if hint != -1 else self.model.chunk_size
 
         if self.verbose:
             text = await self.detokenize(ids)

@@ -124,6 +124,7 @@ async def beam_sample(prompt_ids: np.ndarray, n=4, max_len=None, temperature=Non
 
         h = dc.repeat(h, n*len(h))
         h = h.extend(await model.sample(h, num_samples=1, temperature=temperature))
+        h = dc.token_unique(h)
         
         h = await model.rewrite(h)
         h, done = (h + done).separate_by(not_done)
@@ -423,6 +424,9 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
 
     def is_active_variable(s):
         v = s.data("head.variable")
+        ctr = s.data("head.recurring_variable_counter")
+        v = v + "_" + str(ctr.get(v, 0))
+        
         if v is None: return False
         if active_variable.get() is None: 
             active_variable.set(v)
@@ -457,8 +461,9 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
 
         while not (len(active) == 0 or (len(top_variable_done) == b and dc.max_score(active, scorer=nw_score) < dc.min_score(top_variable_done, scorer=nw_score))):
             # inner variable decoding (beam_sample with 2*n beams and branching factor n)
-            if sample:
-                active = active.extend(await model.sample(active, temperature=temperature, num_samples=b))
+            if method == "sample":
+                active = dc.repeat(active, b*len(active))
+                active = active.extend(await model.sample(active, temperature=temperature, num_samples=1))
             else:
                 kwargs.pop("temperature", None)
                 active = active.extend(await model.topk_continuations(active, k=b, **kwargs))
@@ -479,7 +484,7 @@ async def topk_var_continuations(model, seqs: dc.DataArray, active_variable, b, 
             
             yield active
     elif method == "sample":
-        active = active.element_wise(lambda s: s.copy() * b)
+        active = dc.repeat(active, b*len(active))
         i = 0
 
         while not is_seq_beams_search_done(active, variable_done, num_beams=b):

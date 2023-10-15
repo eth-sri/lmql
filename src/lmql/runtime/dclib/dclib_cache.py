@@ -285,7 +285,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             sampling_mode = "top-1" if temperature == 0.0 else "sample-{}".format(temperature)
 
             # make sure that each uniquely sampled trajectory in the cache, cannot be used
-            # twice as a result of sampling (e.g. when sampling multiple times from the same sequence)
+            # twice as a result of sampling (e.g. when sampling multiple continuations for the same sequence)
             cache_reuse_context = set()
             
             cache_entries = [await self.get_cache(s, sampling_mode, user_data=True, cache_reuse_context=cache_reuse_context, **kwargs) for s in seqs]
