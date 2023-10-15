@@ -19,7 +19,8 @@ from lmql.ops.follow_map import fmap
 from lmql.runtime.interrupt import interrupt
 from lmql.runtime.multi_head_interpretation import (InterpretationHead,
                                                     InterpretationHeadDone,
-                                                    InterpreterCall)
+                                                    InterpreterCall,
+                                                    NoneResult)
 from lmql.runtime.program_state import ProgramState
 from lmql.runtime.stats import Stats
 from lmql.runtime.tokenizer import LMQLTokenizer
@@ -772,11 +773,16 @@ class PromptInterpreter:
                 result_state = si.interpreter_state_from_user_data(seq)
                 if result_state.query_head.result is not None:
                     variable_value = result_state.query_head.result
+                    
+                    # handle 'return None' special case
+                    if variable_value is NoneResult:
+                        variable_value = None
+                    
                     if type(variable_value) is LMQLResult:
                         postprocessed_prompt = variable_value.prompt[len(state.prompt):]
                         variable_value = variable_value.prompt[len(state.prompt):]
                     else:
-                        postprocessed_prompt = str(result_state.query_head.result)
+                        postprocessed_prompt = str(variable_value)
 
             # apply postprocessing decorators if any
             if state.variable_arg("decorators") is not None:
@@ -967,7 +973,7 @@ class PromptInterpreter:
         if self.root_state.query_head.result is not None:
             # one last call to debug_out to get the final state
             await debug_out(self.decoder_step)
-            return [self.root_state.query_head.result]
+            return (await self.postprocess([self.root_state.query_head.result]))[0]
 
         # prepare tokenizer
         self.tokenizer = self.model.get_tokenizer()
@@ -1127,8 +1133,8 @@ class PromptInterpreter:
                 # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
 
-                # applies distribution postprocessor if required
-                results = await (ConditionalDistributionPostprocessor(self).process(results))
+                # post-process results
+                results = await self.postprocess(results)
 
                 # check if a certificate was requested
                 if self.certificate != False:
@@ -1161,6 +1167,14 @@ class PromptInterpreter:
                           "openai_nonstop", "chunksize", "alpha", "verbose", "certificate", 
                           # extra decoding args
                           "top_k", "top_p", "repetition_penalty", "frequency_penalty", "presence_penalty"]
+
+    async def postprocess(self, results):
+        results = [r if r is not NoneResult else None for r in results]
+        
+        # applies distribution postprocessor if required
+        results = await (ConditionalDistributionPostprocessor(self).process(results))
+
+        return results
 
     def derive_decoder_args(self, extra_kwargs, existing_args=None):
         # if no existing args are provided, use no args

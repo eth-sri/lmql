@@ -221,12 +221,12 @@ Answer Choices: (A) 08/29/2021 (B) 08/28/2021 (C) 08/29/1925 (D) 08/30/2021 (E) 
             description: "Asking an expert to answer.",
             code: `# use beam search to explore different potential 'expert' values
 beam(n=2)
-    "Q: What are Large Language Models?\n\n"
+    "Q: What are Large Language Models?\\n\\n"
 
     # prompt for an 'expert'
-    "A good person to answer this question would be[EXPERT]\n\n" where \
-        STOPS_AT(EXPERT, ".") and STOPS_AT(EXPERT, "\n")
-    expert_name = EXPERT.rstrip(".\n")
+    "A good person to answer this question would be[EXPERT]\\n\\n" where \\
+        STOPS_AT(EXPERT, ".") and STOPS_AT(EXPERT, "\\n")
+    expert_name = EXPERT.rstrip(".\\n")
 
     # use 'expert' to answer the question
     "For instance,{expert_name} would answer[ANSWER]" where STOPS_AT(ANSWER, ".")

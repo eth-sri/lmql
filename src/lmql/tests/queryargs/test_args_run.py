@@ -39,13 +39,13 @@ from
 '''
 
     try:
-        s = (await lmql.run(query))[0]
+        s = (await lmql.run(query))
         assert False, f"Expected error, got {s}"
     except TypeError as e:
         assert "Failed to resolve variable 's'" in str(e), f"Expected error, got {e}"
 
     # no input but kw specified
-    s = (await lmql.run(query, s=input_value))[0]
+    s = (await lmql.run(query, s=input_value))
     assert s == input_value, f"Expected {input_value}, got {s}"
 
     multiquery = '''lmql
@@ -56,6 +56,6 @@ from
 '''
 
     # multikw
-    s, a = (await lmql.run(multiquery, s=input_value, a=a_value))[0]
+    s, a = (await lmql.run(multiquery, s=input_value, a=a_value))
     assert s == input_value, f"Expected {input_value}, got {s}"
     assert a == a_value, f"Expected {a_value}, got {a}"
