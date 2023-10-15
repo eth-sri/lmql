@@ -264,9 +264,9 @@ class LMTPDcModel(DcModel):
         # derive max_tokens
         hint = logits_mask_result.max_tokens_hints[0]
         if "chunksize" in kwargs.keys():
-            max_tokens = min(hint, kwargs["chunksize"]) if hint != -1 else kwargs["chunksize"]
+            max_tokens = min(hint, kwargs["chunksize"]) if hint > 0 else kwargs["chunksize"]
         else:
-            max_tokens = hint or self.model.chunk_size if hint != -1 else self.model.chunk_size
+            max_tokens = hint or self.model.chunk_size if hint > 0 else self.model.chunk_size
 
         if self.verbose:
             text = await self.detokenize(ids)
