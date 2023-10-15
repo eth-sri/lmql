@@ -416,10 +416,10 @@ export function Explore() {
         fetch(q.state).then((r) => r.text()).then((r) => {
           persistedState.load(r);
           persistedState.setItem("lmql-editor-contents", q.code)
-          window.setTimeout(() => trackingState.setTrackMostLikely(true), 10);            
+          window.setTimeout(() => trackingState.setTrackMostLikely(true), 10);
         }).catch((e) => {
           console.error(e)
-          alert("Error loading example.")
+          alert("Error loading the selected example. See the console for more details.")
         });
       } else {
         persistedState.setItem("lmql-editor-contents", q.code)
