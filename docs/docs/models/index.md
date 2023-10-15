@@ -12,7 +12,7 @@ To load models in LMQL, you can use the `lmql.model(...)` function which gives y
 ```lmql
 lmql.model("openai/gpt-3.5-turbo-instruct") # OpenAI API model
 lmql.model("random", seed=123) # randomly sampling model
-lmql.model("llama.cpp:<YOUR_WEIGHTS>.bin") # llama.cpp model
+lmql.model("llama.cpp:<YOUR_WEIGHTS>.gguf") # llama.cpp model
 
 lmql.model("local:gpt2") # load a `transformers` model in-process
 lmql.model("local:gpt2", cuda=True, load_in_4bit=True) # load a `transformers` model in process with additional arguments
