@@ -543,6 +543,10 @@ class ReturnStatementTransformer(ast.NodeTransformer):
         return node
 
     def visit_Return(self, node):
+        # handle 'return' statement with no value
+        if node.value is None:
+            return ast.parse(f"yield ('result', (" + yield_call("get_return_value", ()) + "))")
+        # handle 'return' statement with value
         return ast.parse("yield ('result', " + ast.unparse(node.value).strip() + ")")
 
 class LMQLConstraintTransformation:

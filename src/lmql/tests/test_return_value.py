@@ -88,6 +88,8 @@ def two_path_return(a:int):
     '''lmql
     if a > 0:
         return None
+    elif a == 0:
+        return
     else:
         return "Something"
     
@@ -102,9 +104,37 @@ def test_two_path_return():
     assert a == "Something", f"Expected return value to be 'Something' but got '{a}'"
 
     a = two_path_return(0)
+    assert type(a) is lmql.LMQLResult, f"Expected return value to be 'LMQLResult' but got '{type(a)}'"
+
+    a = two_path_return(-1, decoder="sample", n=2)
     assert a == "Something", f"Expected return value to be 'Something' but got '{a}'"
 
-    a = two_path_return(0, decoder="sample", n=2)
+@lmql.query
+def early_return_with_nothing():
+    '''lmql
+    return
+    return "Something"
+    '''
+
+def test_early_return_with_nothing():
+    a = early_return_with_nothing()
+    # should be LMQLResult not 'Something'
+    assert type(a) is lmql.LMQLResult, f"Expected return value to be 'LMQLResult' but got '{type(a)}'"
+
+@lmql.query
+def early_conditionally_return_with_nothing(a: int):
+    '''lmql
+    if a > 0:
+        return
+    return "Something"
+    '''
+
+def test_early_conditionally_return_with_nothing():
+    a = early_conditionally_return_with_nothing(1)
+    # should be LMQLResult not 'Something'
+    assert type(a) is lmql.LMQLResult, f"Expected return value to be 'LMQLResult' but got '{type(a)}'"
+
+    a = early_conditionally_return_with_nothing(-1)
     assert a == "Something", f"Expected return value to be 'Something' but got '{a}'"
 
 if __name__ == "__main__":
