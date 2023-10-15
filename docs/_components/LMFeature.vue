@@ -321,6 +321,7 @@ html.dark .cards>a:hover {
         font-size: 9pt;
         max-width: calc(100vw - 20pt);
         box-shadow: none;
+        overflow-x: scroll;
     }
 
     .feature.code pre .window-controls {
