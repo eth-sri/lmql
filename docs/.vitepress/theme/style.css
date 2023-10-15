@@ -629,3 +629,33 @@ nav a[href^="/docs/stable/"] {
 nav a[href^="/docs/stable/"] p {
   /* color: white !important; */
 }
+
+#version-switcher {
+  opacity: 0.9;
+  text-align: center;
+}
+
+#version-switcher .version {
+  display: inline-block;
+  border-radius: 4pt;
+  padding: 0pt 5pt;
+}
+
+#version-switcher .version:hover {
+  background-color: var(--vp-c-gray-soft);
+  color: var(--vp-c-text-1);
+}
+
+#version-switcher .version.active {
+  background-color: #007bff;
+  color: white;
+}
+
+#version-switcher label {
+  margin-right: 2pt;
+  color: var(--vp-c-text-2);
+}
+
+a:hover #version-switcher label {
+  color: var(--vp-c-text-2);
+}

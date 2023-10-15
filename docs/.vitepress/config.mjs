@@ -108,7 +108,7 @@ function createSidebars() {
       collapsed: false,
       items: [
         {
-          text: docs_dir.includes("latest") ? 'Switch to Stable' : 'Switch to Latest',
+          text: docs_dir.includes("latest") ? '<div id="version-switcher">Switch to Stable</div>' : '<div id="version-switcher">Switch to Latest</div>',
           link: docs_dir.includes("latest") ? '/docs/' : '/docs/latest/',
           path: docs_dir.includes("latest") ? '/docs/' : '/docs/latest/',
         }
