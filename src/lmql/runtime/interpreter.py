@@ -601,7 +601,7 @@ class PromptInterpreter:
             state.variable_arg("decorators").stream(text, program_state)
 
         # invoke output writers
-        await self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace, text, where)
+        asyncio.create_task(self.debugger_output(state, s, valid, is_final, mask, stopping_phrases, program_state, trace, text, where))
 
         state = state.updated(
                         variable=variable,

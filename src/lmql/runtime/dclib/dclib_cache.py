@@ -2,6 +2,7 @@ import asyncio
 from lmql.runtime.dclib.dclib_seq import DecoderSequence
 import numpy as np
 import pickle
+import time
 import os
 import sys
 from typing import List, Union, Any
@@ -81,6 +82,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         # keep track of last cache uses
         mc.last_cache_use = {}
+        mc.active_streams = set()
 
         mc.mask_cache = {}
         mc.show_speculative = show_speculative
@@ -223,11 +225,17 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             stream_id = user_data_dict.get("stream_id") if user_data_dict is not None else None
             if stream_id is not None:
                 self.last_cache_use[stream_id] = max(len(s.input_ids), self.last_cache_use.get(stream_id, 0))
+                self.active_streams.add(stream_id)
 
             # cache hit
             if user_data:
                 return keys, (token, score, user_data_dict)
             return keys, (token, score)
+
+        # keep track of all hit stream ids
+        if previous_stream_id := s.data("stream_id"):
+            self.active_streams.remove(previous_stream_id)
+        stream_id = -1 # will be fresh
 
         return keys, None
     
@@ -239,6 +247,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             # check if the existing entry is a future (i.e. another call is waiting for this token)
             existing = self.cache.get(k, (None, None))[0]
             fut = existing if type(existing) is asyncio.Future else None
+            
+            print("existing", existing, type(existing))
             
             if type(c) is Continuation:
                 self.cache[k] = (c.token, c.logprob)
@@ -543,6 +553,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 stream_id = None
                 cancelled = False
 
+                diff_over_time = []
+
                 async for (s, tokens, scores, edge_types, user_data) in itr():
                     async with self.cache_lock:
                         if type(tokens) is int or len(tokens) == 1:
@@ -584,8 +596,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             # cancel streams that are not used for a several tokens
                             if stream_id is not None:
                                 last_use_diff = len(ids) - self.last_cache_use.get(stream_id, len(sq.input_ids))
-                                # print("last_use_diff", last_use_diff, flush=True)
-                                if last_use_diff > 10 and not cancelled:
+                                if (last_use_diff > self.model_args.get("chunksize", 16) and not stream_id in self.active_streams) and not cancelled:
                                     cancelled = True
                                     await self.delegate.cancel_stream(stream_id)
                             

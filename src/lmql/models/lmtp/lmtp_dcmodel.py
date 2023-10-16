@@ -141,6 +141,8 @@ class LMTPDcModel(DcModel):
         return (s, tokens, scores, edge_type, {"stream_id": payload.get("stream_id", None)})
 
     async def cancel_stream(self, stream_id):
+        if self.verbose:
+            print("lmtp try cancel: stream {}".format(stream_id), flush=True)
         await self.client.request("CANCEL", {"stream_id": stream_id, "model": self.model_identifier})
 
     async def stream_and_return_first(self, s, iterator, sampling_mode):
@@ -150,6 +152,7 @@ class LMTPDcModel(DcModel):
                 buffer += [await anext(iterator)]
             except StopAsyncIteration:
                 break
+        print("add request", self.requests)
         self.requests += 1
 
         async def token_stream():
@@ -270,6 +273,8 @@ class LMTPDcModel(DcModel):
             max_tokens = min(hint, kwargs["chunksize"]) if hint > 0 else kwargs["chunksize"]
         else:
             max_tokens = hint or self.model.chunk_size if hint > 0 else self.model.chunk_size
+            if hint == -1 or hint == 0:
+                max_tokens = 50_000
 
         if self.verbose:
             text = await self.detokenize(ids)

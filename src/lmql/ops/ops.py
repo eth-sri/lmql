@@ -908,6 +908,11 @@ class StopAtOp(Node):
         
         return 0 # other constraints cannot be compared
 
+    def token_hint(self):
+        return {
+            self.predecessors[0].name: -1
+        }
+
 @LMQLOp(["STOPS_BEFORE", "stops_before"])
 class StopBeforeOp(StopAtOp):
     def postprocess(self, operands, value):

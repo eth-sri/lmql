@@ -38,6 +38,7 @@ def cmd_run():
     parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="don't print anything")
     parser.add_argument("--time", action="store_true", dest="time", help="Time the query.")
     parser.add_argument("--certificate", type=str, default="False", help="Create a inference certificate for the executed query (True to print, path to save on disk)")
+    parser.add_argument("--model", type=str, default=None, help="Set/override the model to use to run the query.")
 
     parser.add_argument("--no-clear", action="store_true", dest="no_clear", help="don't clear inbetween printing results (deprectated, use --quiet instead)")
     parser.add_argument("--no-realtime", action="store_true", dest="no_realtime", help="don't print text as it's being generated (deprectated, use --quiet instead)")
@@ -66,6 +67,9 @@ def cmd_run():
         "certificate": certificate,
         "__name__": "<lmql run '{}'>".format(args.lmql_file)
     }
+
+    if args.model is not None:
+        kwargs["model"] = args.model
 
     if os.path.exists(absolute_path):
         results = asyncio.run(lmql.run_file(absolute_path, **kwargs))

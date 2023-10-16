@@ -4,6 +4,9 @@ from lmql.models.lmtp.backends.lmtp_model import LMTPModel
 # uniform random model
 import lmql.models.lmtp.backends.random_model
 
+# 'text' model
+import lmql.models.lmtp.backends.text_model
+
 # only available with 'transformers' package
 try:
     import transformers

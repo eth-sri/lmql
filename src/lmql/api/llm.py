@@ -208,6 +208,12 @@ class LLM:
                 kwargs["inprocess"] = True
                 kwargs["async_transport"] = True
 
+            # special case for 'text' models
+            if model_identifier == "text":
+                kwargs["tokenizer"] = "tiktoken:gpt-3.5-turbo"
+                kwargs["inprocess"] = True
+                kwargs["async_transport"] = True
+
             # special case for 'llama.cpp'
             if model_identifier.startswith("llama.cpp:"):
                 if "tokenizer" in kwargs:

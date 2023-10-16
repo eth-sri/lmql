@@ -1,6 +1,7 @@
 from typing import Tuple
 from lmql.models.lmtp.backends.lmtp_model import LMTPModel, LMTPModelResult, TokenStreamer
 import random
+import asyncio
 
 import numpy as np
 import lmql.utils.nputil as nputil
@@ -25,7 +26,7 @@ class UniformRandomSamplingLLM(LMTPModel):
             self._vocab_size = 50257
             if kwargs.get("verbose", False):
                 print("['random' model using tokenizer gpt2]")
-
+        
     def model_info(self):
         return "UniformRandomSamplingLLM(seed={})".format(self.seed)
 
@@ -37,13 +38,14 @@ class UniformRandomSamplingLLM(LMTPModel):
     def vocab_size(self):
         return self._vocab_size
 
-    def generate(self, input_ids, attention_mask, 
+    async def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
         scores = []
         
         if bias_tensor is not None:
             bias_tensor = self.make_bias_tensor(bias_tensor, self.vocab_size)
+
 
         for i in range(max_new_tokens):
             seed = input_ids.sum() + self.seed
@@ -69,6 +71,8 @@ class UniformRandomSamplingLLM(LMTPModel):
                 break
 
             streamer(input_ids, scores)
+            
+            await asyncio.sleep(0.0)
 
         return LMTPModelResult(sequences=input_ids, scores=scores)
     

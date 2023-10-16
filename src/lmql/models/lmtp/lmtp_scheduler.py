@@ -269,7 +269,7 @@ class Scheduler:
                 await asyncio.sleep(0.01)
                 continue
 
-            self.process_batch(model)
+            await self.process_batch(model)
     
     def worker(self):
         """
@@ -288,9 +288,9 @@ class Scheduler:
         while True:
             if self.kill_event.is_set():
                 break
-            self.process_batch(model)
+            asyncio.run(self.process_batch(model))
 
-    def process_batch(self, model):
+    async def process_batch(self, model):
         for batch in self.batches(model.max_batch_size):
             try:
                 b = GenerateBatch.from_calls(batch)
@@ -309,12 +309,14 @@ class Scheduler:
                     kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)
                     kwargs["attention_mask"] = np.array(kwargs["attention_mask"], dtype=np.int32)
 
-                    result = model.generate(**kwargs, streamer=streamer)
+                    result = await model.generate(**kwargs, streamer=streamer)
                     streamer.log_token(result.sequences, result.scores, last=True)
             except InterruptedError:
                 for c in batch:
                     c.error("lmtp.cancelled")
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print("[Error during generate()]", e, flush=True)
                 for c in batch:
                     c.error("failed to generate tokens '" + str(e) + "'")
