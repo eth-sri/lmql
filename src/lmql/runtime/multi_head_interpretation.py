@@ -127,7 +127,7 @@ class InterpretationHead:
         elif type(self.current_args) is tuple and len(self.current_args) == 2 and self.current_args[0] == "result":
             # consider ("result", <expr>) yields as return statements
             # this avoids a dependency on this file from LMQL compiled modules
-            self.result = self.current_args[1] or NoneResult
+            self.result = NoneResult if self.current_args[1] is None else self.current_args[1]
             raise InterpretationHeadDone(self.result)
         else:
             assert False, f"unexpected yield self.current_args from compiled function: {self.current_args}"
