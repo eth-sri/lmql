@@ -50,13 +50,13 @@ class SentencePieceTokenizer:
         for dummy_token in prepend_dummy_tokens:
             text_to_tokenize = dummy_token + text
             
-            text_to_tokenize = text_to_tokenize
             result = {"input_ids": self.tokenizer.Encode(text_to_tokenize, add_bos=True)}
             if len(result["input_ids"]) <= 2 and dummy_token != "":
                 # "Tokenized text '{}' was merged with dummy token @ into '{}'".format(text_to_tokenize, [self.tokenizer.convert_ids_to_tokens(i) for i in result["input_ids"]])
                 continue
             offset = 2 if len(dummy_token) > 0 else 1
             result["input_ids"] = result["input_ids"][offset:]
+            
             return result
 
         assert False, "LLamaTransformersTokenizer.__call__ failed to workaround tokenization issue for '{}'".format(text)
@@ -76,7 +76,12 @@ class SentencePieceTokenizer:
         
         token_bytes = [str(self.tokenizer.bos_id()).encode("utf-8")] + token_bytes
         ids = self.convert_token_bytes_to_ids(token_bytes)
-        return self.tokenizer.decode(ids)
+        
+        # left-pad with dummy tokens, to avoid automatic removal of leading spaces
+        lpad_str = "<|lpad|>"
+        lpad = self.tokenizer.Encode(lpad_str, add_bos=False)
+
+        return self.tokenizer.Decode(lpad + ids)[len(lpad_str):]
     
     def decode(self, ids, clean_up_tokenization_spaces=True):
         """
