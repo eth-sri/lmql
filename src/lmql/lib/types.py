@@ -138,6 +138,7 @@ async def is_type(ty, description=False):
             
             if key_type is str:
                 if type(existing_value) is str:
+                    existing_value = existing_value.replace("\\n", "\\\n").replace("\"", "\\\"")
                     "\"{existing_value}\"{line_end}"
                 else:
                     '"[STRING_VALUE]"{line_end}' where STOPS_BEFORE(STRING_VALUE, '"') and \
@@ -190,6 +191,6 @@ async def is_type(ty, description=False):
     try:
         json_payload = json.loads(payload)
     except Exception as e:
-        print("Failed to parse JSON from", payload)
+        raise ValueError("Failed to parse JSON from" + str([payload]))
     return type_dict_to_type_instance(json_payload, ty)
     '''
