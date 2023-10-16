@@ -106,7 +106,7 @@ async def is_type(ty, description=False):
             already_parsed = {}
     else:
         already_parsed = {}
-    
+
     # then do scripted parsing as a fallback (does not query the model if already_parsed already contains all the keys we need)
     if description:
         "JSON Format:"

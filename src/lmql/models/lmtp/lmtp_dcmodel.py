@@ -138,7 +138,10 @@ class LMTPDcModel(DcModel):
             edge_type[0] = "top-1"
             tokens[0] = self.tokenizer.decode_bytes([payload["token"]])
 
-        return (s, tokens, scores, edge_type, {})
+        return (s, tokens, scores, edge_type, {"stream_id": payload.get("stream_id", None)})
+
+    async def cancel_stream(self, stream_id):
+        await self.client.request("CANCEL", {"stream_id": stream_id, "model": self.model_identifier})
 
     async def stream_and_return_first(self, s, iterator, sampling_mode):
         buffer = []
@@ -297,7 +300,10 @@ class LMTPDcModel(DcModel):
         first = True
         async for item in generate_iterator:
             if first:
-                event.update({"model": await self.model_info()})
+                event.update({
+                    "model": await self.model_info(),
+                    "stream_id": item["stream_id"]
+                })
                 first = False
             
             event.add("result", [item["token"]])

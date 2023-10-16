@@ -74,9 +74,13 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         mc.token_streams = []
         mc.token_stream_errors = []
         
+        # keep track of cache hits and calls
         mc.cache = {}
         mc.user_data_cache = {}
         mc.cache_lock = asyncio.Lock()
+
+        # keep track of last cache uses
+        mc.last_cache_use = {}
 
         mc.mask_cache = {}
         mc.show_speculative = show_speculative
@@ -212,8 +216,17 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 else:
                     assert type(awaited_result) is tuple and len(awaited_result) == 2
                     token, score = awaited_result
+            
+            user_data_dict = self.user_data_cache.get(k, None)
+
+            # mark cache hit
+            stream_id = user_data_dict.get("stream_id") if user_data_dict is not None else None
+            if stream_id is not None:
+                self.last_cache_use[stream_id] = max(len(s.input_ids), self.last_cache_use.get(stream_id, 0))
+
+            # cache hit
             if user_data:
-                return keys, (token, score, self.user_data_cache.get(k, None))
+                return keys, (token, score, user_data_dict)
             return keys, (token, score)
 
         return keys, None
@@ -223,7 +236,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             if verbose:
                 print("    cached", k)
             
-            # check if the existing entry is a future
+            # check if the existing entry is a future (i.e. another call is waiting for this token)
             existing = self.cache.get(k, (None, None))[0]
             fut = existing if type(existing) is asyncio.Future else None
             
@@ -527,6 +540,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 keys = None
                 sq = None
                 waiting_token_keys = []
+                stream_id = None
+                cancelled = False
 
                 async for (s, tokens, scores, edge_types, user_data) in itr():
                     async with self.cache_lock:
@@ -562,6 +577,17 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                                 # keep track of sample id based edge types as user data
                                 user_data = user_data.copy()
                                 user_data["dc-edge-type"] = edge_type
+
+                            if stream_id is None and "stream_id" in user_data:
+                                stream_id = user_data["stream_id"]
+
+                            # cancel streams that are not used for a several tokens
+                            if stream_id is not None:
+                                last_use_diff = len(ids) - self.last_cache_use.get(stream_id, len(sq.input_ids))
+                                # print("last_use_diff", last_use_diff, flush=True)
+                                if last_use_diff > 10 and not cancelled:
+                                    cancelled = True
+                                    await self.delegate.cancel_stream(stream_id)
                             
                             self.set_cache(token_keys, (np.array(token).reshape(1), np.array(score).reshape(1)), user_data=user_data, verbose=False)
 
@@ -588,7 +614,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                     for k in future_keys:
                         fut = self.cache.get(k, (None, None))[0]
                         if type(fut) is asyncio.Future:
-                            # resolve future as invalid (handled in get_cache)
+                            # resolve future as 'miss' (handled in get_cache)
                             fut.set_result(None)
                             del self.cache[k]
             except Exception as e:

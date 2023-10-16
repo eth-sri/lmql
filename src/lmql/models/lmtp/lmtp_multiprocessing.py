@@ -214,6 +214,8 @@ class LMTPMultiProcessingClient:
                 break
             
             if item.get("error") is not None:
+                if item["error"] == "lmtp.cancelled":
+                    return
                 raise LMTPStreamError(item["error"])
 
             if item.get("finish_reason") is not None:

@@ -16,7 +16,8 @@ class InferenceCertificate:
         self.event_processors = [
             flatten_streamed_chat_responses,
             flatten_streamed_openai_completion,
-            fold_logit_bias
+            fold_logit_bias,
+            flatten_input_id_lists
         ]
 
     def asdict(self, child=False):
@@ -109,9 +110,22 @@ def flatten_streamed_openai_completion(event):
 
 def fold_logit_bias(event):
     name = event.get("name")
-    if name in ["openai.Completion", "openai.ChatCompletion"]:
+    if name in ["openai.Completion", "openai.ChatCompletion", "lmtp.generate"]:
         # check for data.kwargs.logit_bias
         if "kwargs" in event.get("data").keys() and "logit_bias" in event.get("data").get("kwargs").keys():
             event["data"]["kwargs"]["logit_bias"] = "{" + ", ".join([f"{k}: {v}" for k, v in event["data"]["kwargs"]["logit_bias"].items()]) + "}"
     
+    return event
+
+def flatten_input_id_lists(event):
+    name = event.get("name")
+    if name in ["lmtp.generate"]:
+        # check for data.kwargs.logit_bias
+        if "kwargs" in event.get("data").keys():
+            if "ids" in event.get("data").get("kwargs").keys():
+                event["data"]["kwargs"]["ids"] = "[" + ", ".join([f"{v}" for v in event["data"]["kwargs"]["ids"]]) + "]"
+        # same for result
+        if "result" in event.get("data").keys():
+            event["data"]["result"] = "[" + ", ".join([f"{v}" for v in event["data"]["result"]]) + "]"
+        
     return event

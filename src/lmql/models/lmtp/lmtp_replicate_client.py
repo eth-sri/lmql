@@ -80,6 +80,7 @@ class LMTPReplicateClient:
     async def submit_batch(self, batch):
         if self.model_version is None or not self.model_validated:
             await self.check_model()
+        
         # FIXME: Maybe store id to use for later cancel calls?
         body = {"input": {"ops_batch_json": json.dumps(batch)}, "stream": True, "version": self.model_version}
         async with self.session.post('https://api.replicate.com/v1/predictions',
@@ -114,6 +115,9 @@ class LMTPReplicateClient:
                         continue
                     item = json.loads(item_json)
                     if item.get("error") is not None:
+                        # if the stream is cancelled server-side, we stop iterating
+                        if item["error"] == "lmtp.cancelled":
+                            return
                         # FIXME: Is it appropriate for this to kill the whole batch, not just the single stream?
                         raise LMTPStreamError(item["error"])
                     yield item

@@ -88,6 +88,8 @@ class LMTPWebSocketClient:
             item = await q.get()
 
             if item.get("error") is not None:
+                if item["error"] == "lmtp.cancelled":
+                    return
                 raise LMTPStreamError(item["error"])
 
             if item is None: 

@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from queue import Empty as QueueEmpty
 from queue import Queue
+from weakref import WeakValueDictionary
 
 import numpy as np
 
@@ -25,8 +26,13 @@ class GenerateCall:
     stream_id: int
     result_queue: Queue
 
+    cancelled: bool = False
+
     def put(self, token):
         self.result_queue.put(("TOKEN", token))
+
+    def cancel(self):
+        self.cancelled = True
 
     def error(self, msg):
         self.result_queue.put(("TOKEN", {
@@ -92,6 +98,9 @@ class GenerateBatch:
 
         return cls(input_ids, attention_mask, temperature, max_tokens, logit_biases, calls, is_score, scoring_offsets, kwargs)
 
+    def cancelled(self):
+        return not any(not c.cancelled for c in self.calls)
+
     def generate_args(self):
         return {
             "input_ids": self.input_ids,
@@ -142,6 +151,10 @@ class TokenStreamer:
             last_tokens = last_tokens.cpu().numpy()
         if not nputil.is_array(last_scores):
             last_scores = last_scores.cpu().numpy()
+
+        # check for cancelled calls
+        if self.batch.cancelled():
+            raise InterruptedError("inference calls cancelled")
 
         # for each sample get top logprobs
         all_logprobs, all_indices  = nputil.topk(last_scores, max_num_top_logprobs, sorted=True, axis=-1)
@@ -204,6 +217,9 @@ class Scheduler:
 
     def put(self, call: GenerateCall):
         self.queue.put(call)
+
+    def cancel_stream(self, stream_id):
+        pass
 
     def batches(self, max_batch_size=8):
         start = time.time()
@@ -295,6 +311,9 @@ class Scheduler:
 
                     result = model.generate(**kwargs, streamer=streamer)
                     streamer.log_token(result.sequences, result.scores, last=True)
+            except InterruptedError:
+                for c in batch:
+                    c.error("lmtp.cancelled")
             except Exception as e:
                 print("[Error during generate()]", e, flush=True)
                 for c in batch:
@@ -365,6 +384,8 @@ class TokenSession:
         self.static = static
 
         self.longrunning = longrunning
+        
+        self.active_stream = WeakValueDictionary()
 
     async def handle(self, cmd, kwargs):
         stream_id = kwargs.get("stream_id")
@@ -378,7 +399,9 @@ class TokenSession:
                 self.used_models.add(model)
 
                 scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
-                scheduler.put(GenerateCall(prompt, logit_bias, kwargs, stream_id, self.output_stream))
+                call = GenerateCall(prompt, logit_bias, kwargs, stream_id, self.output_stream)
+                self.active_stream[stream_id] = call
+                scheduler.put(call)
             elif cmd == "SCORE":
                 prompt = kwargs.pop("prompt")
                 scored = kwargs.pop("scored")
@@ -392,13 +415,34 @@ class TokenSession:
                 kwargs["scoring_offset"] = len(prompt)
 
                 scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
-                scheduler.put(GenerateCall(full_ids, {}, kwargs, stream_id, self.output_stream))
+                call = GenerateCall(full_ids, {}, kwargs, stream_id, self.output_stream)
+                self.active_stream[stream_id] = call
+                scheduler.put(call)
             elif cmd == "MODEL_INFO":
                 scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
                 self.output_stream.put(("MSG", {
                     "stream_id": stream_id,
                     "model_info": scheduler.model_info()
                 }))
+            elif cmd == "CANCEL":
+                msg_id = kwargs.pop("stream_id")
+                
+                stream_id = kwargs.get("data", {}).get("stream_id")
+                # print("cancel", stream_id, flush=True)
+                if stream_id in self.active_stream.keys():
+                    call = self.active_stream.pop(stream_id)
+                    if call is not None:
+                        call.cancel()
+                    
+                    self.output_stream.put(("MSG", {
+                        "stream_id": msg_id,
+                        "message": "cancel requested"
+                    }))
+                else:
+                        self.output_stream.put(("MSG", {
+                        "stream_id": msg_id,
+                        "message": "no active stream with id " + str(stream_id)
+                    }))
             else:
                 raise Exception("Unknown command: {}".format(cmd))
         except LMTPCannotLoadModelByPolicy as e:
@@ -430,6 +474,10 @@ class TokenSession:
 
     def close(self):
         self.queue_processor.cancel()
+        
+        # cancel all active streams
+        for call in self.active_stream.values():
+            call.cancel()
         
         for m in self.used_models:
             try:

@@ -67,6 +67,14 @@ class DcModel(DcModelRewriteMixin):
         if self.cache_delegate is not None:
             self.cache_delegate.register_token_stream(task)
 
+    def cancel_stream(self, stream_id):
+        """
+        Cancels a token stream with the given id.
+
+        Implementation of this method is optional.
+        """
+        pass
+
     def log_billable_tokens(self, n: int):
         if hasattr(self.model, "billable_tokens"):
             self.model.billable_tokens += n
