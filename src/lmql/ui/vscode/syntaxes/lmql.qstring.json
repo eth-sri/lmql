@@ -9,18 +9,31 @@
             "patterns": [
                 {
                     "include": "source.python#expression"
+                },
+                {
+                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b(?=\\])",
+                    "name": "entity.name.function.lmql"
                 }
             ]
         },
         {
             "begin": "\\{",
             "end": "\\}",
-            "contentName": "keyword.control.lmql",
+            "name": "keyword.control.lmql",
             "patterns": [
                 {
                     "include": "source.python#f-expression"
+                },
+                {
+                    "match": "\\{",
+                    "name": "punctuation.section.block.begin.lmql"
+                },
+                {
+                    "match": "\\}",
+                    "name": "punctuation.section.block.end.lmql"
                 }
             ]
         }
     ]
 }
+

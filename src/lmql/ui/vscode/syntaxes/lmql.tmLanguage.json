@@ -9,6 +9,9 @@
 			"include": "#keywords"
 		},
 		{
+			"include": "#template_variables"
+		},
+		{
 			"include": "source.python#statement"
 		},
 		{
@@ -17,12 +20,10 @@
 	],
 	"repository": {
 		"keywords": {
-			"patterns": [
-				{
-					"name": "keyword.control.lmql",
-					"match": "\\b(BEAM|beam|ARGMAX|argmax|SAMPLE|incontext|BEST_K|best_k|BEAM_VAR|beam_var|VAR|var|sample|FROM|from|WHERE|where|DISTRIBUTION|distribution)\\b"
-				}
-			]
+			"patterns": [{
+				"name": "keyword.control.lmql",
+				"match": "\\b(BEAM|beam|ARGMAX|argmax|SAMPLE|BEST_K|best_k|BEAM_VAR|beam_var|VAR|var|sample|FROM|from|WHERE|where|DISTRIBUTION|distribution)\\b"
+			}]
 		}
 	},
 	"scopeName": "source.lmql"

@@ -3,7 +3,7 @@
   "displayName": "Language Model Query Language (LMQL) Syntax Highlighting",
   "description": "Syntax highlighting for .lmql and Python files with embedded LMQL.",
   "publisher": "lmql-team",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.76.0"
   },
