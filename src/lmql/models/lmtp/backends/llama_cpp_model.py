@@ -45,7 +45,7 @@ class LlamaCppModel(LMTPModel):
 
         return scores.reshape(1, -1)
     
-    def generate(self, input_ids, attention_mask, 
+    async def generate(self, input_ids, attention_mask, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
         token_scores = []

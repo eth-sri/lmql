@@ -141,6 +141,7 @@ class LMTPDcModel(DcModel):
         return (s, tokens, scores, edge_type, {"stream_id": payload.get("stream_id", None)})
 
     async def cancel_stream(self, stream_id):
+        return
         if self.verbose:
             print("lmtp try cancel: stream {}".format(stream_id), flush=True)
         await self.client.request("CANCEL", {"stream_id": stream_id, "model": self.model_identifier})
@@ -272,16 +273,16 @@ class LMTPDcModel(DcModel):
         else:
             max_tokens = hint or self.model.chunk_size if hint > 0 else self.model.chunk_size
             if hint == -1 or hint == 0:
-                max_tokens = 50_000
-
-        if self.verbose:
-            text = await self.detokenize(ids)
-            print("lmtp generate: {} / {} ({} tokens, temperature={}, max_tokens={})".format(ids, str([text])[1:-1], len(ids), temperature, max_tokens))
+                max_tokens = 128
 
         # get token stream
         self.requests += 1
-        token_stream = self.client.generate(ids, max_tokens=max_tokens, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
+        token_stream = await self.client.generate(ids, max_tokens=max_tokens, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
         
+        if self.verbose:
+            text = await self.detokenize(ids)
+            print("lmtp generate: (stream {}) {} / {} ({} tokens, temperature={}, max_tokens={})".format(token_stream.stream_id, ids, str([text])[1:-1], len(ids), temperature, max_tokens))
+
         if active_tracer().active:
             stream_event = active_tracer().event("lmtp.generate", {
                 "model": await self.model_info(),
@@ -298,15 +299,18 @@ class LMTPDcModel(DcModel):
 
             return self.traced_generate(token_stream, event=stream_event)
 
-        return token_stream
+        return token_stream.stream()
 
     async def traced_generate(self, generate_iterator, event: Event):
         first = True
-        async for item in generate_iterator:
+        event.update({
+            "stream_id": generate_iterator.stream_id
+        })
+
+        async for item in generate_iterator.stream():
             if first:
                 event.update({
-                    "model": await self.model_info(),
-                    "stream_id": item["stream_id"]
+                    "model": await self.model_info()
                 })
                 first = False
             

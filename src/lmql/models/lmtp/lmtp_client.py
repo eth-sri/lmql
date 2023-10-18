@@ -10,6 +10,7 @@ import json
 import sys
 import warnings
 from .errors import LMTPStreamError
+from .streams import LMTPStreamHandle
 
 class LMTPWebSocketClient:
     """
@@ -62,8 +63,7 @@ class LMTPWebSocketClient:
             payload.pop("logit_bias", None)
         await self.ws.send_str("GENERATE {}".format(json.dumps(payload)))
 
-        async for token in self.stream_iterator(self.stream_id):
-            yield token
+        return LMTPStreamHandle(self.stream_id, self.stream_iterator(self.stream_id), self)
 
     async def score(self, prompt, scored_prompt, **kwargs):
         self.stream_id += 1
