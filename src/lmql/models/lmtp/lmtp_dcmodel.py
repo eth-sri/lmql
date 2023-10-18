@@ -152,8 +152,6 @@ class LMTPDcModel(DcModel):
                 buffer += [await anext(iterator)]
             except StopAsyncIteration:
                 break
-        print("add request", self.requests)
-        self.requests += 1
 
         async def token_stream():
             nonlocal buffer
@@ -266,7 +264,7 @@ class LMTPDcModel(DcModel):
         
         if len(ids) == 0 or (len(ids) > 0 and self.tokenizer.bos_token_id is not None and ids[0] != self.tokenizer.bos_token_id):
             ids = [self.tokenizer.bos_token_id] + ids
-        
+
         # derive max_tokens
         hint = logits_mask_result.max_tokens_hints[0]
         if "chunksize" in kwargs.keys():
@@ -281,6 +279,7 @@ class LMTPDcModel(DcModel):
             print("lmtp generate: {} / {} ({} tokens, temperature={}, max_tokens={})".format(ids, str([text])[1:-1], len(ids), temperature, max_tokens))
 
         # get token stream
+        self.requests += 1
         token_stream = self.client.generate(ids, max_tokens=max_tokens, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
         
         if active_tracer().active:

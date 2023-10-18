@@ -10,6 +10,9 @@ import numpy as np
 import lmql.utils.nputil as nputil
 
 class TextModel(LMTPModel):
+    # cannot be cancelled
+    cancellable = False
+
     def __init__(self, seed=None, output=None, **kwargs):
         self.seed = seed or 0
         self.kwargs = kwargs

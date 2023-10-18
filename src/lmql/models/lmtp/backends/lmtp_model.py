@@ -28,6 +28,9 @@ class LMTPModel:
 
     """
     max_batch_size: int = 1
+    # indicates whether inference can be cancelled by raising an InterruptedError 
+    # in the provided streamer() during generate()
+    cancellable: bool = True
 
     @property
     def eos_token_id(self):

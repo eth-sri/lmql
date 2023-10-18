@@ -131,8 +131,9 @@ class ScoreStreamer:
                 call.put(token_payload)
 
 class TokenStreamer:
-    def __init__(self, batch: GenerateBatch, eos_token_id):
+    def __init__(self, batch: GenerateBatch, eos_token_id, cancels=True):
         self.batch = batch
+        self.cancels = cancels
         self.eos_token_id = eos_token_id
 
     def __call__(self, input_ids, scores, **kwargs) -> bool:
@@ -153,7 +154,7 @@ class TokenStreamer:
             last_scores = last_scores.cpu().numpy()
 
         # check for cancelled calls
-        if self.batch.cancelled():
+        if self.batch.cancelled() and self.cancels:
             raise InterruptedError("inference calls cancelled")
 
         # for each sample get top logprobs
@@ -303,7 +304,7 @@ class Scheduler:
                     scores = model.score(input_ids, attention_mask)
                     ScoreStreamer().log_token(b, scores)
                 else:
-                    streamer = TokenStreamer(b, model.eos_token_id)
+                    streamer = TokenStreamer(b, model.eos_token_id, cancels=model.cancellable)
                     kwargs = b.generate_args()
                     
                     kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)

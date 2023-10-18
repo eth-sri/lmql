@@ -248,7 +248,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             existing = self.cache.get(k, (None, None))[0]
             fut = existing if type(existing) is asyncio.Future else None
             
-            print("existing", existing, type(existing))
+            # print("existing", existing, type(existing))
             
             if type(c) is Continuation:
                 self.cache[k] = (c.token, c.logprob)
