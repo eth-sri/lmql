@@ -971,9 +971,10 @@ class PromptInterpreter:
 
         # handle queries w/o any TemplateVariables
         if self.root_state.query_head.result is not None:
-            # one last call to debug_out to get the final state
-            await debug_out(self.decoder_step)
-            return (await self.postprocess([self.root_state.query_head.result]))[0]
+            with Context(self.model.get_tokenizer(), self.dcmodel.truncation_threshold):
+                # one last call to debug_out to get the final state
+                await debug_out(self.decoder_step)
+                return (await self.postprocess([self.root_state.query_head.result]))[0]
 
         # prepare tokenizer
         self.tokenizer = self.model.get_tokenizer()
@@ -1160,6 +1161,9 @@ class PromptInterpreter:
                     return results[0]
 
                 return results
+            finally:
+                self.dcmodel.close()
+    
         
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
