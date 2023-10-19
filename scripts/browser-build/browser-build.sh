@@ -7,5 +7,5 @@ pushd wheels
 bash get-wheels.sh
 popd
 
-yarn
-yarn run build
+npm
+npm run build
