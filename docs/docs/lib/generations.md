@@ -12,13 +12,13 @@ The *Generations API* is a lightweight library with the goal of providing high-l
 
 ## Overview
 
-To illustrate the Generations API, let's look at a simple example of generating and scoring text using the `openai/gpt-3.5-turbo-instruct` model:
+To illustrate the Generations API, let's look at a simple example of generating and scoring text using the `openai/text-davinci-003` model:
 
 ```
 import lmql
 
 # obtain a model instance
-m: lmql.LLM = lmql.model("openai/gpt-3.5-turbo-instruct")
+m: lmql.LLM = lmql.model("openai/text-davinci-003")
 
 # simple generation
 m.generate_sync("Hello", max_tokens=10)
@@ -26,7 +26,7 @@ m.generate_sync("Hello", max_tokens=10)
 
 # sequence scoring
 m.score_sync("Hello", ["World", "Apples", "Oranges"])
-# lmql.ScoringResult(model='openai/gpt-3.5-turbo-instruct')
+# lmql.ScoringResult(model='openai/text-davinci-003')
 # -World: -3.9417848587036133
 # -Apples: -15.26676321029663
 # -Oranges: -16.22640037536621
