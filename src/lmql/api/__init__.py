@@ -44,6 +44,8 @@ async def score(prompt, values, model: Optional[Union[str, LLM]] = None, **kwarg
     """
     if model is None:
         model = get_default_scoring_model()
+        if type(model) is str:
+            model = LLM.from_descriptor(model)
     else:
         model = LLM.from_descriptor(model)
     return await model.score(prompt, values, **kwargs)

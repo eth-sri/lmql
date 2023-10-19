@@ -9,7 +9,7 @@ from lmql.models.aliases import model_name_aliases
 from lmql.runtime.loop import run_in_loop
 
 from .queries import query
-from .scoring import dc_score
+from .scoring import dc_score, ScoringResult
 
 import warnings
 
@@ -124,7 +124,7 @@ class LLM:
         """
         return run_in_loop(self.generate(*args, **kwargs))
 
-    async def score(self, prompt: str, values: Union[str, List[str]], **kwargs):
+    async def score(self, prompt: str, values: Union[str, List[str]], **kwargs) -> ScoringResult:
         """
         Returns a ScoringResult object that contains the model scores for each 
         continuation in the given list of values, as an extension of the provided prompt.
@@ -140,7 +140,7 @@ class LLM:
         finally:
             dcmodel.close()
 
-    def score_sync(self, *args, **kwargs):
+    def score_sync(self, *args, **kwargs) -> ScoringResult:
         """
         Syncronous version of `score(...)`.
         """
