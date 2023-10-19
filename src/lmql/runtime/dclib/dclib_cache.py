@@ -596,7 +596,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             # cancel streams that are not used for a several tokens
                             if stream_id is not None:
                                 last_use_diff = len(ids) - self.last_cache_use.get(stream_id, len(sq.input_ids))
-                                if (last_use_diff > self.model_args.get("chunksize", 16) and not stream_id in self.active_streams) and not cancelled:
+                                # TODO: make speculative factor configurable
+                                if (last_use_diff > 32) and not cancelled:
                                     cancelled = True
                                     await self.delegate.cancel_stream(stream_id)
                             
@@ -630,6 +631,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                             del self.cache[k]
             except Exception as e:
                 error = e
+                self.delegate.cancel_stream(stream_id)
             
             if error is not None:
                 try:
