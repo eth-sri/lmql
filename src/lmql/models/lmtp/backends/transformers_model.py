@@ -25,9 +25,9 @@ version_info = {}
 class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
-        self.model_args = kwargs
+        
         self.loader = kwargs.pop("loader", "transformers")
-
+        self.model_args = kwargs
         self.max_batch_size = kwargs.pop("batch_size", 32)
 
         self.silent = kwargs.pop("silent", False)
@@ -38,24 +38,38 @@ class TransformersLLM(LMTPModel):
         if self.loader == "auto-gptq":
             from auto_gptq import AutoGPTQForCausalLM
             self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
+        elif self.loader == 'awq':
+            from awq import AutoAWQForCausalLM
+            self.model = AutoAWQForCausalLM.from_quantized(self.model_identifier, fuse_layers=False, safetensors=True, batch_size=self.max_batch_size,  **self.model_args)
         else:
             from transformers import AutoModelForCausalLM            
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
         
+        if self.loader == 'awq':
+            self.device = self.model.model.device
+        else:
+            self.device = self.model.device
+        
         if not self.silent:
-            print("[", self.model_identifier, " ready on device ", self.model.device, 
+            print("[", self.model_identifier, " ready on device ", self.device, 
         flush=True, sep="", end="]\n")
 
     @property
     def eos_token_id(self):
-        return self.model.config.eos_token_id
+        if self.loader == 'awq':
+            return self.model.model.config.eos_token_id
+        else:
+            return self.model.config.eos_token_id
 
     def score(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, **model_kwargs) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-        input_ids = torch.tensor(input_ids).to(self.model.device)
-        attention_mask = torch.tensor(attention_mask).to(self.model.device)
+        input_ids = torch.tensor(input_ids).to(self.device)
+        attention_mask = torch.tensor(attention_mask).to(self.device)
         
         # prepare model inputs
-        model_inputs = self.model.prepare_inputs_for_generation(input_ids, **model_kwargs, attention_mask=attention_mask, eos_token_id=self.eos_token_id)
+        if self.loader == 'awq':
+            model_inputs = self.model.model.prepare_inputs_for_generation(input_ids, **model_kwargs, attention_mask=attention_mask, eos_token_id=self.eos_token_id)
+        else:
+            model_inputs = self.model.prepare_inputs_for_generation(input_ids, **model_kwargs, attention_mask=attention_mask, eos_token_id=self.eos_token_id)
         model_inputs["attention_mask"] = attention_mask
 
         token_scores = []
@@ -76,8 +90,8 @@ class TransformersLLM(LMTPModel):
     def generate(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor: torch.FloatTensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
-        input_ids = torch.tensor(input_ids).to(self.model.device)
-        attention_mask = torch.tensor(attention_mask).to(self.model.device)
+        input_ids = torch.tensor(input_ids).to(self.device)
+        attention_mask = torch.tensor(attention_mask).to(self.device)
         
         generate_args = {
             "input_ids": input_ids,
@@ -119,6 +133,8 @@ class TransformersLLM(LMTPModel):
     def model_constructor(self):
         if self.loader == "auto-gptq":
             return "AutoGPTQForCausalLM.from_quantized({})".format(format_call(self.model_identifier, **self.model_args))
+        elif self.loader == 'awq':
+            return "AutoAWQForCausalLM.from_quantized({})".format(format_call(self.model_identifier, **self.model_args))
         else:
             return "AutoModelForCausalLM.from_pretrained({})]".format(format_call(self.model_identifier, **self.model_args))
 
@@ -130,6 +146,11 @@ class TransformersLLM(LMTPModel):
                 import auto_gptq
                 version_info = {
                     "auto_gptq": auto_gptq.__version__
+                }
+            elif self.loader == "awq":
+                import awq
+                version_info = {
+                    "awq": awq.__version__
                 }
             else:
                 import transformers

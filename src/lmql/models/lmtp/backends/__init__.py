@@ -11,14 +11,6 @@ try:
 except:
     pass
 
-# only available with 'awq' package
-try:
-    import awq
-    import lmql.models.lmtp.backends.awq_model
-except:
-    pass
-
-
 # only available with llama.cpp python bindings
 @LMTPModel.register("llama.cpp", module_dependencies=["llama_cpp"])
 def _llama_cpp_importer():
