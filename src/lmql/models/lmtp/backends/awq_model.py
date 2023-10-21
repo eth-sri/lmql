@@ -19,7 +19,7 @@ class AwqModel(LMTPModel):
 
         print("[Loading awq model from", self.model_identifier, " with ", kwargs, "]", flush=True)
         
-        self.model = AutoAWQForCausalLM.from_quantized(self.model_identifier[len("awq:"):], fuse_layers=False, safetensors=True, batch_size=self.max_batch_size, )
+        self.model = AutoAWQForCausalLM.from_quantized(self.model_identifier[len("awq:"):], fuse_layers=False, safetensors=True, batch_size=self.max_batch_size,  **self.model_args)
 
 
     def model_info(self):
