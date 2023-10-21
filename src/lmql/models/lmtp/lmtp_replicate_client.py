@@ -22,6 +22,7 @@ class LMTPReplicateClient:
             raise Exception('Please define REPLICATE_API_TOKEN as an environment variable to use Replicate models')
 
         self.model_validated = False
+        self.use_deployment_endpoint = False
 
         endpoint = endpoint.removeprefix('replicate:')
         if len(endpoint) == 0:
@@ -37,14 +38,14 @@ class LMTPReplicateClient:
             if endpoint_pieces[0] == 'deployment':
                 self.model_identifier = '/'.join(endpoint_pieces[1:3])
                 self.model_version = None
-                self.own_deployment = True
+                self.use_deployment_endpoint = True
                 self.model_validated = True
             else:
                 # passed a name/version pair
                 self.model_identifier = '/'.join(endpoint_pieces[:2])
                 self.model_version = endpoint_pieces[-1]
         else:
-            raise Exception('Unknown endpoint descriptor for replicate; should be owner/model or owner/model/version')
+            raise Exception('Unknown endpoint descriptor for replicate; should be owner/model, owner/model/version' or 'deployment/owner/model')
 
         self.session = session
         self.stream_id = 0
@@ -89,7 +90,7 @@ class LMTPReplicateClient:
         if self.model_version is None or not self.model_validated:
             await self.check_model()
         # FIXME: Maybe store id to use for later cancel calls?
-        if self.own_deployment:
+        if self.use_deployment_endpoint:
             body = {"input": {"ops_batch_json": json.dumps(batch)}, "stream": True}
             endpoint = f'https://api.replicate.com/v1/deployments/{self.model_identifier}/predictions'
         else:
