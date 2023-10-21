@@ -26,7 +26,15 @@ class TransformersLLM(LMTPModel):
     def __init__(self, model_identifier, **kwargs):
         self.model_identifier = model_identifier
         
-        self.loader = kwargs.pop("loader", "transformers")
+        self.loader = kwargs.pop("loader", None)
+        if self.loader is None:
+            if '-gptq' in self.model_identifier.lower():
+                self.loader = "gptq"
+            elif '-awq' in self.model_identifier.lower():
+                self.loader = "awq"
+            else:
+                self.loader = "transformers"
+                
         self.model_args = kwargs
         self.max_batch_size = kwargs.get("batch_size", 32)
 
