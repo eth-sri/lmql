@@ -28,7 +28,7 @@ class TransformersLLM(LMTPModel):
         
         self.loader = kwargs.pop("loader", "transformers")
         self.model_args = kwargs
-        self.max_batch_size = kwargs.pop("batch_size", 32)
+        self.max_batch_size = kwargs.get("batch_size", 32)
 
         self.silent = kwargs.pop("silent", False)
 
@@ -40,7 +40,17 @@ class TransformersLLM(LMTPModel):
             self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
         elif self.loader == 'awq':
             from awq import AutoAWQForCausalLM
-            self.model = AutoAWQForCausalLM.from_quantized(self.model_identifier, fuse_layers=False, safetensors=True, batch_size=self.max_batch_size,  **self.model_args)
+            awq_args = {
+                'quant_filename': kwargs.pop("quant_filename", ''),
+                "max_new_tokens": kwargs.pop("max_new_tokens", None),
+                "trust_remote_code": kwargs.pop("trust_remote_code", True),
+                "safetensors": kwargs.pop("safetensors", True),
+                "fuse_layers": False,  # TODO: Figure out why this is broken
+                "max_memory": kwargs.pop("max_memory", None),
+                "offload_folder": kwargs.pop("offload_folder", None),
+                "batch_size": kwargs.get("batch_size", 16)
+            }
+            self.model = AutoAWQForCausalLM.from_quantized(self.model_identifier, **awq_args)
         else:
             from transformers import AutoModelForCausalLM            
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)

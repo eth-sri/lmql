@@ -26,7 +26,6 @@ LMQL supports multiple inference backends, each of which has its own set of para
 * [OpenAI](./openai.html)
 * [Azure OpenAI](./azure.html)
 * [Replicate](./replicate.html)
-* [AWQ](./awq.md)
 
 ## Specifying The Model
 
