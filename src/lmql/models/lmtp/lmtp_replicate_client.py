@@ -15,7 +15,7 @@ class LMTPReplicateClient:
     """
     Simple client for tunneling LMTP into Replicate (https://replicate.com/)
     """
-    def __init__(self, model_identifier, session, endpoint, own_deployment=False, **kwargs):
+    def __init__(self, model_identifier, session, endpoint, **kwargs):
         if 'REPLICATE_API_TOKEN' in os.environ:
             self.api_key = os.environ['REPLICATE_API_TOKEN']
         else: # FIXME: Allow API key to be passed in kwargs?
@@ -38,7 +38,7 @@ class LMTPReplicateClient:
             raise Exception('Unknown endpoint descriptor for replicate; should be owner/model or owner/model/version')
 
         self.model_validated = False
-        self.own_deployment = own_deployment
+        self.own_deployment = kwargs.get('own_deployment', False)
         self.session = session
         self.stream_id = 0
         self.handler = None
