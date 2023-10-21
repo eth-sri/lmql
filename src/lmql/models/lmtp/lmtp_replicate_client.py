@@ -15,7 +15,7 @@ class LMTPReplicateClient:
     """
     Simple client for tunneling LMTP into Replicate (https://replicate.com/)
     """
-    def __init__(self, model_identifier, session, endpoint, **kwargs):
+    def __init__(self, model_identifier, session, endpoint, own_deployment=False, **kwargs):
         if 'REPLICATE_API_TOKEN' in os.environ:
             self.api_key = os.environ['REPLICATE_API_TOKEN']
         else: # FIXME: Allow API key to be passed in kwargs?
@@ -38,6 +38,7 @@ class LMTPReplicateClient:
             raise Exception('Unknown endpoint descriptor for replicate; should be owner/model or owner/model/version')
 
         self.model_validated = False
+        self.own_deployment = own_deployment
         self.session = session
         self.stream_id = 0
         self.handler = None
@@ -78,10 +79,13 @@ class LMTPReplicateClient:
 
 
     async def submit_batch(self, batch):
-        if self.model_version is None or not self.model_validated:
+        if not self.own_deployment and (self.model_version is None or not self.model_validated):
             await self.check_model()
         # FIXME: Maybe store id to use for later cancel calls?
-        body = {"input": {"ops_batch_json": json.dumps(batch)}, "stream": True, "version": self.model_version}
+        if self.own_deployment:
+            body = {"input": {"ops_batch_json": json.dumps(batch)}, "stream": True}
+        else:
+            body = {"input": {"ops_batch_json": json.dumps(batch)}, "stream": True, "version": self.model_version}
         async with self.session.post('https://api.replicate.com/v1/predictions',
                 headers={
                     'Authorization': f'Token {self.api_key}',
