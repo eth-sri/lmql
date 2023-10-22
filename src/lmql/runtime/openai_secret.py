@@ -18,7 +18,7 @@ contents:
         openai-org: <your openai org>
         
 For more info, check the related project docs:
-https://docs.lmql.ai/en/stable/language/openai.html#configuring-openai-api-credentials
+https://lmql.ai/docs/en/stable/language/openai.html#configuring-openai-api-credentials
 """
 
 

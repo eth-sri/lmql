@@ -8,7 +8,7 @@
   <p align="center">
     A programming language for large language models.
     <br />
-    <a href="https://docs.lmql.ai"><strong>Documentation »</strong></a>
+    <a href="https://lmql.ai/docs"><strong>Documentation »</strong></a>
     <br />
     <br />
     <a href="https://lmql.ai">Explore Examples</a>
@@ -52,25 +52,25 @@ Program Output:
 LMQL allows you to express programs that contain both, traditional algorithmic logic, and LLM calls. 
 At any point during execution, you can prompt an LLM on program variables in combination with standard natural language prompting, to leverage model reasoning capabilities in the context of your program.
 
-To better control LLM behavior, you can use the `where` keyword to specify constraints and data types of the generated text. This enables guidance of the model's reasoning process, and constraining of intermediate outputs using an [expressive constraint language](https://docs.lmql.ai/en/stable/language/constraints.html).
+To better control LLM behavior, you can use the `where` keyword to specify constraints and data types of the generated text. This enables guidance of the model's reasoning process, and constraining of intermediate outputs using an [expressive constraint language](https://lmql.ai/docs/en/stable/language/constraints.html).
 
-Beyond this linear form of scripting, LMQL also supports a number of decoding algorithms to execute your program, such as `argmax`, `sample` or even advanced branching decoders like [beam search and `best_k`](https://docs.lmql.ai/en/stable/language/decoders.html). 
+Beyond this linear form of scripting, LMQL also supports a number of decoding algorithms to execute your program, such as `argmax`, `sample` or even advanced branching decoders like [beam search and `best_k`](https://lmql.ai/docs/en/stable/language/decoders.html). 
 
-Learn more about LMQL by exploring thne **[Example Showcase](https://lmql.ai)**, by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)** or by reading the **[documentation](https://docs.lmql.ai)**.
+Learn more about LMQL by exploring thne **[Example Showcase](https://lmql.ai)**, by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)** or by reading the **[documentation](https://lmql.ai/docs)**.
 
 ## Feature Overview
 
 LMQL is designed to make working with language models like OpenAI and 🤗 Transformers more efficient and powerful through its advanced functionality, including multi-variable templates, conditional distributions, constraints, datatypes and control flow.
 
-- [X] **Python Syntax**: Write your queries using [familiar Python syntax](https://docs.lmql.ai/en/stable/language/overview.html), fully integrated with your Python environment (classes, variable captures, etc.)
-- [X] **Rich Control-Flow**: LMQL offers full Python support, enabling powerful [control flow and logic](https://docs.lmql.ai/en/stable/language/scripted_prompts.html) in your prompting logic.
-- [X] **Advanced Decoding**: Take advantage of advanced decoding techniques like [beam search, best_k, and more](https://docs.lmql.ai/en/stable/language/decoders.html).
-- [X] **Powerful Constraints Via Logit Masking**: Apply [constraints to model output](https://docs.lmql.ai/en/stable/language/constraints.html), e.g. to specify token length, character-level constraints, datatype and stopping phrases to get more control of model behavior.
+- [X] **Python Syntax**: Write your queries using [familiar Python syntax](https://lmql.ai/docs/en/stable/language/overview.html), fully integrated with your Python environment (classes, variable captures, etc.)
+- [X] **Rich Control-Flow**: LMQL offers full Python support, enabling powerful [control flow and logic](https://lmql.ai/docs/en/stable/language/scripted_prompts.html) in your prompting logic.
+- [X] **Advanced Decoding**: Take advantage of advanced decoding techniques like [beam search, best_k, and more](https://lmql.ai/docs/en/stable/language/decoders.html).
+- [X] **Powerful Constraints Via Logit Masking**: Apply [constraints to model output](https://lmql.ai/docs/en/stable/language/constraints.html), e.g. to specify token length, character-level constraints, datatype and stopping phrases to get more control of model behavior.
 - [X] **Optimizing Runtime:** LMQL leverages speculative execution to enable faster inference, constraint short-circuiting, more efficient token use and [tree-based caching](https://lmql.ai/blog/release-0.0.6.html).
-- [X] **Sync and Async API**: Execute hundreds of queries in parallel with LMQL's [asynchronous API](https://docs.lmql.ai/en/stable/python/python.html), which enables cross-query batching.
-- [X] **Multi-Model Support**: Seamlessly use LMQL with [OpenAI API, Azure OpenAI, and 🤗 Transformers models](https://docs.lmql.ai/en/stable/language/models.html).
+- [X] **Sync and Async API**: Execute hundreds of queries in parallel with LMQL's [asynchronous API](https://lmql.ai/docs/en/stable/python/python.html), which enables cross-query batching.
+- [X] **Multi-Model Support**: Seamlessly use LMQL with [OpenAI API, Azure OpenAI, and 🤗 Transformers models](https://lmql.ai/docs/en/stable/language/models.html).
 - [X] **Extensive Applications**: Use LMQL to implement advanced applications like [schema-safe JSON decoding](https://github.com/microsoft/guidance#guaranteeing-valid-syntax-json-example-notebook), [algorithmic prompting](https://twitter.com/lbeurerkellner/status/1648076868807950337), [interactive chat interfaces](https://twitter.com/lmqllang/status/1645776209702182917), and [inline tool use](https://lmql.ai/#kv).
-- [X] **Library Integration**: Easily employ LMQL in your existing stack leveraging [LangChain](https://docs.lmql.ai/en/stable/python/langchain.html) or [LlamaIndex](https://docs.lmql.ai/en/stable/python/llama_index.html).
+- [X] **Library Integration**: Easily employ LMQL in your existing stack leveraging [LangChain](https://lmql.ai/docs/en/stable/python/langchain.html) or [LlamaIndex](https://lmql.ai/docs/en/stable/python/llama_index.html).
 - [X] **Flexible Tooling**: Enjoy an interactive development experience with [LMQL's Interactive Playground IDE](https://lmql.ai/playground), and [Visual Studio Code Extension](https://marketplace.visualstudio.com/items?itemName=lmql-team.lmql).
 - [X] **Output Streaming**: Stream model output easily via [WebSocket, REST endpoint, or Server-Sent Event streaming](https://github.com/eth-sri/lmql/blob/main/src/lmql/output/).
 

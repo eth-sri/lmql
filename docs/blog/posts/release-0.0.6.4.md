@@ -16,7 +16,7 @@ Among many things, this update contains several bug fixes and improvements. The 
    To learn more about the internals of the new streaming protocol, i.e. the language model transport protocol (LMTP), you can find more details in [this README file](https://github.com/eth-sri/lmql/blob/main/src/lmql/models/lmtp/README.md). In the future, we intend to implement more model backends using LMTP, streamlining communication between LMQL and models.
 
    <div style="text-align:center">
-    <img src="https://docs.lmql.ai/en/stable/_images/inference.svg" width="80%" />
+    <img src="https://lmql.ai/docs/en/stable/_images/inference.svg" width="80%" />
     <br>
     <i>LMQL's new streaming protocol (LMTP) allows for faster local model inference.</i>
    </div>
