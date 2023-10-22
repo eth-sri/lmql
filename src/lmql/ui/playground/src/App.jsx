@@ -616,7 +616,7 @@ function ModelSelection(props) {
       <span className="instructions">
         <b>Custom Model</b><br/>
         Specify the model to execute your query with. You can also type in the text field above. <i>This setting will override any model specified by the query.</i>
-        {configuration.BROWSER_MODE ? <><br/><a href={"https://lmql.ai/docs/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
+        {configuration.BROWSER_MODE ? <><br/><a href={"https://lmql.ai/docs/"} target="_blank" rel="noreferrer" className="hidden-on-small">
           Install LMQL locally </a> to use other models, e.g. from 🤗 Tranformers</>
         : null}
       </span>
@@ -2864,7 +2864,7 @@ class App extends React.Component {
             {!configuration.NEXT_MODE && <>Explore LMQL</>}
             {configuration.NEXT_MODE && <>Explore New Features</>}
           </FancyButton>}
-          {window.location.hostname.includes("lmql.ai") && <a href={"https://lmql.ai/docs/en/latest/quickstart.html"} target="_blank" rel="noreferrer" className="hidden-on-small">
+          {window.location.hostname.includes("lmql.ai") && <a href={"https://lmql.ai/docs/"} target="_blank" rel="noreferrer" className="hidden-on-small">
           Install LMQL Locally </a>}
           <Spacer />
           {/* show tooltip with build time */}
