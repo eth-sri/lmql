@@ -141,9 +141,11 @@ class LMTPDcModel(DcModel):
         return (s, tokens, scores, edge_type, {"stream_id": payload.get("stream_id", None)})
 
     async def cancel_stream(self, stream_id):
-        return
+        if not self.model_args.get("active_cancelling", False):
+            return
+
         if self.verbose:
-            print("lmtp try cancel: stream {}".format(stream_id), flush=True)
+            print("\nlmtp try cancel: stream {}".format(stream_id), flush=True)
         await self.client.request("CANCEL", {"stream_id": stream_id, "model": self.model_identifier})
 
     async def stream_and_return_first(self, s, iterator, sampling_mode):
@@ -268,12 +270,14 @@ class LMTPDcModel(DcModel):
 
         # derive max_tokens
         hint = logits_mask_result.max_tokens_hints[0]
-        if "chunksize" in kwargs.keys():
+        if not self.model_args.get("token_hinting", True):
+            max_tokens = kwargs.get("chunksize", self.model.chunk_size)
+        elif "chunksize" in kwargs.keys():
             max_tokens = min(hint, kwargs["chunksize"]) if hint > 0 else kwargs["chunksize"]
         else:
             max_tokens = hint or self.model.chunk_size if hint > 0 else self.model.chunk_size
             if hint == -1 or hint == 0:
-                max_tokens = 128
+                max_tokens = 50_000 if self.model_args.get("active_cancelling", False) else self.model.chunk_size
 
         # get token stream
         self.requests += 1
@@ -281,7 +285,7 @@ class LMTPDcModel(DcModel):
         
         if self.verbose:
             text = await self.detokenize(ids)
-            print("lmtp generate: (stream {}) {} / {} ({} tokens, temperature={}, max_tokens={})".format(token_stream.stream_id, ids, str([text])[1:-1], len(ids), temperature, max_tokens))
+            print("\nlmtp generate: (stream {}) {} / {} ({} tokens, temperature={}, max_tokens={})".format(token_stream.stream_id, ids, str([text])[1:-1], len(ids), temperature, max_tokens))
 
         if active_tracer().active:
             stream_event = active_tracer().event("lmtp.generate", {
