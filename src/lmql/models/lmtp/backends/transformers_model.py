@@ -73,7 +73,7 @@ class TransformersLLM(LMTPModel):
 
         return np.array([[0.0] + scores.flatten().tolist() for scores in token_scores])
     
-    def generate(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, 
+    async def generate(self, input_ids: torch.LongTensor, attention_mask: torch.LongTensor, 
                  temperature: float, max_new_tokens: int, 
                  bias_tensor: torch.FloatTensor, streamer: TokenStreamer, **kwargs) -> LMTPModelResult:
         input_ids = torch.tensor(input_ids).to(self.model.device)

@@ -234,7 +234,8 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
         # keep track of all hit stream ids
         if previous_stream_id := s.data("stream_id"):
-            self.active_streams.remove(previous_stream_id)
+            if previous_stream_id in self.active_streams:
+                self.active_streams.remove(previous_stream_id)
         stream_id = -1 # will be fresh
 
         return keys, None

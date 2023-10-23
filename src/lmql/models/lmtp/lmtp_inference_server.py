@@ -24,18 +24,27 @@ class LMTPWebSocketTransport:
         self.ws = ws
         self.queue = asyncio.Queue()
         self._dumper = asyncio.create_task(self.dumper())
+        self.dumper_active = True
 
     async def dumper(self):
-        while True:
-            try:
-                type, payload = await self.queue.get()
-                await self.ws.send_str(type + " " + json.dumps([payload]))
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                warnings.warn("LMTPWebSocketTransport.dumper error".format(e))
+        try:
+            while True:
+                try:
+                    type, payload = await self.queue.get()
+                    await self.ws.send_str(type + " " + json.dumps([payload]))
+                except asyncio.CancelledError:
+                    await self.ws.close()
+                    break
+                except Exception as e:
+                    print("error writing", e, flush=True)
+                    await self.ws.close()
+                    warnings.warn("LMTPWebSocketTransport.dumper error".format(e))
+        finally:
+            self.dumper_active = False
 
     async def send(self, type, payload):
+        if not self.dumper_active:
+            raise IOError("LMTPWebSocketTransport closed")
         await self.queue.put((type, payload))
 
     @staticmethod
@@ -57,8 +66,8 @@ class LMTPWebSocketTransport:
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
         finally:
-            transport._dumper.cancel()
             session.close()
+            transport._dumper.cancel()
             await ws.close()
 
     async def close(self):

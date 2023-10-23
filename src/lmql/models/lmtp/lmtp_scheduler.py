@@ -131,10 +131,11 @@ class ScoreStreamer:
                 call.put(token_payload)
 
 class TokenStreamer:
-    def __init__(self, batch: GenerateBatch, eos_token_id, cancels=True):
+    def __init__(self, batch: GenerateBatch, eos_token_id, scheduler, cancels=True):
         self.batch = batch
         self.cancels = cancels
         self.eos_token_id = eos_token_id
+        self.scheduler = scheduler
 
     def __call__(self, input_ids, scores, **kwargs) -> bool:
         self.log_token(input_ids, scores, **kwargs)
@@ -156,6 +157,8 @@ class TokenStreamer:
         # check for cancelled calls
         if self.batch.cancelled() and self.cancels:
             raise InterruptedError("inference calls cancelled")
+
+        self.scheduler.measure_token(batch_size)
 
         # for each sample get top logprobs
         all_logprobs, all_indices  = nputil.topk(last_scores, max_num_top_logprobs, sorted=True, axis=-1)
@@ -213,6 +216,32 @@ class Scheduler:
         # set once initialized
         self._model_info = "<unavailable>"
 
+        # size of active batch
+        self.active_batch_size = 0
+
+        self.last_token_times = []
+        self.last_batch_sizes = []
+        
+        self.last_tok_s = 0.0
+        self.last_batch_size = 0.0
+
+    def measure_token(self, batch_size):
+        self.last_token_times.append(time.time())
+        self.last_batch_sizes.append(batch_size)
+
+        if len(self.last_token_times) > 100:
+            self.last_token_times.pop(0)
+            self.last_batch_sizes.pop(0)
+
+        samples_to_consider = [v for i,v in enumerate(self.last_batch_sizes) if self.last_token_times[i] > time.time() - 1.0]
+        token_in_last_second = sum(samples_to_consider)
+        self.last_tok_s = self.last_tok_s * 0.9 + token_in_last_second * 0.1
+        
+        avg_batch_size = np.mean(self.last_batch_sizes[-len(samples_to_consider):])
+        self.last_batch_size = self.last_batch_size * 0.9 + avg_batch_size * 0.1
+
+        print("[streaming at {:.2f} tok/s, average batch size {:.2f}]".format(self.last_tok_s, self.last_batch_size), flush=True, end="\r")
+
     def model_info(self):
         return self._model_info
 
@@ -261,6 +290,9 @@ class Scheduler:
 
         model = LMTPModel.load(self.model_identifier, **self.model_args)
         self._model_info = model.model_info()
+        
+        idle_shown = False
+        idle_start = time.time()
 
         while True:
             if self.kill_event.is_set():
@@ -268,8 +300,14 @@ class Scheduler:
 
             if self.queue.empty():
                 await asyncio.sleep(0.01)
+                if not idle_shown:
+                    idle_shown = True
+                    idle_start = time.time()
+                    print("\n[Idle]                                                               ", flush=True, end="\r")
                 continue
-
+            
+            print("[Idle for {:.2f}s]                          ".format(time.time() - idle_start), flush=True, end="\n")
+            idle_shown = False
             await self.process_batch(model)
     
     def worker(self):
@@ -282,14 +320,7 @@ class Scheduler:
         This is the default mode and the thread is started automatically when instantiating
         the scheduler with sync=False.
         """
-
-        model = LMTPModel.load(self.model_identifier, **self.model_args)
-        self._model_info = model.model_info()
-
-        while True:
-            if self.kill_event.is_set():
-                break
-            asyncio.run(self.process_batch(model))
+        asyncio.run(self.async_worker())
 
     async def process_batch(self, model):
         for batch in self.batches(model.max_batch_size):
@@ -304,7 +335,7 @@ class Scheduler:
                     scores = model.score(input_ids, attention_mask)
                     ScoreStreamer().log_token(b, scores)
                 else:
-                    streamer = TokenStreamer(b, model.eos_token_id, cancels=model.cancellable)
+                    streamer = TokenStreamer(b, model.eos_token_id, scheduler=self, cancels=model.cancellable)
                     kwargs = b.generate_args()
                     
                     kwargs["input_ids"] = np.array(kwargs["input_ids"], dtype=np.int64)

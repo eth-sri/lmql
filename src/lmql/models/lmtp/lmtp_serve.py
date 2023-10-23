@@ -53,7 +53,7 @@ def lmtp_serve_main(model_args):
     assert not static or model != "auto", "Cannot use --static mode with model 'auto'. Please specify a specific model."
 
     # all other arguments are model arguments
-    model_args = rename_model_args(model_args)    
+    model_args = rename_model_args(model_args)
 
     # stream endpoint
     async def stream(request):

@@ -101,14 +101,21 @@ class LMTPWebSocketClient:
 
     def connect(self):
         async def msg_handler():
-            async for msg in self.ws:
-                if msg.type == aiohttp.WSMsgType.TEXT:
-                    try:
-                        self.handle(msg)
-                    except Exception as e:
-                        warnings.warn("failed to handle msg {}: {}".format(msg, e))
-                elif msg.type == aiohttp.WSMsgType.ERROR:
-                    break
+            try:
+                async for msg in self.ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        try:
+                            self.handle(msg)
+                        except Exception as e:
+                            warnings.warn("failed to handle msg {}: {}".format(msg, e))
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                        break
+            finally:
+                await self.ws.close()
+                for q in self.iterators.values():
+                    for q in q: q.put_nowait(None)
+                for fut in self.request_futures.values():
+                    fut.set_exception(Exception("LMTP connection closed"))
         self.handler = asyncio.create_task(msg_handler())
 
     def handle(self, msg):
