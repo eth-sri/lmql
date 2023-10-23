@@ -43,7 +43,7 @@ class TransformersLLM(LMTPModel):
         if not self.silent:
             print("[Loading", self.model_identifier, "with", self.model_constructor() + "]", flush=True)
 
-        if self.loader == "gptq":
+        if self.loader == "gptq" or self.loader == "auto-gptq":
             from auto_gptq import AutoGPTQForCausalLM
             self.model = AutoGPTQForCausalLM.from_quantized(self.model_identifier, **self.model_args)
         elif self.loader == 'awq':
@@ -149,7 +149,7 @@ class TransformersLLM(LMTPModel):
         return [BatchLogitsProcessor()]
 
     def model_constructor(self):
-        if self.loader == "gptq":
+        if self.loader == "gptq" or self.loader == "auto-gptq":
             return "AutoGPTQForCausalLM.from_quantized({})".format(format_call(self.model_identifier, **self.model_args))
         elif self.loader == 'awq':
             return "AutoAWQForCausalLM.from_quantized({})".format(format_call(self.model_identifier, **self.model_args))
@@ -160,7 +160,7 @@ class TransformersLLM(LMTPModel):
         global version_info
         
         if len(version_info) == 0:
-            if self.loader == "gptq":
+            if self.loader == "gptq" or self.loader == "auto-gptq":
                 import auto_gptq
                 version_info = {
                     "auto_gptq": auto_gptq.__version__
