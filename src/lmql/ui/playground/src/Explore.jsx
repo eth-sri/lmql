@@ -489,7 +489,7 @@ export function Explore() {
     let description = <>
     LMQL is a query language for large language models. Explore the examples below to get started.
     <LinkBox>
-      <a className="button" target="_blank" rel="noreferrer" href="https://docs.lmql.ai">Documentation</a>
+      <a className="button" target="_blank" rel="noreferrer" href="https://lmql.ai/docs">Documentation</a>
       <a className="button" target="_blank" rel="noreferrer" href="https://lmql.ai">Overview</a>
     </LinkBox>
     </>

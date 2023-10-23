@@ -77,8 +77,8 @@ markdownFiles.forEach(file => {
                     // ignore internal links
                     return
                 }
-                if (url.startsWith("https://docs.lmql.ai")) {
-                    console.log(`File ${file}:${lineno} contains direct link to docs.lmql.ai: ${url}`)
+                if (url.startsWith("https://lmql.ai/docs")) {
+                    console.log(`File ${file}:${lineno} contains direct link to lmql.ai/docs: ${url}`)
                     return
                 }
 

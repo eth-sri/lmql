@@ -2,4 +2,4 @@
 
 This extension provides syntax highlighting for the [Language Model Query Language (LMQL)](https://lmql.ai) in Visual Studio Code.
 
-To learn more about LMQL, visit the [LMQL documentation](https://docs.lmql.ai) or the [LMQL GitHub repository](https://github.com/eth-sri/lmql).
+To learn more about LMQL, visit the [LMQL documentation](https://lmql.ai/docs) or the [LMQL GitHub repository](https://github.com/eth-sri/lmql).
