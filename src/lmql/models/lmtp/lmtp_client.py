@@ -80,24 +80,27 @@ class LMTPWebSocketClient:
         async for token in self.stream_iterator(self.stream_id):
             yield token
 
-    async def stream_iterator(self, stream_id):
+    def stream_iterator(self, stream_id):
         q = asyncio.Queue()
         self.iterators.setdefault(stream_id, []).append(q)
         
-        while True:
-            item = await q.get()
+        async def queue_iterator():
+            while True:
+                item = await q.get()
 
-            if item.get("error") is not None:
-                if item["error"] == "lmtp.cancelled":
-                    return
-                raise LMTPStreamError(item["error"])
+                if item.get("error") is not None:
+                    if item["error"] == "lmtp.cancelled":
+                        return
+                    raise LMTPStreamError(item["error"])
 
-            if item is None: 
-                break
-            if item.get("finish_reason") is not None:
+                if item is None: 
+                    break
+                if item.get("finish_reason") is not None:
+                    yield item
+                    break
                 yield item
-                break
-            yield item
+        
+        return queue_iterator()
 
     def connect(self):
         async def msg_handler():
@@ -126,6 +129,7 @@ class LMTPWebSocketClient:
             for d in data:
                 stream_id = d["stream_id"]
                 consumers = self.iterators.get(stream_id, [])
+                assert len(consumers) > 0, "No consumers for incoming stream {}".format(stream_id)
                 for q in consumers: q.put_nowait(d)
         elif cmd == "MSG":
             data = json.loads(args)

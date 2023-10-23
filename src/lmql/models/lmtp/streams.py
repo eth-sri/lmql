@@ -1,3 +1,5 @@
+import asyncio
+
 class LMTPStreamHandle:
     """
     Stream of future LMTP messages from the server,
@@ -9,5 +11,16 @@ class LMTPStreamHandle:
         self.client = client
     
     async def stream(self):
-        async for item in self.aiterator:
-            yield item
+        error = None
+        
+        while True:
+            try:
+                item = await asyncio.wait_for(self.aiterator.__anext__(), timeout=60)
+                yield item
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
+                error = TimeoutError("Timeout while waiting for stream {}".format(self.stream_id))
+        
+        if error is not None:
+            raise error

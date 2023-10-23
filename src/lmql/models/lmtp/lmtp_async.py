@@ -9,6 +9,7 @@ import warnings
 
 from .lmtp_scheduler import TokenSession, Scheduler
 from .errors import LMTPStreamError
+from .streams import LMTPStreamHandle
 
 class LMTPAsyncTransport:
     def __init__(self, queue):
@@ -143,8 +144,7 @@ class LMTPAsyncClient:
 
         self.cmd_queue.put_nowait(("GENERATE", payload))
 
-        async for token in self.stream_iterator(self.stream_id):
-            yield token
+        return LMTPStreamHandle(self.stream_id, self.stream_iterator(self.stream_id), self)
 
     async def score(self, prompt, scored_prompt, **kwargs):
         self.stream_id += 1
@@ -161,22 +161,25 @@ class LMTPAsyncClient:
         async for token in self.stream_iterator(self.stream_id):
             yield token
 
-    async def stream_iterator(self, stream_id):
+    def stream_iterator(self, stream_id):
         q = asyncio.Queue()
         self.iterators.setdefault(stream_id, []).append(q)
         
-        while True:
-            item = await q.get()
+        async def queue_iterator():
+            while True:
+                item = await q.get()
 
-            if item is None: 
-                break
-            
-            if item.get("error") is not None:
-                if item["error"] == "lmtp.cancelled":
+                if item is None: 
                     break
-                raise LMTPStreamError(item["error"])
+                
+                if item.get("error") is not None:
+                    if item["error"] == "lmtp.cancelled":
+                        break
+                    raise LMTPStreamError(item["error"])
 
-            if item.get("finish_reason") is not None:
+                if item.get("finish_reason") is not None:
+                    yield item
+                    break
                 yield item
-                break
-            yield item
+        
+        return queue_iterator()

@@ -1064,6 +1064,7 @@ const ModelResultText = styled.div`
     opacity: 1.0;
     border-radius: 2pt;
     margin-left: 2pt;
+    line-break: anywhere;
   }
 
   div .badge {
