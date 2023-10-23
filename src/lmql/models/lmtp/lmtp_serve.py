@@ -87,7 +87,7 @@ def argparser(args):
     next_argument_name = None
     
     kwargs = {}
-    flag_args = ["cuda", "static", "single_thread", "docker_hide_port"]
+    flag_args = ["cuda", "static", "single_thread", "docker_hide_port", "busy_logging"]
 
     help_text = """
 usage: serve-model [-h] [--port PORT] [--host HOST] [--cuda] [--dtype DTYPE] [--[*] VALUE] model
@@ -106,9 +106,11 @@ options:
   --host HOST
   --cuda
   --static         If set, the model cannot be switched on client request but remains fixed to the model specified in the model argument.
-  
+
+  --busy_logging   If set, logs idle and busy periods including tok/s to the console. Useful for utilization monitoring.
+
   --single_thread  Run the model on the main thread. This can lead to increased latency when processing multiple requests, but is necessary 
-                   for some models that cannot be run in the background (e.g. falcon).
+                   for some models that cannot be run in the background (e.g. old implementations of falcon).
   
   --dtype DTYPE    What format to load the model weights in. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes), 
                    '4bit' (requires bitsandbytes).
@@ -119,7 +121,7 @@ options:
                    * auto-gptq (loads GPTQ based quantized models with auto-gptq. Consider adding `--use_safetensors true` if the model is
                      distributed in the safetensor format)
   
-  --layout [GROUPS]x[DEVICES]   If set, a fleet of worker processes will be started to run multiple models in parallel. The layout specifies
+  --layout [GROUPS]x[DEVICES]   If set, a fleet of worker processes will be started to run multiple inference processes in parallel. The layout specifies
                                 how many instances are served, and how many GPUs to use per instance. For example, `--layout 2x2` will start 2
                                 instances, each using 2 GPUs (devices 0,1 and 2,3). The provided --port argument will be used as the base port
                                 that load balances between the instances. For more information and more advanced setups see lmtp_layout.py.

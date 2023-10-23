@@ -216,7 +216,8 @@ class Scheduler:
         # set once initialized
         self._model_info = "<unavailable>"
 
-        # size of active batch
+        # logging and utilization monitoring
+        self.busy_logging = self.model_args.get("busy_logging", False)
         self.active_batch_size = 0
 
         self.last_token_times = []
@@ -224,6 +225,7 @@ class Scheduler:
         
         self.last_tok_s = 0.0
         self.last_batch_size = 0.0
+
 
     def measure_token(self, batch_size):
         self.last_token_times.append(time.time())
@@ -240,7 +242,8 @@ class Scheduler:
         avg_batch_size = np.mean(self.last_batch_sizes[-len(samples_to_consider):])
         self.last_batch_size = self.last_batch_size * 0.9 + avg_batch_size * 0.1
 
-        print("[streaming at {:.2f} tok/s, average batch size {:.2f}]".format(self.last_tok_s, self.last_batch_size), flush=True, end="\r")
+        if self.busy_logging:
+            print("[streaming at {:.2f} tok/s, average batch size {:.2f}]".format(self.last_tok_s, self.last_batch_size), flush=True, end="\r")
 
     def model_info(self):
         return self._model_info
@@ -300,14 +303,17 @@ class Scheduler:
 
             if self.queue.empty():
                 await asyncio.sleep(0.01)
-                if not idle_shown:
+                
+                if not idle_shown and self.busy_logging:
                     idle_shown = True
                     idle_start = time.time()
                     print("\n[Idle]                                                               ", flush=True, end="\r")
                 continue
             
-            print("[Idle for {:.2f}s]                          ".format(time.time() - idle_start), flush=True, end="\n")
-            idle_shown = False
+            if self.busy_logging:
+                print("[Idle for {:.2f}s]                          ".format(time.time() - idle_start), flush=True, end="\n")
+                idle_shown = False
+            
             await self.process_batch(model)
     
     def worker(self):
