@@ -48,9 +48,9 @@ class LMTPWebSocketTransport:
         await self.queue.put((type, payload))
 
     @staticmethod
-    async def listen(ws, model_args, static):
+    async def listen(ws, model_args, **kwargs):
         transport = LMTPWebSocketTransport(ws)
-        session = TokenSession(transport, model_args, static=static, longrunning=True)
+        session = TokenSession(transport, model_args, longrunning=True, **kwargs)
 
         try:
             async for msg in ws:

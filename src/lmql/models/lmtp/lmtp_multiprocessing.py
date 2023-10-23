@@ -15,7 +15,8 @@ from .lmtp_inference_server import TokenSession
 
 async def multiprocessing_main_async(pipe: Connection, kwargs):
     transport = LMTPMultiprocessingTransport(pipe)
-    session = TokenSession(transport, kwargs)
+    busy_logging = kwargs.pop("busy_logging", False)
+    session = TokenSession(transport, kwargs, busy_logging=busy_logging)
 
     try:
         while True:

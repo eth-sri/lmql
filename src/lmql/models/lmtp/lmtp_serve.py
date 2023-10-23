@@ -43,6 +43,7 @@ def lmtp_serve_main(model_args):
     port = int(model_args.pop("port", 8080))
     model = model_args.pop("model", "auto")
     single_thread = model_args.pop("single_thread", False)
+    busy_logging = model_args.pop("busy_logging", False)
     static = model_args.pop("static", False) or single_thread
     # in Docker, don't show the port (it's not accessible from outside the container anyway)
     docker_hide_port = model_args.pop("docker_hide_port", False)
@@ -60,10 +61,10 @@ def lmtp_serve_main(model_args):
         # bidirectional websocket 
         ws = web.WebSocketResponse()
         await ws.prepare(request)
-        await LMTPWebSocketTransport.listen(ws, model_args, static=static)
+        await LMTPWebSocketTransport.listen(ws, model_args, static=static, busy_logging=busy_logging)
 
     if model != "auto" and not single_thread:
-        Scheduler.instance(model, model_args, user=None)
+        Scheduler.instance(model, model_args, busy_logging=busy_logging, user=None)
 
     app = web.Application()
     app.add_routes([web.get('/', stream)])
@@ -80,7 +81,7 @@ def lmtp_serve_main(model_args):
     # r executor
     tasks = [web._run_app(app, host=host, port=port, print=web_print)]
     if static and single_thread:
-        tasks += [Scheduler.instance(model, model_args, user=None, sync=True).async_worker()]
+        tasks += [Scheduler.instance(model, model_args, user=None, sync=True, busy_logging=busy_logging).async_worker()]
     asyncio.get_event_loop().run_until_complete(asyncio.gather(*tasks))
 
 def argparser(args):

@@ -29,9 +29,10 @@ def ensure_picklable(kwargs, msg=""):
 async def lmtp_inference_task(model_identifier, token_queue: asyncio.Queue, cmd_queue: asyncio.Queue, kwargs):
     transport = LMTPAsyncTransport(token_queue)
     
-    scheduler = Scheduler.instance(model_identifier, kwargs, user=transport, only_existing=False, sync=True)
+    busy_logging = kwargs.pop("busy_logging", False)
+    scheduler = Scheduler.instance(model_identifier, kwargs, user=transport, only_existing=False, sync=True, busy_logging=busy_logging)
     scheduler_task = scheduler.async_worker()
-    session = TokenSession(transport, kwargs, static=True)
+    session = TokenSession(transport, kwargs, static=True, busy_logging=busy_logging)
 
     async def session_task():
         while True:

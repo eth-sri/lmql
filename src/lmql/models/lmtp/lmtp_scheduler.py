@@ -194,7 +194,7 @@ class Scheduler:
     Can be shared among multiple clients, make sure to call unregister(<user>) when done,
     to allow the scheduler to shut down when no longer needed.
     """
-    def __init__(self, model_identifier, model_args = None, sync=False):
+    def __init__(self, model_identifier, model_args = None, sync=False, busy_logging=False):
         self.model_identifier = model_identifier
         if model_args is None: self.model_args = {}
         else: self.model_args = model_args
@@ -217,7 +217,7 @@ class Scheduler:
         self._model_info = "<unavailable>"
 
         # logging and utilization monitoring
-        self.busy_logging = self.model_args.get("busy_logging", False)
+        self.busy_logging = busy_logging
         self.active_batch_size = 0
 
         self.last_token_times = []
@@ -310,7 +310,7 @@ class Scheduler:
                     print("\n[Idle]                                                               ", flush=True, end="\r")
                 continue
             
-            if self.busy_logging:
+            if self.busy_logging and (time.time() - idle_start) > 0.2 and idle_shown:
                 print("[Idle for {:.2f}s]                          ".format(time.time() - idle_start), flush=True, end="\n")
                 idle_shown = False
             
@@ -360,13 +360,13 @@ class Scheduler:
                     c.error("failed to generate tokens '" + str(e) + "'")
 
     @staticmethod
-    def instance(model_identifier, model_args, user, only_existing=False, sync=False):
+    def instance(model_identifier, model_args, user, only_existing=False, sync=False, busy_logging=False):
         identifier = (model_identifier, pickle.dumps(model_args).hex())
 
         if identifier not in Scheduler._instances:
             if only_existing:
                 raise LMTPCannotLoadModelByPolicy("Model '" + model_identifier + "' is not loaded and server is not configured to load it on demand.")
-            Scheduler._instances[identifier] = Scheduler(model_identifier, model_args, sync=sync)
+            Scheduler._instances[identifier] = Scheduler(model_identifier, model_args, sync=sync, busy_logging=busy_logging)
 
         s = Scheduler._instances[identifier]
         s.last_use = time.time()
@@ -415,13 +415,14 @@ class TokenSession:
     A LMTP token session, which is a single user generating tokens with a fixed model, 
     using several token streams in parallel and varying sampling configurations.
     """
-    def __init__(self, transport, model_args, static=False, longrunning=False):
+    def __init__(self, transport, model_args, longrunning=False, static=False, busy_logging=False):
         self.transport = transport
         self.output_stream = Queue()
         self.queue_processor = asyncio.create_task(self.queue_loop())
         self.used_models = set()
         self.model_args = model_args
         self.static = static
+        self.busy_logging = busy_logging
 
         self.longrunning = longrunning
         
@@ -438,7 +439,7 @@ class TokenSession:
                 logit_bias = kwargs.pop("logit_bias", {})
                 self.used_models.add(model)
 
-                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
+                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static, busy_logging=self.busy_logging)
                 call = GenerateCall(prompt, logit_bias, kwargs, stream_id, self.output_stream)
                 self.active_stream[stream_id] = call
                 scheduler.put(call)
@@ -454,12 +455,12 @@ class TokenSession:
                 # determines the offset from which on the scoring starts in full_ids
                 kwargs["scoring_offset"] = len(prompt)
 
-                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
+                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static, busy_logging=self.busy_logging)
                 call = GenerateCall(full_ids, {}, kwargs, stream_id, self.output_stream)
                 self.active_stream[stream_id] = call
                 scheduler.put(call)
             elif cmd == "MODEL_INFO":
-                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static)
+                scheduler = Scheduler.instance(model, self.model_args, user=self, only_existing=self.static, busy_logging=self.busy_logging)
                 self.output_stream.put(("MSG", {
                     "stream_id": stream_id,
                     "model_info": scheduler.model_info()
@@ -521,7 +522,7 @@ class TokenSession:
         
         for m in self.used_models:
             try:
-                scheduler = Scheduler.instance(m, model_args=self.model_args, user=None, only_existing=self.static)
+                scheduler = Scheduler.instance(m, model_args=self.model_args, user=None, only_existing=self.static, busy_logging=self.busy_logging)
                 scheduler.unregister(self)
                 
                 if self.longrunning:
