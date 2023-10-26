@@ -1,3 +1,11 @@
+def parse_num(prediction):
+    import re
+    
+    # remove all non [0-9] and non [.,] characters
+    prediction = re.sub(r"[^0-9.,]", "", prediction)
+    # remove anything beyond second .
+    prediction = ".".join(prediction.split(".")[:2])
+    return float(prediction.replace(",", ""))
 
 try:
     from datasets import load_dataset
@@ -37,7 +45,7 @@ def gsm8k(n: int, split="test"):
 
     question = s["question"]
     answer = s["answer"]
-    result = int(answer.split("####", 1)[1].strip())
+    result = int(answer.split("####", 1)[1].strip().replace(",", ""))
 
     return GMS8KSample(question, answer, result)
 

@@ -208,6 +208,9 @@ class LMQLResult:
     distribution_variable: Optional[str] = None
     distribution_values: Optional[str] = None
 
+    # decoder sequence (if available)
+    sequence: dc.DecoderSequence = None
+
     @property
     def requires_distribution_postprocessing(self):
         return self.distribution_variable is not None
@@ -1130,6 +1133,9 @@ class PromptInterpreter:
 
                         assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), decoder_args["decoder"])
                         results.append(state.query_head.result)
+
+                    if type(results[-1]) is LMQLResult:
+                        results[-1].sequence = s
                 
                 # set decoder step +1, for all stats logging that happens in postprocessing
                 self.decoder_step += 1
