@@ -20,7 +20,7 @@ project.
 
 **Running Test Suites** The repository contains a number of test suites in the `src/lmql/tests/` directory. To run all 
 tests simply run `python src/lmql/tests/all.py`. Note that for some tests you need to configure an
-OpenAI API key according to the instructions in [documentation](https://docs.lmql.ai/en/stable/language/openai.html).
+OpenAI API key according to the instructions in [documentation](https://lmql.ai/docs/models/openai.html).
 We are working to remove the external dependency on the OpenAI API, but for now it is still required
 for some tests. If you cannot get an API key, you can ask one of the core maintainers to run the
 tests for your, once your pull request is ready.

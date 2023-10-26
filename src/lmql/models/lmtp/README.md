@@ -6,7 +6,7 @@ It relies on the idea of separating model loading and inference into a separate 
 
 ![Architecture](../../../../docs/source/images/inference.svg)
 
-Read more about using LMTP in LMQL, in the [LMQL documentation](https://docs.lmql.ai/en/latest/language/hf.html).
+Read more about using LMTP in LMQL, in the [LMQL documentation](https://lmql.ai/docs/models/hf.html).
 
 ## Communication Channels
 

@@ -8,7 +8,7 @@ authors = [
   "Martin Vechev",
 ]
 homepage = "https://lmql.ai"
-documentation = "https://docs.lmql.ai"
+documentation = "https://lmql.ai/docs"
 maintainers = ["The LMQL Team <hello@lmql.ai>"]
 license = "Apache-2.0"
 readme = "README.md"
