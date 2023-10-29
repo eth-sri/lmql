@@ -21,6 +21,7 @@ from lmql.language.validator import LMQLValidationError, LMQLValidator
 from lmql.ops.ops import lmql_operation_registry
 from lmql.runtime.dclib import get_all_decoders
 from lmql.models.aliases import model_name_aliases
+from lmql.language.dependencies import QueryDependencyScope
 
 OPS_NAMESPACE = "lmql.ops"
 LIB_NAMESPACE = "lmql.lib"
@@ -193,8 +194,6 @@ class PromptScope(ast.NodeVisitor):
             except Exception as e:
                 print("info: failed to parse fstring expression: ", [v])
                 raise e
-                # raise RuntimeError("Failed to parse fstring expression: ", v)
-                return super().visit_Constant(node)
 
         def transform_qexpr(qexpr):
             if type(qexpr) is TemplateVariable and qexpr.name in self.distribution_vars:
@@ -315,8 +314,9 @@ class FunctionCallTransformation(ast.NodeTransformer):
         return node.value
 
     def is_excluded_from_call_transformation(self, node):
-        if not type(node) is ast.Name: return False
         if ast.unparse(node).startswith("lmql.runtime_support.call"): return True
+        if ast.unparse(node).startswith("lmql.lmql_runtime.format"): return True
+        if not type(node) is ast.Name: return False
         return node.id in ["print", "eval", "locals", "globals"]
 
     def visit_Call(self, node: Call) -> Any:
@@ -428,6 +428,7 @@ class PromptClauseTransformation(FunctionCallTransformation):
         qstring_as_fstring: ast.JoinedStr = ast.parse(f'f"""{compiled_qstring}"""').body[0].value
         function_call_transformer = FunctionCallTransformation()
         qstring_as_fstring.values = [function_call_transformer.visit(v) for v in qstring_as_fstring.values]
+        compiled_qstring = ast.unparse(qstring_as_fstring)
 
         # check and collect extra args for decoder, type and decorators
         extra_args = ""
@@ -452,9 +453,9 @@ class PromptClauseTransformation(FunctionCallTransformation):
             result_code = code_str + "\n"
 
             # result_code = f'yield context.query(f"""{compiled_qstring}""")'
-            result_code += interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}", "constraints=" + result_reference, extra_args)
+            result_code += interrupt_call('query', f'{compiled_qstring}', "{**globals(), **locals()}", "constraints=" + result_reference, extra_args)
         else:
-            result_code = interrupt_call('query', f'f"""{compiled_qstring}"""', "{**globals(), **locals()}", extra_args)
+            result_code = interrupt_call('query', f'{compiled_qstring}', "{**globals(), **locals()}", extra_args)
 
         for v in declared_template_vars:
             get_var_call = yield_call('get_var', f'"{v}"')
@@ -779,13 +780,49 @@ class DecodeClauseTransformation:
 
         return self.query
 
+class DeferredMultiCallTransformer(ast.NodeTransformer):
+    """
+    Transforms a() | b() query multi-calls into await lmql.runtime_support.call_one({a: a(), b: b()})
+    """
+    def __init__(self, query: LMQLQuery):
+        self.query = query
+    
+    def transform(self):
+        self.query.prompt = [self.visit(p) for p in self.query.prompt]
+
+    # check for ast.Call | ast.Call expressions
+    def visit_BinOp(self, node: BinOp) -> Any:
+        if type(node.op) is ast.BitOr:
+            operands = [node.left, node.right]
+            if all(type(o) is ast.Await for o in operands) and \
+               all(type(o.value) is ast.Call for o in operands):
+                left = self.visit(node.left.value)
+                right = self.visit(node.right.value)
+
+                if ast.unparse(left.func) != "lmql.runtime_support.call" or \
+                   ast.unparse(right.func) != "lmql.runtime_support.call":
+                    return node
+                
+                left_repr = ast.unparse(node.left.value)[len("lmql.runtime_support."):]
+                right_repr = ast.unparse(node.right.value)[len("lmql.runtime_support."):]
+
+                deferred_left = ast.Call(attr("lmql.runtime_support.defer_call"), left.args, left.keywords)
+                deferred_right = ast.Call(attr("lmql.runtime_support.defer_call"), right.args, right.keywords)
+
+                return ast.parse(f"""await lmql.runtime_support.call_one({{
+                    '{left_repr}': {ast.unparse(deferred_left)},
+                    '{right_repr}': {ast.unparse(deferred_right)}
+                }})""")
+        return node
+
 class CompilerTransformations:
     def __init__(self):
         self.transformations = [
             PromptClauseTransformation,
             WhereClauseTransformation,
             DecodeClauseTransformation,
-            ReturnStatementTransformer
+            ReturnStatementTransformer,
+            DeferredMultiCallTransformer
         ]
     
     def transform(self, query):
@@ -927,6 +964,10 @@ class LMQLCompiler:
             transformations = CompilerTransformations()
             transformations.transform(q)
 
+            # query dependency scoping
+            q.dependencies = QueryDependencyScope().scope(q)
+            decorator_args = "dependencies=" + str(q.dependencies)
+
             model_name = ast.unparse(q.from_ast).strip()
             model_name = model_name_aliases.get(model_name, model_name)
             if model_name[1:-1] in model_name_aliases.keys():
@@ -934,13 +975,13 @@ class LMQLCompiler:
 
             # resulting code
             code = None
-            output_variables = "output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
+            decorator_args += ", output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
 
             # generate function that runs query
             parameters = list(sorted(list(scope.free_vars)))
 
             with PythonFunctionWriter("query", output_file, parameters, 
-                q.prologue, decorators=["lmql.compiled_query"], decorators_args=[output_variables]) as writer:
+                q.prologue, decorators=["lmql.compiled_query"], decorators_args=[decorator_args]) as writer:
                 
                 writer.add(yield_call("set_decoder", ast.unparse(q.decode.method).strip(), unparse_list(q.decode.decoding_args)))                
                 writer.add(yield_call("set_model", model_name))

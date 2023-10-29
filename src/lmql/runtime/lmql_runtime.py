@@ -13,6 +13,7 @@ from lmql.runtime.output_writer import silent
 from lmql.runtime.postprocessing.group_by import GroupByPostprocessor
 from lmql.api.inspect import is_query
 from lmql.runtime.formatting import format, tag
+from lmql.language.dependencies import map_scope
 
 class LMQLInputVariableScope:
     def __init__(self, f, calling_frame):
@@ -73,17 +74,30 @@ class LMQLQueryFunction:
     __lmql_query_function__ = True
     is_async: bool = True
     
-    def __init__(self, fct, output_variables, postprocessors, scope, *args, **kwargs):
+    def __init__(self, fct, output_variables, postprocessors, scope, dependencies, *args, **kwargs):
         self.fct = fct
         self.output_variables = output_variables
         self.postprocessors = postprocessors
         self.scope = scope
+        self.dependencies = dependencies
         
         self.output_writer = None
         self.args = [a for a in inspect.getfullargspec(fct).args if a != "context"]
         self.model = None
         # only set if the query is defined inline of a Python file
         self.function_context = None
+
+    def resolved_query_dependencies(self, dependencies=None):
+        """
+        Resolves all query dependencies of this query to callable
+        LMQL query functions.
+        """
+        assert self.function_context is not None, "Cannot call @lmql.query function without context."
+        scope = self.function_context.scope
+        def resolve(d):
+            fct = scope.resolve(d)
+            return fct.__lmql_query_function__ if hasattr(fct, "__lmql_query_function__") else fct
+        return map_scope(self.dependencies, resolve)
 
     def __hash__(self):
         return hash(self.fct)
@@ -251,13 +265,16 @@ class LMQLQueryFunction:
         """
         return chain(self, output_keys=output_keys)
 
+    def __repr__(self) -> str:
+        return "LMQLQueryFunction(" + self.name + ")"
+
 def context_call(fct_name, *args, **kwargs):
     return ("call:" + fct_name, args, kwargs)
 
 def interrupt_call(fct_name, *args, **kwargs):
     return ("interrupt:" + fct_name, args, kwargs)
 
-def compiled_query(output_variables=None, group_by=None):
+def compiled_query(output_variables=None, dependencies=None, group_by=None):
     if output_variables is None:
         output_variables = []
     
@@ -274,7 +291,8 @@ def compiled_query(output_variables=None, group_by=None):
         return LMQLQueryFunction(fct, 
                                  output_variables=output_variables, 
                                  postprocessors=postprocessors, 
-                                 scope=LMQLInputVariableScope(fct, calling_frame))
+                                 scope=LMQLInputVariableScope(fct, calling_frame),
+                                 dependencies=dependencies)
     return func_transformer
     
 
