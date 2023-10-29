@@ -28,7 +28,7 @@ By default, this exposes an [LMQL/LMTP inference API](https://github.com/eth-sri
 
 **Endpoint and Port** By default, models will be served via port `8080`. To change this, you can specify the port via the `--port` option of the `lmql serve-model` command. On the client side, to connect to a model server running on a different port, you can specify the port when constructing an [`lmql.model`](../lib/generations.md#lmql-llm-objects) object:
 
-```
+```python
 lmql.model("gpt2", endpoint="localhost:9999")
 ```
 
@@ -58,4 +58,30 @@ If you want more control over model loading and configuration, you can pass addi
 
 ```python
 lmql.model("local:gpt2", cuda=True)
+```
+
+## Quantization
+
+Quantization reduces the precision of model parameters to shrink model size and boost inference speed with minimal accuracy loss. LMQL supports two quantization formats: AWQ (using AutoAWQ) and GPTQ (using AutoGPTQ).
+
+### AutoAWQ
+
+AWQ minimizes quantization error by protecting crucial weights, promoting model efficiency without sacrificing accuracy. It's ideal for scenarios requiring both compression and acceleration of LLMs.
+
+Install AutoAWQ following the repo instructions. To use AWQ-quantized models, run:
+
+To use `AWQ`-quantized models, first install [AutoAWQ](https://github.com/casper-hansen/AutoAWQ) using the instructions in the repo.
+
+```bash
+lmql serve-model TheBloke/Mistral-7B-OpenOrca-AWQ --loader awq
+```
+
+### AutoGPTQ
+
+AutoGPTQ reduces model size while retaining performance by lowering the precision of model weights to 4 or 3 bits. It's suitable for efficient deployment and operation of LLMs on consumer-grade hardware.
+
+Install [AutoGPTQ](https://github.com/PanQiWei/AutoGPTQ) following the repo instructions. To use GPTQ-quantized models, run:
+
+```bash
+lmql serve-model TheBloke/Arithmo-Mistral-7B-GPTQ --loader gptq
 ```
