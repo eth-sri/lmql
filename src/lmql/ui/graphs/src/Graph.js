@@ -144,14 +144,26 @@ const layout = {
 };
 
 function ChildData(props) {
-    return <>
-        {props.children.map(child => {
-                return <div key={child.id}>
-                    <NodeData node={child} label={child.label}/>
+    let children = props.children;
+    children.sort((a, b) => {
+        return a.score - b.score;
+    })
+
+    props.expandable = (props.expandable && children.length > 0);
+
+    const [expanded, setExpanded] = React.useState(!props.expandable);
+
+    return <div className='child-data'>
+        {(props.expandable && children.length > 0) && <div className='child-data-header' onClick={() => setExpanded(!expanded)}>
+                {expanded ? '▼' : '▶'} {children.length} children
+        </div>}
+        {(expanded || !props.expandable) && props.children.map(child => {
+                return <div key={child.id} style={{marginLeft: (props.indent || 0) * 10}}>
+                    <NodeData node={child} label={child.label} indent={(props.indent || -1) + 1}/>
                 </div>
             }
         )}
-    </>
+    </div>
 }
 
 function NodeData(props) {
@@ -159,11 +171,13 @@ function NodeData(props) {
         return null;
     }
 
-    return <div class='node-data' style={{borderColor: props.node.color}}>
-        {props.label && <h5>{props.label}</h5>}
+    return <div class={'node-data' + (props.indent > 0 ? ' child' : '')} style={{borderColor: props.node.color}}>
+        {props.label && <h4>{props.label}</h4>}
+        <div className='score value'>Score: <code>{props.node.score}</code></div>
         <SyntaxHighlighter language="json" style={atomOneDarkReasonable} wrapLongLines={true}>
             {JSON.stringify(props.node.result, null, 2)}
         </SyntaxHighlighter>
+        <ChildData expandable={true} indent={(props.indent || 0) + 1} children={props.node.children.map(c => c.data)}/>
     </div>
 }
 
@@ -271,7 +285,7 @@ export function Graph() {
             {activeNode && !activeNode.composite && <>
                 <label>Instance</label>
             </>}
-            {activeNode && activeNode.composite && <ChildData children={child_data}/>}
+            {activeNode && activeNode.composite && <ChildData indent={0} children={child_data}/>}
             {activeNode && !activeNode.composite && <NodeData node={activeNode} label={false}/>}
             <div className='spacer' style={{flexGrow: 1}}/>
             {activeNode && activeNode.lmql && <>
@@ -285,5 +299,15 @@ export function Graph() {
                 </>}
         </div>
         <div className='graph' ref={cy}/>
+        <ul className='graph-toolbar'>
+                <li>
+                    <button onClick={() => {
+                        cy.current.cy.layout(layout).run();
+                        cy.current.cy.fit();
+                    }}>
+                        Re-Layout
+                    </button>
+                </li>
+        </ul>
     </>
 }

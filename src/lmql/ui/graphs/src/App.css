@@ -49,6 +49,18 @@ h1, h2, h3, h4, h5 {
     border-left: 10pt solid transparent;
     padding-left: 5pt;
     margin-top: 10pt;
+    border-bottom: 1pt solid rgb(177, 177, 177);
+    padding-top: 5pt;
+    padding-left: 5pt;
+}
+
+.node-data.child {
+    border-bottom: none;
+}
+
+.node-data .score {
+    top: 2pt;
+    right: 2pt;
 }
 
 .inspector .value {
@@ -62,4 +74,41 @@ h1, h2, h3, h4, h5 {
     border-radius: 3pt;
     padding: 5pt;
     margin-top: 4pt;
+}
+
+.child-data-header {
+    margin-bottom: 5pt;
+    padding: 5pt;
+    border-radius: 3pt;
+}
+
+.child-data-header:hover {
+    background-color: rgb(200, 200, 200);
+    cursor: pointer;
+}
+
+ul.graph-toolbar {
+    position: absolute;
+    top: 5pt;
+    right: 5pt;
+    background-color: white;
+    border-radius: 3pt;
+    border: 1pt solid rgb(177, 177, 177);
+    padding: 0;
+    list-style: none;
+    margin: 0;
+}
+
+ul.graph-toolbar button {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    padding: 10pt;
+    font-size: 12pt;
+    cursor: pointer;
+}
+
+ul.graph-toolbar button:hover {
+    background-color: rgb(226, 225, 225);
 }

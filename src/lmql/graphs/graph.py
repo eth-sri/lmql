@@ -5,7 +5,7 @@ from lmql.graphs.runtime import *
 import random
 import json
 from lmql.runtime.loop import run_in_loop
-from .printer import to_json
+from .printer import InferenceGraphPrinter
 from typing import List, Union
 
 class InferenceGraph:
@@ -36,7 +36,7 @@ class InferenceGraph:
         self.qfct_to_node[node.query_fct] = node
     
     def to_json(self):
-        return to_json(self)
+        return InferenceGraphPrinter().to_json(self)
 
     async def ainfer_call(self, fct: callable, *args, **kwargs):
         """
@@ -75,6 +75,8 @@ class InferenceGraph:
         # in new context, compute result and track inputs and outputs
         # as instance nodes and edges
         with InferenceCall(self, node) as call:
+            if "cache" not in kwargs:
+                kwargs["cache"] = f"/tmp/lmql-graph-cache-{node.name}.tokens"
             result = await node.query_fct.__acall__(*args, **kwargs)
             
             # create corresponding instance graph structure
@@ -85,6 +87,10 @@ class InferenceGraph:
             
             # track instance node in query node
             node.add_instance(instance_node)
+
+            # merge equivalent instance nodes
+            before_len = len(node.instances)
+            node.merge_instances()
             
             return result
 
@@ -121,8 +127,16 @@ def _build_graph(query_fct, graph):
     Constructs an LMQL inference graph from the call hierarchy 
     of the given query function.
     """
-    query_node = QueryNode(query_fct.name, query_fct)
+    name = query_fct.name if type(query_fct) is LMQLQueryFunction else query_fct.__name__
+    query_node = QueryNode(name, query_fct)
     
+    # non-query functions are also QueryNodes, but we do not 
+    # track their dependencies
+    if query_function(query_fct) is None:
+        return query_fct
+
+    query_node.merging_strategy = query_fct.extra_args.get("merge", None)
+
     # get compiler-determined query dependencies
     factored_dependencies = query_fct.resolved_query_dependencies()
     
