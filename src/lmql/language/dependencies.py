@@ -41,15 +41,15 @@ class QueryDependencyScope(ast.NodeVisitor):
         
         # detect branching a() | b() calls 
         # track dependencies of
-        if ast.unparse(func) == "lmql.runtime_support.call_one":
+        if ast.unparse(func) == "lmql.runtime_support.branch":
             subscopes = []
-            assert len(node.args) == 1, "QueryDependencyScope: expected call_one call with exactly one argument, but found {}".format(len(node.args))
-            branching_dict = node.args[0]
-            assert isinstance(branching_dict, Dict), "QueryDependencyScope: expected branching dict with call_one call, but found {}".format(type(branching_dict))
+            assert len(node.args) == 1, "QueryDependencyScope: expected branch call with exactly one argument, but found {}".format(len(node.args))
+            branched_calls = node.args[0]
+            assert isinstance(branched_calls, ast.List), "QueryDependencyScope: expected branch call with a list of dependencies, but found {}".format(type(branched_calls))
 
             subscopes = []
 
-            for k,v in zip(branching_dict.keys, branching_dict.values):
+            for v in branched_calls.elts:
                 scope = QueryDependencyScope()
                 scope.visit(v)
                 subdependencies = scope.effective_dependencies()

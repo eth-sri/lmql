@@ -1,0 +1,17 @@
+{
+  "name": "lmql-graphs",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "cytoscape": "^3.26.0",
+    "cytoscape-dagre": "^2.5.0",
+    "react": "^18.2.0",
+    "react-cytoscapejs": "^2.0.0",
+    "react-dom": "^18.2.0",
+    "react-syntax-highlighter": "^15.5.0"
+  },
+  "devDependencies": {
+    "process": "^0.11.10"
+  }
+}

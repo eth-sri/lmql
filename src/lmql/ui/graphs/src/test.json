@@ -1,0 +1,230 @@
+[
+    {
+        "data": {
+            "id": "node0",
+            "label": "ao_answer",
+            "composite": true,
+            "lmql": "\"Q: {question}\\n A: The answer is[ANSWER]\"\nreturn ANSWER",
+            "lmql_inputs": "['question']",
+            "lmql_outputs": [
+                "ANSWER"
+            ],
+            "lmql_dependencies": "[]"
+        }
+    },
+    {
+        "data": {
+            "id": "instance1",
+            "lmql": "\"Q: {question}\\n A: The answer is[ANSWER]\"\nreturn ANSWER",
+            "lmql_inputs": "['question']",
+            "lmql_outputs": [
+                "ANSWER"
+            ],
+            "lmql_dependencies": "[]",
+            "label": "ao_answer#0",
+            "result": " 46.",
+            "parent": "node0",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "id": "instance2",
+            "lmql": "\"Q: {question}\\n A: The answer is[ANSWER]\"\nreturn ANSWER",
+            "lmql_inputs": "['question']",
+            "lmql_outputs": [
+                "ANSWER"
+            ],
+            "lmql_dependencies": "[]",
+            "label": "ao_answer#1",
+            "result": " 46.",
+            "parent": "node0",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "id": "instance3",
+            "lmql": "\"Q: {question}\\n A: The answer is[ANSWER]\"\nreturn ANSWER",
+            "lmql_inputs": "['question']",
+            "lmql_outputs": [
+                "ANSWER"
+            ],
+            "lmql_dependencies": "[]",
+            "label": "ao_answer#2",
+            "result": " 46.",
+            "parent": "node0",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "id": "node4",
+            "label": "cot",
+            "composite": true,
+            "lmql": "sample(verbose=True)\n    \n\"Q: {question} A: Let's think step by step (one sentences). [REASONING]\" where len(TOKENS(REASONING)) < 20\nreturn REASONING",
+            "lmql_inputs": "['question']",
+            "lmql_outputs": [
+                "REASONING"
+            ],
+            "lmql_dependencies": "[]"
+        }
+    },
+    {
+        "data": {
+            "id": "instance5",
+            "lmql": "sample(verbose=True)\n    \n\"Q: {question} A: Let's think step by step (one sentences). [REASONING]\" where len(TOKENS(REASONING)) < 20\nreturn REASONING",
+            "lmql_inputs": "['question']",
+            "lmql_outputs": [
+                "REASONING"
+            ],
+            "lmql_dependencies": "[]",
+            "label": "cot#0",
+            "result": "\nFirst, we can start by breaking it down: 20*2 = 40 and",
+            "parent": "node4",
+            "value_class_id": 2
+        }
+    },
+    {
+        "data": {
+            "id": "node6",
+            "label": "cot_answer",
+            "composite": true,
+            "lmql": "\"Q: {question}\\n A: {cot(question)} Thus the answer is[ANSWER]\"\nreturn ANSWER",
+            "lmql_inputs": "['cot', 'question']",
+            "lmql_outputs": [
+                "ANSWER"
+            ],
+            "lmql_dependencies": "[LMQLQueryFunction(cot)]"
+        }
+    },
+    {
+        "data": {
+            "id": "instance7",
+            "lmql": "\"Q: {question}\\n A: {cot(question)} Thus the answer is[ANSWER]\"\nreturn ANSWER",
+            "lmql_inputs": "['cot', 'question']",
+            "lmql_outputs": [
+                "ANSWER"
+            ],
+            "lmql_dependencies": "[LMQLQueryFunction(cot)]",
+            "label": "cot_answer#0",
+            "result": " 46.",
+            "parent": "node6",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "id": "node8",
+            "label": "answer",
+            "composite": true,
+            "lmql": "return ao_answer(question) | cot_answer(question)",
+            "lmql_inputs": "['ao_answer', 'cot_answer', 'question']",
+            "lmql_outputs": [],
+            "lmql_dependencies": "[[LMQLQueryFunction(ao_answer), LMQLQueryFunction(cot_answer)]]"
+        }
+    },
+    {
+        "data": {
+            "id": "instance9",
+            "lmql": "return ao_answer(question) | cot_answer(question)",
+            "lmql_inputs": "['ao_answer', 'cot_answer', 'question']",
+            "lmql_outputs": [],
+            "lmql_dependencies": "[[LMQLQueryFunction(ao_answer), LMQLQueryFunction(cot_answer)]]",
+            "label": "answer#0",
+            "result": " 46.",
+            "parent": "node8",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "id": "instance10",
+            "lmql": "return ao_answer(question) | cot_answer(question)",
+            "lmql_inputs": "['ao_answer', 'cot_answer', 'question']",
+            "lmql_outputs": [],
+            "lmql_dependencies": "[[LMQLQueryFunction(ao_answer), LMQLQueryFunction(cot_answer)]]",
+            "label": "answer#1",
+            "result": " 46.",
+            "parent": "node8",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "id": "instance11",
+            "lmql": "return ao_answer(question) | cot_answer(question)",
+            "lmql_inputs": "['ao_answer', 'cot_answer', 'question']",
+            "lmql_outputs": [],
+            "lmql_dependencies": "[[LMQLQueryFunction(ao_answer), LMQLQueryFunction(cot_answer)]]",
+            "label": "answer#2",
+            "result": " 46.",
+            "parent": "node8",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "id": "instance12",
+            "lmql": "return ao_answer(question) | cot_answer(question)",
+            "lmql_inputs": "['ao_answer', 'cot_answer', 'question']",
+            "lmql_outputs": [],
+            "lmql_dependencies": "[[LMQLQueryFunction(ao_answer), LMQLQueryFunction(cot_answer)]]",
+            "label": "answer#3",
+            "result": " 46.",
+            "parent": "node8",
+            "value_class_id": 1
+        }
+    },
+    {
+        "data": {
+            "target": "node6",
+            "source": "node4",
+            "meta": true
+        }
+    },
+    {
+        "data": {
+            "target": "instance7",
+            "source": "instance5"
+        }
+    },
+    {
+        "data": {
+            "target": "node8",
+            "source": "node0",
+            "meta": true
+        }
+    },
+    {
+        "data": {
+            "target": "node8",
+            "source": "node6",
+            "meta": true
+        }
+    },
+    {
+        "data": {
+            "target": "instance9",
+            "source": "instance7"
+        }
+    },
+    {
+        "data": {
+            "target": "instance10",
+            "source": "instance1"
+        }
+    },
+    {
+        "data": {
+            "target": "instance11",
+            "source": "instance2"
+        }
+    },
+    {
+        "data": {
+            "target": "instance12",
+            "source": "instance3"
+        }
+    }
+]

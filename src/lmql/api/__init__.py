@@ -11,7 +11,7 @@ from .llm import LLM, set_default_model, get_default_model, model, get_default_s
 from .queries import query, F, query_from_string
 from .run import run_file, run_sync, run
 from .scoring import ScoringResult
-from .graphs import infer
+from lmql.graphs import infer
 from .serve import serve
 from inspect import *
 

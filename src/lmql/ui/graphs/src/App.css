@@ -1,0 +1,65 @@
+body {
+    background-color: #f5f5f5;
+    padding: 0;
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    overflow: hidden;
+}
+
+h1, h2, h3, h4, h5 {
+    font-weight: 600;
+    margin: 0;
+}
+
+#app {
+    height: 100vh;
+    display: flex;
+}
+
+.graph {
+    flex: 1;
+    height: 100vh;
+    max-width: 80vw;
+}
+
+.inspector {
+    font-family: monospace;
+    font-size: 12pt;
+    width: 420pt;
+    height: 100vh;
+    border-right: 1pt solid rgb(177, 177, 177);
+    background-color: rgb(231, 231, 231);
+    padding: 10pt;
+    margin: 0pt;
+    display: flex;
+    flex-direction: column;
+}
+
+.inspector pre {
+    border-radius: 3pt;
+    background-color: rgb(128, 128, 128);
+}
+
+.inspector label {
+    color: grey;
+    display: block;
+}
+
+.node-data {
+    border-left: 10pt solid transparent;
+    padding-left: 5pt;
+    margin-top: 10pt;
+}
+
+.inspector .value {
+    margin-top: 5pt;
+    line-height: 1.5;
+}
+
+.inspector .value code {
+    display: inline-block;
+    background-color: rgb(220, 220, 220);
+    border-radius: 3pt;
+    padding: 5pt;
+    margin-top: 4pt;
+}

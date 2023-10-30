@@ -3,29 +3,32 @@ import lmql
 @lmql.query(merge=123)
 def cot(question):
     '''lmql
-    "Q: {question} A: Let's think step by step. [REASONING]"
+    sample(verbose=True)
+    
+    "Q: {question} A: Let's think step by step (one sentences). [REASONING]" where len(TOKENS(REASONING)) < 20
+    return REASONING
     '''
 
 @lmql.query
 def cot_answer(question) -> int: 
     '''lmql
-    "Q: {question}\n {cot(question)} A: [ANSWER: int]"
+    "Q: {question}\n A: {cot(question)} Thus the answer is[ANSWER]"
     return ANSWER
     '''
 
-@lmql.query(confidence="abc")
+@lmql.query
 def ao_answer(question) -> int:
     '''lmql
-    "Q: {question}\n A: The answer (single number) is[ANSWER:int]"
+    "Q: {question}\n A: The answer is[ANSWER]"
     return ANSWER
     '''
 
 @lmql.query
 def answer(question):
     '''lmql
-    ao_answer() | cot_answer(question)
+    return ao_answer(question) | cot_answer(question)
     '''
 
 if __name__ == "__main__":
     # graph query
-    lmql.infer(answer, question="What is the answer to life, the universe and everything?", engine="threshold", budget=2)
+    lmql.infer(answer, question="What is 23*2?", state="src/lmql/ui/graphs/src/test.json", iterations=4)

@@ -780,12 +780,13 @@ class DecodeClauseTransformation:
 
         return self.query
 
-class DeferredMultiCallTransformer(ast.NodeTransformer):
+class BranchingCallTransformation(ast.NodeTransformer):
     """
-    Transforms a() | b() query multi-calls into await lmql.runtime_support.call_one({a: a(), b: b()})
+    Transforms a() | b() branching calls into await lmql.runtime_support.branch({a: a(), b: b()})
     """
     def __init__(self, query: LMQLQuery):
         self.query = query
+        self.call_identifier_counter = 0
     
     def transform(self):
         self.query.prompt = [self.visit(p) for p in self.query.prompt]
@@ -803,16 +804,17 @@ class DeferredMultiCallTransformer(ast.NodeTransformer):
                    ast.unparse(right.func) != "lmql.runtime_support.call":
                     return node
                 
-                left_repr = ast.unparse(node.left.value)[len("lmql.runtime_support."):]
-                right_repr = ast.unparse(node.right.value)[len("lmql.runtime_support."):]
+                left_repr = f"call#{self.call_identifier_counter}" + ast.unparse(node.left.value)[len("lmql.runtime_support.call"):]
+                self.call_identifier_counter += 1
+                right_repr = f"call#{self.call_identifier_counter}" + ast.unparse(node.right.value)[len("lmql.runtime_support.call"):]
+                self.call_identifier_counter += 1
 
                 deferred_left = ast.Call(attr("lmql.runtime_support.defer_call"), left.args, left.keywords)
                 deferred_right = ast.Call(attr("lmql.runtime_support.defer_call"), right.args, right.keywords)
 
-                return ast.parse(f"""await lmql.runtime_support.call_one({{
-                    '{left_repr}': {ast.unparse(deferred_left)},
-                    '{right_repr}': {ast.unparse(deferred_right)}
-                }})""")
+                return ast.parse(f"""await lmql.runtime_support.branch([
+                    {ast.unparse(deferred_left)}, {ast.unparse(deferred_right)}
+                ])""")
         return node
 
 class CompilerTransformations:
@@ -822,7 +824,7 @@ class CompilerTransformations:
             WhereClauseTransformation,
             DecodeClauseTransformation,
             ReturnStatementTransformer,
-            DeferredMultiCallTransformer
+            BranchingCallTransformation
         ]
     
     def transform(self, query):
