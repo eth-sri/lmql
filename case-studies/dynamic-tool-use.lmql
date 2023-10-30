@@ -1,0 +1,20 @@
+@lmql.query(confidence=Min(-0.3))
+def ao(question):
+    "Q: {answer}\n A: [ANSWER]"
+
+def rag(question):
+    "Q: {answer}"
+    "Context: {retrieve_context(question, top_k=5)}"
+    "A: [ANSWER]"
+
+def wikipedia(question):
+    "Q: {answer}"
+    "Search Term: [TERM]"
+    "Results: {wikipedia_search(TERM, )}"
+    "A: [ANSWER]"
+
+def answer(question):
+    0.9 * ao(question) | 0.95 * rag(question) | wikipedia(question)
+
+# graph query
+graph.infer(answer, question="What is the answer to life, the universe and everything?")

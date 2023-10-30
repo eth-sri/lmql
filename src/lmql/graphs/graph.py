@@ -38,7 +38,7 @@ class InferenceGraph:
     def to_json(self):
         return to_json(self)
 
-    async def ainfer_call(self, fct, *args, **kwargs):
+    async def ainfer_call(self, fct: callable, *args, **kwargs):
         """
         Invoked for a regular a() query function call, this method 
         determines how to infer the result of the call.
@@ -49,7 +49,7 @@ class InferenceGraph:
         node = self.qfct_to_node.get(qfct)
         return await self.ainfer(node, *args, **kwargs)
 
-    async def ainfer_branch(self, branching_call):
+    async def ainfer_branch(self, branching_call: List[defer_call]):
         """
         Invoked for a a() | b() branching call, this method determines
         which branch to explore and how its result should be inferred.
@@ -64,7 +64,7 @@ class InferenceGraph:
         target_node = self.qfct_to_node.get(query_function(call.target))
         return await self.ainfer(target_node, *call.args, **call.kwargs)
 
-    async def ainfer(self, node, *args, **kwargs):
+    async def ainfer(self, node: QueryNode, *args, **kwargs):
         """
         Infers the result of the given query node, assuming the 
         provided arguments and keyword arguments are the inputs.
@@ -88,7 +88,7 @@ class InferenceGraph:
             
             return result
 
-    def infer(self, node, *args, **kwargs):
+    def infer(self, node: QueryNode, *args, **kwargs):
         return run_in_loop(self.ainfer(node, *args, **kwargs))
 
 @dataclass

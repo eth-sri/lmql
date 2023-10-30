@@ -1,0 +1,19 @@
+# model-based fact checking
+def verified(s):
+    "Q: Is the following sentence factually correct? '{s}'
+     A: [ANSWER]" where ANSWER in [" yes", " no"]
+    return ANSWER == " yes"
+
+# retries specifies that the engine will re-sample this query
+# at max 4 times before backtracking one level further up the tree
+@lmql.query(decoder="sample", temperature=1.0, retries=4)
+def verified_answer(user_input, prompt=""):
+    "Q: {user_input} A:{prompt}[ANSWER: sentence]" where verified(sentence)
+    
+    if len(ANSWER) == 0: 
+        return prompt + ANSWER
+    else: 
+        return verified_answer(user_input, prompt=prompt + ANSWER)
+
+# graph query
+graph.infer(verified_answer, question="What is the answer to life, the universe and everything?")

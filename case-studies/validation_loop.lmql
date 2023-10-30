@@ -1,0 +1,31 @@
+def verifier(ANSWER):
+    "Given the following answer, what are some issues to revise in the next iteration?"
+    "Answer: {ANSWER}"
+    "Issues: [ISSUES: list]"
+    return ISSUES
+
+def revised(question, ANSWER, max_revisions=4)
+    "Question: {question}"
+    "Answer: {ANSWER}
+    
+    for i in range(max_revisions):
+        issues = verifier(ANSWER)
+        if len(issues) == 0:
+            return ANSWER
+        else:
+            "Verifier: {issues}"
+            "Revised Answer: [ANSWER]"
+    
+    assert False, "Failed to revise answer"
+
+@lmql.query(decoder="sample", retries=4)
+def revised_answer(user_input):
+    "Question: {user_input}"
+    "Answer:[DRAFT]"
+    return revised(user_input, DRAFT)
+
+def answer(q):
+    revised_answer(q)
+
+# graph query
+graph.infer(verified_answer, question="What is the answer to life, the universe and everything?")

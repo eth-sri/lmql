@@ -1,0 +1,20 @@
+@lmql.query(n=5, merge=ByEmbedding())
+def cot(question):
+    cot()
+
+def cot_answer(question) -> int: 
+    reasoning = cot(question)
+    "Q: {question}\n {reasoning} A: [ANSWER: int]"
+    return ANSWER
+
+def ao_answer(question) -> int:
+    "Q: {question}\n A: The answer (single number) is[ANSWER:int]"
+    assert score(ANSWER) > 0.3
+    return ANSWER
+
+@lmql.query
+def answer(question):
+    ao_answer(question) | cot_answer(question)
+
+# graph query
+lmql.infer(answer, question="What is the answer to life, the universe and everything?", engine="threshold", budget=2)   Z

@@ -1,0 +1,13 @@
+# model-based fact checking
+def verified(s):
+    "Q: Is the following sentence factually correct? '{s}'
+     A: [ANSWER]" where ANSWER in [" yes", " no"]
+    return ANSWER == " yes"
+
+# inductively defined continuation
+def verified_answer(user_input):
+    # if 'verified' fails for some sentence, token decoder backtracks
+    "Q: {user_input} A:[ANSWER]" where verified(s) for s in sentences(ANSWER)
+
+# graph query
+graph.infer(verified_answer, question="What is the answer to life, the univerzse and everything?")

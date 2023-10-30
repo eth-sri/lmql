@@ -1,0 +1,22 @@
+def model_check(spec, program):
+    "Q: Does the following program satisfy the specification?"
+    "Spec: {spec}"
+    "Program: {program}"
+    "Analysis: [ANALYSIS]"
+    "Response: [RESPONSE]" where RESPONSE in ["Yes", "No"]
+    return RESPONSE == "Yes"
+
+@lmql.query(confidence=GreaterThan(-0.3))
+def draft(spec):
+    # non-token constraints correspond to asserts after query execution has finished
+    # assertion failures mean the execution result is discarded
+    "Q: {spec} ```[PROGRAM]" where check_program(PROGRAM, spec) and model_check(spec, PROGRAM)
+
+def programs(spec, n=5):
+    # generate at least n programs
+    programs = [draft(spec) for _ in range(n)]
+    # return the best program
+    return max(programs, key=score)
+
+# graph query
+graph.infer(program, question="Write me a program that prints 42")
