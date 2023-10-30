@@ -31,4 +31,7 @@ def answer(question):
 
 if __name__ == "__main__":
     # graph query
-    lmql.infer(answer, question="What is 23*2?", state="src/lmql/ui/graphs/src/test.json", iterations=4)
+    lmql.infer(answer, question="What is 23*2?", state="graph.json", iterations=4)
+    # to inspect the resulting graph, run 
+    # lmql graph-watch graph.json 
+    # and open http://localhost:1234 in your browser

@@ -47,7 +47,7 @@ def to_json(graph):
 
     for n in graph.nodes:
         # meta edges
-        for edge in n.predecessors:
+        for edge in n.incoming:
             for d in edge.dependencies:
                 entries.append({"data": {
                     "target": node_ids[id(n)],

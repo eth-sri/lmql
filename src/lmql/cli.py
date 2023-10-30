@@ -24,6 +24,15 @@ def cmd_chat():
     absolute_path = os.path.abspath(file)
     subprocess.run([sys.executable, "-m", "lmql.lib.chat", absolute_path], cwd=project_root)
 
+def cmd_graph_watch():
+    """emoji:👀 Watch a graph file and serve it via web ui"""
+    if len(sys.argv) == 2:
+        print("Usage: 💬 lmql graph-watch <file>")
+        return
+    file = sys.argv[2]
+    absolute_path = os.path.abspath(file)
+    subprocess.run([sys.executable, "watch.py", absolute_path], cwd=os.path.join(project_root, "lmql/ui/graphs"))
+
 def cmd_run():
     """
     emoji:🏃 run a LMQL script (e.g. "lmql run latest/hello.lmql")

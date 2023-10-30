@@ -12,6 +12,7 @@
     "react-syntax-highlighter": "^15.5.0"
   },
   "devDependencies": {
-    "process": "^0.11.10"
+    "process": "^0.11.10",
+    "parcel": "*"
   }
 }

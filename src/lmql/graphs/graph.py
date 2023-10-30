@@ -135,8 +135,8 @@ def _build_graph(query_fct, graph):
     # of dependencies and add corresponding edges to the graph
     factored_dependencies = [[dep] if type(dep) is not list else dep for dep in factored_dependencies]
     for deps in product(*factored_dependencies):
-        edge = Edge([_build_graph(pred, graph=graph) for pred in deps], target=query_node)
-        query_node.predecessors.append(edge)
+        edge = QueryEdge([_build_graph(pred, graph=graph) for pred in deps], target=query_node)
+        query_node.incoming.append(edge)
     graph.add(query_node)
     
     return query_node
