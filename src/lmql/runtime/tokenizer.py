@@ -311,6 +311,7 @@ def _load_tokenizer(model_identifier, type, **kwargs) -> LMQLTokenizer:
         try:
             if TiktokenTokenizer.is_available(tiktoken_identifier):
                 tiktoken_available = True
+        # FIXME broad exception handling hides environment issues when downloading data for tokenizer, e.g. due to HTTPS errors
         except:
             tiktoken_available = False
         
