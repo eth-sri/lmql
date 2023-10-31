@@ -80,6 +80,9 @@ h1, h2, h3, h4, h5 {
     margin-bottom: 5pt;
     padding: 5pt;
     border-radius: 3pt;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .child-data-header:hover {

@@ -4,7 +4,8 @@ from lmql.graphs.merging import *
 @lmql.query
 def cot(question):
     '''lmql
-    "Q: {question} A: Let's think step by step (one sentences). [REASONING]" where len(TOKENS(REASONING)) < 20
+    sample
+    "Q: {question} A: Let's think step by step (one sentences). [REASONING]"
     return REASONING
     '''
 
@@ -26,7 +27,7 @@ def ao_answer(question) -> int:
     return ANSWER
     '''
 
-@lmql.query(merge=ByValue())
+@lmql.query(merge=ByIntValue())
 def answer(question):
     '''lmql
     return ao_answer(question) | cot_answer(question)
