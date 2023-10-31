@@ -89,6 +89,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         mc.calls = 0
         mc.hits = 0
 
+        # disk-based cache file to use
         mc.cache_file = cache_file
 
         try:
@@ -254,7 +255,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
             # generator over new results
             non_cached_argmax = iter((await self.delegate.argmax(DataArray(non_cached), **kwargs)).items())                
-            
+
             results = []
             # put new results in cache
             for i, (s, key, c) in enumerate(zip(seqs, cache_keys, cached_tokens)):
@@ -294,7 +295,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
             
             # apply operation for non-cached
             non_cached = [s for s, cont in zip(seqs, cached_cont) if cont is None]
-            
+
             # generator over new results
             non_cached_sample = iter((await self.delegate.sample(DataArray(non_cached), num_samples=num_samples, **kwargs)).items())
             results = []

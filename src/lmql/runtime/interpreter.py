@@ -194,7 +194,10 @@ class LMQLContext:
 
         return LMQLResult(self.state.prompt, await self.get_all_vars(),self.interpreter.distribution_variable, self.interpreter.distribution_values)
 
-    async def score(self, values, **kwargs):
+    def logprobs(self, variable):
+        return self.program_state.get_scores(variable)
+        
+    async def score_continuation(self, values, **kwargs):
         model = kwargs.get("model", None)
         if model is not None:
             return await score(self.prompt, values, **kwargs)
@@ -548,13 +551,13 @@ class PromptInterpreter:
 
             # current context
             program_state: ProgramState = state.program_state.copy()
-            program_state.set(variable, text, scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
+            program_state.set(variable, text, scores=None, diff=diff_text, montonicity="inc", tokens=text_tokens)
             program_state.subinterpreter_results = subvalid
             program_state.prompt = state.prompt
 
             # follow context
             follow_program_state: ProgramState = state.program_state.copy()
-            follow_program_state.set(variable, text + str(ops.NextToken), scores=(), diff=diff_text, montonicity="inc", tokens=text_tokens)
+            follow_program_state.set(variable, text + str(ops.NextToken), scores=None, diff=diff_text, montonicity="inc", tokens=text_tokens)
             follow_program_state.subinterpreter_results = subfollow
             follow_program_state.prompt = state.prompt
 
@@ -760,8 +763,9 @@ class PromptInterpreter:
             text_diff = text[len(await seq.text(state.variable_offset, limit=-2, pretty=False)):]
             
             variable_value = text
+            variable_scores = self.variable_scores(variable, seq.predecessor)
             # set raw variable value
-            program_state.set(variable, variable_value, scores=(), diff=text_diff, montonicity="fin", tokens=text_tokens)
+            program_state.set(variable, variable_value, scores=variable_scores, diff=text_diff, montonicity="fin", tokens=text_tokens)
 
             where = state.full_where_condition(self)
 
@@ -792,7 +796,7 @@ class PromptInterpreter:
                 variable_value, postprocessed_prompt = state.variable_arg("decorators").post(variable_value, postprocessed_prompt, program_state)
 
             # set postprocessed variable value and program value
-            program_state.set(variable, postprocessed_prompt, program_value=variable_value, scores=(), diff="", montonicity="fin")
+            program_state.set(variable, postprocessed_prompt, program_value=variable_value, scores=None, diff="", montonicity="fin")
 
             # current variable is done
             variable = None
@@ -901,6 +905,27 @@ class PromptInterpreter:
                 )
         user_data[self.user_data_key] = state
         return RewrittenInputIds(appended_input_ids=None, strip_eos=False, user_data=user_data)
+
+    def variable_scores(self, variable: str, seq: dc.DecoderSequence):
+        try:
+            s = seq
+            state = self.interpreter_state_from_user_data(s)
+            variable_index = state.recurring_variable_counter.get(variable, 0)
+            logprobs = seq.logprobs
+            i = 0
+            while i < len(logprobs) and s is not None:
+                state = self.interpreter_state_from_user_data(s)
+                variable_index_in_seq = state.recurring_variable_counter.get(variable, 0)
+                if state.variable != variable or s.deterministic[-1] or variable_index_in_seq != variable_index:
+                    break
+                else:
+                    i += 1
+                    s = s.predecessor
+            if s is None or state.variable != variable:
+                i -= 1
+            return logprobs[-i:]
+        except Exception as e:
+            warnings.warn("error: could not obtain variable scores for variable {} and sequence {}: {}".format(variable, seq, e))
 
     async def tokenize(self, *args):
         # tokenize should be specific to the current model in use (infer from currently process
@@ -1173,7 +1198,7 @@ class PromptInterpreter:
         
     EXTRA_DECODER_ARGS = ["decoder", "dcmodel", "modern_rewriter", "modern_logits_processor", "dclib_additional_logits_processor", 
                           "input_id_rewriter", "output_writer", "chunk_timeout", "chatty_openai", "distribution_batch_size", 
-                          "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative", 
+                          "openai_chunksize", "step_budget", "stats", "performance_stats", "cache", "show_speculative",
                           "openai_nonstop", "chunksize", "alpha", "verbose", "certificate", 
                           # extra decoding args
                           "top_k", "top_p", "repetition_penalty", "frequency_penalty", "presence_penalty"]

@@ -9,8 +9,8 @@ class ByValue:
     """
     Merges query result nodes by their exact value.
     """
-    def __init__(self):
-        pass
+    def __init__(self, score='mean'):
+        self.score = score
 
     def value_normalizer(self, instance: InstanceNode):
         return str(instance.result)
@@ -25,14 +25,14 @@ class ByValue:
 
     def merge_group(self, equivalent_instances: List[InstanceNode]):
         result = self.value_normalizer(equivalent_instances[0])
-        return AggregatedInstanceNode.from_instances(result, equivalent_instances)
+        return AggregatedInstanceNode.from_instances(result, equivalent_instances, scoring=self.score)
     
 class ByIntValue(ByValue):
     """
     Merges query result nodes by their exact value, but converts them to integers first.
     """
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     def value_normalizer(self, instance: InstanceNode):
         # use first consecutive digits allowing for , and - also

@@ -17,7 +17,7 @@ def solution(input):
     "Input: {input}"
     "Possible next steps: [STEPS]"
 
-    return | step_score(step) * solution(step) for step in STEPS |
+    return | solution(step)@step_score(step) for step in STEPS |
 
 def final_solution(input):
     solution()

@@ -5,7 +5,7 @@ Runtime support used by compiled LMQL query code.
 import inspect
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
-from lmql.graphs import branch, defer_call, call
+from lmql.graphs import branch, defer_call, call, annotate_score, scorer
 
 from lmql.ops.ops import *
 from lmql.runtime.context import Context

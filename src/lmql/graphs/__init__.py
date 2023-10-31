@@ -1,8 +1,8 @@
 from .nodes import *
-from .runtime import call, defer_call, branch
+from .runtime import call, defer_call, branch, annotate_score, scorer
 from lmql.graphs.graph import InferenceGraph, query_function
 
-def infer(fct, *args, iterations=1, state=None, **kwargs):
+def infer(fct, *args, samples=1, state=None, **kwargs):
     """
     Use the LMQL graph execution engine to infer the result of a 
     graph of LMQL query functions.
@@ -13,7 +13,7 @@ def infer(fct, *args, iterations=1, state=None, **kwargs):
     with open(state, "w") as f:
         f.write(graph.to_json())
     
-    for _ in range(iterations):
+    for _ in range(samples):
         graph.infer(qnode, *args, **kwargs)
 
         with open(state, "w") as f:

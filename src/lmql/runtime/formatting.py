@@ -35,4 +35,8 @@ def format(s):
     if is_chat_list(s):
         return format_chat(s)
 
+    # check for prompt formattable objects
+    if hasattr(s, "__prompt__"):
+        return s.__prompt__()
+
     return unescape(s)

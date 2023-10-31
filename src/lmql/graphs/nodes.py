@@ -17,6 +17,8 @@ class QueryNode:
 
         self.instances = []
 
+        self.num_calls = 0
+
     def merge_instances(self):
         if self.merging_strategy is None:
             return
@@ -33,35 +35,52 @@ class InstanceNode:
     An instance node represents the result of a query function with the specified inputs 
     (instance nodes of predecessor queries used to produce this result).
     """
-    def __init__(self, result, predecessors):
+    def __init__(self, result, predecessors, score=1.0):
         self.result = result
         self.predecessors: List[InstanceNode] = predecessors
-        self.score = 1.0
+        self.score = score
         
         # identifier for this result's class (e.g. should be the same for equivalent/aggregated results)
         self.value_class = str(result)
 
+    def __prompt__(self):
+        return str(self.result)
+    
     def __repr__(self):
         return f"<InstanceNode {self.value_class} {str([self.result])[1:-1]} score={self.score}>"
 
 class AggregatedInstanceNode(InstanceNode):
-    def __init__(self, result, children):
+    def __init__(self, result, children, score):
         predecessors = []
         for c in children:
             predecessors.extend(set(c.predecessors))
         super().__init__(result, predecessors)
         
-        self.score = sum(p.score for p in predecessors)
+        self.score = score
         self.children = children
     
     def __repr__(self):
         return f"<AggregatedInstanceNode {len(self.children)} {self.value_class} {str([self.result])[1:-1]} score={self.score}>"
 
     @classmethod
-    def from_instances(cls, result, instances):
+    def from_instances(cls, result, instances, scoring='mean'):
         if len(instances) == 1:
             return instances[0]
-        return cls(result, instances)
+        
+        score = 1.0
+
+        if scoring == 'mean':
+            score = sum([i.score for i in instances]) / len(instances)
+        elif scoring == 'max':
+            score = max([i.score for i in instances])
+        elif scoring == 'min':
+            score = min([i.score for i in instances])
+        elif scoring == 'sum':
+            score = sum([i.score for i in instances])
+        else:
+            raise ValueError(f"Unknown score aggregation method '{scoring}'")
+
+        return cls(result, instances, score)
     
     @staticmethod
     def flattend(instances: List[InstanceNode]):

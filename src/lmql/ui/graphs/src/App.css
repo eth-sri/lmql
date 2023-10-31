@@ -115,3 +115,16 @@ ul.graph-toolbar button {
 ul.graph-toolbar button:hover {
     background-color: rgb(226, 225, 225);
 }
+
+.colors {
+    color: hsl(218, 100%, 50%);
+    color: hsl(30, 100%, 50%);
+    color: hsl(120, 55%, 58%);
+    color: hsl(0, 70%, 57%);
+    color: hsl(270, 100%, 50%);
+    color: hsl(30, 100%, 50%);
+    color: hsl(330, 100%, 50%);
+    color: hsl(0, 0%, 50%);
+    color: hsl(70, 100%, 50%);
+    color: hsl(190, 100%, 50%);
+}

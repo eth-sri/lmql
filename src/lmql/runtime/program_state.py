@@ -34,8 +34,9 @@ class ProgramState:
     def set(self, name, value, program_value=None, scores=None, diff=None, montonicity="var", tokens=None):
         self.variable_values[name] = value
         self.variable_program_values[name] = program_value if program_value is not None else value
-        self.variable_diffs[name] = diff
-        self.variable_scores[name] = scores
+        self.variable_diffs[name] = diff    
+        if scores is not None:
+            self.variable_scores[name] = scores
         self.variable_monotonicity[name] = montonicity
         
         if tokens is not None:
@@ -49,6 +50,9 @@ class ProgramState:
     
     def get_tokens(self, name):
         return self.variable_tokens.get(name, None)
+
+    def get_scores(self, name):
+        return self.variable_scores.get(name)
 
     def get_diff(self, name, default=None):
         return self.variable_diffs.get(name, default)

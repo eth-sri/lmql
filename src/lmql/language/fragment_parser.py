@@ -162,6 +162,19 @@ class LanguageFragmentParser:
             self.query.prologue = []
             self.state = "prompt"
 
+        at_state = False
+        for i, tok in enumerate(self.query.prompt_str):
+            if tok.type == tokenize.OP:
+                if at_state and tok.string in ["*", "+", "/", "-"]:
+                    self.query.prompt_str[i] = tokenize.TokenInfo(
+                        type=tokenize.OP, string=f"'{tok.string}'@", start=tok.start, end=tok.end, line=tok.line
+                    )
+
+                at_state = tok.string == "@"
+                continue
+            else:
+                at_state = False
+
         self.prologue_transform()
         self.inline_where_transform()
         self.inline_distribution_transform()

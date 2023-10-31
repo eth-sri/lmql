@@ -113,3 +113,52 @@ class defer_call:
             argstr += str(self.kwargs)[1:-1]
         argstr = argstr.rstrip(",")
         return f"deferred {qfct.name}({argstr})"
+
+def annotate_score(result, score, additive_op=None, existing_score=None):
+    """
+    Annotates the provided 'result' with the provided 'score' in the current
+    graph execution context and returns the 'result' as-is.
+
+    Assignment happens on an instance level as tracked via `id(result)`.
+    """
+
+    if additive_op is not None:
+        if additive_op == "*":
+            score = score * existing_score
+        elif additive_op == "+":
+            score = score + existing_score
+        elif additive_op == "-":
+            score = score - existing_score
+        elif additive_op == "/":
+            score = score / existing_score
+        else:
+            raise TypeError(f"Compound scoring operation '@{additive_op}' is not supported.")
+    
+    context = get_graph_context()
+    if context is not None:
+        context.value_scores[id(result)] = score
+    
+    return result
+
+def scorer(runtime_context):
+    """
+    Returns a callable that llows to score LMQL values (placeholder variables or scored query inputs)
+    by variable name or by value.
+    """
+    def score(value=None, variable=None):
+        if variable is not None:
+            return runtime_context.logprobs(variable)
+        else:
+            context = get_graph_context()
+            # if not in a graph context, score is always 0.0
+            if context is None:
+                return 0.0
+            
+            node = context.inputs_mapping.get(id(value))
+            # in graph context, default score is 1.0
+            # TODO: should we have different default scores for graph and non-graph contexts?
+            if node is None:
+                return 1.0
+            return node.score
+
+    return score

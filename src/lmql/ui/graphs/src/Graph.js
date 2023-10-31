@@ -11,7 +11,7 @@ import { atomOneDarkReasonable } from 'react-syntax-highlighter/dist/esm/styles/
 
 Cytoscape.use(dagre);
 
-// different colors to use for different value_class_id values
+// as hsl
 const VALUE_CLASS_COLORS = [
     '#1f77b4',
     '#ff7f0e',
@@ -39,6 +39,17 @@ const cyStyle = [
         'width': '10px',
         'height': '10px',
         'background-color': 'grey',
+        // line break label
+        // allow line breaks
+        'text-wrap': 'wrap',
+        // wrap at 20 characters
+        'text-wrap': 'wrap',
+        'text-max-width': '100px',
+        'text-justification': 'center',
+        // show label below
+        'text-valign': 'bottom',
+        'text-halign': 'center',
+        'text-margin-y': '5px',
       }
     },
     {
@@ -63,7 +74,7 @@ const cyStyle = [
         style: {
           'width': 1,
           'target-arrow-shape': 'triangle',
-          'line-color': 'grey',
+          'line-color': '#A0A0A0',
           'target-arrow-color': 'grey',
           "curve-style": "bezier",
           "control-point-step-size": 40,
@@ -146,7 +157,7 @@ const layout = {
 function ChildData(props) {
     let children = props.children;
     children.sort((a, b) => {
-        return a.score - b.score;
+        return b.score - a.score;
     })
 
     props.expandable = (props.expandable && children.length > 0);
@@ -246,11 +257,32 @@ export function Graph() {
                     cy_instance.elements().remove();
                     cy_instance.add(elements);
 
+                    // gather max and min score
+                    let min_score = 0;
+                    let max_score = 0;
+                    cy_instance.nodes().forEach(node => {
+                        let score = node.data().score;
+                        if (score < min_score) {
+                            min_score = score;
+                        }
+                        if (score > max_score) {
+                            max_score = score;
+                        }
+                    })
+
                     // for each node, assign 'color' based on VALUE_CLASS_COLORS and value_class_id (with modulo)
                     cy_instance.nodes().forEach(node => {
                         let color = VALUE_CLASS_COLORS[node.data().value_class_id % VALUE_CLASS_COLORS.length];
-                        node.style('background-color', color);
-                        node.data('color', color);
+                        let relative_score = (node.data().score - min_score) / (max_score - min_score);
+                        // adapt L based on score between 50% and 80%
+                        if (color) {
+                            node.data('color', color);
+                            node.data('label', node.data('label') + "\n(" + node.data().score.toFixed(2) + ")");
+                            // node.style('border-width', relative_score * 2);
+                            // background opacity
+                            node.style('background-color', color);
+                            
+                        }
                     })
 
                     cy_instance.layout(layout).run();

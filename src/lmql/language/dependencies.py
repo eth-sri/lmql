@@ -75,6 +75,9 @@ class QueryDependencyScope(ast.NodeVisitor):
             return node
         
         target = args[0]
+        if type(target) is not ast.Name:
+            return node
+        
         self._dependencies.append(ast.unparse(target))
 
         return node

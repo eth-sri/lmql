@@ -26,6 +26,15 @@ from lmql.language.dependencies import QueryDependencyScope
 OPS_NAMESPACE = "lmql.ops"
 LIB_NAMESPACE = "lmql.lib"
 
+def yield_call(func, *args):
+    return f"""yield lmql.runtime_support.context_call("{func}", {", ".join([str(a) for a in args])})"""
+
+def interrupt_call(func, *args):
+    return f"""yield lmql.runtime_support.interrupt_call("{func}", {", ".join([str(a) for a in args])})"""
+
+# expression to use in compiled code to access a LMQL value scorer
+RUNTIME_SCORER = "lmql.runtime_support.scorer((" + yield_call("get_context", ()) + "))"
+
 class FreeVarCollector(ast.NodeVisitor):
     def __init__(self, free_vars, exclude_criteria=None):
         self.free_vars = free_vars
@@ -221,7 +230,7 @@ class PromptScope(ast.NodeVisitor):
         # make sure "input" can be intercepted
         if name in ["input"]:
             return False
-        if name in ["lmql", "context", "__dynamic__"]:
+        if name in ["lmql", "context", "__dynamic__", "scored", "score", "logprobs"]:
             return True
         if name in self.free_vars:
             return True
@@ -301,6 +310,7 @@ def attr(s):
     for name in names[1:]:
         element = ast.Attribute(element, name, ast.Load())
     return element
+
 class FunctionCallTransformation(ast.NodeTransformer):
     """
     Translates function calls into lmql.call calls (to enable automatic await and unpacking 
@@ -319,6 +329,36 @@ class FunctionCallTransformation(ast.NodeTransformer):
         if not type(node) is ast.Name: return False
         return node.id in ["print", "eval", "locals", "globals"]
 
+    def builtin_name(self, node):
+        if not type(node) is ast.Name: return None
+        name = node.id
+
+        return {
+            "scored": "lmql.runtime_support.scored",
+            "score": RUNTIME_SCORER
+        }.get(name, None)
+
+    def is_builtin_var_operation(self, call: ast.Call):
+        target = call.func
+        if not type(target) is ast.Name: return False
+        op_name = target.id
+        
+        var_operations = {
+            "logprobs"
+        }
+
+        if not op_name in var_operations: return False
+        
+        args = call.args
+        if not len(args) == 1: return False
+        arg = args[0]
+        if not type(arg) is ast.Name: return False
+        
+        var_name = arg.id
+
+        # call context logprobs('<var_name')
+        return ast.parse("(" + yield_call("get_context", ()) + ").{}('{}')".format(op_name, var_name)).body[0].value
+
     def visit_Call(self, node: Call) -> Any:
         f = self.visit(node.func)
         args = [self.visit(a) for a in node.args]
@@ -329,6 +369,15 @@ class FunctionCallTransformation(ast.NodeTransformer):
             node.args = args
             node.keywords = keywords
             return node
+
+        if builtin_name := self.builtin_name(node.func):
+            node.func = ast.parse(builtin_name).body[0].value
+            node.args = args
+            node.keywords = keywords
+            return node
+
+        if var_operation := self.is_builtin_var_operation(node):
+            return var_operation
 
         wrapped = Call(attr("lmql.runtime_support.call"), [f, *args], keywords)
         wrapped = ast.Await(wrapped)
@@ -817,6 +866,36 @@ class BranchingCallTransformation(ast.NodeTransformer):
                 ])""")
         return node
 
+class AtOperatorTransformation(ast.NodeTransformer):
+    """
+    Transforms scoring expressions like A@0.9 into lmql.lmql_runtime.annotate_score(A, score=0.9)
+    """
+    def __init__(self, query: LMQLQuery):
+        self.query = query
+        self.call_identifier_counter = 0
+    
+    def transform(self):
+        self.query.prompt = [self.visit(p) for p in self.query.prompt]
+
+    def visit_BinOp(self, node: BinOp) -> Any:
+        if type(node.op) is ast.MatMult:
+            left = node.left
+            additive_op = None
+            # check additive scoring (fragment parser transformers '@*' to '@"*"@'")
+            if type(left) is ast.BinOp and type(left.op) is ast.MatMult:
+                # additive operation e.g. *, /, +, -
+                additive_op = left.right
+                # actual score operand
+                left = left.left
+
+                score_expr = f", additive_op={ast.unparse(additive_op) if additive_op else 'None'}"
+                score_expr += ", existing_score={}({})".format(RUNTIME_SCORER, ast.unparse(left))
+            else:
+                score_expr = ""
+
+            return ast.parse(f"lmql.lmql_runtime.annotate_score({ast.unparse(left)}, score={ast.unparse(node.right)}{score_expr})")
+        return node
+
 class CompilerTransformations:
     def __init__(self):
         self.transformations = [
@@ -824,7 +903,8 @@ class CompilerTransformations:
             WhereClauseTransformation,
             DecodeClauseTransformation,
             ReturnStatementTransformer,
-            BranchingCallTransformation
+            BranchingCallTransformation,
+            AtOperatorTransformation
         ]
     
     def transform(self, query):
@@ -927,12 +1007,6 @@ def preprocess_text(lmql_code):
     lines = lmql_code.split("\n")
     common_indent = min([len(l) - len(l.lstrip()) for l in lines if len(l.strip()) > 0])
     return "\n".join([l[common_indent:] for l in lines])
-
-def yield_call(func, *args):
-    return f"""yield lmql.runtime_support.context_call("{func}", {", ".join([str(a) for a in args])})"""
-
-def interrupt_call(func, *args):
-    return f"""yield lmql.runtime_support.interrupt_call("{func}", {", ".join([str(a) for a in args])})"""
 
 class LMQLCompiler:
     def __init__(self):

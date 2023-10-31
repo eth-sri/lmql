@@ -18,9 +18,10 @@ class InferenceGraph:
     aspect of the inference process (e.g. reliabililty, consistency, cost, etc.).
     """
 
-    def __init__(self):
+    def __init__(self, caching_strategy=None):
         # all instance and query nodes of this graph
         self.nodes: List[Union[QueryNode, InstanceNode]] = []
+        self.caching_strategy = caching_strategy
         
         # mapping of LMQLQueryFunction to QueryNodes
         self.qfct_to_node = {}
@@ -70,26 +71,39 @@ class InferenceGraph:
         provided arguments and keyword arguments are the inputs.
         """
         # check if this is a sub-query call
-        context = get_graph_context()
+        context: InferenceCall = get_graph_context()
+        
+        # count query calls per node
+        node.num_calls += 1
 
         # in new context, compute result and track inputs and outputs
         # as instance nodes and edges
         with InferenceCall(self, node) as call:
-            if "cache" not in kwargs:
+            if "cache" not in kwargs and self.caching_strategy == 'node':
                 kwargs["cache"] = f"/tmp/lmql-graph-cache-{node.name}.tokens"
-            result = await node.query_fct.__acall__(*args, **kwargs)
             
+            result = await node.query_fct.__acall__(*args, **kwargs)
+            score = 1.0
+            
+            # check if result has identity-mapped instance node
+            if result_node := call.inputs_mapping.get(id(result)):
+                score = result_node.score
+            # otherwise check if result has been manually annotated with 
+            # a score (e.g. a@0.1)
+            elif value_score := call.value_scores.get(id(result)):
+                score = value_score
+
             # create corresponding instance graph structure
-            instance_node = InstanceNode(result, call.inputs)
+            instance_node = InstanceNode(result, call.inputs, score=score)
             # register new instance node in calling context (as input to calling query)
             if context is not None:
                 context.inputs.append(instance_node)
+                context.inputs_mapping[id(result)] = instance_node
             
             # track instance node in query node
             node.add_instance(instance_node)
 
             # merge equivalent instance nodes
-            before_len = len(node.instances)
             node.merge_instances()
             
             return result
@@ -113,6 +127,11 @@ class InferenceCall:
     # inputs to the current call accumulated so far during
     # execution of the current query function
     inputs: list = field(default_factory=list)
+    
+    # maps input values (id(value)) to the corresponding instance nodes
+    inputs_mapping: Dict[int, InstanceNode] = field(default_factory=dict)
+    # maps local value IDs (id(...)) to the corresponding scores
+    value_scores: Dict[int, float] = field(default_factory=dict)
 
     def __enter__(self):
         push_graph_context(self)

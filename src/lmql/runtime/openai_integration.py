@@ -557,6 +557,8 @@ class DclibOpenAiModel(DcModel):
                 sampling_modes = [f"sample-{temperature}-sample-id-{random.randint(0, 2**32-1)}" for _ in range(len(seqs))]
                 edge_type_populated_user_data = [{"dc-edge-type": sm} for sm in sampling_modes]
             
+            # print(sampling_modes)
+
             completions: List[CompletionResult] = await self.completion_buffer(seqs, logprobs=num_samples, sampling_modes=sampling_modes, **kwargs)
             
             next_token_ids = []
