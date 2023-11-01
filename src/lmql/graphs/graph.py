@@ -6,7 +6,7 @@ import random
 import json
 from lmql.runtime.loop import run_in_loop
 from .printer import InferenceGraphPrinter
-from typing import List, Union
+from typing import List, Union, Tuple
 from lmql.graphs.inference_call import InferenceCall
 
 class InferenceGraph:
@@ -50,28 +50,8 @@ class InferenceGraph:
             return await call_raw(fct, *args, **kwargs)
         node = self.qfct_to_node.get(qfct)
 
-        # check for existing previously computed (deferred) ainfer result
-        context = get_graph_context()
-        arg_repr = str(args) + str(kwargs)
-        
-        options = [defer_call(fct, *args, **kwargs)] + (other_options or [])
-        
-        if context is not None:
-            previously_deferred = context.node.branches.get(arg_repr, [])
-            options = options + previously_deferred
-        
-        print(context.node.name if context is not None else "<root>", ": ", options, sep="")
-
         # call actual ainfer method
-        result = await self.ainfer(node, *args, other_options=other_options, **kwargs)
-
-        # check for value alternatives recorded for 'result'
-        if context is not None:
-            if alternatives := context.value_alternatives[id(result)]:
-                context.node.branches.setdefault(arg_repr, []).extend(alternatives)
-        # print("node.branches", node, node.branches)
-
-        return result
+        return await self.ainfer(node, *args, other_options=other_options, **kwargs)
 
     async def ainfer_branch(self, id: int, branching_call: List[defer_call]):
         """
@@ -97,6 +77,8 @@ class InferenceGraph:
         Infers the result of the given query node, assuming the 
         provided arguments and keyword arguments are the inputs.
         """
+        assert node is not None, "Query node cannot be None"
+
         # check if this is a sub-query call
         context: InferenceCall = get_graph_context()
         
@@ -142,12 +124,17 @@ class InferenceGraph:
         return run_in_loop(self.ainfer(node, *args, **kwargs))
 
 
-def _build_graph(query_fct, graph):
+def _build_graph(query_fct_or_ref: Union[LMQLQueryFunction, Tuple[str, LMQLQueryFunction]], graph):
     """
     Constructs an LMQL inference graph from the call hierarchy 
     of the given query function.
     """
-    name = query_fct.name if type(query_fct) is LMQLQueryFunction else query_fct.__name__
+    if type(query_fct_or_ref) is tuple:
+        query_fct = query_fct_or_ref[1]
+        name = query_fct_or_ref[0]
+    else:
+        query_fct = query_fct_or_ref
+        name = query_fct.name if type(query_fct) is LMQLQueryFunction else query_fct.__name__
     query_node = QueryNode(name, query_fct)
     
     # non-query functions are also QueryNodes, but we do not 

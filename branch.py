@@ -25,9 +25,16 @@ def branch():
     )
 
 @lmql.query
+def non_branch(name: str):
+    '''lmql
+    return name
+    '''
+
+@lmql.query
 def q():
     '''lmql
-    "Is '{branch()}' and '{branch()}' the same name? (yes or no)\n"
+    argmax(dump_compiled_code=True)
+    "Is '{branch()}' and '{non_branch('Alice')}' the same name? (yes or no)\n"
     print([context.prompt])
     "A:[A]"
     print("answer is", [A])

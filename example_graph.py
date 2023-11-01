@@ -30,7 +30,7 @@ def ao_answer(question):
 @lmql.query
 def answer(question):
     '''lmql
-    return ao_answer(question) | cot_answer(question)
+    return ao_answer(question)@0.9 | cot_answer(question)
     '''
 
 @lmql.query(merge=ByIntValue(score='mean'))

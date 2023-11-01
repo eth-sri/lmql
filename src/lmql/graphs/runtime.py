@@ -59,6 +59,7 @@ async def call_raw(fct, *args, **kwargs):
     """
     Non-graph aware version of call(...).
     """
+
     if type(fct) is LMQLQueryFunction or (hasattr(fct, "__lmql_query_function__") and fct.__lmql_query_function__.is_async):
         result = await fct(*args, **kwargs)
         return result

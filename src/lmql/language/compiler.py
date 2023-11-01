@@ -22,6 +22,7 @@ from lmql.ops.ops import lmql_operation_registry
 from lmql.runtime.dclib import get_all_decoders
 from lmql.models.aliases import model_name_aliases
 from lmql.language.dependencies import QueryDependencyScope
+from lmql.language.compiled_call import CompiledCall
 
 OPS_NAMESPACE = "lmql.ops"
 LIB_NAMESPACE = "lmql.lib"
@@ -379,10 +380,13 @@ class FunctionCallTransformation(ast.NodeTransformer):
         if var_operation := self.is_builtin_var_operation(node):
             return var_operation
 
-        args_repr = "{'args':(" + ast.unparse(args).strip() + ")"
+        return self.compiled_call(f, args, keywords)
+    
+    @staticmethod
+    def compiled_call(f, args, keywords):
+        args_repr = "{'args': tuple([" + ", ".join([ast.unparse(a) for a in args]) + "])"
         if len(keywords) > 0:
             kw_repr = ', '.join([f'{k.arg}={ast.unparse(k.value)}' for k in keywords]) + '}'
-            print(kw_repr)
             args_repr += ", 'kwargs': '{' + " + kw_repr + " + '}'"
         args_repr += "}"
         wrapped = wrapped = interrupt_call('call', ast.unparse(f), args_repr)
@@ -846,28 +850,54 @@ class BranchingCallTransformation(ast.NodeTransformer):
     def transform(self):
         self.query.prompt = [self.visit(p) for p in self.query.prompt]
 
+    def branching_operand(self, node):
+        if type(node) is ast.Yield:
+            return node.value, None
+        elif type(node) is ast.BinOp and \
+            type(node.op) is ast.MatMult and \
+            type(node.left) is ast.Yield:
+            return node.left.value, node.right
+        else:
+            return None
+
     # check for ast.Call | ast.Call expressions
     def visit_BinOp(self, node: BinOp) -> Any:
         if type(node.op) is ast.BitOr:
-            operands = [node.left, node.right]
-            if all(type(o) is ast.Await for o in operands) and \
-               all(type(o.value) is ast.Call for o in operands):
-                left = self.visit(node.left.value)
-                right = self.visit(node.right.value)
+            operands = [self.branching_operand(node.left), self.branching_operand(node.right)]
+            
+            if any(o is None for o in operands):
+                return node
+            
+            left = operands[0][0]
+            left_score = operands[0][1]
 
-                if ast.unparse(left.func) != "lmql.runtime_support.call" or \
-                   ast.unparse(right.func) != "lmql.runtime_support.call":
-                    return node
+            right = operands[1][0]
+            right_score = operands[1][1]
 
-                deferred_left = ast.Call(attr("lmql.runtime_support.defer_call"), left.args, left.keywords)
-                deferred_right = ast.Call(attr("lmql.runtime_support.defer_call"), right.args, right.keywords)
+            left = self.visit(left)
+            right = self.visit(right)
 
-                call_id = self.call_identifier_counter
-                self.call_identifier_counter += 1
+            # view L/R as compiled function calls
+            left = CompiledCall.view(left)
+            right = CompiledCall.view(right)
 
-                return ast.parse(f"""await lmql.runtime_support.branch({call_id}, [
-                    {ast.unparse(deferred_left)}, {ast.unparse(deferred_right)}
-                ])""")
+            if any(c is None for c in [left, right]):
+                return node
+
+            deferred_left = ast.Call(attr("lmql.runtime_support.defer_call"), [left.func] + left.args, left.keywords)
+            deferred_right = ast.Call(attr("lmql.runtime_support.defer_call"), [right.func] + right.args, right.keywords)
+
+            call_id = self.call_identifier_counter
+            self.call_identifier_counter += 1
+
+            # ast.parse(f"""await lmql.runtime_support.branch({call_id}, [
+            #     {ast.unparse(deferred_left)}, {ast.unparse(deferred_right)}
+            # ])""")
+        
+            return FunctionCallTransformation.compiled_call(ast.Name("lmql.runtime_support.branch"), [
+                ast.Constant(call_id, "int"),
+                ast.List([deferred_left, deferred_right], ast.Load())
+            ], [])
         return node
 
 class AtOperatorTransformation(ast.NodeTransformer):
@@ -1045,8 +1075,10 @@ class LMQLCompiler:
             transformations.transform(q)
 
             # query dependency scoping
-            q.dependencies = QueryDependencyScope().scope(q)
-            decorator_args = "dependencies=" + str(q.dependencies)
+            dependency_scope = QueryDependencyScope()
+            q.dependencies = dependency_scope.scope(q)
+            decorator_args = "dependencies=" + dependency_scope.dependency_dict()
+            print(decorator_args)
 
             model_name = ast.unparse(q.from_ast).strip()
             model_name = model_name_aliases.get(model_name, model_name)
