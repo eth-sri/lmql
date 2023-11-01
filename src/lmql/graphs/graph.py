@@ -7,6 +7,7 @@ import json
 from lmql.runtime.loop import run_in_loop
 from .printer import InferenceGraphPrinter
 from typing import List, Union
+from lmql.graphs.inference_call import InferenceCall
 
 class InferenceGraph:
     """
@@ -39,7 +40,7 @@ class InferenceGraph:
     def to_json(self):
         return InferenceGraphPrinter().to_json(self)
 
-    async def ainfer_call(self, fct: callable, *args, **kwargs):
+    async def ainfer_call(self, fct: callable, *args, other_options=None, **kwargs):
         """
         Invoked for a regular a() query function call, this method 
         determines how to infer the result of the call.
@@ -48,24 +49,50 @@ class InferenceGraph:
         if qfct is None:
             return await call_raw(fct, *args, **kwargs)
         node = self.qfct_to_node.get(qfct)
-        return await self.ainfer(node, *args, **kwargs)
 
-    async def ainfer_branch(self, branching_call: List[defer_call]):
+        # check for existing previously computed (deferred) ainfer result
+        context = get_graph_context()
+        arg_repr = str(args) + str(kwargs)
+        
+        options = [defer_call(fct, *args, **kwargs)] + (other_options or [])
+        
+        if context is not None:
+            previously_deferred = context.node.branches.get(arg_repr, [])
+            options = options + previously_deferred
+        
+        print(context.node.name if context is not None else "<root>", ": ", options, sep="")
+
+        # call actual ainfer method
+        result = await self.ainfer(node, *args, other_options=other_options, **kwargs)
+
+        # check for value alternatives recorded for 'result'
+        if context is not None:
+            if alternatives := context.value_alternatives[id(result)]:
+                context.node.branches.setdefault(arg_repr, []).extend(alternatives)
+        # print("node.branches", node, node.branches)
+
+        return result
+
+    async def ainfer_branch(self, id: int, branching_call: List[defer_call]):
         """
-        Invoked for a a() | b() branching call, this method determines
+        Invoked for a 'a() | b()'-style branching calls. This method determines
         which branch to explore and how its result should be inferred.
         """
+        context: InferenceCall = get_graph_context()
+        assert context is not None, "ainfer_branch() can only be called from within a graph context via lmql.infer(...)"
+
         # 1. decide which branch to explore
         call: defer_call = random.choice(branching_call)
-        
+        # record other calls as possible alternatives to be explored later
+        other_options = [c for c in branching_call if c is not call]
+
         # 2. check whether to re-sample branch or use cached result
         pass
 
         # 3. infer branch result
-        target_node = self.qfct_to_node.get(query_function(call.target))
-        return await self.ainfer(target_node, *call.args, **call.kwargs)
+        return await self.ainfer_call(call.target, *call.args, **call.kwargs, other_options=other_options)
 
-    async def ainfer(self, node: QueryNode, *args, **kwargs):
+    async def ainfer(self, node: QueryNode, *args, other_options=None, **kwargs):
         """
         Infers the result of the given query node, assuming the 
         provided arguments and keyword arguments are the inputs.
@@ -82,6 +109,7 @@ class InferenceGraph:
             if "cache" not in kwargs and self.caching_strategy == 'node':
                 kwargs["cache"] = f"/tmp/lmql-graph-cache-{node.name}.tokens"
             
+            # actually execute underlying query function
             result = await node.query_fct.__acall__(*args, **kwargs)
             score = 1.0
             
@@ -96,10 +124,12 @@ class InferenceGraph:
             # create corresponding instance graph structure
             instance_node = InstanceNode(result, call.inputs, score=score)
             # register new instance node in calling context (as input to calling query)
+
             if context is not None:
                 context.inputs.append(instance_node)
                 context.inputs_mapping[id(result)] = instance_node
-            
+                context.value_alternatives[id(result)] = other_options or call.value_alternatives.get(id(result))
+
             # track instance node in query node
             node.add_instance(instance_node)
 
@@ -110,35 +140,6 @@ class InferenceGraph:
 
     def infer(self, node: QueryNode, *args, **kwargs):
         return run_in_loop(self.ainfer(node, *args, **kwargs))
-
-@dataclass
-class InferenceCall:
-    """
-    Graph context for an graph inference call. 
-
-    Allows call(...) and branch(...) calls to add edges between their
-    results and the result of the current query call.
-    """
-    # inference graph we operate in
-    graph: InferenceGraph
-    # query node representing the current call
-    node: "QueryNode"
-    
-    # inputs to the current call accumulated so far during
-    # execution of the current query function
-    inputs: list = field(default_factory=list)
-    
-    # maps input values (id(value)) to the corresponding instance nodes
-    inputs_mapping: Dict[int, InstanceNode] = field(default_factory=dict)
-    # maps local value IDs (id(...)) to the corresponding scores
-    value_scores: Dict[int, float] = field(default_factory=dict)
-
-    def __enter__(self):
-        push_graph_context(self)
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        pop_graph_context()
 
 
 def _build_graph(query_fct, graph):

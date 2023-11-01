@@ -1,6 +1,6 @@
 from .nodes import *
 from .runtime import call, defer_call, branch, annotate_score, scorer
-from lmql.graphs.graph import InferenceGraph, query_function
+from lmql.graphs.graph import InferenceGraph, query_function, InferenceCall
 
 def infer(fct, *args, samples=1, state=None, **kwargs):
     """

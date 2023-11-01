@@ -852,16 +852,14 @@ class BranchingCallTransformation(ast.NodeTransformer):
                 if ast.unparse(left.func) != "lmql.runtime_support.call" or \
                    ast.unparse(right.func) != "lmql.runtime_support.call":
                     return node
-                
-                left_repr = f"call#{self.call_identifier_counter}" + ast.unparse(node.left.value)[len("lmql.runtime_support.call"):]
-                self.call_identifier_counter += 1
-                right_repr = f"call#{self.call_identifier_counter}" + ast.unparse(node.right.value)[len("lmql.runtime_support.call"):]
-                self.call_identifier_counter += 1
 
                 deferred_left = ast.Call(attr("lmql.runtime_support.defer_call"), left.args, left.keywords)
                 deferred_right = ast.Call(attr("lmql.runtime_support.defer_call"), right.args, right.keywords)
 
-                return ast.parse(f"""await lmql.runtime_support.branch([
+                call_id = self.call_identifier_counter
+                self.call_identifier_counter += 1
+
+                return ast.parse(f"""await lmql.runtime_support.branch({call_id}, [
                     {ast.unparse(deferred_left)}, {ast.unparse(deferred_right)}
                 ])""")
         return node

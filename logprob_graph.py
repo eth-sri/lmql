@@ -27,21 +27,15 @@ def ao_answer(question):
     return ANSWER@(logprobs(ANSWER).mean())
     '''
 
-@lmql.query
+@lmql.query(merge=ByIntValue(score='mean'))
 def answer(question):
     '''lmql
     return ao_answer(question) | cot_answer(question)
     '''
 
-@lmql.query(merge=ByIntValue(score='mean'))
-def final_answer(question):
-    '''lmql
-    return answer(question)
-    '''
-
 if __name__ == "__main__":
     # graph query
-    lmql.infer(final_answer, question="What is 23*2-123?", state="graph.json", samples=4)
+    lmql.infer(answer, question="What is 23*2-123?", state="graph.json", samples=4)
     # to inspect the resulting graph, run 
     # lmql graph-watch graph.json 
     # and open http://localhost:1234 in your browser

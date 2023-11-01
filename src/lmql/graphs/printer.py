@@ -80,6 +80,7 @@ class InferenceGraphPrinter:
                 "parent": node_ids[id(n)],
                 "value_class_id": value_class_id,
                 "score": instance.score,
-                "children": aggregate_node_data
+                "children": aggregate_node_data,
+                "unrealized": instance.unrealized
             }
         }

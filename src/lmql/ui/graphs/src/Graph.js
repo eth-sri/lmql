@@ -279,7 +279,9 @@ export function Graph() {
                             node.data('color', color);
                             node.data('label', node.data('label') + "\n(" + node.data().score.toFixed(2) + ")");
                             // node.style('border-width', relative_score * 2);
-                            // background opacity
+                            if (node.data("unrealized")) {
+                                node.style('opacity', 0.5);
+                            }
                             node.style('background-color', color);
                             
                         }

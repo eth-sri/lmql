@@ -43,8 +43,8 @@ class QueryDependencyScope(ast.NodeVisitor):
         # track dependencies of
         if ast.unparse(func) == "lmql.runtime_support.branch":
             subscopes = []
-            assert len(node.args) == 1, "QueryDependencyScope: expected branch call with exactly one argument, but found {}".format(len(node.args))
-            branched_calls = node.args[0]
+            assert len(node.args) == 2, "QueryDependencyScope: expected branch call with exactly one argument, but found {}".format(len(node.args))
+            branched_calls = node.args[1]
             assert isinstance(branched_calls, ast.List), "QueryDependencyScope: expected branch call with a list of dependencies, but found {}".format(type(branched_calls))
 
             subscopes = []

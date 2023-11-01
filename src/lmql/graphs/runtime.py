@@ -68,7 +68,7 @@ async def call_raw(fct, *args, **kwargs):
     else:
         return fct(*args, **kwargs)
 
-async def branch(branching_call: Dict):
+async def branch(id: int, branching_call: Dict):
     """
     Used by compiled LMQL query functions to evaluate branching call expressions like 'a() | b()'
     """
@@ -84,7 +84,7 @@ async def branch(branching_call: Dict):
         return result
 
     # use graph context for actual execution
-    return await inference_call.graph.ainfer_branch(branching_call)
+    return await inference_call.graph.ainfer_branch(id, branching_call)
 
 class defer_call:
     """
@@ -97,7 +97,11 @@ class defer_call:
     @property
     def target(self):
         return self._args[0]
-    
+
+    @property
+    def query_function(self):
+        return query_function(self.target)
+
     @property
     def args(self):
         return self._args[1:]

@@ -1,7 +1,8 @@
 """
 Node types for LMQL Graphs.
 """
-from typing import List
+from typing import List, Dict, Any
+from dataclasses import dataclass, field
 
 class QueryNode:
     """
@@ -19,6 +20,9 @@ class QueryNode:
 
         self.num_calls = 0
 
+        # maps branch IDs to branch context
+        self.branches: Dict[str, Any] = {}
+
     def merge_instances(self):
         if self.merging_strategy is None:
             return
@@ -35,13 +39,14 @@ class InstanceNode:
     An instance node represents the result of a query function with the specified inputs 
     (instance nodes of predecessor queries used to produce this result).
     """
-    def __init__(self, result, predecessors, score=1.0):
+    def __init__(self, result, predecessors, score=1.0, unrealized=False):
         self.result = result
         self.predecessors: List[InstanceNode] = predecessors
         self.score = score
         
         # identifier for this result's class (e.g. should be the same for equivalent/aggregated results)
         self.value_class = str(result)
+        self.unrealized = unrealized
 
     def __prompt__(self):
         return str(self.result)

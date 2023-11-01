@@ -20,6 +20,6 @@ def solution(input):
     return | solution(step)@step_score(step) for step in STEPS |
 
 def final_solution(input):
-    solution()
+    return solution()
 
 graph.infer(solution, input="4 9 10 13")
