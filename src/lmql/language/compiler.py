@@ -379,8 +379,14 @@ class FunctionCallTransformation(ast.NodeTransformer):
         if var_operation := self.is_builtin_var_operation(node):
             return var_operation
 
-        wrapped = Call(attr("lmql.runtime_support.call"), [f, *args], keywords)
-        wrapped = ast.Await(wrapped)
+        args_repr = "{'args':(" + ast.unparse(args).strip() + ")"
+        if len(keywords) > 0:
+            kw_repr = ', '.join([f'{k.arg}={ast.unparse(k.value)}' for k in keywords]) + '}'
+            print(kw_repr)
+            args_repr += ", 'kwargs': '{' + " + kw_repr + " + '}'"
+        args_repr += "}"
+        wrapped = wrapped = interrupt_call('call', ast.unparse(f), args_repr)
+        wrapped = ast.parse(wrapped).body[0].value
 
         return wrapped
 class PromptClauseTransformation(FunctionCallTransformation):

@@ -10,9 +10,11 @@ import warnings
 import re
 import lmql.ops.ops as ops
 import lmql.runtime.dclib as dc
+from lmql.runtime.resumables import resumable
 from lmql.runtime.dclib.dclib_model import TokenMask
 from lmql.language.qstrings import (DistributionVariable, TemplateVariable,
                                     qstring_to_stmts)
+from lmql.graphs.runtime import call, branching_point
 from lmql.ops.follow_map import FollowMap
 from lmql.ops.token_set import VocabularyMatcher, has_tail, tset
 from lmql.ops.follow_map import fmap
@@ -73,7 +75,9 @@ class RewrittenInputIds:
             final=[r.final if r is not None else True for r in results]
         )
 
-class advance: pass # used as symbol
+class advance: pass 
+@dataclass
+class function_call: result: Any
 
 class PromptState(NamedTuple):
     interpreter: 'PromptInterpreter'
@@ -163,6 +167,12 @@ class LMQLContext:
     async def query(self, qstring, __locals, **kwargs):
         return InterpreterCall(qstring, __locals, kwargs, loc=None)
 
+    async def call(self, fct, allargs):
+        args = allargs.get("args", [])
+        kwargs = allargs.get("kwargs", {})
+        result = await call(fct, *args, **kwargs)
+        return InterpreterCall("__branching_call__", result)
+
     async def set_model(self, model_name):
         self.interpreter.set_model(model_name)
 
@@ -222,10 +232,32 @@ class LMQLResult:
     # element instead of a single element (override [0] behavior)
     def __getitem__(self, key):
         if not key == 0:
-            print("access", key)
             return super().__getitem__(key)
         warnings.warn("Deprecated result[0] access on a query result detected. Since 0.7, an argmax/sample query function with a single result returns a LMQLResult object instead of a list of a single element. Please use the results directly and not via result[0]. In the future, this will raise an error.", DeprecationWarning)
         return self
+
+class QueryResumable(resumable):
+    def __init__(self, state, interpreter):
+        self.state = state
+        self.interpreter: PromptInterpreter = interpreter
+    
+    def copy(self):
+        return QueryResumable(self.state, self.interpreter.copy())
+    
+    def __call__(self, *args, **kwargs):
+        if len(self.state.stmt_buffer) == 0 or type(self.state.stmt_buffer[0]) is not function_call:
+            warnings.warn("warning: resuming a query resumable from a non-branched state. This is not supported and will likely lead to unexpected results.")
+            return self.interpreter.resume(self.state)
+        else:
+            state_branching_for_value = self.state.updated(
+                stmt_buffer=[function_call(args[0])] + self.state.stmt_buffer[1:],
+                interpreter=self.interpreter
+            )
+
+            return self.interpreter.resume(state_branching_for_value)
+
+    def __repr__(self):
+        return f"<QueryResumable {self.state}>"
 
 class PromptInterpreter:
     """
@@ -239,6 +271,7 @@ class PromptInterpreter:
         self.model_identifier = force_model.model_identifier if isinstance(force_model, LLM) else force_model
         self.name = name
         self.tokenizer: LMQLTokenizer = None
+        self.force_model = force_model
         
         # whether an inference certificate should be generated
         self.certificate = False
@@ -246,6 +279,7 @@ class PromptInterpreter:
         # decoder configuration
         self.decoder = None
         self.decoder_kwargs = None
+        self.full_decoder_args = None
         self.decoder_step = 0
 
         # extra interpreter flags passed via @lmql.query/@lmql.compiled_query
@@ -270,6 +304,9 @@ class PromptInterpreter:
         self.cache_file = None
         self.show_speculative = False
         
+        # debug out function (for output writers)
+        self.debug_out: callable = None
+        
         # key to use to store program statein decoding tree
         self.user_data_key = "head"
 
@@ -283,6 +320,66 @@ class PromptInterpreter:
 
         # context to determine model
         self.context = context
+
+    def copy(self):
+        i = PromptInterpreter(self.context, force_model=self.force_model, name=self.name)
+         # model-specific components
+        i.model = self.model
+        i.model_identifier = self.model_identifier
+        i.tokenizer = self.tokenizer
+        i.dcmodel = self.dcmodel
+        
+        # whether an inference certificate should be generated
+        i.certificate = self.certificate
+
+        # decoder configuration
+        i.decoder = self.decoder
+        i.decoder_kwargs = self.decoder_kwargs
+        i.full_decoder_args = self.full_decoder_args
+        i.decoder_step = self.decoder_step
+
+        # extra interpreter flags passed via @lmql.query/@lmql.compiled_query
+        i.extra_kwargs = self.extra_kwargs
+
+        # query program
+        # not copying root state (execution dependent)
+        # i.root_state = None
+        i.fct = self.fct
+
+        # constraints
+        i.where = self.where
+
+        # distribution variable if any
+        i.distribution_variable = self.distribution_variable
+        i.distribution_values = self.distribution_values
+
+        # logging and debugger output
+        i.output_writer = self.output_writer
+        i.prefers_compact_mask  = self.prefers_compact_mask
+        
+        # caching configuration
+        i.caching = self.caching
+        i.cache_file = self.cache_file
+        i.show_speculative = self.show_speculative
+
+        i.debug_out = self.debug_out
+        
+        # key to use to store program statein decoding tree
+        i.user_data_key = self.user_data_key
+
+        i.eager_followmap_expansion = self.eager_followmap_expansion
+        
+        # subinterpreters in case of inline queries
+        # not copying subinterpreters (execution dependent)
+        i.subinterpreters = {}
+
+        # decoder graph if decoder graph logging is enabled
+        i.decoder_graph = self.decoder_graph
+
+        # context to determine model
+        i.context = self.context
+
+        return i
 
     def __str__(self):
         args = []
@@ -357,7 +454,7 @@ class PromptInterpreter:
         prompt = state.prompt
         recurring_variable_counter = state.recurring_variable_counter.copy()
         distribution_reached = False
-
+        
         query_head = state.query_head
 
         async def continue_for_more_prompt_stmts():
@@ -371,16 +468,25 @@ class PromptInterpreter:
                 query_head.context = LMQLContext(self, state, prompt)
                 await query_head.continue_()
 
-            qstring = query_head.current_args[0]
-            query_args_after_last_continue = query_head.current_args[2] if len(query_head.current_args) > 2 else None
+            arg = query_head.current_args[0]
             
-            if len(query_head.current_args) > 2:
-                program_variables_after_last_continue = query_head.current_args[1]
-            
-            stmt_buffer = qstring_to_stmts(qstring) + [advance]
+            if arg == "__branching_call__":
+                result = query_head.current_args[1]
+                # branching calls induce query cloning
+                stmt_buffer = [function_call(result)]
+            else:
+                qstring = arg
+                # qstrings are top-level statements without return value
+                interrupt_call_evaluation_result = None
+                query_args_after_last_continue = query_head.current_args[2] if len(query_head.current_args) > 2 else None
+                
+                if len(query_head.current_args) > 2:
+                    program_variables_after_last_continue = query_head.current_args[1]
+                
+                stmt_buffer = qstring_to_stmts(qstring) + [advance]
 
-            # return context used for last continue_
-            return query_head.context
+                # return context used for last continue_
+                return query_head.context
         
         def format_buffer():
             return [s if type(s) is str else s.name for s in stmt_buffer if s is not advance]
@@ -439,6 +545,32 @@ class PromptInterpreter:
                     query_head.context = LMQLContext(self, state, prompt)
                     assert query_head.fresh_copy, "query head must be fresh copy to avoid state sharing side effects"
                     await query_head.advance(None)
+                    stmt_buffer = stmt_buffer[1:]
+                elif type(s) is function_call:
+                    # get result
+                    result = s.result
+
+                    if type(result) is branching_point:
+                        cloned_program_state = state.program_state.copy()
+                        cloned_program_state.python_scope = program_variables_after_last_continue or state.program_state.python_scope
+                        
+                        cloned_state = state.updated(
+                            variable=variable,
+                            prompt=prompt,
+                            query_args=query_args,
+                            variable_args=variable_args,
+                            stmt_buffer=stmt_buffer,
+                            query_head=query_head.copy(),
+                            program_state=cloned_program_state,
+                            recurring_variable_counter=recurring_variable_counter
+                        )
+                        result = result(resumable=QueryResumable(cloned_state, interpreter=self))
+
+                    query_head: InterpretationHead = query_head.copy()
+                    query_head.context = LMQLContext(self, state, prompt)
+                    assert query_head.fresh_copy, "query head must be fresh copy to avoid state sharing side effects"
+                    
+                    await query_head.advance(result)
                     stmt_buffer = stmt_buffer[1:]
                 else:
                     assert False, "prompt interpreter encountered unsupported prompt stmt of type {}: {}".format(type(s), s)
@@ -621,7 +753,7 @@ class PromptInterpreter:
 
         # extract hint of maximum number of tokens to generate for 'variable' from 
         # the where clause (e.g. upper bounds or no maximum for unbounded variables)
-        max_tokens_hint = ops.most_restrictive_hint([ops.token_hint(where, variable), max_tokens_hint])
+        max_tokens_hint = ops.most_restrictive_hint([ops.token_hint(where, variable), max_tokens_hint]) + 1
 
         if has_tail(mask):
             state = state.updated(tail = mask.tail)
@@ -997,6 +1129,8 @@ class PromptInterpreter:
                 _DCLibDebugPrinter.printer.add_decoder_state(data)
             self.dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
 
+        self.debug_out = debug_out
+
         # handle queries w/o any TemplateVariables
         if self.root_state.query_head.result is not None:
             with Context(self.model.get_tokenizer(), self.dcmodel.truncation_threshold):
@@ -1015,24 +1149,7 @@ class PromptInterpreter:
         if return_prompt_string:
             return self.root_state.prompt
 
-        # tokenize initial prompt
-        prompt_ids = await self.tokenize(self.root_state.prompt)
-        if self.dcmodel.bos_token_id is not None:
-            prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
-
-        prompt = self.tokenizer.tokenize(self.root_state.prompt, asbytes=True)
-        n = len(prompt)
-        
-        # make sure that the initial prompt is not considered part of a variable
-        self.root_state = self.root_state.updated(variable_offset=n)
-
         decoder_args = self.decoder_kwargs.copy()
-
-        # pass processor as decoder argument
-        decoder_args["modern_logits_processor"] = self.where_processor
-        
-        # pass rewriter as decoder argument
-        decoder_args["modern_rewriter"] = self.rewrite_processor
 
         if "__get_where__" in decoder_args:
             return self.where
@@ -1083,6 +1200,14 @@ class PromptInterpreter:
             else:
                 assert False, "Invalid value for 'cache' parameter. Expected either a boolean (to enable/disable) or a string (to enable with a disk-based cache file)"
 
+        # tokenize initial prompt
+        prompt_ids = await self.tokenize(self.root_state.prompt)
+        if self.dcmodel.bos_token_id is not None:
+            prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
+
+        # make sure that the initial prompt is not considered part of a variable
+        self.root_state = self.root_state.updated(variable_offset=len(prompt_ids))
+
         # setup dcmodel for use
         self.dcmodel.model_args = decoder_args
         if self.caching:
@@ -1091,8 +1216,48 @@ class PromptInterpreter:
 
         assert len(prompt_ids) < decoder_args["max_len"], "The initial prompt already exceeds the provided max_len. Please increase the max_len or reduce the initial prompt (Initial prompt: '{}', max_len: {})".format(len(prompt_ids), decoder_args["max_len"])
 
+        decoder_args["decoder_fct"] = decoder_fct
+
+        self.full_decoder_args = decoder_args
+
+        return await self.decode(self.root_state)
+    
+    @trace("PromptInterpreter.resume")
+    async def resume(self, state: PromptState):
+        if self.tokenizer is None:
+            # prepare tokenizer
+            self.tokenizer = self.model.get_tokenizer()
+
+        assert self.root_state is None, "error: resume() can only be called on a freshly copied() PromptInterpreter instance"
+
+        # advance root state to the next LLM prompt variable
+        state = await self.advance(state)
+
+        # handle resumed queries w/o any remaining TemplateVariables
+        if state.query_head.result is not None:
+            with Context(self.model.get_tokenizer(), self.dcmodel.truncation_threshold):
+                # one last call to debug_out to get the final state
+                await self.debug_out(self.decoder_step)
+                return (await self.postprocess([state.query_head.result]))[0]
+        
+        return await self.decode(state)
+
+    async def decode(self, state: PromptState):
+        self.root_state = state
+        prompt = self.tokenizer.tokenize(self.root_state.prompt, asbytes=True)
+
+        # make sure that the initial prompt is not considered part of a variable
+        self.root_state = self.root_state.updated(variable_offset=len(prompt))
+
+        # pass processor as decoder argument
+        self.full_decoder_args["modern_logits_processor"] = self.where_processor
+        
+        # pass rewriter as decoder argument
+        self.full_decoder_args["modern_rewriter"] = self.rewrite_processor
+
         # set step budget at least to max_len
-        step_budget = decoder_args.get("step_budget", max(1024, decoder_args.get("max_len", 1024)))
+        step_budget = self.full_decoder_args.get("step_budget", max(1024, self.full_decoder_args.get("max_len", 1024)))
+        decoder_fct = self.full_decoder_args["decoder_fct"]
 
         with Context(self.model.get_tokenizer(), self.dcmodel.truncation_threshold):
             try:
@@ -1102,8 +1267,8 @@ class PromptInterpreter:
                 average_step_time = None
                 start = time.time()
 
-                async for _ in decoder_fct(prompt, **decoder_args):
-                    await debug_out(self.decoder_step)
+                async for _ in decoder_fct(prompt, **self.full_decoder_args):
+                    await self.debug_out(self.decoder_step)
                     self.decoder_step += 1
 
                     if step_budget is not None and self.decoder_step >= step_budget:
@@ -1116,18 +1281,18 @@ class PromptInterpreter:
                     
                     average_step_time = (time.time() - start) if average_step_time is None else (average_step_time * 0.9 + (time.time() - start) * 0.1)
 
-                    if "performance_stats" in decoder_args:
+                    if "performance_stats" in self.full_decoder_args:
                         if self.decoder_step % 10 == 0:
                             Stats.print_all()
                             print("step", self.decoder_step, "time", average_step_time)
 
                     start = time.time()
                 
-                assert False, "decoder {} did not finish with dc.finish(), which means no result sequences were returned. \n\nThe reason for this may be a too small max_len value (max_len={}) ".format(decoder_args["decoder"], decoder_args["max_len"])
+                assert False, "decoder {} did not finish with dc.finish(), which means no result sequences were returned. \n\nThe reason for this may be a too small max_len value (max_len={}) ".format(self.full_decoder_args["decoder"], self.full_decoder_args["max_len"])
                     
             except dc.FinishException as fe:
-                # one last call to debug_out to get the final state
-                await debug_out(self.decoder_step)
+                # one last call to self.debug_out to get the final state
+                await self.debug_out(self.decoder_step)
                 # if dc.finish is used, the decoder sets the sequences it considers 
                 # finished (return them to prompt interpreter)
                 result_sequences = fe.result_sequences
@@ -1154,9 +1319,9 @@ class PromptInterpreter:
                         results.append(state.query_head.result)
                     else:
                         state = await self.advance(state)
-                        assert len(s.input_ids) < decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(decoder_args["max_len"], len(s.input_ids))
+                        assert len(s.input_ids) < self.full_decoder_args["max_len"], "The decoder returned a sequence that exceeds the provided max_len (max_len={}, sequence length={}). To increase the max_len, please provide a corresponding max_len argument to the decoder function.".format(self.full_decoder_args["max_len"], len(s.input_ids))
 
-                        assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), decoder_args["decoder"])
+                        assert state.query_head.result is not None, "decoder designates sequence {} as finished but the underyling query program has not produced a result. This is likekly a decoder bug. Decoder in use {}".format(await s.text(), self.full_decoder_args["decoder"])
                         results.append(state.query_head.result)
 
                     if type(results[-1]) is LMQLResult:

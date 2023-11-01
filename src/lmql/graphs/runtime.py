@@ -9,6 +9,7 @@ from lmql.runtime.query_function import LMQLQueryFunction
 import inspect
 import warnings
 from typing import Dict
+from lmql.runtime.resumables import resumable
 
 """
 Graph context available as context variable during call(...) and branch(...) calls,
@@ -166,3 +167,16 @@ def scorer(runtime_context):
             return node.score
 
     return score
+
+class branching_point:
+    def __init__(self, handler):
+        self.handler = handler
+
+    def __call__(self, resumable: resumable):
+        """
+        Returns one of the possible branching values of this branching point.
+
+        :param resumable: Parameterized resumable to obtain the query result,
+            assuming a different branching variant.
+        """
+        return self.handler(resumable)

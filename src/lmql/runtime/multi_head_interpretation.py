@@ -117,12 +117,22 @@ class InterpretationHead:
         elif type(self.current_args) is tuple and len(self.current_args) >= 2 and self.current_args[0].startswith("interrupt:"):
             function_name = self.current_args[0][10:]
             fct = getattr(self.context, function_name)
-            res = await self.context.query(*self.current_args[1], **self.current_args[2])
-            assert type(res) is InterpreterCall, f"interrupt: expected InterpreterCall, got {type(res)}"
-            self.current_args = res.args
+            res = await fct(*self.current_args[1], **self.current_args[2])
+            # assert type(res) is InterpreterCall, f"interrupt: expected InterpreterCall, got {type(res)}"
+            
+            # for interpreter call, save the args
+            if type(res) is InterpreterCall:
+                self.current_args = res.args
+            
+            # check for replay
             if len(self.future_trace) > 0:
                 res = self.future_trace.pop(0)
                 await self.advance(res)
+            # if not an interpreter call, treat as "call:"
+            elif not type(res) is InterpreterCall:
+                await self.advance(res)
+            # else: wait for external advance call (caller needs to do some work first)
+
             return
         elif type(self.current_args) is tuple and len(self.current_args) == 2 and self.current_args[0] == "result":
             # consider ("result", <expr>) yields as return statements
