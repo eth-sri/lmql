@@ -152,5 +152,5 @@ class ExploreAll(Solver):
         return "<ExploreAll solver>"
         
 def get_default_solver():
-    # return ExploreAll(early_stopping=True)
-    return Sampling(include_dangling=True)
+    return ExploreAll(early_stopping=True)
+    # return Sampling(include_dangling=True)

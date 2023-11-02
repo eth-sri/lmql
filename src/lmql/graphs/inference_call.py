@@ -44,3 +44,15 @@ class InferenceCall:
     
     def __exit__(self, exc_type, exc_value, traceback):
         pop_graph_context()
+
+    def score(self, value):
+        score = 1.0
+        if result_node := self.inputs_mapping.get(id(value)):
+            score = result_node.score
+
+        # otherwise check if result has been manually annotated with 
+        # a score (e.g. a@0.1)
+        elif value_score := self.value_scores.get(id(value)):
+            score = value_score
+
+        return score

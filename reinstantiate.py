@@ -53,10 +53,16 @@ def ao_answer(question):
     return ANSWER@(logprobs(ANSWER).mean())
     '''
 
+@lmql.query
+def answer(question):
+    '''lmql
+    return ao_answer(question) | cot_answer(question)
+    '''
+
 @lmql.query(merge=ByIntValue(score='mean'))
 def final_answer(question):
     '''lmql
-    return ao_answer(question)
+    return answer(question)
     '''
 
 if __name__ == "__main__":

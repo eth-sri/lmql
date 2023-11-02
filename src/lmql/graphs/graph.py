@@ -123,22 +123,11 @@ class InferenceGraph:
         # in new context, compute result and track inputs and outputs
         # as instance nodes and edges
         with InferenceCall(self, node, context.solver, args, kwargs) as call:
-            if "cache" not in kwargs and self.caching_strategy == 'node':
-                kwargs["cache"] = f"/tmp/lmql-graph-cache-{node.name}.tokens"
-            
-            # actually execute underlying query function
-            result = await node.query_fct.__acall__(*args, **kwargs)
-            score = 1.0
+            result = await self.invoke(node.query_fct, *args, node_name=node.name, **kwargs)
         
             # check if result has identity-mapped instance node
             actual_result = checkpoint.get_result(result)
-            if result_node := call.inputs_mapping.get(id(actual_result)):
-                score = result_node.score
-
-            # otherwise check if result has been manually annotated with 
-            # a score (e.g. a@0.1)
-            elif value_score := call.value_scores.get(id(actual_result)):
-                score = value_score
+            score = call.score(actual_result)
 
             # create corresponding instance graph structure
             instance_node = InstanceNode(actual_result, call.inputs, score=score)
@@ -154,6 +143,7 @@ class InferenceGraph:
             # merge equivalent instance nodes
             node.merge_instances()
 
+            # invoke on_infer callback hook
             if self.on_infer:
                 self.on_infer()
 
@@ -205,9 +195,17 @@ class InferenceGraph:
             
             return checkpoint_result
 
+    async def invoke(self, query_fct, *args, node_name, **kwargs):
+        if "cache" not in kwargs and self.caching_strategy == 'node':
+            kwargs["cache"] = f"/tmp/lmql-graph-cache-{node_name}.tokens"
+
+        return await query_fct.__acall__(*args, **kwargs)
+
     async def acomplete(self, node: InstanceNode, solver, unwrap=True):
         """
         Like ainfer for dangling nodes (e.g. partially sampled paths).
+
+        TODO: think about unifying this with ainfer, based on overlap
         """
 
         if self.on_infer:
@@ -221,7 +219,7 @@ class InferenceGraph:
 
         with InferenceCall(self, node.query_node, solver) as call:
             if len(node.predecessors) == 0:
-                result = await query_node.query_fct.__acall__(*node.call.args, **node.call.kwargs)
+                result = await self.invoke(query_node.query_fct, *node.call.args, node_name=query_node.name, **node.call.kwargs)
             else:
                 predecessor_result = [await self.acomplete(pred, solver, unwrap=False) for pred in node.predecessors]
                 assert len(predecessor_result) <= 1, "Cannot complete dangling node with multiple predecessors"
@@ -245,28 +243,19 @@ class InferenceGraph:
 
             # switch to query node
             node = node.query_node
-            
-            score = 1.0
         
             # check if result has identity-mapped instance node
             actual_result = checkpoint.get_result(result)
-            if result_node := call.inputs_mapping.get(id(actual_result)):
-                score = result_node.score
+            score = call.score(actual_result)
 
-            # otherwise check if result has been manually annotated with 
-            # a score (e.g. a@0.1)
-            elif value_score := call.value_scores.get(id(actual_result)):
-                score = value_score
-
-            # create corresponding instance graph structure
-            # instance_node = InstanceNode(actual_result, call.inputs, score=score)
+            # update corresponding instance node (convert from dangling to concrete)
             instance_node.set_result(actual_result)
             if len(instance_node.predecessors) == 0:
                 instance_node.predecessors = call.inputs
             instance_node.score = score
             instance_node.dangling = False
+            
             # register new instance node in calling context (as input to calling query)
-
             if context is not None:
                 context.inputs.append(instance_node)
                 context.inputs_mapping[id(actual_result)] = instance_node
@@ -274,6 +263,7 @@ class InferenceGraph:
             # merge equivalent instance nodes
             node.merge_instances()
 
+            # invoke on_infer callback hook
             if self.on_infer:
                 self.on_infer()
 
@@ -296,7 +286,6 @@ class InferenceGraph:
                             [inode]
                         ))
                 
-
                 if type(result) is checkpoint:
                     unwrapped_result = result(identity)
                     instance_node.result = unwrapped_result
