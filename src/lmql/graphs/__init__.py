@@ -1,12 +1,15 @@
 from .nodes import *
 from .runtime import call, defer_call, branch, annotate_score, scorer, checkpoint
 from lmql.graphs.graph import InferenceGraph, query_function, InferenceCall, identity
+from .solvers import Sampling
 
-def infer(fct, *args, samples=1, state=None, enumerative=False, **kwargs):
+def infer(fct, *args, samples=1, parallel=1, state=None, enumerative=False, solver=None, **kwargs):
     """
     Use the LMQL graph execution engine to infer the result of a 
     graph of LMQL query functions.
     """
+    solver = solver or Sampling()
+
     qfct = query_function(fct)
     graph, qnode = InferenceGraph.from_query(qfct)
     
@@ -19,15 +22,9 @@ def infer(fct, *args, samples=1, state=None, enumerative=False, **kwargs):
     graph.on_infer = save
 
     results = []
-    
-    for _ in range(samples):
-        with InferenceCall(graph, qnode, args, kwargs) as call:
-            results += [graph.infer(qnode, *args, **kwargs)]
 
-        if enumerative:
-            for i in qnode.dangling():
-                print("dangling result", graph.complete(i))
-                save()
+    for _ in range(samples):
+        results += solver.step(graph, qnode, *args, parallel=parallel, **kwargs)
         save()
     
     return results

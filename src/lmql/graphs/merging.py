@@ -49,4 +49,7 @@ class ByIntValue(ByValue):
 
     def value_normalizer(self, instance: InstanceNode):
         # use first consecutive digits allowing for , and - also
-        return int(re.search(r"[-,\d]+", str(instance.result)).group(0).replace(",", ""))
+        try:
+            return int(re.search(r"[-,\d]+", str(instance.result)).group(0).replace(",", ""))
+        except:
+            return -9999

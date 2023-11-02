@@ -42,7 +42,7 @@ def final_answer(question):
 if __name__ == "__main__":
     # graph query
     with lmql.traced("infer") as t:
-        lmql.infer(final_answer, question="What is 23*2-123?", state="graph.json", samples=1)
+        lmql.infer(final_answer, question="What is 23*2-123?", state="graph.json", samples=1, parallel=1)
         print(lmql.certificate(t).asdict().get("metrics"))
     # to inspect the resulting graph, run 
     # lmql graph-watch graph.json 

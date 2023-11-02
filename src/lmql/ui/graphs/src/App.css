@@ -56,6 +56,17 @@ h1, h2, h3, h4, h5 {
     padding-left: 5pt;
 }
 
+.node-data.dangling {
+    opacity: 0.4;
+    border-left: 2pt solid grey;
+    margin-left: 8pt;
+}
+
+.node-data.dangling:hover {
+    opacity: 1.0;
+}
+
+
 .node-data.child {
     border-bottom: none;
 }

@@ -157,6 +157,11 @@ const layout = {
 function ChildData(props) {
     let children = props.children;
     children.sort((a, b) => {
+        if (a.dangling && !b.dangling) {
+            return 1;
+        } else if (!a.dangling && b.dangling) {
+            return -1;
+        }
         return b.score - a.score;
     })
 
@@ -182,9 +187,14 @@ function NodeData(props) {
         return null;
     }
 
-    return <div className={'node-data' + (props.indent > 0 ? ' child' : '')} style={{borderColor: props.node.color}}>
-        {props.label && <h4>{props.label}</h4>}
-        <div className='score value'>Score: <code>{props.node.score}</code></div>
+    let dangling = props.node && props.node.dangling;
+    let color = !dangling ? props.node.color : 'grey';
+    let label = dangling ? props.node.label.replace("0.00", "dangling") : props.node.label;
+
+
+    return <div className={'node-data' + (props.indent > 0 ? ' child' : '') + (dangling ? ' dangling' : '')} style={{borderColor: color}}>
+        {props.label && <h4>{label}</h4>}
+        {!dangling && <div className='score value'>Score: <code>{props.node.score}</code></div>}
         <SyntaxHighlighter language="json" style={atomOneDarkReasonable} wrapLongLines={true}>
             {JSON.stringify(props.node.result, null, 2)}
         </SyntaxHighlighter>
@@ -292,7 +302,7 @@ export function Graph() {
                             node.data('color', color);
                             node.data('label', node.data('label') + "\n(" + (node.data().score || 0).toFixed(2) + ")");
                             // node.style('border-width', relative_score * 2);
-                            if (node.data("unrealized")) {
+                            if (node.data("dangling")) {
                                 node.style('opacity', 0.5);
                                 node.style('width', 1);
                                 node.style('height', 1);

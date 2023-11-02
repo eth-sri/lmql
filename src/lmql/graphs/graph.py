@@ -11,6 +11,7 @@ from typing import List, Union, Tuple, Optional
 from lmql.runtime.resumables import resumable, identity
 from lmql.graphs.inference_call import InferenceCall
 from functools import partial
+from .solvers import Solver
 
 class InferenceGraph:
     """
@@ -65,29 +66,48 @@ class InferenceGraph:
         context: InferenceCall = get_graph_context()
         assert context is not None, "ainfer_branch() can only be called from within a graph context via lmql.infer(...)"
 
-        # 1. decide which branch to explore
-        call: defer_call = random.choice(branching_call)
-        # record other calls as possible alternatives to be explored later
-        other_options = [c for c in branching_call if c is not call]
+        candidate_instance_nodes = []
+        for call in branching_call:
+            node = self.qfct_to_node.get(call.query_function)
+
+            candidate_instance_nodes.append(InstanceNode(
+                node,
+                predecessors=[],
+                dangling=True,
+                resumable=None,
+                call=call,
+                score=None,
+            ))
+
+        # 1. decide which candidate instance node to explore
+        call_node: InstanceNode = context.solver.choice(candidate_instance_nodes, context)
+        call = call_node.call
+
+        # 2. record other calls as possible alternatives to be explored later
+        other_options = [inode for inode in candidate_instance_nodes if inode is not call_node]
 
         # 3. infer branch result
         result = await self.ainfer_call(call.target, *call.args, **call.kwargs)
 
+        # add dangling nodes/paths for all unexplored branches for this call
         if len(other_options) > 0:
             def exchange_result_with_resumable(query_resumable):
                 nonlocal result, other_options
-                for other in other_options:
+                for other_node in other_options:
                     # TODO: if a query function is used in different ways, this may be incorrect
-                    node = self.qfct_to_node.get(other.query_function)
+                    call = other_node.call
+                    node = self.qfct_to_node.get(call.query_function)
                     async def qresume(*args, __fresh__=False, **kwargs):
                         if __fresh__:
-                            r = await self.ainfer(node, *other.args, unwrap=False, **other.kwargs)
+                            r = await self.ainfer(node, *call.args, unwrap=False, **call.kwargs)
                             return await query_resumable(r)
                         else:
                             return await query_resumable(*args, **kwargs)
                     
-                    context.dangling_nodes.setdefault(id, []).append(
-                        lifted(node, other, qresume, []))
+                    # make sure other option node can be resumed
+                    other_node.resumable = qresume
+                    # store other node in calling context and thus in instance graph
+                    context.dangling_nodes.setdefault(id, []).append(other_node)
                 return result
             return checkpoint(exchange_result_with_resumable)
         else:
@@ -108,7 +128,7 @@ class InferenceGraph:
 
         # in new context, compute result and track inputs and outputs
         # as instance nodes and edges
-        with InferenceCall(self, node, args, kwargs) as call:
+        with InferenceCall(self, node, context.solver, args, kwargs) as call:
             if "cache" not in kwargs and self.caching_strategy == 'node':
                 kwargs["cache"] = f"/tmp/lmql-graph-cache-{node.name}.tokens"
             
@@ -190,13 +210,13 @@ class InferenceGraph:
             
             return checkpoint_result
 
-    async def acomplete(self, node: InstanceNode, unwrap=True):
+    async def acomplete(self, node: InstanceNode, solver, unwrap=True):
         assert node.dangling, "Cannot complete non-dangling instance nodes"
         assert node.resumable is not None, "Provided query node does not have a resumable"
 
-        with InferenceCall(self, node) as call:
+        with InferenceCall(self, node, solver) as call:
             assert len(node.predecessors) <= 1, "a acomplete() call expects a linear predecessor chain"
-            inputs = [await self.acomplete(p, unwrap=True) for p in node.predecessors]
+            inputs = [await self.acomplete(p, solver=solver, unwrap=True) for p in node.predecessors]
             result = await node.resumable(*inputs, __fresh__=len(inputs) == 0)
 
             score = 1.0
@@ -224,8 +244,8 @@ class InferenceGraph:
 
         return node.result
     
-    def complete(self, node: InstanceNode):
-        return run_in_loop(self.acomplete(node))
+    def complete(self, node: InstanceNode, solver: Solver):
+        return run_in_loop(self.acomplete(node, solver))
 
     def infer(self, node: QueryNode, *args, **kwargs):
         return run_in_loop(self.ainfer(node, *args, **kwargs))

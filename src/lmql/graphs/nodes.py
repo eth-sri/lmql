@@ -60,7 +60,21 @@ class InstanceNode:
     def __prompt__(self):
         return str(self.result)
     
+    @classmethod
+    def candidate(cls, node, call):
+        return cls(
+            node,
+            predecessors=[],
+            dangling=False,
+            resumable=None,
+            call=call,
+            score=None,
+        )
+
     def __repr__(self):
+        if self.dangling:
+            resumable = " resumable" if self.resumable is not None else ""
+            return f"<dangling{resumable} InstanceNode {str([self.result])[1:-1]} {self.call}>"
         return f"<InstanceNode {self.value_class} {str([self.result])[1:-1]} score={self.score}>"
     
 class AggregatedInstanceNode(InstanceNode):

@@ -15,6 +15,8 @@ class InferenceCall:
     graph: Any
     # query node representing the current call
     node: "QueryNode"
+    # the solver used for graph inference
+    solver: "Solver"
     
     args: Tuple = field(default_factory=tuple)
     kwargs: Dict[str, Any] = field(default_factory=dict)
@@ -30,6 +32,9 @@ class InferenceCall:
     
     # alternative branched query executions
     dangling_nodes: [InstanceNode] = field(default_factory=dict)
+
+    # indicates root 'solver' call
+    root: bool = False
 
     def __enter__(self):
         push_graph_context(self)

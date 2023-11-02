@@ -81,7 +81,7 @@ class InferenceGraphPrinter:
                 "value_class_id": value_class_id,
                 "score": instance.score,
                 "children": aggregate_node_data,
-                "unrealized": instance.dangling,
+                "dangling": instance.dangling,
                 "resumable": str(instance.resumable)
             }
         }
