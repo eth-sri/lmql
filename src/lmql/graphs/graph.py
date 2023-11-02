@@ -13,6 +13,29 @@ from lmql.graphs.inference_call import InferenceCall
 from functools import partial
 from .solvers import Solver
 
+class qresume:
+    def __init__(self, graph, call, node, query_resumable):
+        self.graph = graph
+        self.call = call
+        self.node = node
+        self.query_resumable = query_resumable
+
+    async def __call__(self, *args, __fresh__=False, **kwargs):
+        if __fresh__:
+            r = await self.graph.ainfer(self.node, *self.call.args, unwrap=False, **self.call.kwargs)
+            # # provide additionally arising dangling nodes a resumable
+            # # to obtain the result of the current call
+            while type(r) is checkpoint: r = r(self.query_resumable)
+            # return r
+
+            # # resume remaining path with fresh result 'r'
+            return await self.query_resumable(r)
+        else:
+            return await self.query_resumable(*args, **kwargs)
+    def __repr__(self):
+        return f"<qresume [{self.call}] -> [{self.query_resumable}]>"
+
+
 class InferenceGraph:
     """
     An inference graph is a directed acyclic graph (DAG) of LMQL query functions
@@ -91,25 +114,19 @@ class InferenceGraph:
 
         # add dangling nodes/paths for all unexplored branches for this call
         if len(other_options) > 0:
-            def exchange_result_with_resumable(query_resumable):
+            def exchange_result_with_resumable(outer_resumable):
                 nonlocal result, other_options
                 for other_node in other_options:
-                    # TODO: if a query function is used in different ways, this may be incorrect
                     call = other_node.call
+                    # TODO: if a query function is used in different ways, this may be incorrect
+                    # (need to map call site to query node, not query function to query node)
                     node = self.qfct_to_node.get(call.query_function)
-                    async def qresume(*args, __fresh__=False, **kwargs):
-                        if __fresh__:
-                            r = await self.ainfer(node, *call.args, unwrap=False, **call.kwargs)
-                            return await query_resumable(r)
-                        else:
-                            return await query_resumable(*args, **kwargs)
-                    
                     # make sure other option node can be resumed
-                    other_node.resumable = qresume
+                    other_node.resumable = qresume(self, call, node, outer_resumable)
                     # store other node in calling context and thus in instance graph
                     context.dangling_nodes.setdefault(id, []).append(other_node)
                 return result
-            return checkpoint(exchange_result_with_resumable)
+            return checkpoint(exchange_result_with_resumable, result)
         else:
             return result
 
@@ -137,21 +154,22 @@ class InferenceGraph:
             score = 1.0
         
             # check if result has identity-mapped instance node
-            if result_node := call.inputs_mapping.get(id(result)):
+            actual_result = checkpoint.get_result(result)
+            if result_node := call.inputs_mapping.get(id(actual_result)):
                 score = result_node.score
 
             # otherwise check if result has been manually annotated with 
             # a score (e.g. a@0.1)
-            elif value_score := call.value_scores.get(id(result)):
+            elif value_score := call.value_scores.get(id(actual_result)):
                 score = value_score
 
             # create corresponding instance graph structure
-            instance_node = InstanceNode(result, call.inputs, score=score)
+            instance_node = InstanceNode(actual_result, call.inputs, score=score)
             # register new instance node in calling context (as input to calling query)
 
             if context is not None:
                 context.inputs.append(instance_node)
-                context.inputs_mapping[id(result)] = instance_node
+                context.inputs_mapping[id(actual_result)] = instance_node
 
             # track instance node in query node
             node.add_instance(instance_node)
@@ -193,7 +211,7 @@ class InferenceGraph:
             
             # make sure calling context provides resumable in exchagne
             # for actual result
-            checkpoint_result = checkpoint(exchange_result_for_resumable)
+            checkpoint_result = checkpoint(exchange_result_for_resumable, result)
 
             # if 'unwrapping', caller does not expect 'checkpoint' and 
             # we stored lifted dangling nodes directly in the graph (calling
@@ -211,38 +229,81 @@ class InferenceGraph:
             return checkpoint_result
 
     async def acomplete(self, node: InstanceNode, solver, unwrap=True):
+        """
+        Like ainfer for dangling nodes (e.g. partially sampled paths).
+        """
+
         assert node.dangling, "Cannot complete non-dangling instance nodes"
         assert node.resumable is not None, "Provided query node does not have a resumable"
 
-        with InferenceCall(self, node, solver) as call:
+        context = get_graph_context()
+
+        with InferenceCall(self, node.query_node, solver) as call:
             assert len(node.predecessors) <= 1, "a acomplete() call expects a linear predecessor chain"
-            inputs = [await self.acomplete(p, solver=solver, unwrap=True) for p in node.predecessors]
+            inputs = [await self.acomplete(p, solver=solver, unwrap=False) for p in node.predecessors]
+            # register origin of 'inputs' with predecessor instance node in inference call context
+            for i, pnode in zip(inputs, node.predecessors):
+                call.inputs_mapping[id(i)] = pnode
+
+            # provide acomplete results with resumable
+            while len(inputs) == 1 and type(inputs[0]) is checkpoint:
+                inputs[0] = inputs[0](node.resumable)
+
+            # resume this node's query function with completed inputs
             result = await node.resumable(*inputs, __fresh__=len(inputs) == 0)
 
-            score = 1.0
-            
-            # check if result has identity-mapped instance node
-            if result_node := call.inputs_mapping.get(id(result)):
-                score = result_node.score
+            actual_result = checkpoint.get_result(result)
 
+            # get score of result
+            score = 1.0
+            # check if result has identity-mapped instance node
+            if result_node := call.inputs_mapping.get(id(actual_result)):
+                score = result_node.score
             # otherwise check if result has been manually annotated with 
             # a score (e.g. a@0.1)
-            elif value_score := call.value_scores.get(id(result)):
+            elif value_score := call.value_scores.get(id(actual_result)):
                 score = value_score
-
-            if type(result) is checkpoint:
-                result = result(node.resumable)
-
-            node.result = result
-            node.value_class = str(result)
+            
+            node.result = actual_result
+            node.value_class = str(actual_result)
             node.score = score
             node.dangling = False
-            node.resumable = None
             if len(inputs) == 0:
                 node.predecessors = call.inputs[0].predecessors
                 node.query_node.instances.remove(call.inputs[0])
 
-        return node.result
+            node.query_node.merge_instances()
+
+            # add new (lifted) dangling nodes for un-explored paths in this call
+            dangling_nodes = call.dangling_nodes
+            for call_id, inodes in dangling_nodes.items():
+                for inode in inodes:
+                    inode.result.add_instance(inode)
+
+            def exchange_result_for_resumable(outer_resumable):
+                nonlocal actual_result
+                
+                # create lifted dangling instance nodes using 'outer_resumable'
+                for call_id, inodes in dangling_nodes.items():
+                    for inode in inodes:
+                        instance_node = lifted(
+                            node.query_node,
+                            node.call,
+                            outer_resumable,
+                            [inode]
+                        )
+                        context.dangling_nodes.setdefault(call_id, []).append(instance_node)
+                
+                return actual_result
+            
+            # make sure calling context provides resumable in exchagne
+            # for actual result
+            result = checkpoint(exchange_result_for_resumable, result)
+
+        if unwrap and type(result) is checkpoint:
+            return checkpoint.get_result(result)
+
+        return result
     
     def complete(self, node: InstanceNode, solver: Solver):
         return run_in_loop(self.acomplete(node, solver))

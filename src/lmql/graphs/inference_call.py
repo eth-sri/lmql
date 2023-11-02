@@ -33,6 +33,8 @@ class InferenceCall:
     # alternative branched query executions
     dangling_nodes: [InstanceNode] = field(default_factory=dict)
 
+    dangling_created: bool = False
+
     # indicates root 'solver' call
     root: bool = False
 

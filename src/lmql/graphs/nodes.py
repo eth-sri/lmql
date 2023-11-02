@@ -13,11 +13,8 @@ class QueryNode:
         self.name = name
         self.query_fct = query_fct
         self.incoming: List['QueryEdge'] = []
-
         self.merging_strategy = None
-
         self.instances = []
-
         self.num_calls = 0
 
     def merge_instances(self):
@@ -26,8 +23,9 @@ class QueryNode:
         self.instances = self.merging_strategy.merge(self.instances)
 
     def add_instance(self, node):
-        self.instances.append(node)
-        node.query_node = self
+        if node not in self.instances:
+            self.instances.append(node)
+            node.query_node = self
 
     def dangling(self):
         for i in self.instances:

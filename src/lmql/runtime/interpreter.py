@@ -576,7 +576,9 @@ class PromptInterpreter:
                             program_state=cloned_program_state,
                             recurring_variable_counter=recurring_variable_counter
                         )
-                        result = result(resumable=QueryResumable(cloned_state, interpreter=self))
+                        # handle all 'checkpoint's until the actual result is unwrapped
+                        while type(result) is checkpoint:
+                            result = result(resumable=QueryResumable(cloned_state, interpreter=self))
 
                     query_head: InterpretationHead = query_head.copy()
                     query_head.context = LMQLContext(self, state, prompt)

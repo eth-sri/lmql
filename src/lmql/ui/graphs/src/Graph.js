@@ -195,8 +195,8 @@ function NodeData(props) {
     return <div className={'node-data' + (props.indent > 0 ? ' child' : '') + (dangling ? ' dangling' : '')} style={{borderColor: color}}>
         {props.label && <h4>{label}</h4>}
         {!dangling && <div className='score value'>Score: <code>{props.node.score}</code></div>}
-        <SyntaxHighlighter language="json" style={atomOneDarkReasonable} wrapLongLines={true}>
-            {JSON.stringify(props.node.result, null, 2)}
+        <SyntaxHighlighter language="text" style={atomOneDarkReasonable} wrapLongLines={true}>
+            {props.node.result}
         </SyntaxHighlighter>
         <ChildData expandable={true} indent={(props.indent || 0) + 1} children={props.node.children.map(c => c.data)}/>
     </div>
@@ -300,13 +300,14 @@ export function Graph() {
                         // adapt L based on score between 50% and 80%
                         if (color) {
                             node.data('color', color);
-                            node.data('label', node.data('label') + "\n(" + (node.data().score || 0).toFixed(2) + ")");
                             // node.style('border-width', relative_score * 2);
                             if (node.data("dangling")) {
                                 node.style('opacity', 0.5);
+                                node.style('font-size', 6);
                                 node.style('width', 1);
                                 node.style('height', 1);
                             } else {
+                                node.data('label', node.data('label') + "\n(" + (node.data().score || 0).toFixed(2) + ")");
                                 node.style('background-color', color);
                             }
                         }

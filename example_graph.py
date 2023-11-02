@@ -12,9 +12,19 @@ def cot(question):
     '''
 
 @lmql.query
+def cot_hard(question):
+    '''lmql
+    sample
+    
+    "Q: {question} A: Let's think step by step with a dashed list:\n[REASONING]"
+
+    return REASONING@logprobs(REASONING).mean()
+    '''
+
+@lmql.query
 def cot_answer(question): 
     '''lmql
-    reasoning = cot(question)
+    reasoning = cot(question) | cot_hard(question)
     "Q: {question}\n A:{reasoning} Thus the answer is[ANSWER]" where len(TOKENS(ANSWER)) < 20
 
     return ANSWER@(logprobs(ANSWER).mean() + score(reasoning))
@@ -42,7 +52,11 @@ def final_answer(question):
 if __name__ == "__main__":
     # graph query
     with lmql.traced("infer") as t:
-        lmql.infer(final_answer, question="What is 23*2-123?", state="graph.json", samples=1, parallel=1)
+        lmql.infer(final_answer, 
+                   question="What is 23*2-123?", 
+                   state="graph.json", 
+                   samples=3,
+                   parallel=1)
         print(lmql.certificate(t).asdict().get("metrics"))
     # to inspect the resulting graph, run 
     # lmql graph-watch graph.json 

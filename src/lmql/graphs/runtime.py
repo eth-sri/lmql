@@ -172,8 +172,9 @@ def scorer(runtime_context):
     return score
 
 class checkpoint:
-    def __init__(self, handler):
+    def __init__(self, handler, result=None):
         self.handler = handler
+        self.result = result
 
     def __call__(self, resumable: resumable):
         """
@@ -185,3 +186,9 @@ class checkpoint:
             assuming a different branching variant.
         """
         return self.handler(resumable)
+
+    @staticmethod
+    def get_result(value):
+        if type(value) is checkpoint:
+            return checkpoint.get_result(value.result) or value
+        return value
