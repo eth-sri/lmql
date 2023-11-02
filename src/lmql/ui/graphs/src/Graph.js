@@ -195,8 +195,8 @@ function NodeData(props) {
     return <div className={'node-data' + (props.indent > 0 ? ' child' : '') + (dangling ? ' dangling' : '')} style={{borderColor: color}}>
         {props.label && <h4>{label}</h4>}
         {!dangling && <div className='score value'>Score: <code>{props.node.score}</code></div>}
-        <SyntaxHighlighter language="text" style={atomOneDarkReasonable} wrapLongLines={true}>
-            {props.node.result}
+        <SyntaxHighlighter language="json" style={atomOneDarkReasonable} wrapLongLines={true}>
+            {JSON.stringify(props.node.result, null, 2)}
         </SyntaxHighlighter>
         <ChildData expandable={true} indent={(props.indent || 0) + 1} children={props.node.children.map(c => c.data)}/>
     </div>

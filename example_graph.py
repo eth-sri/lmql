@@ -12,13 +12,29 @@ def cot(question):
     '''
 
 @lmql.query
-def cot_hard(question):
+def cot_superhard(question):
     '''lmql
     sample
     
+    "Q: {question} A: Let's think precisely:\n[REASONING]"
+
+    return REASONING@logprobs(REASONING).mean()
+    '''
+
+@lmql.query
+def cot_medium_hard(question):
+    '''lmql
+    sample
+
     "Q: {question} A: Let's think step by step with a dashed list:\n[REASONING]"
 
     return REASONING@logprobs(REASONING).mean()
+    '''
+
+@lmql.query
+def cot_hard(question):
+    '''lmql
+    return cot_superhard(question) | cot_medium_hard(question)
     '''
 
 @lmql.query
@@ -55,7 +71,7 @@ if __name__ == "__main__":
         lmql.infer(final_answer, 
                    question="What is 23*2-123?", 
                    state="graph.json", 
-                   samples=3,
+                   samples=10,
                    parallel=1)
         print(lmql.certificate(t).asdict().get("metrics"))
     # to inspect the resulting graph, run 

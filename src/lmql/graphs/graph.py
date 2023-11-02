@@ -13,29 +13,6 @@ from lmql.graphs.inference_call import InferenceCall
 from functools import partial
 from .solvers import Solver
 
-class qresume:
-    def __init__(self, graph, call, node, query_resumable):
-        self.graph = graph
-        self.call = call
-        self.node = node
-        self.query_resumable = query_resumable
-
-    async def __call__(self, *args, __fresh__=False, **kwargs):
-        if __fresh__:
-            r = await self.graph.ainfer(self.node, *self.call.args, unwrap=False, **self.call.kwargs)
-            # # provide additionally arising dangling nodes a resumable
-            # # to obtain the result of the current call
-            while type(r) is checkpoint: r = r(self.query_resumable)
-            # return r
-
-            # # resume remaining path with fresh result 'r'
-            return await self.query_resumable(r)
-        else:
-            return await self.query_resumable(*args, **kwargs)
-    def __repr__(self):
-        return f"<qresume [{self.call}] -> [{self.query_resumable}]>"
-
-
 class InferenceGraph:
     """
     An inference graph is a directed acyclic graph (DAG) of LMQL query functions
@@ -122,7 +99,7 @@ class InferenceGraph:
                     # (need to map call site to query node, not query function to query node)
                     node = self.qfct_to_node.get(call.query_function)
                     # make sure other option node can be resumed
-                    other_node.resumable = qresume(self, call, node, outer_resumable)
+                    other_node.resumable = outer_resumable
                     # store other node in calling context and thus in instance graph
                     context.dangling_nodes.setdefault(id, []).append(other_node)
                 return result
@@ -233,77 +210,119 @@ class InferenceGraph:
         Like ainfer for dangling nodes (e.g. partially sampled paths).
         """
 
+        if self.on_infer:
+            self.on_infer()
+
         assert node.dangling, "Cannot complete non-dangling instance nodes"
         assert node.resumable is not None, "Provided query node does not have a resumable"
 
         context = get_graph_context()
+        query_node = node.query_node
 
         with InferenceCall(self, node.query_node, solver) as call:
-            assert len(node.predecessors) <= 1, "a acomplete() call expects a linear predecessor chain"
-            inputs = [await self.acomplete(p, solver=solver, unwrap=False) for p in node.predecessors]
-            # register origin of 'inputs' with predecessor instance node in inference call context
-            for i, pnode in zip(inputs, node.predecessors):
-                call.inputs_mapping[id(i)] = pnode
+            if len(node.predecessors) == 0:
+                result = await query_node.query_fct.__acall__(*node.call.args, **node.call.kwargs)
+            else:
+                predecessor_result = [await self.acomplete(pred, solver, unwrap=False) for pred in node.predecessors]
+                assert len(predecessor_result) <= 1, "Cannot complete dangling node with multiple predecessors"
 
-            # provide acomplete results with resumable
-            while len(inputs) == 1 and type(inputs[0]) is checkpoint:
-                inputs[0] = inputs[0](node.resumable)
+                if len(predecessor_result) > 0:
+                    catch_up = node.predecessors[0].resumable
 
-            # resume this node's query function with completed inputs
-            result = await node.resumable(*inputs, __fresh__=len(inputs) == 0)
+                    if type(predecessor_result[0]) is checkpoint:
+                        predecessor_result[0] = predecessor_result[0](catch_up)
+                
+                        # add final edges for dangling nodes
+                        for call_id, inodes in context.dangling_nodes.items():
+                            for inode in inodes:
+                                query_node.add_instance(inode)
 
-            actual_result = checkpoint.get_result(result)
+                result = await catch_up(*predecessor_result)
+            
+            args = node.call.args
+            kwargs = node.call.kwargs
+            instance_node = node
 
-            # get score of result
+            # switch to query node
+            node = node.query_node
+            
             score = 1.0
+        
             # check if result has identity-mapped instance node
+            actual_result = checkpoint.get_result(result)
             if result_node := call.inputs_mapping.get(id(actual_result)):
                 score = result_node.score
+
             # otherwise check if result has been manually annotated with 
             # a score (e.g. a@0.1)
             elif value_score := call.value_scores.get(id(actual_result)):
                 score = value_score
-            
-            node.result = actual_result
-            node.value_class = str(actual_result)
-            node.score = score
-            node.dangling = False
-            if len(inputs) == 0:
-                node.predecessors = call.inputs[0].predecessors
-                node.query_node.instances.remove(call.inputs[0])
 
-            node.query_node.merge_instances()
+            # create corresponding instance graph structure
+            # instance_node = InstanceNode(actual_result, call.inputs, score=score)
+            instance_node.set_result(actual_result)
+            if len(instance_node.predecessors) == 0:
+                instance_node.predecessors = call.inputs
+            instance_node.score = score
+            instance_node.dangling = False
+            # register new instance node in calling context (as input to calling query)
 
-            # add new (lifted) dangling nodes for un-explored paths in this call
+            if context is not None:
+                context.inputs.append(instance_node)
+                context.inputs_mapping[id(actual_result)] = instance_node
+
+            # merge equivalent instance nodes
+            node.merge_instances()
+
+            if self.on_infer:
+                self.on_infer()
+
+            # create dangeling instance nodes for each alternative branch
             dangling_nodes = call.dangling_nodes
             for call_id, inodes in dangling_nodes.items():
                 for inode in inodes:
                     inode.result.add_instance(inode)
 
             def exchange_result_for_resumable(outer_resumable):
-                nonlocal actual_result
+                nonlocal result
                 
                 # create lifted dangling instance nodes using 'outer_resumable'
                 for call_id, inodes in dangling_nodes.items():
                     for inode in inodes:
-                        instance_node = lifted(
-                            node.query_node,
-                            node.call,
+                        context.dangling_nodes.setdefault(call_id, []).append(lifted(
+                            node,
+                            defer_call(node.query_fct, *args, **kwargs),
                             outer_resumable,
                             [inode]
-                        )
-                        context.dangling_nodes.setdefault(call_id, []).append(instance_node)
+                        ))
                 
-                return actual_result
+
+                if type(result) is checkpoint:
+                    unwrapped_result = result(identity)
+                    instance_node.result = unwrapped_result
+                    return unwrapped_result
+                return result
             
             # make sure calling context provides resumable in exchagne
             # for actual result
-            result = checkpoint(exchange_result_for_resumable, result)
+            checkpoint_result = checkpoint(exchange_result_for_resumable, result)
 
-        if unwrap and type(result) is checkpoint:
-            return checkpoint.get_result(result)
+            # if 'unwrapping', caller does not expect 'checkpoint' and 
+            # we stored lifted dangling nodes directly in the graph (calling
+            # context is client or solver directly)
+            if unwrap:
+                # make sure dangling nodes are created
+                checkpoint_result(identity)
+                
+                # add final edges for dangling nodes
+                for call_id, inodes in context.dangling_nodes.items():
+                    for inode in inodes:
+                        context.node.add_instance(inode)
+                return result
+            
+            return checkpoint_result
 
-        return result
+        return None
     
     def complete(self, node: InstanceNode, solver: Solver):
         return run_in_loop(self.acomplete(node, solver))

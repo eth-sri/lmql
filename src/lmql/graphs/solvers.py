@@ -88,7 +88,7 @@ class Solver(ABC):
         try:
             tasks = await asyncio.gather(*[self.do_step(graph, qnode, *args, **kwargs) for _ in range(parallel)])
             for t in tasks:
-                results += t
+                results += [t]
         except RuntimeError as e:
             if "StopIteration" in str(e):
                 raise StopIteration("Solver can stop inference at this point.")
@@ -152,4 +152,5 @@ class ExploreAll(Solver):
         return "<ExploreAll solver>"
         
 def get_default_solver():
-    return ExploreAll(early_stopping=True)
+    # return ExploreAll(early_stopping=True)
+    return Sampling(include_dangling=True)

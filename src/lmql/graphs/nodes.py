@@ -55,6 +55,10 @@ class InstanceNode:
 
         self.query_node: QueryNode = None
 
+    def set_result(self, result):
+        self.result = result
+        self.value_class = str(result)
+
     def __prompt__(self):
         return str(self.result)
     
