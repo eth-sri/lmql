@@ -75,12 +75,13 @@ class InferenceGraphPrinter:
             "data": {
                 "id": node_ids[id(instance)],
                 **lmql_signature,
-                "label": n.name + f"#{i}",
+                "label": n.name.split("(",1)[0] + f"#{i}",
                 "result": str(instance.result),
                 "parent": node_ids[id(n)],
                 "value_class_id": value_class_id,
                 "score": instance.score,
                 "children": aggregate_node_data,
-                "unrealized": instance.unrealized
+                "unrealized": instance.dangling,
+                "resumable": str(instance.resumable)
             }
         }

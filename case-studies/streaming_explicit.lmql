@@ -1,19 +1,31 @@
+import lmql
+
 # model-based fact checking
+@lmql.query
 def verified(s):
-    "Q: Is the following sentence factually correct? '{s}'
-     A: [ANSWER]" where ANSWER in [" yes", " no"]
+    '''lmql
+    "Q: Is the following sentence factually correct? '{s}' A: [ANSWER]" where ANSWER in [" yes", " no"]
     return ANSWER == " yes"
+    '''
 
 # retries specifies that the engine will re-sample this query
 # at max 4 times before backtracking one level further up the tree
 @lmql.query(decoder="sample", temperature=1.0, retries=4)
-def verified_answer(user_input, prompt=""):
-    "Q: {user_input} A:{prompt}[ANSWER: sentence]" where verified(sentence)
+def verified_answer(question, prompt=""):
+    '''lmql
+    "Q: {question} A:{prompt}[ANSWER]" where len(TOKENS(ANSWER)) < 32
     
-    if len(ANSWER) == 0: 
+    # make sure all answers are verified
+
+    if len(ANSWER) == 0 or not verified(ANSWER):
         return prompt + ANSWER
     else: 
-        return verified_answer(user_input, prompt=prompt + ANSWER)
+        return verified_answer(question, prompt=prompt + ANSWER)
+    '''
 
 # graph query
-graph.infer(verified_answer, question="What is the answer to life, the universe and everything?")
+result = lmql.infer(verified_answer, 
+           question="What is the answer to life, the universe and everything?",
+           state="graph.json")
+
+print("overal result", result)

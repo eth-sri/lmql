@@ -20,9 +20,6 @@ class QueryNode:
 
         self.num_calls = 0
 
-        # maps branch IDs to branch context
-        self.branches: Dict[str, Any] = {}
-
     def merge_instances(self):
         if self.merging_strategy is None:
             return
@@ -30,6 +27,12 @@ class QueryNode:
 
     def add_instance(self, node):
         self.instances.append(node)
+        node.query_node = self
+
+    def dangling(self):
+        for i in self.instances:
+            if i.dangling:
+                yield i
 
     def __repr__(self):
         return "QueryNode(" + self.name + ")"
@@ -39,21 +42,27 @@ class InstanceNode:
     An instance node represents the result of a query function with the specified inputs 
     (instance nodes of predecessor queries used to produce this result).
     """
-    def __init__(self, result, predecessors, score=1.0, unrealized=False):
+    def __init__(self, result, predecessors, score=1.0, dangling=False, resumable=None, call=None):
         self.result = result
         self.predecessors: List[InstanceNode] = predecessors
         self.score = score
         
         # identifier for this result's class (e.g. should be the same for equivalent/aggregated results)
         self.value_class = str(result)
-        self.unrealized = unrealized
+        self.dangling = dangling
+        
+        # query resumable if this instance node is dangling
+        self.resumable = resumable
+        self.call = call
+
+        self.query_node: QueryNode = None
 
     def __prompt__(self):
         return str(self.result)
     
     def __repr__(self):
         return f"<InstanceNode {self.value_class} {str([self.result])[1:-1]} score={self.score}>"
-
+    
 class AggregatedInstanceNode(InstanceNode):
     def __init__(self, result, children, score):
         predecessors = []
@@ -96,6 +105,20 @@ class AggregatedInstanceNode(InstanceNode):
             else:
                 result.append(i)
         return result
+
+def lifted(qnode: QueryNode, call, resumable, predecessors: List[InstanceNode]):
+    """
+    Lifts a dangling instance node to a dangling instance node of 'qnode', in a
+    calling context of 'call' and 'resumable'.
+    """
+    return InstanceNode(
+        qnode,
+        predecessors=predecessors,
+        dangling=True,
+        resumable=resumable,
+        call=call,
+        score=None,
+    )
 
 class QueryEdge:
     """

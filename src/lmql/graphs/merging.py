@@ -4,6 +4,7 @@ Instance node merging strategies.
 from .nodes import InstanceNode, AggregatedInstanceNode
 from typing import List
 import re
+from .runtime import defer_call
 
 class ByValue:
     """
@@ -14,10 +15,12 @@ class ByValue:
         self.none_counts = 0
 
     def value_normalizer(self, instance: InstanceNode):
+        if instance.dangling:
+            return id(instance)
         return str(instance.result)
 
     def _normalize(self, instance: InstanceNode):
-        if instance.result is None:
+        if instance.result is None or instance.dangling:
             i = self.none_counts
             self.none_counts += 1
             return f"{i}"

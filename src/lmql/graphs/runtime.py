@@ -78,7 +78,7 @@ async def branch(id: int, branching_call: Dict):
     
     # handle case without a graph context (no branching possible)
     if inference_call is None:
-        warnings.warn("An excuted query contains a branching query call (e.g. 'a() | b()') and is executed outside of graph context. Only the first branch will be executed. Use lmql.infer(...) to execute the query in a multi-branch context.")
+        warnings.warn("An excuted query contains a branching query call (e.g. 'a() | b()') is executed outside of graph context. Only the first branch will be executed. Use lmql.infer(...) to execute the query in a multi-branch context.")
     
         first = branching_call[0]
         result = await first()
@@ -92,9 +92,10 @@ class defer_call:
     """
     Represents a deferred call to a query function (e.g. as used to defer branching calls in graphs).
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, __branch_score__=None, **kwargs):
         self._args = args
         self.kwargs = kwargs
+        self.branch_score = __branch_score__
 
     @property
     def target(self):
@@ -118,7 +119,8 @@ class defer_call:
         if len(self.kwargs) > 0:
             argstr += str(self.kwargs)[1:-1]
         argstr = argstr.rstrip(",")
-        return f"deferred {qfct.name}({argstr})"
+        score = " @ " + str(self.branch_score) if self.branch_score is not None else ""
+        return f"deferred {qfct.name}({argstr}){score}"
 
 def annotate_score(result, score, additive_op=None, existing_score=None):
     """
@@ -169,13 +171,15 @@ def scorer(runtime_context):
 
     return score
 
-class branching_point:
+class checkpoint:
     def __init__(self, handler):
         self.handler = handler
 
     def __call__(self, resumable: resumable):
         """
-        Returns one of the possible branching values of this branching point.
+        Returns the value to return from the function call, in exchange for a 
+        resumable that can be used to obtain the query result assuming a different
+        branching variant at the same point in the graph.
 
         :param resumable: Parameterized resumable to obtain the query result,
             assuming a different branching variant.

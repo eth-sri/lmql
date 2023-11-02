@@ -30,7 +30,7 @@ def ao_answer(question):
 @lmql.query
 def answer(question):
     '''lmql
-    return ao_answer(question)@0.9 | cot_answer(question)
+    return ao_answer(question) | cot_answer(question)
     '''
 
 @lmql.query(merge=ByIntValue(score='mean'))
@@ -41,7 +41,9 @@ def final_answer(question):
 
 if __name__ == "__main__":
     # graph query
-    lmql.infer(final_answer, question="What is 23*2-123?", state="graph.json", samples=4)
+    with lmql.traced("infer") as t:
+        lmql.infer(final_answer, question="What is 23*2-123?", state="graph.json", samples=1)
+        print(lmql.certificate(t).asdict().get("metrics"))
     # to inspect the resulting graph, run 
     # lmql graph-watch graph.json 
     # and open http://localhost:1234 in your browser

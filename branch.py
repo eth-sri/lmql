@@ -1,6 +1,6 @@
 import lmql
 import inspect
-from lmql.graphs.runtime import branching_point
+from lmql.graphs.runtime import checkpoint
 from lmql.runtime.loop import run_in_loop
 
 # lmql.set_default_model(lmql.model("random", seed=123))
@@ -8,36 +8,39 @@ from lmql.runtime.loop import run_in_loop
 class Graph:
     def __init__(self):
         self.collected_resumables = []
+        self.n = 0
 
-    def branching_point(self, *values):
+    def branch(self, *values):
         def handler(resumable):
             choice = values[0]
             self.collected_resumables.extend([(v, resumable) for v in values if v is not choice])
             return values[0]
-        return branching_point(handler)
+        return checkpoint(handler)
 
 graph = Graph()
 
-def branch():
-    return graph.branching_point(
-        "Bob",
-        "Alice"
-    )
+def branch(s):
+    graph.n += 1
+    print("branch called", graph.n)
 
-@lmql.query
-def non_branch(name: str):
-    '''lmql
-    return name
-    '''
+    if graph.n == 1:
+        return graph.branch(
+            "Only Bob"
+        )
+    
+    return graph.branch(
+        "Bob",
+        "Alice",
+        "Charlie"
+    )
 
 @lmql.query
 def q():
     '''lmql
-    argmax(dump_compiled_code=True)
-    "Is '{branch()}' and '{non_branch('Alice')}' the same name? (yes or no)\n"
-    print([context.prompt])
-    "A:[A]"
-    print("answer is", [A])
+    a = branch("")
+    b = branch(a)
+    print([a,b])
+    "A:[A]" where len(TOKENS(A)) < 10
     return context.prompt
     '''
 

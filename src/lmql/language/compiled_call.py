@@ -38,6 +38,14 @@ class CompiledCall:
                 args = args.args[0].elts
 
         keywords = items.get("'kwargs'", [])
+        if type(keywords) is ast.Dict:
+            def key_to_identifier(key):
+                if type(key) is ast.Constant:
+                    return key.value
+                return key
+            keywords = [
+                ast.keyword(key_to_identifier(key),value) for key,value in zip(keywords.keys, keywords.values)
+            ]
 
         return cls(func=target, args=args, keywords=keywords)
     

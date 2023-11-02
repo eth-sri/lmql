@@ -33,6 +33,8 @@ h1, h2, h3, h4, h5 {
     margin: 0pt;
     display: flex;
     flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .inspector pre {
@@ -127,4 +129,9 @@ ul.graph-toolbar button:hover {
     color: hsl(0, 0%, 50%);
     color: hsl(70, 100%, 50%);
     color: hsl(190, 100%, 50%);
+}
+
+.full-json {
+    overflow: auto;
+    margin-top: 10pt;
 }

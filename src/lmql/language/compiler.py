@@ -386,8 +386,8 @@ class FunctionCallTransformation(ast.NodeTransformer):
     def compiled_call(f, args, keywords):
         args_repr = "{'args': tuple([" + ", ".join([ast.unparse(a) for a in args]) + "])"
         if len(keywords) > 0:
-            kw_repr = ', '.join([f'{k.arg}={ast.unparse(k.value)}' for k in keywords]) + '}'
-            args_repr += ", 'kwargs': '{' + " + kw_repr + " + '}'"
+            kw_repr = ', '.join([f'"{k.arg}":{ast.unparse(k.value)}' for k in keywords])
+            args_repr += ", 'kwargs': { " + kw_repr + " }"
         args_repr += "}"
         wrapped = wrapped = interrupt_call('call', ast.unparse(f), args_repr)
         wrapped = ast.parse(wrapped).body[0].value
@@ -857,7 +857,16 @@ class BranchingCallTransformation(ast.NodeTransformer):
             type(node.op) is ast.MatMult and \
             type(node.left) is ast.Yield:
             return node.left.value, node.right
+        elif type(node) is ast.BinOp and \
+            type(node.op) is ast.MatMult and \
+            type(node.left) is ast.BinOp and \
+            type(node.left.op) is ast.MatMult and \
+            type(node.left.left) is ast.Yield and \
+            type(node.left.right) is ast.Constant and \
+            type(node.left.right.value) is str:
+            return node.left.left.value, ast.Constant(node.left.right.value + ast.unparse(node.right), "str")
         else:
+            print("not a branching operand", ast.unparse(node), type(node.left), type(node.right))
             return None
 
     # check for ast.Call | ast.Call expressions
@@ -869,10 +878,10 @@ class BranchingCallTransformation(ast.NodeTransformer):
                 return node
             
             left = operands[0][0]
-            left_score = operands[0][1]
+            left_score = operands[0][1] or ast.Constant(None, "None")
 
             right = operands[1][0]
-            right_score = operands[1][1]
+            right_score = operands[1][1] or ast.Constant(None, "None")
 
             left = self.visit(left)
             right = self.visit(right)
@@ -884,16 +893,12 @@ class BranchingCallTransformation(ast.NodeTransformer):
             if any(c is None for c in [left, right]):
                 return node
 
-            deferred_left = ast.Call(attr("lmql.runtime_support.defer_call"), [left.func] + left.args, left.keywords)
-            deferred_right = ast.Call(attr("lmql.runtime_support.defer_call"), [right.func] + right.args, right.keywords)
+            deferred_left = ast.Call(attr("lmql.runtime_support.defer_call"), [left.func] + left.args, left.keywords + [ast.keyword("__branch_score__", left_score)])
+            deferred_right = ast.Call(attr("lmql.runtime_support.defer_call"), [right.func] + right.args, right.keywords + [ast.keyword("__branch_score__", right_score)])
 
             call_id = self.call_identifier_counter
             self.call_identifier_counter += 1
 
-            # ast.parse(f"""await lmql.runtime_support.branch({call_id}, [
-            #     {ast.unparse(deferred_left)}, {ast.unparse(deferred_right)}
-            # ])""")
-        
             return FunctionCallTransformation.compiled_call(ast.Name("lmql.runtime_support.branch"), [
                 ast.Constant(call_id, "int"),
                 ast.List([deferred_left, deferred_right], ast.Load())
@@ -1078,7 +1083,6 @@ class LMQLCompiler:
             dependency_scope = QueryDependencyScope()
             q.dependencies = dependency_scope.scope(q)
             decorator_args = "dependencies=" + dependency_scope.dependency_dict()
-            print(decorator_args)
 
             model_name = ast.unparse(q.from_ast).strip()
             model_name = model_name_aliases.get(model_name, model_name)
@@ -1086,7 +1090,6 @@ class LMQLCompiler:
                 model_name = "'" + model_name_aliases[model_name[1:-1]] + "'"
 
             # resulting code
-            code = None
             decorator_args += ", output_variables=[" + ", ".join([f'"{v}"' for v in scope.defined_vars]) + "]"
 
             # generate function that runs query

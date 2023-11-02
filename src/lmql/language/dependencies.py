@@ -53,6 +53,7 @@ class QueryDependencyScope(ast.NodeVisitor):
                 else:
                     counts[repr] = 1
                 
+                repr = repr.replace("'", "\\'")
                 s += f"('{repr}', '{ast.unparse(target)}'),"
             elif type(entry) is list:
                 s += self.dependency_dict(entry)
@@ -119,7 +120,11 @@ class QueryDependencyScope(ast.NodeVisitor):
     def dependency_repr(self, func, args, keywords):
         repr_s = ast.unparse(func) + "(" + ", ".join([ast.unparse(a) for a in args])
         if kwargs := keywords:
-            repr_s += ", " + ast.unparse(kwargs)
+            for kw in kwargs:
+                key = kw.arg
+                if key == "__branch_score__":
+                    continue
+                repr_s += ", " + key + "=" + ast.unparse(kw.value)
         repr_s += ")"
         return repr_s
 

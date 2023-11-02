@@ -1,16 +1,25 @@
+import lmql
+
+@lmql.query
 def step_score(STEP):
+    '''lmql
     "Evaluate if given input and steps still can lead to a result of 24"
     "Step: {STEP}"
     "Estimate (0-5): [SCORE]" where SCORE in [0, 1, 2, 3, 4, 5]
     
     return float(SCORE)
+    '''
 
-@lmql.query(model="llama.cpp:...")
+@lmql.query
 def score(STEP):
+    '''lmql
     "{STEP}"
     return token_score(STEP)
+    '''
 
+@lmql.query(decoder="sample")
 def solution(input):
+    '''lmql
     if input.endswith('(left: 24)'):
         return True
     
@@ -18,8 +27,12 @@ def solution(input):
     "Possible next steps: [STEPS]"
 
     return | solution(step)@step_score(step) for step in STEPS |
+    '''
 
+@lmql.query
 def final_solution(input):
+    '''lmql
     return solution()
+    '''
 
 graph.infer(solution, input="4 9 10 13")

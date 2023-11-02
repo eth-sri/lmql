@@ -14,7 +14,7 @@ from lmql.runtime.resumables import resumable
 from lmql.runtime.dclib.dclib_model import TokenMask
 from lmql.language.qstrings import (DistributionVariable, TemplateVariable,
                                     qstring_to_stmts)
-from lmql.graphs.runtime import call, branching_point
+from lmql.graphs.runtime import call, checkpoint
 from lmql.ops.follow_map import FollowMap
 from lmql.ops.token_set import VocabularyMatcher, has_tail, tset
 from lmql.ops.follow_map import fmap
@@ -171,6 +171,7 @@ class LMQLContext:
         args = allargs.get("args", [])
         kwargs = allargs.get("kwargs", {})
         result = await call(fct, *args, **kwargs)
+
         return InterpreterCall("__branching_call__", result)
 
     async def set_model(self, model_name):
@@ -244,20 +245,31 @@ class QueryResumable(resumable):
     def copy(self):
         return QueryResumable(self.state, self.interpreter.copy())
     
-    def __call__(self, *args, **kwargs):
+    async def __call__(self, *args, **kwargs):
         if len(self.state.stmt_buffer) == 0 or type(self.state.stmt_buffer[0]) is not function_call:
             warnings.warn("warning: resuming a query resumable from a non-branched state. This is not supported and will likely lead to unexpected results.")
-            return self.interpreter.resume(self.state)
-        else:
+            if self.interpreter.root_state is not None:
+                self.interpreter = self.interpreter.copy()
             state_branching_for_value = self.state.updated(
-                stmt_buffer=[function_call(args[0])] + self.state.stmt_buffer[1:],
+                stmt_buffer=self.state.stmt_buffer[1:],
                 interpreter=self.interpreter
             )
+            return await self.interpreter.resume(state_branching_for_value)
+        else:
+            if self.interpreter.root_state is not None:
+                self.interpreter = self.interpreter.copy()
+            resumed_query_head = self.state.query_head.copy()
+            resumed_query_head.future_trace.append(args[0])
+            state_branching_for_value = self.state.updated(
+                stmt_buffer=self.state.stmt_buffer[1:],
+                interpreter=self.interpreter,
+                query_head=resumed_query_head
+            )
 
-            return self.interpreter.resume(state_branching_for_value)
+            return await self.interpreter.resume(state_branching_for_value)
 
     def __repr__(self):
-        return f"<QueryResumable {self.state}>"
+        return f"<QueryResumable {self.interpreter.name} {self.state}>"
 
 class PromptInterpreter:
     """
@@ -550,7 +562,7 @@ class PromptInterpreter:
                     # get result
                     result = s.result
 
-                    if type(result) is branching_point:
+                    if type(result) is checkpoint:
                         cloned_program_state = state.program_state.copy()
                         cloned_program_state.python_scope = program_variables_after_last_continue or state.program_state.python_scope
                         
@@ -560,7 +572,7 @@ class PromptInterpreter:
                             query_args=query_args,
                             variable_args=variable_args,
                             stmt_buffer=stmt_buffer,
-                            query_head=query_head.copy(),
+                            query_head=query_head,
                             program_state=cloned_program_state,
                             recurring_variable_counter=recurring_variable_counter
                         )

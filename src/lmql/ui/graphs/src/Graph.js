@@ -182,7 +182,7 @@ function NodeData(props) {
         return null;
     }
 
-    return <div class={'node-data' + (props.indent > 0 ? ' child' : '')} style={{borderColor: props.node.color}}>
+    return <div className={'node-data' + (props.indent > 0 ? ' child' : '')} style={{borderColor: props.node.color}}>
         {props.label && <h4>{props.label}</h4>}
         <div className='score value'>Score: <code>{props.node.score}</code></div>
         <SyntaxHighlighter language="json" style={atomOneDarkReasonable} wrapLongLines={true}>
@@ -201,6 +201,19 @@ function LMQLCode(props) {
         >
         {props.children}
     </SyntaxHighlighter>
+}
+
+function FullJSON(props) {
+    const [expanded, setExpanded] = React.useState(false);
+    return <div className='full-json'>
+        <div className='full-json-header child-data-header' onClick={() => setExpanded(!expanded)}>
+            <h4> {expanded ? '▼' : '▶'} Full JSON</h4>
+        </div>
+        {expanded && <SyntaxHighlighter language="json" style={atomOneDarkReasonable}>
+            {JSON.stringify(props.data, null, 2)}
+        </SyntaxHighlighter>}
+        <br/>
+    </div>
 }
 
 export function Graph() {
@@ -277,22 +290,25 @@ export function Graph() {
                         // adapt L based on score between 50% and 80%
                         if (color) {
                             node.data('color', color);
-                            node.data('label', node.data('label') + "\n(" + node.data().score.toFixed(2) + ")");
+                            node.data('label', node.data('label') + "\n(" + (node.data().score || 0).toFixed(2) + ")");
                             // node.style('border-width', relative_score * 2);
                             if (node.data("unrealized")) {
                                 node.style('opacity', 0.5);
+                                node.style('width', 1);
+                                node.style('height', 1);
+                            } else {
+                                node.style('background-color', color);
                             }
-                            node.style('background-color', color);
-                            
                         }
                     })
 
                     cy_instance.layout(layout).run();
     
-                    cy_instance.nodes().forEach(node => {
-                        let props = node_pos[node.id()];
-                        node.position(props);
-                    })
+                    // re-enable to keep positions when data is updated
+                    // cy_instance.nodes().forEach(node => {
+                    //     let props = node_pos[node.id()];
+                    //     node.position(props);
+                    // })
 
                     if (!activeNode) {
                         setActiveNode(cy_instance.nodes()[0].data());
@@ -329,8 +345,8 @@ export function Graph() {
                 <LMQLCode>
                     {activeNode && activeNode.lmql}
                 </LMQLCode>
-                <br/>
                 </>}
+            {activeNode && <FullJSON data={activeNode}/>}
         </div>
         <div className='graph' ref={cy}/>
         <ul className='graph-toolbar'>

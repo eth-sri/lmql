@@ -90,12 +90,12 @@ class Tracer:
         # updateable event handle
         return Event(self.events[-1])
 
-    def add(self, metric_name, n=1):
+    def add(self, metric_name, n=1, aggregate="sum"):
         """
         Adds a value to the given metric.
         """
         if self.parent is not None:
-            self.parent.add(metric_name, n)
+            self.parent.add(metric_name, n, aggregate=aggregate)
 
         # split by dot as a hierarchy
         parts = metric_name.split(".")
@@ -104,7 +104,14 @@ class Tracer:
         for i in range(len(parts) - 1):
             current = current.setdefault(parts[i], {})
         # add value
-        current[parts[-1]] = current.get(parts[-1], 0) + n
+        if aggregate == "sum":
+            current[parts[-1]] = current.get(parts[-1], 0) + n
+        elif aggregate == "mean":
+            current[parts[-1]] = current.get(parts[-1], [0, 0])
+            current[parts[-1]][0] += n
+            current[parts[-1]][1] += 1
+        else:
+            raise ValueError("Invalid aggregation method: {}".format(aggregate))
 
     def add_child_tracer(self, tracer):
         self.children.append(tracer)
