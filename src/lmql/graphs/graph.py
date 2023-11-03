@@ -13,6 +13,21 @@ from lmql.graphs.inference_call import InferenceCall
 from functools import partial
 from .solvers import Solver, GraphCallAssertionError
 
+def with_resumable(fct):
+    async def wrapper(*args, unpack=False, **kwargs):
+        call: InferenceCall = get_graph_context()
+        async def handler(r):
+            return await fct(*args, **kwargs, resumable=r, calling_context=call)
+        
+        if unpack:
+            r = await handler(identity)
+            while type(r) is checkpoint:
+                r = await r(identity)
+            return r
+        else:
+            return checkpoint(handler)
+    return wrapper
+
 class InferenceGraph:
     """
     An inference graph is a directed acyclic graph (DAG) of LMQL query functions
@@ -62,320 +77,143 @@ class InferenceGraph:
         if self.on_infer:
             self.on_infer()
 
-    async def ainfer_branch(self, id: int, branching_call: List[defer_call]):
-        """
-        Invoked for a 'a() | b()'-style branching calls. This method determines
-        which branch to explore and how its result should be inferred.
-        """
-        context: InferenceCall = get_graph_context()
-        assert context is not None, "ainfer_branch() can only be called from within a graph context via lmql.infer(...)"
-
-        candidate_instance_nodes = []
-        for call in branching_call:
-            node = self.qfct_to_node.get(call.query_function)
-
-            candidate_instance_nodes.append(InstanceNode(
-                node,
-                predecessors=[],
-                dangling=True,
-                resumable=None,
-                call=call,
-                score=None,
-            ))
-
-        # 1. decide which candidate instance node to explore
-        call_node: InstanceNode = context.solver.choice(candidate_instance_nodes, context)
-        call = call_node.call
-
-        # 2. record other calls as possible alternatives to be explored later
-        other_options = [inode for inode in candidate_instance_nodes if inode is not call_node]
-
-        # 3. infer branch result
-        result = await self.ainfer_call(call.target, *call.args, **call.kwargs)
-
-        # add dangling nodes/paths for all unexplored branches for this call
-        if len(other_options) > 0:
-            def exchange_result_with_resumable(outer_resumable):
-                nonlocal result, other_options
-                for other_node in other_options:
-                    call = other_node.call
-                    # TODO: if a query function is used in different ways, this may be incorrect
-                    # (need to map call site to query node, not query function to query node)
-                    node = self.qfct_to_node.get(call.query_function)
-                    # make sure other option node can be resumed
-                    other_node.resumable = outer_resumable
-                    # store other node in calling context and thus in instance graph
-                    context.dangling_nodes.setdefault(id, []).append(other_node)
-                return result
-            return checkpoint(exchange_result_with_resumable, result)
-        else:
-            return result
-
-    async def ainfer(self, node: QueryNode, *args, unwrap=True, **kwargs):
-        """
-        Infers the result of the given query node, assuming the 
-        provided arguments and keyword arguments are the inputs.
-        """
-        assert node is not None, "Query node cannot be None"
-
-        # check if this is a sub-query call
-        context: InferenceCall = get_graph_context()
-        
-        # count query calls per node
-        node.num_calls += 1
-
-        # in new context, compute result and track inputs and outputs
-        # as instance nodes and edges
-        with InferenceCall(self, node, context.solver, args, kwargs) as call:
-            result = await self.invoke(node.query_fct, *args, query_node=node, context=context, **kwargs)
-        
-            # check if result has identity-mapped instance node
-            actual_result = checkpoint.get_result(result)
-            score = call.score(actual_result)
-
-            # create corresponding instance graph structure
-            instance_node = InstanceNode(actual_result, call.inputs, score=score)
             
-            if type(actual_result) is GraphCallAssertionError:
-                instance_node.error = actual_result
-            
-            # track instance node in query node
-            node.add_instance(instance_node)
-            
-            # register new instance node in calling context (as input to calling query)
-            if context is not None:
-                context.inputs.append(instance_node)
-                context.inputs_mapping[id(actual_result)] = instance_node
-
-            # merge equivalent instance nodes
-            node.merge_instances()
-
-            # invoke on_infer callback hook
-            await self.debug_out()
-
-            # create dangeling instance nodes for each alternative branch
-            dangling_nodes = call.dangling_nodes
-            for call_id, inodes in dangling_nodes.items():
-                for inode in inodes:
-                    inode.result.add_instance(inode)
-
-            def exchange_result_for_resumable(outer_resumable):
-                nonlocal result
-                
-                # create lifted dangling instance nodes using 'outer_resumable'
-                for call_id, inodes in dangling_nodes.items():
-                    for inode in inodes:
-                        context.dangling_nodes.setdefault(call_id, []).append(lifted(
-                            node,
-                            defer_call(node.query_fct, *args, **kwargs),
-                            outer_resumable,
-                            [inode]
-                        ))
-                
-                # also make call to sampled instance_node re-entrant (i.e. allows to re-sample
-                # any instance node in the context of its caller)
-                instance_node.resumable = outer_resumable
-        
-                while type(result) is checkpoint:
-                    result = result(outer_resumable)
-
-                # for assertion errors, do not return but propagate them 
-                # to the calling context (after grabbing the resumable for this query)
-                if type(result) is GraphCallAssertionError:
-                    raise result
-                
-                return result
-            
-            # make sure calling context provides resumable in exchagne
-            # for actual result
-            checkpoint_result = checkpoint(exchange_result_for_resumable, result)
-
-            # if 'unwrapping', caller does not expect 'checkpoint' and 
-            # we stored lifted dangling nodes directly in the graph (calling
-            # context is client or solver directly)
-            if unwrap:
-                # make sure dangling nodes are created
-                try:
-                    checkpoint_result(identity)
-                finally:                
-                    # add final edges for dangling nodes
-                    for call_id, inodes in context.dangling_nodes.items():
-                        for inode in inodes:
-                            context.node.add_instance(inode)
-                    return result
-            
-            return checkpoint_result
-
-    async def invoke(self, query_fct, *args, query_node, context, **kwargs):
-        if "cache" not in kwargs and self.caching_strategy == 'node':
-            kwargs["cache"] = f"/tmp/lmql-graph-cache-{query_node.name}.tokens"
-
-        try:
-            return await query_fct.__acall__(*args, **kwargs)
-        except GraphCallAssertionError as e:
-            error = e
-            return error
-        except AssertionError as e:
-            error = GraphCallAssertionError(str(e), None)
-            call = get_graph_context()
-
-            def exchange_result_for_retry_node(outer_resumable):
-                retry_node = InstanceNode(query_node,
-                                        call.inputs,
-                                        None, 
-                                        dangling=True, 
-                                        resumable=outer_resumable,
-                                        call=defer_call(query_fct, *args, **kwargs))
-                error.retry_node = retry_node
-                context.dangling_nodes.setdefault(id(error), []).append(retry_node)
-
-                return error
-            return checkpoint(exchange_result_for_retry_node, error)
-
-    async def acomplete(self, node: InstanceNode, solver, unwrap=True):
-        """
-        Like ainfer for dangling nodes (e.g. partially sampled paths).
-
-        TODO: think about unifying this with ainfer, based on overlap
-        """
-
-        if self.on_infer:
-            self.on_infer()
-
-        original_dangling_node = node
-
-        if not node.dangling:
-            return node.result
-        assert node.resumable is not None, "Provided query node does not have a resumable"
-
-        context = get_graph_context()
-        query_node = node.query_node
-
-        with InferenceCall(self, node.query_node, solver) as call:
-            if len(node.predecessors) == 0:
-                result = await self.invoke(query_node.query_fct, *node.call.args, query_node=query_node, context=context, **node.call.kwargs)
-            else:
-                class mock_query:
-                    async def __acall__(*args):
-                        predecessor_result = [await self.acomplete(pred, solver, unwrap=False) for pred in node.predecessors]
-                        assert len(predecessor_result) <= 1, "Cannot complete dangling node with multiple predecessors"
-
-                        if len(predecessor_result) > 0:
-                            catch_up = node.predecessors[0].resumable
-
-                            if type(predecessor_result[0]) is checkpoint:
-                                try:
-                                    while type(predecessor_result[0]) is checkpoint:
-                                        predecessor_result[0] = predecessor_result[0](catch_up)
-                                finally:
-                                    # add final edges for dangling nodes
-                                    for call_id, inodes in context.dangling_nodes.items():
-                                        for inode in inodes:
-                                            query_node.add_instance(inode)
-                        
-                        if len(node.predecessors) > 0 and node.predecessors[0].error is not None:
-                            return node.predecessors[0].error
-                        else:
-                            return await catch_up(*predecessor_result)
-
-                # invoke get_result like a query function
-                result = await self.invoke(mock_query(), query_node=query_node, context=context)
-
-            args = node.call.args
-            kwargs = node.call.kwargs
-            instance_node = InstanceNode(result, [], score=None, dangling=False)
-
-            # switch to query node
-            node = node.query_node
-        
-            # check if result has identity-mapped instance node
-            actual_result = checkpoint.get_result(result)
-            score = call.score(actual_result)
-
-            # update corresponding instance node (convert from dangling to concrete)
-            instance_node.set_result(actual_result)
-            if len(instance_node.predecessors) == 0:
-                instance_node.predecessors = call.inputs
-            else:
-                call.inputs = instance_node.predecessors
-            instance_node.score = score
-            instance_node.dangling = False
-
-            if type(actual_result) is GraphCallAssertionError:
-                # instance_node.error = actual_result
-                instance_node.error = actual_result
-                instance_node.dangling = False
-            else:
-                instance_node.error = None
-            
-            # register new instance node in calling context (as input to calling query)
-            if context is not None:
-                context.inputs.append(instance_node)
-                context.inputs_mapping[id(actual_result)] = instance_node
-
-            # track instance node in query node
-            node.add_instance(instance_node)
-
-            # merge equivalent instance nodes
-            node.merge_instances()
-
-            # invoke on_infer callback hook
-            await self.debug_out()
-
-            # create dangeling instance nodes for each alternative branch
-            dangling_nodes = call.dangling_nodes
-            for call_id, inodes in dangling_nodes.items():
-                for inode in inodes:
-                    inode.result.add_instance(inode)
-
-            def exchange_result_for_resumable(outer_resumable):
-                nonlocal result
-
-                # create lifted dangling instance nodes using 'outer_resumable'
-                for call_id, inodes in dangling_nodes.items():
-                    for inode in inodes:
-                        context.dangling_nodes.setdefault(call_id, []).append(lifted(
-                            node,
-                            defer_call(node.query_fct, *args, **kwargs),
-                            outer_resumable,
-                            [inode]
-                        ))
-
-                if type(result) is GraphCallAssertionError:
-                    raise result
-                else:
-                    original_dangling_node.query_node.remove_instance(original_dangling_node)
-
-                return result
-            
-            # make sure calling context provides resumable in exchagne
-            # for actual result
-            checkpoint_result = checkpoint(exchange_result_for_resumable, result)
-
-            # if 'unwrapping', caller does not expect 'checkpoint' and 
-            # we stored lifted dangling nodes directly in the graph (calling
-            # context is client or solver directly)
-            if unwrap:
-                try:
-                    # make sure dangling nodes are created
-                    checkpoint_result(identity)
-                finally:
-                    # add final edges for dangling nodes
-                    for call_id, inodes in context.dangling_nodes.items():
-                        for inode in inodes:
-                            context.node.add_instance(inode)
-                    return result
-            
-            return checkpoint_result
-
-        return None
-    
     def complete(self, node: InstanceNode, solver: Solver):
         return run_in_loop(self.acomplete(node, solver))
 
     def infer(self, node: QueryNode, *args, **kwargs):
         return run_in_loop(self.ainfer(node, *args, **kwargs))
 
+    @with_resumable
+    async def ainfer_branch(self, id: int, branching_call: List[defer_call], resumable: resumable, calling_context: InferenceCall):
+        """
+        Invoked for a 'a() | b()'-style branching calls. This method determines
+        which branch to explore and how its result should be inferred.
+        """
+        assert resumable is not None, "ainfer_branch must be called with a resumable"
+        assert calling_context is not None, "ainfer_branch must be called with a call"
+
+        candidate_instance_nodes = []
+        for dcall in branching_call:
+            node = self.qfct_to_node.get(dcall.query_function)
+
+            candidate_instance_nodes.append(InstanceNode(
+                node,
+                predecessors=[],
+                dangling=True,
+                resumable=resumable,
+                call=dcall,
+                score=None,
+                query_node=node
+            ))
+
+        # 1. decide which candidate instance node to explore
+        chosen_call_node: InstanceNode = calling_context.solver.choice(candidate_instance_nodes, calling_context)
+        chosen_call = chosen_call_node.call
+
+        # 2. record other calls as possible alternatives to be explored later
+        other_options = [inode for inode in candidate_instance_nodes if inode is not chosen_call_node]
+
+        # 3. infer branch result
+        result = await self.ainfer_call(chosen_call.target, *chosen_call.args, **chosen_call.kwargs)
+
+        # create dangling nodes in the graph for all other options
+        for o in other_options:
+            o.query_node.add_instance(o)
+            calling_context.dangling_nodes.append(o)
+
+        await self.debug_out()
+        
+        return result
+
+    @with_resumable
+    async def ainfer(self, node: QueryNode, *args, return_node = False, resumable: resumable = None, calling_context: InferenceCall = None, **kwargs):
+        """
+        Infers the result of the given query node, assuming the 
+        provided arguments and keyword arguments are the inputs.
+        """
+        assert resumable is not None, "ainfer must be called with a resumable"
+        assert calling_context is not None, "ainfer must be called with a call"
+
+        with InferenceCall(self, node, calling_context.solver, args, kwargs) as call:
+            result = await node.query_fct.__acall__(*args, **kwargs)
+
+            # create instance node for this result
+            instance_node = InstanceNode(
+                result,
+                predecessors=call.inputs,
+                dangling=False,
+                resumable=resumable,
+                call=call,
+                score=None,
+                query_node=node
+            )
+            node.add_instance(instance_node)
+
+            # check for dangling nodes from sub-calls, to be lifted to this call level
+            for dangling_node in call.dangling_nodes:
+                lnode = lifted(node, defer_call(node.query_fct, *args, **kwargs), resumable, [dangling_node])
+                node.add_instance(lnode)
+                calling_context.dangling_nodes.append(lnode)
+
+            # register result as input to calling context
+            calling_context.inputs.append(instance_node)
+
+            return result
+
+    @with_resumable
+    async def acomplete(self, node: InstanceNode, unwrap=True, resumable: resumable = None, calling_context: InferenceCall = None):
+        """
+        Like ainfer for dangling nodes (e.g. partially sampled paths).
+        """
+        assert resumable is not None, "acomplete must be called with a resumable"
+        assert calling_context is not None, "acomplete must be called with a call"
+
+        with InferenceCall(self, node.query_node, calling_context.solver, node.call.args, node.call.kwargs) as call:
+            if len(node.predecessors) == 0:
+                qfct = node.call.query_function
+                result = await qfct.__acall__(*node.call.args, **node.call.kwargs)
+                # result = await self.ainfer(node.query_node, *node.call.args, return_node=True, **node.call.kwargs)
+                replayed = False
+            else:
+                predecessors_values = [await self.acomplete(pred) for pred in node.predecessors]
+                while any([type(p) is checkpoint for p in predecessors_values]):
+                    for i in range(len(predecessors_values)):
+                        if type(predecessors_values[i]) is checkpoint:
+                            predecessors_values[i] = await predecessors_values[i](node.resumable)
+                print("resume with", [predecessors_values])
+                result = await node.resumable(*predecessors_values)
+                replayed = True
+
+            async def rewrite_node_data(resumable):
+                """
+                Executed once continuation of this acomplete call was 
+                determined (actual results only become available after
+                all predecessors have been completed).
+                """
+                nonlocal result, call
+
+                while type(result) is checkpoint:
+                    result = await result(resumable)
+
+                # check for dangling nodes from sub-calls, to be lifted to this call level
+                for dangling_node in call.dangling_nodes:
+                    lnode = lifted(node.query_node, call, resumable, [dangling_node])
+                    node.query_node.add_instance(lnode) # dangling_node)
+                    calling_context.dangling_nodes.append(lnode)
+
+                # register result as input to calling context
+                calling_context.inputs.append(node)
+                
+                if not replayed:
+                    node.predecessors = call.inputs
+
+                node.dangling = False
+                node.set_result(result)
+
+                return result
+            
+            return checkpoint(rewrite_node_data)
 
 def _build_graph(query_fct_or_ref: Union[LMQLQueryFunction, Tuple[str, LMQLQueryFunction]], graph, instance_pool):
     """

@@ -9,10 +9,9 @@ seed(43)
 def cot(question):
     '''lmql
     sample
-    
-    "Q: {question} A: Let's think step by step (one sentences). [REASONING]"
 
-    return REASONING@logprobs(REASONING).mean()
+
+    return "cot success"
     '''
 
 @lmql.query
@@ -20,8 +19,8 @@ def cot_superhard(question):
     '''lmql
     sample
 
-    if random() < 0.5:
-        assert False, "This is a super hard question, I don't know how to answer it."
+    # if random() < 0.5:
+    #     assert False, "This is a super hard question, I don't know how to answer it."
     
     return "success"
     '''
@@ -29,13 +28,14 @@ def cot_superhard(question):
 @lmql.query
 def cot_hard(question):
     '''lmql
-    return cot_superhard(question)
+    return cot(question) | cot_superhard(question)
     '''
 
 @lmql.query
 def cot_answer(question): 
     '''lmql
     reasoning = cot_hard(question)
+    print("reasoning", type(reasoning), [reasoning])
 
     return "89 answer with " + reasoning
     '''

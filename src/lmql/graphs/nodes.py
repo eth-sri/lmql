@@ -44,7 +44,7 @@ class InstanceNode:
     An instance node represents the result of a query function with the specified inputs 
     (instance nodes of predecessor queries used to produce this result).
     """
-    def __init__(self, result, predecessors, score=1.0, dangling=False, resumable=None, call=None, error=None):
+    def __init__(self, result, predecessors, score=1.0, dangling=False, resumable=None, call=None, error=None, query_node=None):
         self.result = result
         self.predecessors: List[InstanceNode] = predecessors
         self.score = score
@@ -58,7 +58,7 @@ class InstanceNode:
         self.call = call
         self.error = error
 
-        self.query_node: QueryNode = None
+        self.query_node: QueryNode = query_node
 
     def set_result(self, result):
         self.result = result
@@ -76,6 +76,7 @@ class InstanceNode:
             resumable=None,
             call=call,
             score=None,
+            query_node=node
         )
 
     def __repr__(self):

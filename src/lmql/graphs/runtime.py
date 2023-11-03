@@ -177,7 +177,7 @@ class checkpoint:
         self.handler = handler
         self.result = result
 
-    def __call__(self, resumable: resumable):
+    async def __call__(self, resumable: resumable):
         """
         Returns the value to return from the function call, in exchange for a 
         resumable that can be used to obtain the query result assuming a different
@@ -186,7 +186,7 @@ class checkpoint:
         :param resumable: Parameterized resumable to obtain the query result,
             assuming a different branching variant.
         """
-        return self.handler(resumable)
+        return await self.handler(resumable)
 
     @staticmethod
     def get_result(value):

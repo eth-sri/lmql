@@ -31,7 +31,7 @@ class InferenceCall:
     value_scores: Dict[int, float] = field(default_factory=dict)
     
     # alternative branched query executions
-    dangling_nodes: [InstanceNode] = field(default_factory=dict)
+    dangling_nodes: List[InstanceNode] = field(default_factory=list)
 
     dangling_created: bool = False
 

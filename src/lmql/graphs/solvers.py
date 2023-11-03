@@ -78,9 +78,9 @@ class Solver(ABC):
                 # check if we need an inference call (fresh samples) or 
                 # partially completed inference call (dangling paths)
                 if call_node.dangling:
-                    return await graph.acomplete(call_node, self)
+                    return await graph.acomplete(call_node, unpack=True)
                 else:
-                    return await graph.ainfer(qnode, *args, **kwargs)
+                    return await graph.ainfer(call_node.query_node, *args, unpack=True, **kwargs)
             except GraphCallAssertionError as e:
                 # graph call assertions are counted as rejected samples
                 return e
