@@ -190,9 +190,12 @@ function NodeData(props) {
     let dangling = props.node && props.node.dangling;
     let color = !dangling ? props.node.color : 'grey';
     let label = dangling ? props.node.label.replace("0.00", "dangling") : props.node.label;
+    let error = props.node.error != "None";
 
-
-    return <div className={'node-data' + (props.indent > 0 ? ' child' : '') + (dangling ? ' dangling' : '')} style={{borderColor: color}}>
+    return <div 
+            className={'node-data' + (props.indent > 0 ? ' child' : '') + (dangling ? ' dangling' : '') + (error ? ' error' : '')} 
+            style={{borderColor: color}}
+        >
         {props.label && <h4>{label}</h4>}
         {!dangling && <div className='score value'>Score: <code>{props.node.score}</code></div>}
         <SyntaxHighlighter language="json" style={atomOneDarkReasonable} wrapLongLines={true}>
@@ -301,11 +304,19 @@ export function Graph() {
                         if (color) {
                             node.data('color', color);
                             // node.style('border-width', relative_score * 2);
-                            if (node.data("dangling")) {
+                            if (node.data("error") != "None") {
+                                node.style('background-color', "red");
                                 node.style('opacity', 0.5);
                                 node.style('font-size', 6);
                                 node.style('width', 1);
                                 node.style('height', 1);
+                                node.data('label', node.data('label') + "\n(failed)");
+                            } else if (node.data("dangling")) {
+                                node.style('opacity', 0.5);
+                                node.style('font-size', 6);
+                                node.style('width', 1);
+                                node.style('height', 1);
+                                node.data('label', node.data('label') + "\n(unexplored)");
                             } else {
                                 node.data('label', node.data('label') + "\n(" + (node.data().score || 0).toFixed(2) + ")");
                                 node.style('background-color', color);

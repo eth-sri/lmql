@@ -1132,7 +1132,6 @@ class PromptInterpreter:
             valid=None, final=None, mask=None, 
             stopping_phrases=None, where=None,
             tail=None)
-        self.root_state = await self.advance(self.root_state)
 
         async def debug_out(decoder_step):
             if PromptInterpreter.main != self:
@@ -1144,6 +1143,8 @@ class PromptInterpreter:
             self.dcmodel.report_stats(_DCLibDebugPrinter.printer, decoder_step)
 
         self.debug_out = debug_out
+
+        self.root_state = await self.advance(self.root_state)
 
         # handle queries w/o any TemplateVariables
         if self.root_state.query_head.result is not None:
@@ -1162,7 +1163,10 @@ class PromptInterpreter:
         return_prompt_string = self.extra_kwargs.pop("return_prompt_string", False)
         if return_prompt_string:
             return self.root_state.prompt
+        
+        return await self.decode(self.root_state)
 
+    async def construct_decoder_dict(self):
         decoder_args = self.decoder_kwargs.copy()
 
         if "__get_where__" in decoder_args:
@@ -1216,11 +1220,12 @@ class PromptInterpreter:
 
         # tokenize initial prompt
         prompt_ids = await self.tokenize(self.root_state.prompt)
+        n = len(prompt_ids)
         if self.dcmodel.bos_token_id is not None:
             prompt_ids = [self.dcmodel.bos_token_id] + prompt_ids
 
         # make sure that the initial prompt is not considered part of a variable
-        self.root_state = self.root_state.updated(variable_offset=len(prompt_ids))
+        self.root_state = self.root_state.updated(variable_offset=n)
 
         # setup dcmodel for use
         self.dcmodel.model_args = decoder_args
@@ -1232,9 +1237,7 @@ class PromptInterpreter:
 
         decoder_args["decoder_fct"] = decoder_fct
 
-        self.full_decoder_args = decoder_args
-
-        return await self.decode(self.root_state)
+        return decoder_args
     
     @trace("PromptInterpreter.resume")
     async def resume(self, state: PromptState):
@@ -1262,6 +1265,9 @@ class PromptInterpreter:
 
         # make sure that the initial prompt is not considered part of a variable
         self.root_state = self.root_state.updated(variable_offset=len(prompt))
+
+        if self.full_decoder_args is None:
+            self.full_decoder_args = await self.construct_decoder_dict()
 
         # pass processor as decoder argument
         self.full_decoder_args["modern_logits_processor"] = self.where_processor

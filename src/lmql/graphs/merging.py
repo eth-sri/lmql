@@ -20,7 +20,7 @@ class ByValue:
         return str(instance.result)
 
     def _normalize(self, instance: InstanceNode):
-        if instance.result is None or instance.dangling:
+        if instance.result is None or instance.dangling or instance.error:
             i = self.none_counts
             self.none_counts += 1
             return f"{i}"

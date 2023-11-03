@@ -27,6 +27,10 @@ class QueryNode:
             self.instances.append(node)
             node.query_node = self
 
+    def remove_instance(self, node):
+        self.instances.remove(node)
+        node.query_node = None
+
     def dangling(self):
         for i in self.instances:
             if i.dangling:
@@ -40,7 +44,7 @@ class InstanceNode:
     An instance node represents the result of a query function with the specified inputs 
     (instance nodes of predecessor queries used to produce this result).
     """
-    def __init__(self, result, predecessors, score=1.0, dangling=False, resumable=None, call=None):
+    def __init__(self, result, predecessors, score=1.0, dangling=False, resumable=None, call=None, error=None):
         self.result = result
         self.predecessors: List[InstanceNode] = predecessors
         self.score = score
@@ -52,6 +56,7 @@ class InstanceNode:
         # query resumable if this instance node is dangling
         self.resumable = resumable
         self.call = call
+        self.error = error
 
         self.query_node: QueryNode = None
 

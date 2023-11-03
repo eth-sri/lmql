@@ -56,7 +56,7 @@ class QueryDependencyScope(ast.NodeVisitor):
                 repr = repr.replace("'", "\\'")
                 s += f"('{repr}', '{ast.unparse(target)}'),"
             elif type(entry) is list:
-                s += self.dependency_dict(entry)
+                s += self.dependency_dict(entry) + ","
         s.rstrip(",")
         return "[" + s + "]"
 

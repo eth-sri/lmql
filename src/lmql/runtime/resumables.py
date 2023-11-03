@@ -22,6 +22,12 @@ class resumable(ABC):
         """
         pass
 
+    async def __acall__(self, *args, **kwargs):
+        """
+        Resumes the resumable context with the given arguments.
+        """
+        return await self.__call__(*args, **kwargs)
+
     @staticmethod
     def chain(*resumables):
         """

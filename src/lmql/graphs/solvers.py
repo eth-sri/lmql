@@ -10,6 +10,19 @@ from .runtime import defer_call
 from .nodes import *
 from lmql.runtime.loop import run_in_loop
 
+class GraphCallAssertionError(Exception):
+    def __init__(self, message, retry_node=None):
+        super().__init__(message)
+        self.failed_node = None
+        self.retry_node = retry_node
+        self.message = message
+
+    def __repr__(self):
+        return "GraphCallAssertionError(" + self.args[0] + ")"
+    
+    def __str__(self):
+        return "GraphCallAssertionError(" + self.args[0] + ")"
+
 class Solver(ABC):
     """
     Base class for solvers.
@@ -61,12 +74,18 @@ class Solver(ABC):
             # select next candidate
             call_node = self.choice(candidates, call)
             
-            # check if we need an inference call (fresh samples) or 
-            # partially completed inference call (dangling paths)
-            if call_node.dangling:
-                return await graph.acomplete(call_node, self)
-            else:
-                return await graph.ainfer(qnode, *args, **kwargs)
+            try:
+                # check if we need an inference call (fresh samples) or 
+                # partially completed inference call (dangling paths)
+                if call_node.dangling:
+                    return await graph.acomplete(call_node, self)
+                else:
+                    return await graph.ainfer(qnode, *args, **kwargs)
+            except GraphCallAssertionError as e:
+                # graph call assertions are counted as rejected samples
+                return e
+            finally:
+                await graph.debug_out()
 
     def step(self, graph, qnode, *args, parallel=1, **kwargs):
         """
@@ -88,6 +107,8 @@ class Solver(ABC):
         try:
             tasks = await asyncio.gather(*[self.do_step(graph, qnode, *args, **kwargs) for _ in range(parallel)])
             for t in tasks:
+                if isinstance(t, GraphCallAssertionError):
+                    continue
                 results += [t]
         except RuntimeError as e:
             if "StopIteration" in str(e):
@@ -152,5 +173,5 @@ class ExploreAll(Solver):
         return "<ExploreAll solver>"
         
 def get_default_solver():
-    return ExploreAll(early_stopping=True)
+    return ExploreAll(early_stopping=False)
     # return Sampling(include_dangling=True)

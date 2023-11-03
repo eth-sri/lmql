@@ -120,7 +120,8 @@ class defer_call:
             argstr += str(self.kwargs)[1:-1]
         argstr = argstr.rstrip(",")
         score = " @ " + str(self.branch_score) if self.branch_score is not None else ""
-        return f"deferred {qfct.name}({argstr}){score}"
+        fct_name = qfct.name if qfct is not None else str(self.target)
+        return f"deferred {fct_name}({argstr}){score}"
 
 def annotate_score(result, score, additive_op=None, existing_score=None):
     """

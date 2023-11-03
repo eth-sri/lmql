@@ -54,12 +54,20 @@ h1, h2, h3, h4, h5 {
     border-bottom: 1pt solid rgb(177, 177, 177);
     padding-top: 5pt;
     padding-left: 5pt;
+    padding-right: 5pt;
 }
 
 .node-data.dangling {
     opacity: 0.4;
     border-left: 2pt solid grey;
     margin-left: 8pt;
+}
+
+.node-data.error {
+    border-left: 10pt solid red;
+    border-color: red !important;
+    background-color: rgb(255, 230, 230);
+    border-radius: 3pt;
 }
 
 .node-data.dangling:hover {

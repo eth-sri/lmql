@@ -23,27 +23,41 @@ def cot_superhard(question):
     if random() < 0.5:
         assert False, "This is a super hard question, I don't know how to answer it."
     
-    return "success"
+    "Q: {question} A: Let's think precisely:\n[REASONING]"
+
+    return REASONING@logprobs(REASONING).mean()
+    '''
+
+@lmql.query
+def cot_medium_hard(question):
+    '''lmql
+    sample
+
+    "Q: {question} A: Let's think step by step with a dashed list:\n[REASONING]"
+
+    return REASONING@logprobs(REASONING).mean()
     '''
 
 @lmql.query
 def cot_hard(question):
     '''lmql
-    return cot_superhard(question)
+    return cot_superhard(question) | cot_medium_hard(question)
     '''
 
 @lmql.query
 def cot_answer(question): 
     '''lmql
-    reasoning = cot_hard(question)
+    reasoning = cot(question) | cot_hard(question)
+    "Q: {question}\n A:{reasoning} Thus the answer is[ANSWER]" where len(TOKENS(ANSWER)) < 20
 
-    return "89 answer with " + reasoning
+    return ANSWER@(logprobs(ANSWER).mean() + score(reasoning))
     '''
 
 @lmql.query(decoder='sample')
 def ao_answer(question):
     '''lmql
-    return "AO answer 12"
+    "Q: {question}\n A: The answer is[ANSWER]" where len(TOKENS(ANSWER)) < 20
+    return ANSWER@(logprobs(ANSWER).mean())
     '''
 
 @lmql.query
@@ -63,7 +77,8 @@ if __name__ == "__main__":
     with lmql.traced("infer") as t:
         lmql.infer(final_answer, 
                    question="What is 23*2-123?", 
-                   state="graph.json",
+                   state="graph.json", 
+                   samples=3,
                    parallel=1)
         print(lmql.certificate(t).asdict().get("metrics"))
     # to inspect the resulting graph, run 
