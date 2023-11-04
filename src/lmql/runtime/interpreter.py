@@ -1130,6 +1130,8 @@ class PromptInterpreter:
 
     @trace("PromptInterpreter.run")
     async def run(self, fct, *args, **kwargs):
+        print("PromptInterpreter.run", self.name)
+        
         self.fct = fct
 
         # enable tracing if needed (e.g. certificate=True or a file)

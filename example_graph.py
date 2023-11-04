@@ -6,84 +6,45 @@ from random import random, seed
 lmql.set_default_model(lmql.model("random"))
 
 seed(43)
+ctr = {'value': 1}
+m = lmql.model("random")
 
-failed = {}
-
-@lmql.query
-def cot_superhard(question):
+@lmql.query(model=m)
+async def a_0():
     '''lmql
-    sample
-    
-    if not "cot_superhard" in failed:
-        failed["cot_superhard"] = 0
-        print("fail cot superhard")
-        assert False, "fail cot_superhard"
+    try:
+        assert ctr['value'] > 1
+    finally:
+        ctr['value'] += 1
 
-    return "super hard"@0.1
+    return "a" + str(ctr['value'])
     '''
 
-@lmql.query
-def cot_hard(question):
+@lmql.query(model=m)
+async def b_0():
     '''lmql
-    "before"
-    if not "cot_hard" in failed:
-        failed["cot_hard"] = 0
-        assert False, "fail cot_hard"
-    "after"
-
-    r = cot_superhard(question)
-    "after call"
-    
-    return r + " from cot_hard"
+    return "b" + str(ctr['value'])
     '''
 
-@lmql.query
-def cot_answer(question): 
+@lmql.query(model=m)
+async def a():
     '''lmql
-    if not "cot_answer" in failed:
-        failed["cot_answer"] = 0
-        assert False, "fail cot_answer"
-    
-    reasoning = cot_hard(question)
 
-    return ("answer to " + reasoning)@*0.5
+    r = a_0() | b_0()
+
+    return r + 'both'
     '''
 
-
-@lmql.query
-def answer(question):
+@lmql.query(model=m)
+async def one(i=0):
     '''lmql
-    a = cot_answer(question)
-    if not "answer" in failed:
-        failed["answer"] = 0
-        assert False, "fail answer"
-
-    return a
+    return "one of " + a()
     '''
-
-@lmql.query(merge=ByIntValue(score='mean'))
-def final_answer(question):
-    '''lmql
-    return answer(question)
-    '''
-
-def num_samples():
-    import sys
-    if len(sys.argv) > 1:
-        try:
-            return int(sys.argv[1])
-        except:
-            return 2
-    return 2
 
 if __name__ == "__main__":
     # graph query
     with lmql.traced("infer") as t:
-        lmql.infer(final_answer, 
-                   question="What is 23*2-123?", 
-                   state="graph.json", 
-                   samples=num_samples(),
-                   parallel=1)
+        lmql.infer(one, state="graph.json", parallel=1)
         print(lmql.certificate(t).asdict().get("metrics"))
     # to inspect the resulting graph, run 
     # lmql graph-watch graph.json 

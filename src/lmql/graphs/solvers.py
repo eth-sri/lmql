@@ -51,7 +51,7 @@ class Solver(ABC):
         """
         results = []
         for i in range(samples):
-            print("==== SOLVER STEP ====")
+            # print("==== SOLVER STEP ====")
             try:
                 results += await self.astep(graph, qnode, *args, parallel=parallel, **kwargs)
             except RuntimeError as e:

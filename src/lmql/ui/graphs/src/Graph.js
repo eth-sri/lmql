@@ -313,10 +313,16 @@ export function Graph() {
                                 node.data('label', node.data('label') + "\n(failed)");
                             } else if (node.data("dangling")) {
                                 node.style('opacity', 0.5);
-                                node.style('font-size', 6);
+
                                 node.style('width', 1);
                                 node.style('height', 1);
-                                node.data('label', node.data('label') + "\n(unexplored)");
+                                if (node.data("resample") == "True") {
+                                    node.data('label', node.data('label') + "\n(unexplored)");
+                                } else {
+                                    node.data('label', node.data('label') + "\n(dangling)");
+                                    node.style('opacity', 1.0);
+                                    node.style('shape', 'triangle')
+                                }
                             } else {
                                 node.data('label', node.data('label') + "\n(" + (node.data().score || 0).toFixed(2) + ")");
                                 node.style('background-color', color);

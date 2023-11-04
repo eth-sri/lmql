@@ -220,7 +220,6 @@ class InferenceGraph:
 
         # use cached value for non-dangling nodes in path to complete
         if not instance_node.dangling:
-            print("use cached value")
             if instance_node.error is not None:
                 raise ValueError("failed node must have at least one dangling node (retry): {} {}".format(instance_node, instance_node.error.retry_node))
             return instance_node, []
@@ -303,6 +302,9 @@ class InferenceGraph:
         node.merge_instances()
 
         return instance_node, lifted_dangling
+    
+    def __str__(self):
+        return "<InferenceGraph queries={}>".format(len(self.nodes))
 
 def _build_graph(query_fct_or_ref: Union[LMQLQueryFunction, Tuple[str, LMQLQueryFunction]], graph, instance_pool):
     """
