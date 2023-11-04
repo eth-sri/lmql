@@ -11,10 +11,10 @@ from .nodes import *
 from lmql.runtime.loop import run_in_loop
 
 class GraphCallAssertionError(Exception):
-    def __init__(self, message, retry_node=None):
+    def __init__(self, message):
         super().__init__(message)
         self.failed_node = None
-        self.retry_node = retry_node
+        self.retry_node = None
         self.message = message
 
     def __repr__(self):
@@ -51,6 +51,7 @@ class Solver(ABC):
         """
         results = []
         for i in range(samples):
+            print("==== SOLVER STEP ====")
             try:
                 results += await self.astep(graph, qnode, *args, parallel=parallel, **kwargs)
             except RuntimeError as e:
@@ -78,9 +79,9 @@ class Solver(ABC):
                 # check if we need an inference call (fresh samples) or 
                 # partially completed inference call (dangling paths)
                 if call_node.dangling:
-                    return await graph.acomplete(call_node, unpack=True)
+                    return await graph.acomplete(call_node)
                 else:
-                    return await graph.ainfer(call_node.query_node, *args, unpack=True, **kwargs)
+                    return await graph.ainfer(call_node.query_node, *args, **kwargs)
             except GraphCallAssertionError as e:
                 # graph call assertions are counted as rejected samples
                 return e

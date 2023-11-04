@@ -311,7 +311,7 @@ def _load_tokenizer(model_identifier, type, **kwargs) -> LMQLTokenizer:
         try:
             if TiktokenTokenizer.is_available(tiktoken_identifier):
                 tiktoken_available = True
-        except:
+        except Exception as e:
             tiktoken_available = False
         
         if tiktoken_available:

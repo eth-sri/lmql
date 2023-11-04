@@ -1,57 +1,68 @@
 import lmql
 import inspect
+import asyncio
 from lmql.graphs.runtime import checkpoint
 from lmql.runtime.loop import run_in_loop
+from lmql.runtime.lmql_runtime import call
 
-# lmql.set_default_model(lmql.model("random", seed=123))
+lmql.set_default_model(lmql.model("random", seed=123))
+global i
+i = 0
 
-class Graph:
-    def __init__(self):
-        self.collected_resumables = []
-        self.n = 0
-
-    def branch(self, *values):
-        def handler(resumable):
-            choice = values[0]
-            self.collected_resumables.extend([(v, resumable) for v in values if v is not choice])
-            return values[0]
-        return checkpoint(handler)
-
-graph = Graph()
+global resumables
+resumables = []
 
 def branch(s):
-    graph.n += 1
-    print("branch called", graph.n)
+    async def handler(resumable):
+        global i
+        global resumables
+        i += 1
+        resumables += [resumable]
 
-    if graph.n == 1:
-        return graph.branch(
-            "Only Bob"
-        )
-    
-    return graph.branch(
-        "Bob",
-        "Alice",
-        "Charlie"
-    )
+        assert i > 1, "fail for first call"
+            
+        return s + str(i)
+    return checkpoint(handler)
+
+class NamedRuntime:
+    def __init__(self, name) -> None:
+        self.name = name
+    """
+    Default LMQL runtime to use for sub-query resolution.
+    """
+    async def call(self, fct, *args, **kwargs):
+        print('call dispatched via', self.name)
+        return await call(fct, *args, **kwargs)
+
+def another():
+    return 123
 
 @lmql.query
-def q():
+async def q():
     '''lmql
-    a = branch("")
-    b = branch(a)
-    print([a,b])
-    "A:[A]" where len(TOKENS(A)) < 10
-    return context.prompt
+    s = branch("hi")
+    a = another()
+    return "return with" + s + str(a)
     '''
 
-res = [q()]
-# print("p1", [p1])
+async def main():
+    r1 = NamedRuntime("r1")
 
-with lmql.traced("resumed") as t:
-    for value, resumable in graph.collected_resumables:
-        res += [run_in_loop(resumable.copy()(value))]
-        # print("extra", [res])
-        # print(value, resumable)
+    try:
+        print(await q(runtime=r1))
+    except AssertionError:
+        print("call 1 failed")
+        pass
 
-    for r in res:
-        print(r)
+    r2 = NamedRuntime("r2")
+    print("===== RESUME 1")
+    for r in resumables:
+        print(await r("resumed-1", runtime=r2))
+    
+    r3 = NamedRuntime("r3")
+    print("===== RESUME 2")
+    for r in resumables:
+        print(await r("resumed-2", runtime=r3))
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -77,7 +77,10 @@ class RewrittenInputIds:
 
 class advance: pass 
 @dataclass
-class function_call: result: Any
+class function_call: 
+    fct: Any
+    args: Any
+    kwargs: Any
 
 class PromptState(NamedTuple):
     interpreter: 'PromptInterpreter'
@@ -133,6 +136,17 @@ class PromptState(NamedTuple):
         else:
             return ops.AndOp.all(*[a for a in [constraints, interpreter.where, variable_tactic] if a is not None])
 
+class DefaultRuntime:
+    @property
+    def resumable(self):
+        return False
+    
+    """
+    Default LMQL runtime to use for sub-query resolution.
+    """
+    async def call(self, fct, *args, **kwargs):
+        return await call(fct, *args, **kwargs)
+
 class LMQLContext:
     def __init__(self, interpreter, state, prompt):
         self.interpreter = interpreter
@@ -170,9 +184,8 @@ class LMQLContext:
     async def call(self, fct, allargs):
         args = allargs.get("args", [])
         kwargs = allargs.get("kwargs", {})
-        result = await call(fct, *args, **kwargs)
-
-        return InterpreterCall("__branching_call__", result)
+        
+        return InterpreterCall("__branching_call__", function_call(fct, args, kwargs))
 
     async def set_model(self, model_name):
         self.interpreter.set_model(model_name)
@@ -245,28 +258,28 @@ class QueryResumable(resumable):
     def copy(self):
         return QueryResumable(self.state, self.interpreter.copy())
     
-    async def __call__(self, *args, **kwargs):
+    async def __call__(self, *args, runtime=None, **kwargs):
         if len(self.state.stmt_buffer) == 0 or type(self.state.stmt_buffer[0]) is not function_call:
-            warnings.warn("warning: resuming a query resumable from a non-branched state. This is not supported and will likely lead to unexpected results.")
-            if self.interpreter.root_state is not None:
-                self.interpreter = self.interpreter.copy()
-            state_branching_for_value = self.state.updated(
-                stmt_buffer=self.state.stmt_buffer[1:],
-                interpreter=self.interpreter
-            )
-            return await self.interpreter.resume(state_branching_for_value)
-        else:
-            if self.interpreter.root_state is not None:
-                self.interpreter = self.interpreter.copy()
-            resumed_query_head = self.state.query_head.copy()
-            resumed_query_head.future_trace.append(args[0])
-            state_branching_for_value = self.state.updated(
-                stmt_buffer=self.state.stmt_buffer[1:],
-                interpreter=self.interpreter,
-                query_head=resumed_query_head
-            )
+            raise ValueError("error: resuming a query resumable from a non-branched state. This is not supported and will likely lead to unexpected results.")
 
+        if self.interpreter.root_state is not None:
+            self.interpreter = self.interpreter.copy()
+        resumed_query_head = self.state.query_head.copy()
+        resumed_query_head.future_trace.append(args[0])
+        state_branching_for_value = self.state.updated(
+            stmt_buffer=self.state.stmt_buffer[1:],
+            interpreter=self.interpreter,
+            query_head=resumed_query_head
+        )
+        resumed_query_head.context = LMQLContext(self.interpreter, state_branching_for_value, state_branching_for_value.prompt)
+        if runtime is not None:
+            self.interpreter.runtime = runtime
+        resume_repr = str(state_branching_for_value)
+        try:
             return await self.interpreter.resume(state_branching_for_value)
+        except Exception as e:
+            print("exception on", resume_repr, e)
+            raise e
 
     def __repr__(self):
         return f"<QueryResumable {self.interpreter.name} {self.state}>"
@@ -284,6 +297,7 @@ class PromptInterpreter:
         self.name = name
         self.tokenizer: LMQLTokenizer = None
         self.force_model = force_model
+        self.runtime = DefaultRuntime()
         
         # whether an inference certificate should be generated
         self.certificate = False
@@ -410,6 +424,8 @@ class PromptInterpreter:
     def set_extra_args(self, **kwargs):
         if "output_writer" in kwargs:
             self.output_writer = kwargs["output_writer"]
+        if "runtime" in kwargs:
+            self.runtime = kwargs.pop("runtime")
         # store remaining flags
         self.extra_kwargs.update(kwargs)
         
@@ -485,7 +501,7 @@ class PromptInterpreter:
             if arg == "__branching_call__":
                 result = query_head.current_args[1]
                 # branching calls induce query cloning
-                stmt_buffer = [function_call(result)]
+                stmt_buffer = [result]
             else:
                 qstring = arg
                 # qstrings are top-level statements without return value
@@ -560,9 +576,11 @@ class PromptInterpreter:
                     stmt_buffer = stmt_buffer[1:]
                 elif type(s) is function_call:
                     # get result
-                    result = s.result
+                    call: function_call = s
 
-                    if type(result) is checkpoint:
+                    continued_head = query_head.copy()
+
+                    if self.runtime.resumable:
                         cloned_program_state = state.program_state.copy()
                         cloned_program_state.python_scope = program_variables_after_last_continue or state.program_state.python_scope
                         
@@ -577,10 +595,13 @@ class PromptInterpreter:
                             recurring_variable_counter=recurring_variable_counter
                         )
                         # handle all 'checkpoint's until the actual result is unwrapped
-                        while type(result) is checkpoint:
-                            result = await result(resumable=QueryResumable(cloned_state, interpreter=self))
+                        r = QueryResumable(cloned_state, interpreter=self)
+                        # call with resumable
+                        result = await self.runtime.call(call.fct, *call.args, resumable=r, **call.kwargs)
+                    else:
+                        result = await self.runtime.call(call.fct, *call.args, **call.kwargs)
 
-                    query_head: InterpretationHead = query_head.copy()
+                    query_head: InterpretationHead = continued_head
                     query_head.context = LMQLContext(self, state, prompt)
                     assert query_head.fresh_copy, "query head must be fresh copy to avoid state sharing side effects"
                     

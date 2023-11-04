@@ -83,6 +83,7 @@ class InferenceGraphPrinter:
                 "children": aggregate_node_data,
                 "dangling": instance.dangling,
                 "resumable": str(instance.resumable),
+                "resample": str(instance.resample),
                 "error": str(instance.error)
             }
         }

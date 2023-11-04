@@ -44,7 +44,7 @@ class InstanceNode:
     An instance node represents the result of a query function with the specified inputs 
     (instance nodes of predecessor queries used to produce this result).
     """
-    def __init__(self, result, predecessors, score=1.0, dangling=False, resumable=None, call=None, error=None, query_node=None):
+    def __init__(self, result, predecessors, score=1.0, dangling=False, resumable=None, call=None, error=None, query_node=None, resample=False):
         self.result = result
         self.predecessors: List[InstanceNode] = predecessors
         self.score = score
@@ -59,6 +59,8 @@ class InstanceNode:
         self.error = error
 
         self.query_node: QueryNode = query_node
+
+        self.resample = resample
 
     def set_result(self, result):
         self.result = result
@@ -83,7 +85,7 @@ class InstanceNode:
         if self.dangling:
             resumable = " resumable" if self.resumable is not None else ""
             return f"<dangling{resumable} InstanceNode {str([self.result])[1:-1]} {self.call}>"
-        return f"<InstanceNode {self.value_class} {str([self.result])[1:-1]} score={self.score}>"
+        return f"<InstanceNode {str([self.result])[1:-1]} qnode={str(self.query_node)} score={self.score}>"
     
 class AggregatedInstanceNode(InstanceNode):
     def __init__(self, result, children, score):
@@ -140,6 +142,7 @@ def lifted(qnode: QueryNode, call, resumable, predecessors: List[InstanceNode]):
         resumable=resumable,
         call=call,
         score=None,
+        query_node=qnode
     )
 
 class QueryEdge:

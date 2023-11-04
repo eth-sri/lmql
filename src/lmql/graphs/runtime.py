@@ -49,14 +49,6 @@ def query_function(fct):
 
 async def call(fct, *args, **kwargs):
     """
-    Used by compiled LMQL query functions to evaluate call expressions like 'a()'.
-    """
-    if inference_call := get_graph_context():
-        return await inference_call.graph.ainfer_call(fct, *args, **kwargs)
-    return await call_raw(fct, *args, **kwargs)
-
-async def call_raw(fct, *args, **kwargs):
-    """
     Non-graph aware version of call(...).
     """
 
@@ -74,19 +66,14 @@ async def branch(id: int, branching_call: Dict):
     """
     Used by compiled LMQL query functions to evaluate branching call expressions like 'a() | b()'
     """
-    inference_call = get_graph_context()
     
     # handle case without a graph context (no branching possible)
-    if inference_call is None:
-        warnings.warn("An excuted query contains a branching query call (e.g. 'a() | b()') is executed outside of graph context. Only the first branch will be executed. Use lmql.infer(...) to execute the query in a multi-branch context.")
-    
-        first = branching_call[0]
-        result = await first()
+    warnings.warn("An excuted query contains a branching query call (e.g. 'a() | b()') is executed outside of graph context. Only the first branch will be executed. Use lmql.infer(...) to execute the query in a multi-branch context.")
 
-        return result
+    first = branching_call[0]
+    result = await first()
 
-    # use graph context for actual execution
-    return await inference_call.graph.ainfer_branch(id, branching_call)
+    return result
 
 class defer_call:
     """
@@ -193,3 +180,6 @@ class checkpoint:
         if type(value) is checkpoint:
             return checkpoint.get_result(value.result) or value
         return value
+    
+    def __repr__(self):
+        return f"<checkpoint {self.handler}>"
