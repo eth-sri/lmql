@@ -9,7 +9,7 @@ import asyncio
 import json
 import sys
 import warnings
-from .errors import LMTPStreamError
+from lmql.models.lmtp.errors import LMTPStreamError
 
 class LMTPWebSocketClient:
     """
@@ -146,7 +146,7 @@ async def interactive_client():
     import termcolor
 
     async with aiohttp.ClientSession() as session:
-        async with session.ws_connect('http://workstation:8888') as ws:
+        async with session.ws_connect('http://<your endpoint>:8888') as ws:
             from lmql.runtime.tokenizer import tokenizer
 
             model = sys.argv[1]
