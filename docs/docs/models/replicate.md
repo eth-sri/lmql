@@ -10,7 +10,7 @@ To run a [🤗 Transformers](./hf.html) model on Replicate, you need to:
 
 1. Export the environment variable `REPLICATE_API_TOKEN` with the credential to use to authenticate the request.
 
-2. Set the `transport=` argument to your model to `replicate:ORG/MODEL`, matching the name with which the model was uploaded.
+2. Set the `endpoint=` argument to your model to `replicate:ORG/MODEL`, matching the name with which the model was uploaded. If you want to use models from your organization's deployments, set the `endpoint=` argument to your deployment to `replicate:deployment/ORG/MODEL`.
 
 3. Set the `tokenizer=` argument to your model to a huggingface transformers name from which correct configuration for the tokenizer in use can be downloaded.
 
