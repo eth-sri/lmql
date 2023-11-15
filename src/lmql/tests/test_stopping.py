@@ -130,5 +130,32 @@ async def test_stop_before_should_not_postprocess_if_sc_not_satisfied():
         len(TOKENS(REVIEW)) > 10 and STOPS_BEFORE(REVIEW, "exempted") and STOPS_AT(REVIEW, "vendors")
     '''
 
+@lmql.query
+async def test_stop_overlapping_before():
+    '''lmql
+    argmax
+        """{{
+            "first_name": "Bruno", 
+            "last_name": "Mars", 
+            "birthday": "1985-10-0", 
+            "age": 32, 
+            "hobby": [[
+                "sing", 
+                "dance"
+            ]], 
+            "address": {{
+                "street_address": "12345", 
+                "city": "New York", 
+                "state": "NY", 
+                "country":"US"
+            }},
+            # the 2 most popular songs
+            """
+        '"songs":[[\n        "[GEN_STR]' where STOPS_BEFORE(GEN_STR, ',') and STOPS_BEFORE(GEN_STR, '"') and STOPS_BEFORE(GEN_STR, ']') and len(TOKENS(GEN_STR)) < 10 and GEN_STR == 'abc",'
+        assert GEN_STR == "abc", "Expected just 'abc', but got {}".format(str([GEN_STR])[1:-1])
+    from 
+        lmql.model("random", seed=123)
+    '''
+
 if __name__ == "__main__":
     run_all_tests(globals())

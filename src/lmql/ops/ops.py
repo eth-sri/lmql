@@ -901,7 +901,7 @@ class StopAtOp(Node):
                 return "before" # this operator does not match, so order does not matter
             if other_matched_phrase_index == -1:
                 return "after" # other operator does not match, so order does not matter
-            if matched_phrase_index < other_matched_phrase_index:
+            if matched_phrase_index >= other_matched_phrase_index:
                 return "before"
             else:
                 return "after"
