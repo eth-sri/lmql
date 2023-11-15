@@ -7,5 +7,5 @@ pushd wheels
 bash get-wheels.sh
 popd
 
-npm
+npm install
 npm run build
