@@ -14,6 +14,7 @@ import time
 import asyncio
 
 from lmql.runtime.stats import Stats
+from lmql.api.blobs import Blob
 from lmql.runtime.tracing import Tracer
 from lmql.models.model_info import model_info
 
@@ -397,7 +398,7 @@ async def completion_api(**kwargs):
     num_prompts = len(kwargs["prompt"])
     timeout = kwargs.pop("timeout", 1.5)
     tracer = kwargs.pop("tracer", None)
-    
+
     max_tokens = kwargs.get("max_tokens")
     # if no token limit is set, use 1024 as a generous chunk size
     # (completion models require max_tokens to be set)

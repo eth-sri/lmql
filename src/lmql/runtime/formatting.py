@@ -1,6 +1,8 @@
 """
 Formatting of values in a prompt context.
 """
+from lmql.api.blobs import Blob
+from lmql.runtime.context import Context
 
 def unescape(s):
     return str(s).replace("[", "[[").replace("]", "]]")
@@ -18,6 +20,10 @@ def is_chat_list(l):
     return True
 
 def format_chat(chat):
+    """
+    Formats a list of dicts representing an OpenAI Chat model
+    input into an LMQL-compliant prompt string using <lmql:ROLE/> tags.
+    """
     qstring = ""
     
     for m in chat:
@@ -34,5 +40,8 @@ def format(s):
     """
     if is_chat_list(s):
         return format_chat(s)
+    
+    if isinstance(s, Blob):
+        return tag("media id='" + s.id + "'")
 
     return unescape(s)

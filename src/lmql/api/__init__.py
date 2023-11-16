@@ -13,6 +13,7 @@ from .run import run_file, run_sync, run
 from .scoring import ScoringResult
 from .serve import serve
 from inspect import *
+from .blobs import Blob
 
 from lmql.runtime.tokenizer import tokenizer
 from lmql.runtime.loop import run_in_loop

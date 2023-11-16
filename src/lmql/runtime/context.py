@@ -49,7 +49,8 @@ def pop_context():
     _context.set(_context.get()[:-1])
 
 class Context:
-    def __init__(self, tokenizer, truncation_threshold=-3e38):
+    def __init__(self, interpreter, tokenizer=None, truncation_threshold=-3e38):
+        self.interpreter = interpreter
         self.tokenizer = tokenizer
         self.truncation_threshold = truncation_threshold
 
@@ -60,3 +61,10 @@ class Context:
     def __exit__(self, exc_type, exc_value, traceback):
         pop_context()
         return False
+    
+    @classmethod
+    def get(cls):
+        ctx = _context.get()
+        if len(ctx) == 0:
+            return None
+        return ctx[-1]
