@@ -72,7 +72,8 @@ def is_azure_chat(kwargs):
 
 def is_chat_model(kwargs):
     model = kwargs.get("model", None)
-    
+    api_config = kwargs.get("api_config", {})
+
     return model_info(model).is_chat_model or \
            is_azure_chat(kwargs) or \
            kwargs.get("api_config", {}).get("chat_model", False)
@@ -171,7 +172,7 @@ def get_endpoint_and_headers(kwargs):
     }
     if openai_org:
         headers['OpenAI-Organization'] = openai_org
-    if model_info(kwargs["model"]).is_chat_model:
+    if is_chat_model({**kwargs, "api_config": api_config}):
         endpoint = "https://api.openai.com/v1/chat/completions"
     else:
         endpoint = "https://api.openai.com/v1/completions"
@@ -181,7 +182,6 @@ async def chat_api(**kwargs):
     global stream_semaphore
 
     num_prompts = len(kwargs["prompt"])
-    model = kwargs["model"]
     api_config = kwargs.get("api_config", {})
     tokenizer = api_config.get("tokenizer")
     assert tokenizer is not None, "internal error: chat_api expects an 'api_config' with a 'tokenizer: LMQLTokenizer' mapping in your API payload"

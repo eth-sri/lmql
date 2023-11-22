@@ -16,5 +16,7 @@ def model_info(model_identifier):
         return ModelInfo(is_chat_model=True)
     elif "gpt-3.5-turbo" in model_identifier:
         return ModelInfo(is_chat_model=True)
+    elif "openai/gpt-4" in model_identifier:
+        return ModelInfo(is_chat_model=True)
     else:
         return ModelInfo(is_chat_model=False)
