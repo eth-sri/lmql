@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, List, Union, NamedTuple, Tuple, Set
 from lmql.runtime.postprocessing.conditional_prob import ConditionalDistributionPostprocessor
 import numpy as np
 import warnings
-
+from jinja2 import Template
 import re
 import lmql.ops.ops as ops
 import lmql.runtime.dclib as dc
@@ -230,13 +230,13 @@ class PromptInterpreter:
     token masking and scripted interaction during query execution.
     """
 
-    def __init__(self, context=None, force_model=None, name="<root>") -> None:
+    def __init__(self, context=None, force_model=None, name="<root>",chat_template=None) -> None:
         # model-specific components
         self.model = force_model
         self.model_identifier = force_model.model_identifier if isinstance(force_model, LLM) else force_model
         self.name = name
         self.tokenizer: LMQLTokenizer = None
-        
+        self.chat_template = chat_template
         # whether an inference certificate should be generated
         self.certificate = False
 
@@ -280,6 +280,29 @@ class PromptInterpreter:
 
         # context to determine model
         self.context = context
+
+
+
+        self.current_role = None
+        self.current_role_end = None
+        
+
+    def extract_role_and_remove_tag(self,text:str):
+        # Regular expression to find the pattern and extract the role
+        match = re.search(r'<lmql:(\w+)/>', text)
+        if match:
+            role = match.group(1)  # Extracting the role
+            text = re.sub(r'<lmql:\w+/>', '', text)  # Removing the tag
+            return role, text
+        else:
+            return None, text
+
+
+    def get_start_end(self,role,s):
+        eos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.eos_token
+        bos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.bos_token
+        role_end,role_start = Template(self.chat_template).render(messages=[{'role':role,'content':s}],bos_token=bos_token,eos_token=eos_token).split(s)
+        return role_end,role_start
 
     def __str__(self):
         args = []
@@ -463,7 +486,23 @@ class PromptInterpreter:
         )
 
     def process_query_string(self, s: str, first=False):
-        if not model_info(self.model_identifier).is_chat_model:
+
+
+        if self.chat_template:
+            role, s = self.extract_role_and_remove_tag(s)
+
+            # Role change or new role
+            if role and role!=self.current_role:
+                role_start,role_end = self.get_start_end(role = role,s=s)
+                if self.current_role is None:
+                    s = role_start + s
+                else:
+                    s = self.current_role_end + role_start + s
+                self.current_role_end = role_end
+                self.current_role = role
+            
+
+        elif not model_info(self.model_identifier).is_chat_model:
             # check if this is the first token in the prompt and it is a tag
             first_tag = s.startswith("<lmql:") and first
             # replace <lmql:ROLE/> with ((ROLE)):

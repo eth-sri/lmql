@@ -211,7 +211,7 @@ class LMQLQueryFunction:
         query_kwargs, runtime_args = self.make_kwargs(*args, **kwargs)
 
         forced_model = self.model or runtime_args.get("model") or (self.extra_args or {}).get("model")
-        interpreter = PromptInterpreter(force_model=forced_model, name=self.name)
+        interpreter = PromptInterpreter(force_model=forced_model, name=self.name,chat_template = self.extra_args.get("chat_template","""{{message['role']}}"""))
 
         if self.output_writer is not None:
             runtime_args["output_writer"] = self.output_writer
