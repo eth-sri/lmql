@@ -42,6 +42,8 @@ class TransformersLLM(LMTPModel):
             from transformers import AutoModelForCausalLM            
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
         
+        # compile model
+        self.model = torch.compile(self.model)
         if not self.silent:
             print("[", self.model_identifier, " ready on device ", self.model.device, 
         flush=True, sep="", end="]\n")
