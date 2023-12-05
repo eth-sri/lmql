@@ -23,7 +23,7 @@ jobs:
               path: env/lib/python3.10/site-packages
               key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.cfg') }}
           - name: Install Dependencies
-            run: source env/bin/activate && pip install -e '.[tests,llama]' && pip install langchain
+            run: source env/bin/activate && pip install -e '.[hf,hf-accel,tests,llama]' && pip install langchain
           - name: Run Tests
             env:
               OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
