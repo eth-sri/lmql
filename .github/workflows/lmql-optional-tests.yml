@@ -16,8 +16,9 @@ jobs:
               source env/bin/activate
               echo "VIRTUAL ENV:" $VIRTUAL_ENV
           # cache dependencies
-          - name: Cache Dependencies
-            uses: actions/cache@v3
+          - name: Cache dependencies
+            id: cache
+            uses: corca-ai/local-cache@v2
             with:
               path: env/lib/python3.10/site-packages
               key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.cfg') }}
