@@ -623,10 +623,18 @@ class LMQLConstraintTransformation:
             return self.default_transform_node(expr, snf).strip()
         elif type(expr) is ast.Call:
             constraint_ref = get_builtin_name(expr.func) or get_inner_constraint_ref(expr.func, self.scope)
+            
             if constraint_ref is not None:
                 args = [self.transform_node(a, snf) for a in expr.args]
                 args_list = ", ".join(args)
-                return f"{constraint_ref}([{args_list}])"
+                
+                keywords = {key.arg: self.transform_node(key.value, snf) for key in expr.keywords}
+                keywords_list = ", ".join([f"{k}={v}" for k,v in keywords.items()])
+                if len(keywords_list) > 0:
+                    keywords_list = ", " + keywords_list
+
+                return f"{constraint_ref}([{args_list}]{keywords_list})"
+            
             if is_allowed_builtin_python_call(expr.func):
                 return self.default_transform_node(expr, snf).strip()
             

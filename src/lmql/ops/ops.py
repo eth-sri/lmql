@@ -731,6 +731,9 @@ def remainder(seq: str, phrase: str):
 
 @LMQLOp("REGEX")
 class RegexOp(Node):
+    def __init__(self, predecessors, **kwargs):
+        super().__init__(predecessors)
+        self.kwargs = kwargs
 
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
@@ -745,7 +748,7 @@ class RegexOp(Node):
         ex = args[1]
         assert isinstance(ex, str)
 
-        verbose = kwargs.get("verbose", False)
+        verbose = self.kwargs.get("verbose", False)
         
         if x == strip_next_token(x):
             return fmap(
