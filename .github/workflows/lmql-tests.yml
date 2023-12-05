@@ -21,4 +21,4 @@ jobs:
           - name: Run Tests
             env:
               OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
-            run: source env/bin/activate && python src/lmql/tests/all.py openai langchain --failearly
+            run: source env/bin/activate && python src/lmql/tests/all.py langchain --failearly
