@@ -51,9 +51,11 @@ if __name__ == "__main__":
     # default is the explicit name for .
     if "default" in sys.argv:
         targets.append(THIS_DIR)
+    
+    include_all_optional = "optional" in sys.argv
 
     optional_targets = os.listdir(os.path.join(THIS_DIR, "optional"))
-    optional_targets = [t for t in optional_targets if os.path.isdir(os.path.join(THIS_DIR, "optional", t)) and t in sys.argv]
+    optional_targets = [t for t in optional_targets if os.path.isdir(os.path.join(THIS_DIR, "optional", t)) and (t in sys.argv or include_all_optional)]
     optional_targets = [os.path.join(THIS_DIR, "optional", t) for t in optional_targets]
 
     targets = sorted(set(targets + optional_targets))

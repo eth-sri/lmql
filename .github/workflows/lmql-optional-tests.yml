@@ -1,13 +1,11 @@
 name: Run Tests
 
-on:
-  push:
-    branches: [ tests ]
-  pull_request:
-    branches: [ main ]
+# optional tests only run manually
+on: workflow_dispatch
+
 
 jobs:
-    tests:
+    optional-tests:
       runs-on: lmql-ci
       steps:
           - uses: actions/checkout@v3
@@ -25,6 +23,6 @@ jobs:
               path: env/lib/python3.10/site-packages
               key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.cfg') }}
           - name: Install Dependencies
-            run: source env/bin/activate && pip install -e '.[hf,hf-accel,tests,llama]'
-          - name: Run Default Tests
-            run: source env/bin/activate && python src/lmql/tests/all.py --failearly
+            run: source env/bin/activate && pip install -e '.[hf,hf-accel,tests,llama]' && pip install langchain
+          - name: Run Optional Tests
+            run: source env/bin/activate && python src/lmql/tests/all.py only optional --failearly
