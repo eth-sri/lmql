@@ -1,11 +1,11 @@
 name: Test Release to test.pypi.org
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish'
-        required: true
+    workflow_dispatch:
+      inputs:
+        version:
+          description: 'Version to publish'
+          required: true
 
 
 jobs:
@@ -74,7 +74,7 @@ jobs:
               run: pip install build twine
             - name: Package
               env:
-                VERSION: ${{ github.event.inputs.version }}
+                VERSION: ${{ github.ref }}
               run: bash scripts/wheel.sh $(echo $VERSION | sed 's/^refs\/tags\/v//')
             - name: Publish
               env:
