@@ -22,6 +22,7 @@ jobs:
             with:
               path: env/lib/python3.10/site-packages
               key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.cfg') }}
+              base: "/home/docker/.cache/"
           - name: Install Dependencies
             run: source env/bin/activate && pip install -e '.[hf,hf-accel,tests,llama]' && pip install langchain
           - name: Run Optional Tests
