@@ -1,8 +1,7 @@
-name: Run Tests
+name: Run Optional Tests
 
 # optional tests only run manually
 on: workflow_dispatch
-
 
 jobs:
     optional-tests:
