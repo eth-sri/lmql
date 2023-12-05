@@ -44,3 +44,12 @@ def to_dense(mask, vocab_size):
     dense_mask = np.ones([vocab_size]) * -np.inf
     dense_mask[mask] = 0
     return dense_mask
+
+def mask_key(mask):
+    if mask_num_allowed(mask) == 1:
+        return str(mask_get_only_allowed(mask))
+    else:
+        if is_fixed_int_mask(mask):
+            return "-".join([str(i) for i in mask])
+        else:
+            return "-".join([str(i) for i in np.where(mask >= 0)[0]])
