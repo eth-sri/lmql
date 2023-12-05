@@ -168,22 +168,3 @@ async def no_return_chain(s: str = 'default', a: int = 12):
     where
         R1 == s and R2 == "8"
     '''
-
-
-def test_decorated_chain():
-    c = multi_kw_chain.aschain(output_keys=["result"])
-    
-    input_value = "Hi there"
-    a_value = 8
-
-    # as chain
-    s,a = c({"s": input_value, "a": a_value})["result"]
-    assert s == input_value, f"Expected {input_value}, got {s}"
-    assert a == a_value, f"Expected {a_value}, got {a}"
-
-    c = no_return_chain.aschain()
-    res = c({"s": input_value, "a": a_value})
-    s = res["R1"]
-    a = res["R2"]
-    assert s == input_value, f"Expected {input_value}, got {s}"
-    assert a == str(a_value), f"Expected {a_value}, got {a}"

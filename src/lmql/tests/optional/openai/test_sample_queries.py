@@ -18,7 +18,7 @@ def load_queries():
     cwd = os.path.dirname(os.path.realpath(__file__))
     # js file to require file and console.log .queries
     contents = f"""
-    require = require("{os.path.join(cwd, "..", "ui", "playground", "src", "queries.js")}")
+    require = require("{os.path.join(cwd, "..", "..", "..", "ui", "playground", "src", "queries.js")}")
     console.log(JSON.stringify(require.queries))
     """
     # write contents to temp file

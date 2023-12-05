@@ -173,6 +173,16 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
         if type(s) is DeterministicDecoderSequence and len(s.next_ids) > 0:
             keys.append((self.base_key(s), str(s.next_ids[0])))
 
+        def unpack(token):
+            if type(token) is np.ndarray:
+                token = token[0]
+            if type(token) is np.bytes_:
+                token = token.decode("utf-8")
+            try:
+                return int(token)
+            except:
+                return None
+
         if mask is not None:
             if masks.mask_num_allowed(mask) == 1:
                 keys.append((self.base_key(s), str(masks.mask_get_only_allowed(mask))))
@@ -182,18 +192,26 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
                     if edge_type == "top-1":
                         argmax_token, argmax_score = self.cache.get((self.base_key(s), "top-1"), (None, None))
-                        if type(argmax_token) is int and argmax_token in mask:
-                            keys.append((self.base_key(s), str(argmax_token)))
+                        argmax_token = unpack(argmax_token)
+                        print("check if", [argmax_token, masks.mask_is_allowed(mask, argmax_token)], flush=True)
+                        if type(argmax_token) is int and masks.mask_is_allowed(mask, argmax_token):
+                            keys.append((self.base_key(s), "top-1"))
                 else:
+                    if edge_type == "top-1":
+                        argmax_token, argmax_score = self.cache.get((self.base_key(s), "top-1"), (None, None))
+                        unpacked_argmax_token = unpack(argmax_token)
+                        if type(unpacked_argmax_token) is int and masks.mask_is_allowed(mask, unpacked_argmax_token):
+                            keys.append((self.base_key(s), "top-1"))
+                    
                     keys.append((self.base_key(s), edge_type, "-".join([str(i) for i in np.where(mask >= 0)[0]])))
         else:
             # standard key is sequence id + edge type
             keys.append((self.base_key(s), edge_type))
 
-        return keys
+        return keys, mask is not None
     
     async def get_cache(self, s: DecoderSequence, edge_type: str, user_data=False, **kwargs):
-        keys = await self.get_keys(s, edge_type, **kwargs)
+        keys, has_mask = await self.get_keys(s, edge_type, **kwargs)
 
         for k in keys:
             token, score = None, None
@@ -221,7 +239,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
     def set_cache(self, key, c: Union[Continuation, tuple], user_data=None, verbose=False):
         for k in key:
             if verbose:
-                print("    cached", k)
+                print("    cached", (k[0][-20:], k[1]), c)
             
             # check if the existing entry is a future
             existing = self.cache.get(k, (None, None))[0]
@@ -252,6 +270,12 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
             # apply operation for non-cached
             non_cached = [s for s, c in zip(seqs, cached_tokens) if c is None]
+
+            # for i, keys in enumerate(cache_keys):
+            #     if cached_tokens[i] is None:
+            #         for key in keys:
+            #             print("   X non-cached", (key[0][-30:], key[1:]), non_cached[i])
+
             # generator over new results
             non_cached_argmax = iter((await self.delegate.argmax(DataArray(non_cached), **kwargs)).items())                
             
@@ -527,6 +551,7 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
                 keys = None
                 sq = None
                 waiting_token_keys = []
+                has_mask = False
 
                 async for (s, tokens, scores, edge_types, user_data) in itr():
                     async with self.cache_lock:
@@ -546,13 +571,17 @@ class CachedDcModel(DcModelRewriteMixin, CacheDelegate):
 
                             if ids is None:
                                 ids = s.input_ids
-                                keys = await self.get_keys(s, edge_type, **self.model_args)
+                                keys, has_mask = await self.get_keys(s, edge_type, **self.model_args)
                                 sq = s
                             
                             token_keys = [(self.base_key(ids), edge_type, *k[2:]) for k in keys]
                             token_keys += [(self.base_key(ids), str(token))]
                             # filter out keys with edge_type=None
                             token_keys = [k for k in token_keys if k[1] is not None]
+
+                            # do not allow top-1 entries if this is a masked distribution
+                            if has_mask:
+                                token_keys = [k for k in token_keys if k[1] != "top-1" or len(k[2:]) > 0]
 
                             # for tk in token_keys:
                             #     if tk in self.cache and type(self.cache[tk][0]) is not asyncio.Future:

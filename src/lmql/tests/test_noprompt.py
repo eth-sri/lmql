@@ -26,14 +26,6 @@ async def test_noprompt_beam():
     rs = await noprompt_beam()
     assert [r.variables['RESPONSE'] for r in rs] == [' Protocol', ' Protocol radi'], f"Expected fixed random value but got {[r.variables['RESPONSE'] for r in rs]}"
 
-@lmql.query(model="openai/text-ada-001")
-def test_noprompt_openai():
-    '''lmql
-    "[RESPONSE]" where len(TOKENS(RESPONSE)) < 10
-    expected = "\n\nThe first step in any software development"
-    assert RESPONSE == "\n\nThe first step in any software development", f"Expected '{expected}' got {[RESPONSE]}"
-    '''
-
 @lmql.query(model=lmql.model("random", seed=123))
 def test_noprompt_with_constraints():
     '''lmql

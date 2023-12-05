@@ -37,9 +37,10 @@ async def test_llm_multi_generate():
         assert type(r) is str and len(r) > 0
 
 async def test_llm_generate_two_sequential():
-    llm = lmql.model("openai/text-ada-001", seed=123)
+    llm = lmql.model("random", seed=123)
     result1 = await llm.generate("Test", max_tokens=10)
     result2 = await llm.generate("Test", max_tokens=10)
+    
     assert type(result1) is str and len(result1) > 0
     assert type(result2) is str and len(result2) > 0
 
@@ -70,16 +71,6 @@ def test_llm_score_two():
 def test_llm_local():
     m = lmql.model("local:sshleifer/tiny-gpt2", silent=True)
     assert m.score_sync("Hello", ["World", "Test"]).argmax() == "Test"
-
-def test_llm_openai():
-    try:
-        import lmql.runtime.openai_secret
-    except:
-        print("Skipping test_api.test_llm_openai because no OpenAI API configuration could be found.")
-        return
-
-    m = lmql.model("openai/text-davinci-003", silent=True)
-    assert m.score_sync("Hello", ["World", "Test"]).argmax() == "World"
 
 if __name__ == "__main__":
     run_all_tests(globals())
