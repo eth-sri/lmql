@@ -2,7 +2,7 @@ name: Run Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ tests ]
 
 jobs:
     test-with-hf-transformers:
