@@ -29,15 +29,15 @@ def run_tests(directory):
                     break
         except subprocess.TimeoutExpired:
             print(">", f"[{i+1}/{len(files)}]", f, "timed out after", timeout, "seconds")
-            sys.exit(1)
+            return 1
 
         except KeyboardInterrupt:
-            sys.exit(1)
+            return 1
 
     if errors != 0:
-        sys.exit(1)
+        return 1
     else:
-        sys.exit(0)
+        return 
 
 if __name__ == "__main__":
     THIS_DIR = os.path.dirname(__file__)
@@ -51,12 +51,21 @@ if __name__ == "__main__":
     # default is the explicit name for .
     if "default" in sys.argv:
         targets.append(THIS_DIR)
+    
+    include_all_optional = "optional" in sys.argv
 
     optional_targets = os.listdir(os.path.join(THIS_DIR, "optional"))
-    optional_targets = [t for t in optional_targets if os.path.isdir(os.path.join(THIS_DIR, "optional", t)) and t in sys.argv]
+    optional_targets = [t for t in optional_targets if os.path.isdir(os.path.join(THIS_DIR, "optional", t)) and (t in sys.argv or include_all_optional)]
     optional_targets = [os.path.join(THIS_DIR, "optional", t) for t in optional_targets]
 
     targets = sorted(set(targets + optional_targets))
 
+    exit_codes = []
+
     for t in targets:
-        run_tests(t)
+        exit_codes += [run_tests(t)]
+    
+    if any(exit_codes):
+        sys.exit(1)
+    else:
+        sys.exit(0)

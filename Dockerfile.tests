@@ -16,6 +16,7 @@ RUN mkdir /lmql/src
 RUN pip install -e ".[llama,hf,hf-accel,tests]"
 RUN pip install -e ".[hf]"
 RUN pip install -e ".[hf,hf-accel,tests]"
+RUN pip install langchain
 
 COPY src /lmql/src
 
