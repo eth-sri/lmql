@@ -26,4 +26,6 @@ jobs:
           - name: Install Dependencies
             run: source env/bin/activate && pip install -e '.[hf,hf-accel,tests,llama]' && pip install langchain
           - name: Run Optional Tests
+            env:
+              OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
             run: source env/bin/activate && python src/lmql/tests/all.py only optional openai langchain --failearly
