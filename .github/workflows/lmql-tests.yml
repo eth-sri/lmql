@@ -44,8 +44,8 @@ jobs:
             run: pip install build twine
           - name: Package
             env:
-              VERSION: ${{ github.ref }}
-            run: bash scripts/wheel.sh $(echo $VERSION | sed 's/^refs\/tags\/v//')
+              VERSION: 0.999999
+            run: bash scripts/wheel.sh $VERSION
           - name: Upload wheel as artifact
             uses: actions/upload-artifact@v2
             with:
