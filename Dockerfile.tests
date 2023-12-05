@@ -1,0 +1,26 @@
+FROM python:3.11-bullseye
+
+# install lmql with llama.cpp dependencies
+WORKDIR /lmql
+
+# download test model weights
+RUN wget https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf?download=true -O /lmql/llama-2-7b-chat.Q2_K.gguf
+
+# install the torch cpu version
+RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+COPY setup.cfg /lmql/setup.cfg
+COPY setup.py /lmql/setup.py
+RUN mkdir /lmql/src
+
+RUN pip install -e ".[llama,hf,hf-accel,tests]"
+RUN pip install -e ".[hf]"
+RUN pip install -e ".[hf,hf-accel,tests]"
+
+COPY src /lmql/src
+
+# python install sshleifer/tiny-gpt2 via transformers
+RUN python -c "from transformers import AutoTokenizer, AutoModelForCausalLM; AutoTokenizer.from_pretrained('sshleifer/tiny-gpt2'); AutoModelForCausalLM.from_pretrained('sshleifer/tiny-gpt2'); AutoTokenizer.from_pretrained('gpt2'); AutoModelForCausalLM.from_pretrained('gpt2')"
+
+CMD ["python", "src/lmql/tests/all.py"]
+CMD "bash"

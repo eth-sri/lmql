@@ -227,7 +227,7 @@ def hello():
         asyncio.run(lmql.run(code_openai, output_writer=lmql.printing, model="openai/text-ada-001"))
 
 def basic_samples():
-    from lmql.tests.test_sample_queries import main
+    from lmql.tests.optional.openai.test_sample_queries import main
     import asyncio
     asyncio.run(main())
 
