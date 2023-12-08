@@ -56,6 +56,13 @@ class LMQLTokenizer:
         if "FORCE_TIKTOKEN" in os.environ:
             assert type(self.tokenizer_impl) is TiktokenTokenizer
 
+    @property
+    def chat_template(self):
+        if hasattr(self.tokenizer_impl, "tokenizer") and hasattr(self.tokenizer_impl.tokenizer, "chat_template"):
+            return self.tokenizer_impl.tokenizer.chat_template
+        else:
+            return None
+
     def backend(self):
         return self.tokenizer_impl.backend()
     
