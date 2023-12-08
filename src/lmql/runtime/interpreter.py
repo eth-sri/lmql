@@ -230,13 +230,12 @@ class PromptInterpreter:
     token masking and scripted interaction during query execution.
     """
 
-    def __init__(self, context=None, force_model=None, name="<root>",chat_template=None) -> None:
+    def __init__(self, context=None, force_model=None, name="<root>", chat_template=None) -> None:
         # model-specific components
         self.model = force_model
         self.model_identifier = force_model.model_identifier if isinstance(force_model, LLM) else force_model
         self.name = name
         self.tokenizer: LMQLTokenizer = None
-        self.chat_template = chat_template
         # whether an inference certificate should be generated
         self.certificate = False
 
@@ -267,7 +266,7 @@ class PromptInterpreter:
         self.cache_file = None
         self.show_speculative = False
         
-        # key to use to store program statein decoding tree
+        # key to use to store program state in decoding tree
         self.user_data_key = "head"
 
         self.eager_followmap_expansion = True
@@ -281,11 +280,11 @@ class PromptInterpreter:
         # context to determine model
         self.context = context
 
-
-
+        # chat template (if provided explicitly)
+        self._chat_template = chat_template
+        
         self.current_role = None
         self.current_role_end = None
-        
 
     def extract_role_and_remove_tag(self,text:str):
         # Regular expression to find the pattern and extract the role
@@ -298,11 +297,11 @@ class PromptInterpreter:
             return None, text
 
 
-    def get_start_end(self,role,s):
+    def get_start_end(self, role, s, chat_template):
         eos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.eos_token
         bos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.bos_token
-        role_end,role_start = Template(self.chat_template).render(messages=[{'role':role,'content':s}],bos_token=bos_token,eos_token=eos_token).split(s)
-        return role_end,role_start
+        role_end,role_start = Template(chat_template).render(messages=[{'role':role,'content':s}],bos_token=bos_token,eos_token=eos_token).split(s)
+        return role_end, role_start
 
     def __str__(self):
         args = []
@@ -485,19 +484,26 @@ class PromptInterpreter:
             recurring_variable_counter=recurring_variable_counter
         )
 
+    def get_chat_template(self):
+        if self._chat_template is None:
+            self._chat_template = self.model.get_tokenizer().chat_template
+        return self._chat_template
+
     def process_query_string(self, s: str, first=False):
+        chat_template = self.get_chat_template()
 
-
-        if self.chat_template:
+        if chat_template:
             role, s = self.extract_role_and_remove_tag(s)
 
             # Role change or new role
             if role and role!=self.current_role:
-                role_start,role_end = self.get_start_end(role = role,s=s)
+                role_start,role_end = self.get_start_end(role = role, s=s, chat_template=chat_template)
+                
                 if self.current_role is None:
                     s = role_start + s
                 else:
                     s = self.current_role_end + role_start + s
+                
                 self.current_role_end = role_end
                 self.current_role = role
             
