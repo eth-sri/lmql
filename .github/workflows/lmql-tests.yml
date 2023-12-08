@@ -1,9 +1,11 @@
 name: Run Tests
 
-on: workflow_dispatch  
+on:
+  push:
+    branches: [ main ]
 
 jobs:
-    test-without-hf-transformers:
+    tests:
       runs-on: lmql-ci
       steps:
           - uses: actions/checkout@v3
@@ -14,27 +16,87 @@ jobs:
               export PATH=$PATH:/home/docker/.local/bin
               source env/bin/activate
               echo "VIRTUAL ENV:" $VIRTUAL_ENV
+          # cache dependencies
+          - name: Cache dependencies
+            id: cache
+            uses: corca-ai/local-cache@v2
+            with:
+              path: env
+              key: ${{ runner.os }}-env-${{ hashFiles('**/setup.cfg') }}
+              base: "/home/docker/.cache/"
           - name: Install Dependencies
-            run: source env/bin/activate && pip install -e . && pip install langchain
-          - name: Greet
+            run: source env/bin/activate && pip install -e '.[hf,hf-accel,tests,llama]'
+          - name: Run Default Tests
+            run: source env/bin/activate && python src/lmql/tests/all.py --failearly
+    wheel:
+      runs-on: lmql-ci
+      needs: [tests]
+      steps:
+          - uses: actions/checkout@v3
+          - name: Setup Fresh Virtual Environment
+            run: |
+              pip install --upgrade pip
+              python3.10 -m venv env
+              export PATH=$PATH:/home/docker/.local/bin
+              source env/bin/activate
+              echo "VIRTUAL ENV:" $VIRTUAL_ENV  
+          - name: Install Packaging Dependencies
+            run: pip install build twine
+          - name: Package
             env:
-              OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
-            run: source env/bin/activate && python -m lmql.cli hello openai
-    test-with-hf-transformers:
-        runs-on: lmql-ci
-        needs: [test-without-hf-transformers]
-        steps:
-            - uses: actions/checkout@v3
-            - name: Setup Fresh Virtual Environment
-              run: |
-                pip install --upgrade pip
-                python3.10 -m venv env
-                export PATH=$PATH:/home/docker/.local/bin
-                source env/bin/activate
-                echo "VIRTUAL ENV:" $VIRTUAL_ENV
-            - name: Install Dependencies
-              run: source env/bin/activate && pip install -e '.[hf,tests]' && pip install langchain
-            - name: Run Tests
-              env:
-                OPENAI_API_KEY: ${{ secrets.LMQL_CI_OPENAI_KEY }}
-              run: source env/bin/activate && python src/lmql/tests/all.py --failearly
+              VERSION: 0.999999
+            run: bash scripts/wheel.sh $VERSION
+          - name: Upload wheel as artifact
+            uses: actions/upload-artifact@v2
+            with:
+              name: lmql
+              path: dist/
+
+    web-build:
+      runs-on: ubuntu-latest
+      needs: [tests]
+  
+      steps:
+      - uses: actions/checkout@v3
+      - name: Prepare Node.js environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+          cache: 'npm'
+      # cached dependencies for node
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            docs/node_modules
+            scripts/browser-build/node_modules
+            src/lmql/ui/live/node_modules
+            src/lmql/ui/playground/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+  
+      - name: Build website and In-Browser LMQL Distribution
+        run: cd scripts && bash deploy-web.sh
+      - uses: actions/upload-artifact@master
+        with:
+          name: lmql-web-payload
+          path: web-deploy
+  
+    web-deploy:
+      name: Deploy Main Playground 
+      runs-on: ubuntu-latest
+      needs: [web-build]
+      if:
+        contains('
+          refs/heads/main
+        ', github.ref)
+      steps:
+      - uses: actions/checkout@master
+      - uses: actions/download-artifact@master
+        with:
+          name: lmql-web-payload
+          path: web-deploy
+      - name: Deploy to web branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: web-deploy
+          branch: web

@@ -35,7 +35,7 @@ KWARGS = {"stop": ["\n", "\\.", "Wonders"]}
 @pytest.mark.asyncio
 async def test_do_async(test_llm):
     r = await test_llm.apredict(*ARGS, **KWARGS)
-    assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "apredict result is not as expected"
+    assert r == "available aliases huge millennia announcementbid continents Epstein retention Buddhism", "apredict result is not as expected"
 
 
 @pytest.mark.asyncio
@@ -46,18 +46,14 @@ async def test_do_sync_in_async(test_llm):
 
 def test_do_sync(test_llm):
     r = test_llm.predict(*ARGS, **KWARGS)
-    assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "predict result is not as expected"
+    assert r == "available aliases huge millennia announcementbid continents Epstein retention Buddhism", "predict result is not as expected"
 
 def test_do_repeated_sync(test_llm):
     r = test_llm.predict(*ARGS, **KWARGS)
-    assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "Call 1: predict result is not as expected"
+    assert r == "available aliases huge millennia announcementbid continents Epstein retention Buddhism", "Call 1: predict result is not as expected"
     r = test_llm.predict(*ARGS, **KWARGS)
-    assert r == "available Spoon announces 1929edyame fertilizer Dipmmseasea", "Call 2: predict result is not as expected"
+    assert r == "available aliases huge millennia announcementbid continents Epstein retention Buddhism", "Call 2: predict result is not as expected"
 
 if __name__ == "__main__":
-    if not "RUN_LC_TESTS" in os.environ:
-        print("Skipping LMTP LangChain integration tests because RUN_LC_TESTS is not set")
-        sys.exit(0)
-
     # only run this file with pytest
     sys.exit(pytest.main(args=["-s", __file__]))

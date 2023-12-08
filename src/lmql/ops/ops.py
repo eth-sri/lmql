@@ -731,6 +731,9 @@ def remainder(seq: str, phrase: str):
 
 @LMQLOp("REGEX")
 class RegexOp(Node):
+    def __init__(self, predecessors, **kwargs):
+        super().__init__(predecessors)
+        self.kwargs = kwargs
 
     def forward(self, *args, **kwargs):
         if any([a is None for a in args]): return None
@@ -744,6 +747,8 @@ class RegexOp(Node):
         x = args[0]
         ex = args[1]
         assert isinstance(ex, str)
+
+        verbose = self.kwargs.get("verbose", False)
         
         if x == strip_next_token(x):
             return fmap(
@@ -751,8 +756,8 @@ class RegexOp(Node):
             )
 
         r = Regex(ex)
-        rd = r.d(strip_next_token(x), verbose=False) # take derivative
-        print(f"r={r.pattern} x={strip_next_token(x)} --> {rd.pattern if rd is not None else '[no drivative]'}")
+        rd = r.d(strip_next_token(x), verbose=verbose) # take derivative
+        if verbose: print(f"r={r.pattern} x={strip_next_token(x)} --> {rd.pattern if rd is not None else '[no drivative]'}")
         if rd is None:
             return False 
         elif rd.is_empty(): # derivative is empty -> full match; therefore we must end

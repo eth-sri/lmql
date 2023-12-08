@@ -82,7 +82,6 @@ async def apply(q, *args, **kwargs):
         stats["cached"] += 1
         return cache[key]
     else:
-        kwargs = {}
         try:
             result = await q(*args, **kwargs)
             if len(result) == 1:

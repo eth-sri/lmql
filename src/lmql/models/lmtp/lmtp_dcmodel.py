@@ -224,7 +224,7 @@ class LMTPDcModel(DcModel):
     async def singleton_result(self, token, score):
         yield {"token": token, "logprob": score, "top_logprobs": {token: score}}
 
-    async def generate(self, s, temperature, top_logprobs = 1, chunk_size=None, **kwargs):
+    async def generate(self, s, temperature, sampling_mode, top_logprobs = 1, chunk_size=None, **kwargs):
         kwargs = {**self.model_args, **kwargs}
 
         # get token masks from interpreter
@@ -245,7 +245,7 @@ class LMTPDcModel(DcModel):
             num_allowed = masks.mask_num_allowed(mask)
             if num_allowed == 1:
                 only_allowed_id = masks.mask_get_only_allowed(mask)
-                return self.singleton_result(only_allowed_id, 0.0)
+                return self.stream_and_return_first(s, self.singleton_result(only_allowed_id, 0.0), sampling_mode)
             
             assert nputil.is_array(mask), "logit_mask_or_fixed_id must be a LongTensor not a " + str(type(mask))
             invert = num_allowed < self.tokenizer.vocab_size - num_allowed
@@ -270,7 +270,7 @@ class LMTPDcModel(DcModel):
 
         if self.verbose:
             text = await self.detokenize(ids)
-            print("lmtp generate: {} / {} ({} tokens, temperature={}, max_tokens={})".format(ids, str([text])[1:-1], len(ids), temperature, max_tokens))
+            print("lmtp generate: {} / {} ({} tokens, temperature={}, max_tokens={})".format(ids, str([text])[1:-1], len(ids), temperature, max_tokens), flush=True)
 
         # get token stream
         token_stream = self.client.generate(ids, max_tokens=max_tokens, temperature=temperature, logit_bias=mask, top_logprobs=top_logprobs, **self.extra_decoding_parameters)
@@ -289,9 +289,9 @@ class LMTPDcModel(DcModel):
                 }
             })
 
-            return self.traced_generate(token_stream, event=stream_event)
+            token_stream = self.traced_generate(token_stream, event=stream_event)
 
-        return token_stream
+        return self.stream_and_return_first(s, token_stream, sampling_mode)
 
     async def traced_generate(self, generate_iterator, event: Event):
         first = True
@@ -337,7 +337,7 @@ class LMTPDcModel(DcModel):
                 # no sample-id needed for (deterministic) top-1
                 unique_sampling_mode = [sampling_mode for _ in seqs]
 
-            tokens = await asyncio.gather(*[self.stream_and_return_first(s, await self.generate(s, temperature=temperature, **kwargs), mode) for s,mode in zip(seqs, unique_sampling_mode)])
+            tokens = await asyncio.gather(*[await self.generate(s, sampling_mode=mode, temperature=temperature, **kwargs) for s,mode in zip(seqs, unique_sampling_mode)])
 
             next_token_ids = np.array([t['token'] for t in tokens], dtype=np.int64)
             next_token_scores = np.array([t['logprob'] for t in tokens], dtype=np.float32)
@@ -365,7 +365,7 @@ class LMTPDcModel(DcModel):
                 return [s.make_successors(next_token_ids[i].reshape(1), next_token_scores[i], logits=None) for i,s in enumerate(seqs)]
 
             self.model.num_queries += len(seqs)
-            result = await asyncio.gather(*[self.stream_and_return_first(s, await self.generate(s, temperature=0.0, top_logprobs=k, chunk_size=None if k == 1 else 1, **kwargs), "top-1") for s in seqs])
+            result = await asyncio.gather(*[await self.generate(s, sampling_mode="top-1", temperature=0.0, top_logprobs=k, chunk_size=None if k == 1 else 1, **kwargs) for s in seqs])
 
             logits = []
             next_token_ids = []
