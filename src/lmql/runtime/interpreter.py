@@ -88,13 +88,16 @@ class PromptState(NamedTuple):
     
     recurring_variable_counter : Dict[str, int]
     variable_offset : int
-
+    # for chat templates
+    current_role : str
+    current_role_end : str
+    
     # optional extra keyword arguments passed to the currently excuting qstring
     query_args: Optional[Dict[str, Any]]
     # view on query_args that only contains variable arguments that apply to the current variable
     variable_args: Optional[Dict[str, Any]]
 
-    # only availebl after processing where clause
+    # only available after processing where clause
     valid: Optional[bool]
     final: Optional[str] 
     mask : Optional[Any]
@@ -283,9 +286,7 @@ class PromptInterpreter:
         # chat template (if provided explicitly)
         self._chat_template = chat_template
         
-        self.current_role = None
-        self.current_role_end = None
-
+      
     def extract_role_and_remove_tag(self,text:str):
         # Regular expression to find the pattern and extract the role
         match = re.search(r'<lmql:(\w+)/>', text)
@@ -300,8 +301,9 @@ class PromptInterpreter:
     def get_start_end(self, role, s, chat_template):
         eos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.eos_token
         bos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.bos_token
-        role_end,role_start = Template(chat_template).render(messages=[{'role':role,'content':s}],bos_token=bos_token,eos_token=eos_token).split(s)
-        return role_end, role_start
+        role_start,role_end = Template(chat_template).render(messages=[{'role':role,'content':s}],bos_token=bos_token,eos_token=eos_token).split(s)
+        
+        return role_start, role_end
 
     def __str__(self):
         args = []
@@ -415,14 +417,14 @@ class PromptInterpreter:
                 s = stmt_buffer[0]
 
                 if type(s) is str:
-                    s = self.process_query_string(s, first=len(prompt) == 0)
+                    s, new_role, role_end = self.process_query_string(s, state=state,first=len(prompt) == 0)
                     prompt += s
                     stmt_buffer = stmt_buffer[1:]
                     query_args = None
                     variable_args = None
                     
                     # keep latest prompt in transient state
-                    state = state.updated(prompt=prompt)
+                    state = state.updated(prompt=prompt,current_role=new_role,current_role_end=role_end)
                 elif type(s) is TemplateVariable:
                     variable = s.name
                     query_args = query_args_after_last_continue
@@ -489,24 +491,19 @@ class PromptInterpreter:
             self._chat_template = self.model.get_tokenizer().chat_template
         return self._chat_template
 
-    def process_query_string(self, s: str, first=False):
+    def process_query_string(self, s: str, state:PromptState,first=False):
         chat_template = self.get_chat_template()
-
+        new_role = None
+        role_end = None
         if chat_template:
             role, s = self.extract_role_and_remove_tag(s)
-
-            # Role change or new role
-            if role and role!=self.current_role:
-                role_start,role_end = self.get_start_end(role = role, s=s, chat_template=chat_template)
-                
-                if self.current_role is None:
+            if role and role != state.current_role:
+                role_start, role_end = self.get_start_end(role=role, s=s, chat_template=chat_template)
+                if state.current_role is None:
                     s = role_start + s
                 else:
-                    s = self.current_role_end + role_start + s
-                
-                self.current_role_end = role_end
-                self.current_role = role
-            
+                    s = state.current_role_end + role_start + s
+                new_role = role
 
         elif not model_info(self.model_identifier).is_chat_model:
             # check if this is the first token in the prompt and it is a tag
@@ -516,7 +513,7 @@ class PromptInterpreter:
             # strip off leading newline if it was added due to a tag
             if first_tag: s = s[1:]
         s = unescape_qstring(s)
-        return s
+        return s, new_role, role_end
 
     def interpreter_state_user_data(self, state: PromptState):
         return {self.user_data_key: state}
@@ -1006,7 +1003,7 @@ class PromptInterpreter:
                 recurring_variable_counter={}, variable_offset=0,
                 valid=None, final=None, mask=None, 
                 stopping_phrases=None, where=None,
-                tail=None)
+                tail=None, current_role=None, current_role_end=None)
             self.root_state = await self.advance(self.root_state)
 
             # update context
