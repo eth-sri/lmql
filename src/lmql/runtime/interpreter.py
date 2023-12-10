@@ -289,19 +289,21 @@ class PromptInterpreter:
       
     def extract_role_and_remove_tag(self,text:str):
         # Regular expression to find the pattern and extract the role
-        match = re.search(r'<lmql:(\w+)/>', text)
+        match = re.search(r'<lmql:(\w+)/> ', text)
         if match:
             role = match.group(1)  # Extracting the role
-            text = re.sub(r'<lmql:\w+/>', '', text)  # Removing the tag
+            text = re.sub(r'<lmql:\w+/> ', '', text)  # Removing the tag and following space
+   
             return role, text
         else:
             return None, text
 
 
-    def get_start_end(self, role, s, chat_template):
+    def get_start_end(self, role, chat_template):
         eos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.eos_token
         bos_token = self.model.adapter._tokenizer.tokenizer_impl.tokenizer.bos_token
-        role_start,role_end = Template(chat_template).render(messages=[{'role':role,'content':s}],bos_token=bos_token,eos_token=eos_token).split(s)
+        split_template_text = "split_template_text" # Dummy text to split the template - just needs to not be present in the template
+        role_start,role_end = Template(chat_template,trim_blocks=True, lstrip_blocks=True).render(messages=[{'role':role,'content':split_template_text}],bos_token=bos_token,eos_token=eos_token).split(split_template_text)
         
         return role_start, role_end
 
@@ -498,7 +500,7 @@ class PromptInterpreter:
         if chat_template:
             role, s = self.extract_role_and_remove_tag(s)
             if role and role != state.current_role:
-                role_start, role_end = self.get_start_end(role=role, s=s, chat_template=chat_template)
+                role_start, role_end = self.get_start_end(role=role, chat_template=chat_template)
                 if state.current_role is None:
                     s = role_start + s
                 else:
