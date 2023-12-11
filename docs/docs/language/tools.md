@@ -47,7 +47,7 @@ How much profit did he make?"
 # insert few shot demonstrations
 "{gsm8k_samples()}"
 
-# prompt tempalte
+# prompt template
 "Q: {QUESTION}\n"
 "Let's think step by step.\n"
 
@@ -83,7 +83,7 @@ Further, we use a function `gsm8k_samples` that returns a few-shot samples for t
 
 ## Beyond Calculators
 
-**Wikipedia Search** Function use is not limited to calculators. In the example bellow we show how text retrieval, using Pythons [`async`/`await` syntax](https://docs.python.org/3/library/asyncio.html), can be used to augment the reasoning capabilities of the large language model. 
+**Wikipedia Search** Function use is not limited to calculators. In the example below we show how text retrieval, using Python's [`async`/`await` syntax](https://docs.python.org/3/library/asyncio.html), can be used to augment the reasoning capabilities of the large language model. 
 
 ```lmql
 async def wikipedia(q):
@@ -138,7 +138,8 @@ To remember things, you can use 'assign'/'get':
 `assign("Alice", "banana") # result: "banana"`
 - To retrieve a stored value:
 `get("Alice") # result: "banana"`
-Always tail calls with " # result". Using these actions, let's solve the following question.\n"""
+Always tail calls with " # result". Using these actions, let's solve
+the following question.\n"""
 
 # actual problem statement
 """
