@@ -44,9 +44,9 @@ For more information and example-based discussion on how to use LMQL, please ref
 
 The LMQL language comprises two syntax variants:
 
-* The modern, more minimalistic [standard syntax](#modern-syntax) that relies on a very small set of language constructs in an otherwise standard Python environment. This syntax is the main focus for the continued development of LMQL.
+* The modern, more minimalistic [standard syntax](#standard-syntax) that relies on a very small set of language constructs in an otherwise standard Python environment. This syntax is the main focus for the continued development of LMQL.
 
-* A *legacy* [standalone syntax](#legacy-syntax) that is more static in nature but relevant for standalone LMQL use-cases.
+* A *legacy* [standalone syntax](#standalone-syntax) that is more static in nature but relevant for standalone LMQL use-cases.
 
 Both syntax variants are compatible and can be used interchangeably. 
 
