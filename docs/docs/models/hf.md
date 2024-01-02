@@ -7,7 +7,7 @@ LMQL relies on a two-process architecture: The inference process (long-running) 
 
 This architecture is advantageous for locally-hosted models, as the model loading time can be quite long or the required GPU hardware might not even be available on the client machine. 
 
-This chapter first discusses how to use of the two-process inference API, and then presents an alternative on how to leverage [In-Process Model Loading](#in-process-model-loading), which avoids the need for a separate server process within the same architecture.
+This chapter first discusses how to use of the two-process inference API, and then presents an alternative on how to leverage [In-Process Model Loading](#in-process-models), which avoids the need for a separate server process within the same architecture.
 
 ![Inference Architecture](./inference.svg)
 
@@ -26,7 +26,7 @@ By default, this exposes an [LMQL/LMTP inference API](https://github.com/eth-sri
 
 ### Configuration
 
-**Endpoint and Port** By default, models will be served via port `8080`. To change this, you can specify the port via the `--port` option of the `lmql serve-model` command. On the client side, to connect to a model server running on a different port, you can specify the port when constructing an [`lmql.model`](../lib/generations.md#lmql-llm-objects) object:
+**Endpoint and Port** By default, models will be served via port `8080`. To change this, you can specify the port via the `--port` option of the `lmql serve-model` command. On the client side, to connect to a model server running on a different port, you can specify the port when constructing an [`lmql.model`](../lib/generations.md#lmqlllm-objects) object:
 
 ```python
 lmql.model("gpt2", endpoint="localhost:9999")
