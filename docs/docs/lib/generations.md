@@ -36,7 +36,7 @@ The snippet above demonstrates the different components of the Generations API:
 
 - **`lmql.LLM`** At the core of the Generations API are `lmql.LLM` objects. Using the `lmql.model(...)` constructor, you can access a wide range of different models, as described in the [Models](../models/index.md) chapter. This includes support for models running in the same process, in a separate worker process or cloud-based models available via a API endpoint.
 
-- [**`lmql.LLM.generate(...)`**](#llmqgenerate) is a simple function to generating text completions based on a given prompt. This can be helpful to quickly obtain single-step completions, or to generate a list of completions for a given prompt.
+- [**`lmql.LLM.generate(...)`**](#lmqlgenerate) is a simple function to generating text completions based on a given prompt. This can be helpful to quickly obtain single-step completions, or to generate a list of completions for a given prompt.
 
 -   [**`lmql.LLM.score(...)`**](#lmqlscore) allows you to directly access the scores, your model assigns to the tokenized representation of your input prompt and continuations. This can be helpful for tasks such as classification or ranking. 
     
