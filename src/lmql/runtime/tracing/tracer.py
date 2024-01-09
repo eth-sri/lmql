@@ -194,7 +194,7 @@ class ContextTracer:
         self.tracer = tracer
 
     def __enter__(self):
-        _ensure_tracer
+        _ensure_tracer()
         current = _tracer.get()[-1] if len(_tracer.get()) > 0 else None
         if current is not None:
             if self.tracer.parent is not None:

@@ -13,7 +13,7 @@ import LMExamples from './_components/LMExamples.vue'
 
 <div class="banner">
 
-LMQL 0.7 is now available. [Read the announcement post](/blog/posts/release-0.7.html) to learn more about this release.
+Help shape the next major version of LMQL by filling out the [LMQL developer survey](https://forms.gle/pGvAicNpUhS1rAkK9)
 
 </div>
 
