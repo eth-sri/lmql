@@ -48,3 +48,7 @@ my_azure_model = lmql.model(
 The resulting `my_azure_model` object can now be used in the `from` clause of a query, as `model=...` argument for LMQL query functions, or for direct [generation](../lib/generations.md).
 
 Azure configuration parameters specified as part of an `lmql.model(...)` object generally take precedence over environment variables. The latter just act as a fallback, e.g. when `api_key=` is not specified as a keyword argument.
+
+::: tip Using a Custom Deployment Name
+If your deployment name uses a non-standard name (e.g. different from e.g. `gpt-3.5-turbo`), the LMQL runtime may not be able to automatically infer a corresponding tokenizer to use. To resolve this, you can additionally specify a `tokenizer="openai/gpt-3.5-turbo"` parameter to the `lmql.model` call, with the name of the tokenizer that should be used for this model.
+:::
