@@ -13,14 +13,14 @@ Prompt construction and generation is implemented via expressive *Python control
 for i in range(4):
     # 'where' denotes hard constraints enforced by the runtime
     "- [THING] \n" where THING in \ 
-        ["Volleyball", "Sunscreen", "Bathing Suite"]
+        ["Volleyball", "Sunscreen", "Bathing Suit"]
 ```
 %SPLIT%
 ```promptdown
 My packing list for the trip:
 
 - [THING| Volleyball]
-- [THING| Bathing Suite]
+- [THING| Bathing Suit]
 - [THING| Sunscreen]
 - [THING| Volleyball]
 ```

@@ -56,7 +56,7 @@ LMQL currently only supports integer constraints. However, support for floating 
 :::
 
 ### Choice From Set
-LMQL allows to specify that a variable should be a choice from a set of possible values. This can be rephrased as the variable being within a  set of possible values, i.e. `THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])` in the following example
+LMQL allows to specify that a variable should be a choice from a set of possible values. This can be rephrased as the variable being within a  set of possible values, i.e. `THING in set(["Volleyball", "Sunscreen", "Bathing Suit"])` in the following example
 
 ```{lmql}
 name::set
@@ -68,7 +68,7 @@ sample(temperature=0.8)
 from
    'openai/text-ada-001'
 where
-   THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])
+   THING in set(["Volleyball", "Sunscreen", "Bathing Suit"])
 
 ```
 ```promptdown
