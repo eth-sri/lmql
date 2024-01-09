@@ -7,7 +7,7 @@ LMQL relies on a two-process architecture: The inference process (long-running) 
 
 This architecture is advantageous for locally-hosted models, as the model loading time can be quite long or the required GPU hardware might not even be available on the client machine. 
 
-This chapter first discusses how to use of the two-process inference API, and then presents an alternative on how to leverage [In-Process Model Loading](#in-process-model-loading), which avoids the need for a separate server process within the same architecture.
+This chapter first discusses how to use of the two-process inference API, and then presents an alternative on how to leverage [In-Process Model Loading](#in-process-models), which avoids the need for a separate server process within the same architecture.
 
 ![Inference Architecture](./inference.svg)
 

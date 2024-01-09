@@ -74,7 +74,7 @@ Generates a text completion based on a given prompt. Returns the full prompt + c
 
 **Return Value** The function returns a string or a list of strings, depending on the decoder in use (`decoder=argmax` yields a single sequence, `decoder="sample", n=2` yields two sequences, etc.).
 
-**Asynchronous** The function is asynchronous and should be used with [`asyncio`](https://docs.python.org/3/library/asyncio.html) and with `await`. When run in parallel, multiple generations will be batched and parallelized across multiple calls to the same model. For synchronous use, you can rely on [`LLM.generate_sync`](#llm-generate_sync), note however, that in this case, the function will block the current thread until generation is complete.
+**Asynchronous** The function is asynchronous and should be used with [`asyncio`](https://docs.python.org/3/library/asyncio.html) and with `await`. When run in parallel, multiple generations will be batched and parallelized across multiple calls to the same model. For synchronous use, you can rely on [`LLM.generate_sync`](#llm-generate-sync), note however, that in this case, the function will block the current thread until generation is complete.
 
 ### `LLM.generate_sync(...)`
 
@@ -134,7 +134,7 @@ async def lmql.generate(
 `lmql.generate` generates text completions based on a given prompt and behaves just like [`LLM.generate`](#llm-generate), 
 with the provided `model` instance or model name.
 
-If no `model` is provided, the default model is used. See [`lmql.set_default_model`](#lmql-set_default_model) for more information.
+If no `model` is provided, the default model is used. See [`lmql.set_default_model`](#lmql-set-default-model) for more information.
 
 ### `lmql.generate_sync(...)`
 
@@ -154,7 +154,7 @@ async def score(
 `lmql.score` scores different continuation `values` for a given `prompt` and behaves just like [`LLM.score`](#llm-score),
 with the provided `model` instance or model name.
 
-If no `model` is provided, the default model is used. See [`lmql.set_default_model`](#lmql-set_default_model) for more information.
+If no `model` is provided, the default model is used. See [`lmql.set_default_model`](#lmql-set-default-model) for more information.
 
 ### `lmql.score_sync(...)`
 

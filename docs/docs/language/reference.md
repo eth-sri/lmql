@@ -34,7 +34,7 @@ LMQL's [current reference implementation](#reference-implementation) is written 
 
 * The `lmql playground` offers an interactive interface for running, debugging and experimenting with LMQL programs. It is the recommended way to get started with LMQL. An online version of the playground is available at [lmql.ai/playground](https://lmql.ai/playground).
 
-* LMQL is available as a Python library, with the `lmql.query` function offering a simple way to use LMQL directly from within Python. For more information, please refer to the [Python API](#python-api) section.
+* LMQL is available as a Python library, with the `lmql.query` function offering a simple way to use LMQL directly from within Python. For more information, please refer to general [Documentation](overview.md).
 
 * The `lmql run` CLI tool can used to run LMQL programs directly from the command line.
 
@@ -44,9 +44,9 @@ For more information and example-based discussion on how to use LMQL, please ref
 
 The LMQL language comprises two syntax variants:
 
-* The modern, more minimalistic [standard syntax](#modern-syntax) that relies on a very small set of language constructs in an otherwise standard Python environment. This syntax is the main focus for the continued development of LMQL.
+* The modern, more minimalistic [standard syntax](#standard-syntax) that relies on a very small set of language constructs in an otherwise standard Python environment. This syntax is the main focus for the continued development of LMQL.
 
-* A *legacy* [standalone syntax](#legacy-syntax) that is more static in nature but relevant for standalone LMQL use-cases.
+* A *legacy* [standalone syntax](#standalone-syntax) that is more static in nature but relevant for standalone LMQL use-cases.
 
 Both syntax variants are compatible and can be used interchangeably. 
 
