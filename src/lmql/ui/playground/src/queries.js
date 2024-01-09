@@ -38,7 +38,7 @@ sample(temperature=0.8)
 # use a loop to generate a list
 for i in range(4):
     "- [THING] \\n" where \\
-        THING in set(["Volleyball", "Sunscreen", "Bathing Suite"])`,
+        THING in set(["Volleyball", "Sunscreen", "Bathing Suit"])`,
             state: 'precomputed/list.json'
          },
          {
