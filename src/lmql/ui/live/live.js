@@ -37,8 +37,8 @@ io.on('connection', s => {
     const app_input = request.app_input;
     const app_arguments = request.app_arguments;
     
-    // run "python live.py endpoints" and get output lines as array
-    execFile(`python`, [`live.py`, `endpoints`, app_name], (err, stdout, stderr) => {
+    // run "python3 live.py endpoints" and get output lines as array
+    execFile(`python3`, [`live.py`, `endpoints`, app_name], (err, stdout, stderr) => {
         if (err) {
             console.log(err);
             s.emit("app-error", stdout + stderr)
@@ -95,7 +95,7 @@ app.get('/app/:app_name', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   let html = fs.readFileSync(path.join(content_dir, 'index.html'), {encoding: 'utf8'})
   
-  execFile(`python`, [`live.py`, `client-html`, app_name], (err, stdout, stderr) => {
+  execFile(`python3`, [`live.py`, `client-html`, app_name], (err, stdout, stderr) => {
     if (err) {
         console.log(err);
         res.send(html.replace("<<<CLIENT_HTML>>>", "Failed to load app html for app."))
@@ -108,8 +108,8 @@ app.get('/app/:app_name', (req, res) => {
 // serve /app/<app_name>
 app.get('/app/:app_name/app-client.js', (req, res) => {
   const app_name = req.params.app_name;
-  // run "python live.py endpoints" and get output lines as array
-  execFile(`python`, [`live.py`, `client-script`, app_name], (err, stdout, stderr) => {
+  // run "python3 live.py endpoints" and get output lines as array
+  execFile(`python3`, [`live.py`, `client-script`, app_name], (err, stdout, stderr) => {
     if (err) {
         console.log(err);
         res.send("")
@@ -144,15 +144,15 @@ let running_processes = {}
 function run_app(app_name, app_input, app_arguments, socket) {
     const app_input_as_json = JSON.stringify(app_input);
     const app_arguments_as_json = JSON.stringify(app_arguments);
-    // run "python live.py endpoints" and get output lines as array
-    // console.log(" >", `python live.py ${app_name} ${app_input_as_json}`);
+    // run "python3 live.py endpoints" and get output lines as array
+    // console.log(" >", `python3 live.py ${app_name} ${app_input_as_json}`);
     
     if (!app_input) {
       socket.emit("app-exit", `Error: Cannot run app with empty input\n`)
       return;
     }
 
-    const live_process = spawn('python', ['live.py', app_name, app_input_as_json, app_arguments_as_json]);
+    const live_process = spawn('python3', ['live.py', app_name, app_input_as_json, app_arguments_as_json]);
     // app input escape all double quotes as twice
     let input = app_input.replace(/"/g, '\\"');
 
