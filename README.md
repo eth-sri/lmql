@@ -24,10 +24,10 @@
 </div>
 
 
-
-> <img width="120pt" alt="image" src="https://github.com/eth-sri/lmql/assets/17903049/bfa7ecf5-847b-47d0-9160-f8596aa47749"> <br/>Help us shape the next major version of LMQL by filling out the LMQL developer survey: https://forms.gle/pGvAicNpUhS1rAkK9
-
 LMQL is a programming language for large language models (LLMs) based on a *superset of Python*. LMQL offers a novel way of interweaving traditional programming with the ability to call LLMs in your code. It goes beyond traditional templating languages by integrating LLM interaction natively at the level of your program code. 
+
+> <img width="200pt" alt="image" src="https://github.com/eth-sri/lmql/assets/17903049/bfa7ecf5-847b-47d0-9160-f8596aa47749"> <br/>Help us shape the next major version of LMQL by filling out the LMQL developer survey: https://forms.gle/pGvAicNpUhS1rAkK9
+
 ## Explore LMQL
 
 An LMQL program reads like standard Python, but top-level strings are interpreted as query strings: They are passed to an LLM, where template variables like `[GREETINGS]` are automatically completed by the model:
