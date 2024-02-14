@@ -64,7 +64,7 @@ async def test_conditional_stopping():
     from 
         lmql.model("local:llama.cpp:/lmql/llama-2-7b-chat.Q2_K.gguf", tokenizer="AyyYOO/Luna-AI-Llama2-Uncensored-FP16-sharded") 
     where 
-        len(TOKENS(OUTPUT)) > 21 and STOPS_AT(OUTPUT, "review")
+        len(TOKENS(OUTPUT)) > 80 and STOPS_AT(OUTPUT, "review")
     '''
 
 @lmql.query
