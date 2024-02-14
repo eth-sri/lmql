@@ -9,6 +9,8 @@ import lmql.version as version_info
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+is_windows = os.name == "nt"  # Necessary to properly run yarn using subprocess.run on Windows
+
 def cmd_serve_model():
     """emoji:🏄 Serve a 🤗 Transformers model via the LMQL inference API"""
     from lmql.models.lmtp.lmtp_serve import cli
@@ -124,7 +126,7 @@ def cmd_playground():
     print(f"[lmql playground {project_root}, liveserver=localhost:{args.live_port}, ui=localhost:{args.ui_port}]")
 
     # # make sure yarn is installed
-    if subprocess.call(["yarn", "--version"]) != 0:
+    if subprocess.call(["yarn", "--version"], shell=is_windows) != 0:
         subprocess.run(['npm', 'install', '-g', 'yarn'], check=True)
 
     # repo commit
@@ -140,15 +142,16 @@ def cmd_playground():
 
     # Ensure that we can download dependencies before we start either live.js or the debug server
     yarn_cwd_live = os.path.join(project_root, "lmql/ui/live")
-    subprocess.run(['yarn'], cwd=yarn_cwd_live, check=True)
+    subprocess.run(['yarn'], cwd=yarn_cwd_live, check=True, shell=is_windows)
 
     yarn_cwd_playground = os.path.join(project_root, 'lmql/ui/playground')
-    subprocess.run(['yarn'], cwd=yarn_cwd_playground, check=True)
+    subprocess.run(['yarn'], cwd=yarn_cwd_playground, check=True, shell=is_windows)
 
     # live server that executes LMQL queries and returns results and debugger data
     live_process = subprocess.Popen(['yarn', 'cross-env', 'node', 'live.js'],
         cwd=yarn_cwd_live,
         env=dict(os.environ, PORT=str(args.live_port)),
+        shell=is_windows,
     )
 
     # UI that displays the debugger (uses live server API for data and remote execution)
@@ -156,6 +159,7 @@ def cmd_playground():
         ['yarn', 'cross-env', 'yarn', 'run', 'start'],
         cwd=yarn_cwd_playground,
         env=dict(os.environ, REACT_APP_BUILD_COMMIT=str(commit), REACT_APP_SOCKET_PORT=str(args.live_port)),
+        shell=is_windows,
     )
 
     try:
