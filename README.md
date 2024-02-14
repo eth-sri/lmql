@@ -23,6 +23,8 @@
   </p>
 </div>
 
+### >> Help us shape the next major version of LMQL and fill out the LMQL developer survey  here: https://forms.gle/pGvAicNpUhS1rAkK9 (5-question) <<
+
 LMQL is a programming language for large language models (LLMs) based on a *superset of Python*. LMQL offers a novel way of interweaving traditional programming with the ability to call LLMs in your code. It goes beyond traditional templating languages by integrating LLM interaction natively at the level of your program code. 
 ## Explore LMQL
 
