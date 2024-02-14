@@ -580,11 +580,6 @@ function ModelSelection(props) {
       {"name": "random", note: "Random (uniform) token sampling.", inprocess: false}
     ],
     "Other Suggestions": [
-      {"name": "openai/text-ada-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-curie-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-babbage-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-davinci-001", "note": "OpenAI", inprocess: false},
-      {"name": "openai/text-davinci-003", "note": "OpenAI", inprocess: false},
       {"name": "openai/gpt-3.5-turbo-instruct", "note": "OpenAI", inprocess: false},
       {"name": "chatgpt", "note": "OpenAI", inprocess: false},
       {"name": "gpt-4", "note": "OpenAI", inprocess: false}
@@ -718,11 +713,12 @@ function EditorPanel(props) {
       />
       </EditorContainer>
       <ButtonGroup>
-        <FancyButton className='green' onClick={() => props.onRun()} disabled={props.processState != "idle" && props.processState != "secret-missing"}>
+        {!configuration.BROWSER_MODE && <FancyButton className='green' onClick={() => props.onRun()} disabled={props.processState != "idle" && props.processState != "secret-missing"}>
           {props.processState == "running" ? <>Running...</> : <>&#x25B6; Run</>}
-        </FancyButton>
+        </FancyButton>}
         {/* status light for connection status */}
-        <StatusLight connectionState={props.status} />
+        {configuration.BROWSER_MODE && <InstallLocallyLink href="https://lmql.ai/docs/installation.html" target="_blank">Install LMQL to run your own programs. ↗</InstallLocallyLink>}
+        {!configuration.BROWSER_MODE && <StatusLight connectionState={props.status} />}
         <StopButton onClick={() => {
           LMQLProcess.kill()
         }} disabled={props.processState != "running"}>
@@ -737,6 +733,18 @@ function EditorPanel(props) {
     </Panel>
   );
 }
+
+const InstallLocallyLink = styled.a`
+  color: white;
+  cursor: pointer;
+  font-size: 10pt;
+  line-height: 2.0em;
+  text-decoration: underline;
+
+  &:hover {
+    color: #a0a0a0;
+  }
+`
 
 const ButtonErrorIndicator = styled.button`
   background: none;
@@ -2782,6 +2790,10 @@ class App extends React.Component {
   }
 
   onRun() {
+    if (configuration.BROWSER_MODE) {
+      return; // not supported in browser mode
+    }
+
     const code = persistedState.getItem("lmql-editor-contents");
     const model = persistedState.getItem("playground-model");
     const appData = {
