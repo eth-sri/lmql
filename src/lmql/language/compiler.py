@@ -425,8 +425,15 @@ class PromptClauseTransformation(FunctionCallTransformation):
             return constant
     
         # transform expressions embedded in f-strings
+        # in case ending with quote, add a trailing space to avoid SyntaxError: unterminated string literal
+        # check issue #324
+        if compiled_qstring.endswith('"'):
+            compiled_qstring += " "
         qstring_as_fstring: ast.JoinedStr = ast.parse(f'f"""{compiled_qstring}"""').body[0].value
+
         function_call_transformer = FunctionCallTransformation()
+        # remove the added space
+        qstring_as_fstring.values[-1].value = qstring_as_fstring.values[-1].value[:-1]
         qstring_as_fstring.values = [function_call_transformer.visit(v) for v in qstring_as_fstring.values]
 
         # check and collect extra args for decoder, type and decorators
