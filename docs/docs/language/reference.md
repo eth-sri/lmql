@@ -201,6 +201,23 @@ distribution
     ANSWER in ["A", "B"]
 ```
 
+Instead of writing the query in string, you could also write it in a more programmatic way with query builder. 
+```python
+import lmql
+from lmql.language.query_builder import QueryBuilder
+
+query = (QueryBuilder()
+          .set_decoder('argmax')
+          .set_prompt('What is the capital of France? [ANSWER]')
+          .set_model('gpt2')
+          .set_distribution('ANSWER', '["A", "B"]')
+          .build())
+
+lmql.run_sync(query)
+```
+
+
+
 :::
 
 ### Decoder Clause
