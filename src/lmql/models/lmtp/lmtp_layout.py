@@ -32,11 +32,34 @@ def layout_main(args):
     
     num_groups = int(layout.split("x")[0])
     num_devices_per_group = int(layout.split("x")[1])
-    num_devices = num_groups * num_devices_per_group
+    num_devices = num_groups * num_devices_per_group # the total number of devices needed
 
+    # Query the hardware to see how many GPUs there are in total.
+    # Note: we might not be able to _uses_ all of these in a shared compute environment...
     cmd = ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader"]
-    gpu_ids = subprocess.check_output(cmd).decode("utf-8").strip().split("\n")[:num_devices]
-    gpu_ids = [int(gpu_id) for gpu_id in gpu_ids]
+    all_gpu_ids = subprocess.check_output(cmd).decode("utf-8").strip().split("\n")
+    all_gpu_ids = [int(gpu_id) for gpu_id in all_gpu_ids]
+
+    # at this point, all_gpu_ids has a list of all GPUs on the system; however, we might not actually have access
+    # to all of them. Let's check CUDA_VISIBLE_DEVICES and see:
+    if os.getenv("CUDA_VISIBLE_DEVICES"):
+        avail_gpus = [int(g) for g in os.getenv("CUDA_VISIBLE_DEVICES").split(",")]
+        # quick sanity checks:
+        if len(avail_gpus) == 0:
+            print(f"CUDA_VISIBLE_DEVICES is set but includes no GPUSs?")
+            sys.exit(1)
+
+        if len(avail_gpus) != len(set(avail_gpus) & set(all_gpu_ids)):
+            print(f"CUDA_VISIBLE_DEVICES specifies GPUs that nvidia-smi doesn't know about...")
+            sys.exit(1)
+
+        if num_devices > len(avail_gpus):
+            print(f"Layout specified more devices ({num_devices}) than available: {len(avail_gpus)}")
+
+        gpu_ids = avail_gpus[:num_devices]
+    else:
+        gpu_ids = all_gpu_ids[:num_devices]  # take however many of the total we need to make up our list
+
 
     # validate layout
     if len(gpu_ids) < num_groups * num_devices_per_group:
