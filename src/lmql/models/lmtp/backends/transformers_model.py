@@ -39,6 +39,9 @@ class TransformersLLM(LMTPModel):
         self.max_batch_size = kwargs.get("batch_size", 32)
 
         self.silent = kwargs.pop("silent", False)
+        self.torch_compile = kwargs.pop("torch_compile", False)
+        if self.torch_compile and self.loader != "transformers":
+            raise ValueError("Torch compile is only supported for transformers models")
 
         if not self.silent:
             print("[Loading", self.model_identifier, "with", self.model_constructor() + "]", flush=True)
@@ -62,7 +65,9 @@ class TransformersLLM(LMTPModel):
         else:
             from transformers import AutoModelForCausalLM            
             self.model = AutoModelForCausalLM.from_pretrained(self.model_identifier, **self.model_args)
-        
+            if self.torch_compile:
+                self.model = torch.compile(self.model)
+
         if self.loader == 'awq':
             self.device = self.model.model.device
         else:
