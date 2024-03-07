@@ -87,7 +87,7 @@ def argparser(args):
     next_argument_name = None
     
     kwargs = {}
-    flag_args = ["cuda", "static", "single_thread", "docker_hide_port"]
+    flag_args = ["cuda", "static", "single_thread", "docker_hide_port", "torch_compile"]
 
     help_text = """
 usage: serve-model [-h] [--port PORT] [--host HOST] [--cuda] [--dtype DTYPE] [--[*] VALUE] model
@@ -110,6 +110,8 @@ options:
   --single_thread  Run the model on the main thread. This can lead to increased latency when processing multiple requests, but is necessary 
                    for some models that cannot be run in the background (e.g. falcon).
   
+  --torch_compile  If set, the model will be compiled before serving. This can lead to a inferece speedup(~30%), c.f. https://huggingface.co/docs/transformers/main/perf_torch_compile
+  
   --dtype DTYPE    What format to load the model weights in. Options: 'float16' (not available on all models), '8bit' (requires bitsandbytes), 
                    '4bit' (requires bitsandbytes).
   
@@ -127,7 +129,6 @@ options:
   --[*] VALUE      Any other argument will be passed as a keyword argument to the relevant backend implementation, e.g. the 
                    AutoModelForCausalLM.from_pretrained function.
     """
-
     for arg in args:
         if arg == "-h" or arg == "--help":
             print(help_text)
