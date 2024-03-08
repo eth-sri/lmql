@@ -1258,8 +1258,6 @@ class PromptInterpreter:
 
         for ic in inline_calls:
             si = ic.subinterpreter(self, calling_state.prompt)
-            if si is None: continue
-            
             subinterpreters.append(si)
             
             # prepare subinterpreter if this is the first time it is used

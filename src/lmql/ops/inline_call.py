@@ -2,8 +2,12 @@ from typing import Optional, Any
 from .node import *
 from .booleans import *
 import inspect
+from copy import deepcopy
 
 class InlineCallOp(Node):
+    """
+    Represents a nested query call e.g. in "[A: fct()]".
+    """
     def __init__(self, predecessors, lcls, glbs):
         super().__init__(predecessors)
         fct, args = predecessors
@@ -34,7 +38,7 @@ class InlineCallOp(Node):
         
         # set positional arguments
         assert fct.function_context is not None, "LMQL in-context function " + str(fct) + " has no function context."
-        self.query_kwargs = None
+        self.query_kwargs = self.derive_query_kwargs(predecessors[1])
 
     def execute_predecessors(self, trace, context):
         fct, args = self.predecessors
@@ -57,19 +61,27 @@ class InlineCallOp(Node):
             return None
         return context.subinterpreter_results[si]
     
+    def derive_query_kwargs(self, args):
+        args = args[1:]
+        
+        # get python values of variables when available
+        args = [a.python_value if isinstance(a, Var) and a.python_variable else a for a in args]
+
+        def is_kwarg(a):
+            return type(a) is tuple and len(a) == 2 and type(a[0]) is str and a[0].startswith("__kw:")
+        kwargs = {k[0][len("__kw:"):]: k[1] for k in args if is_kwarg(k)}
+        args = [a for a in args if not is_kwarg(a)]
+
+        if self.self_binding is not None:
+            kwargs["__self__"] = self.self_binding
+        query_kwargs, _ = self.query_fct.make_kwargs(*args, **kwargs)
+        
+        return query_kwargs
+
     def subinterpreter(self, runtime, prompt, args = None):
         query_kwargs = None
         if args is not None:
-            args = args[1:]
-            def is_kwarg(a):
-                return type(a) is tuple and len(a) == 2 and type(a[0]) is str and a[0].startswith("__kw:")
-            kwargs = {k[0][len("__kw:"):]: k[1] for k in args if is_kwarg(k)}
-            args = [a for a in args if not is_kwarg(a)]
-
-            if self.self_binding is not None:
-                kwargs["__self__"] = self.self_binding
-            query_kwargs, _ = self.query_fct.make_kwargs(*args, **kwargs)
-            self.query_kwargs = query_kwargs
+            self.query_kwargs = self.derive_query_kwargs(args)
         else:
             if self.query_kwargs is None:
                 return None
@@ -97,6 +109,7 @@ class InlineCallOp(Node):
         runtime = context.runtime
         # instructs postprocessing logic to use subinterpreters results as postprocessing results
         si = self.subinterpreter(runtime, context.prompt, args)
+        assert si.root_state is not None, "subinterpreter result is not initialized: {} (this is very likely a bug, please report it in the issue tracker of the project)".format(si)
         return si
     
     def postprocess_order(self, other, operands, other_inputs, **kwargs):
