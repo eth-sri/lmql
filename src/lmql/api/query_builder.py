@@ -1,3 +1,19 @@
+from lmql.api import run, run_sync
+
+
+class QueryExecution:
+    def __init__(self, query_string):
+        self.query_string = query_string
+
+    async def run(self, *args, **kwargs):
+        # This method should asynchronously execute the query_string
+        return await run(self.query_string, *args, **kwargs)
+
+    def run_sync(self, *args, **kwargs):
+        # This method should synchronously execute the query_string
+        return run_sync(self.query_string, *args, **kwargs)
+
+
 class QueryBuilder:
     def __init__(self):
         self.decoder = None
@@ -56,5 +72,7 @@ class QueryBuilder:
             variable, expr = self.distribution_expr
             components.append(f'distribution {variable} in {expr}')
 
-        return ' '.join(components)
+        query_string = ' '.join(components)
+        # Return an instance of QueryExecution instead of a string
+        return QueryExecution(query_string)
 

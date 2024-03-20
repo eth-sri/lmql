@@ -204,16 +204,16 @@ distribution
 Instead of writing the query in string, you could also write it in a more programmatic way with query builder. 
 ```python
 import lmql
-from lmql.language.query_builder import QueryBuilder
 
-query = (QueryBuilder()
+query = (lmql.QueryBuilder()
           .set_decoder('argmax')
           .set_prompt('What is the capital of France? [ANSWER]')
           .set_model('gpt2')
           .set_distribution('ANSWER', '["A", "B"]')
           .build())
 
-lmql.run_sync(query)
+query.run_sync()
+# You can also run it asynchronously with query.run_async() and await the result
 ```
 
 
