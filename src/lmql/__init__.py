@@ -32,3 +32,6 @@ from lmql.runtime.lmql_runtime import (LMQLQueryFunction, compiled_query, tag)
 
 # event loop utils
 from lmql.runtime.loop import main
+
+# query builder
+from lmql.api.query_builder import QueryBuilder
