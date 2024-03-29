@@ -115,7 +115,7 @@ with lmql.traced("my-context") as t:
     print(lmql.certificate(t))
 ```
 
-This produces one certificate for all calls made in the defined context, where each query is represented as a separate item in the list of `children` certificates. Recorded events are are nested in child certificates. Additionally, an aggregated `metrics` object ranging over all (recursive) calls is included in the top-level certificate.
+This produces one certificate for all calls made in the defined context, where each query is represented as a separate item in the list of `children` certificates. Recorded events are nested in child certificates. Additionally, an aggregated `metrics` object ranging over all (recursive) calls is included in the top-level certificate.
 
 ## Certificate Callbacks And Return Values
 
