@@ -1570,7 +1570,7 @@ function EmptyModelResult(props) {
     return <CenterBox>
       {props.firstInput ? <h2>
         Interactive Mode<br/>
-        <span className="subtitle">Type your message below and and press Enter to send.</span>
+        <span className="subtitle">Type your message below and press Enter to send.</span>
       </h2> : <h2>
       <LMQLSpinner/>
       Waiting for first tokens...
