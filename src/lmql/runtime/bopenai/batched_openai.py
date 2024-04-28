@@ -579,6 +579,8 @@ class AsyncOpenAIAPI:
         self.complete_request_workers = [asyncio.create_task(self.complete_request_worker(self.complete_request_queue)) for i in range(5)]
         
         self.worker_loops = set()
+        self.worker_loops_started = 0
+        self.worker_loop_added = asyncio.Event()
 
         self.stats_logger = None 
         
@@ -666,6 +668,8 @@ class AsyncOpenAIAPI:
 
     async def complete_request_worker(self, queue: asyncio.Queue):
         self.worker_loops.add(asyncio.get_running_loop())
+        self.worker_loops_started += 1
+        self.worker_loop_added.set()
         
         while True:
             try:
@@ -724,6 +728,10 @@ class AsyncOpenAIAPI:
         # check for workers
         if len(self.complete_request_workers) == 0:
             raise APIShutDownException(f"bopenai requires at least one worker to be running to issue new complete requests.")
+
+        while self.worker_loops_started < len(self.complete_request_workers):
+            await self.worker_loop_added.wait()
+            self.worker_loop_added.clear()
 
         loop = asyncio.get_running_loop()
 
