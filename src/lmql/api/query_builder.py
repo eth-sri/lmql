@@ -15,6 +15,20 @@ class QueryExecution:
 
 
 class QueryBuilder:
+    """
+    Simple query builder to construct LMQL queries programatically.
+
+    # Example usage:
+    query = (lmql.QueryBuilder()
+              .set_decoder('argmax')
+              .set_prompt('What is the capital of France? [ANSWER]')
+              .set_model('local:gpt2')
+              .set_where('len(TOKENS(ANSWER)) < 10')
+              .set_where('len(TOKENS(ANSWER)) > 2')
+              .build())
+
+    result = query.run_sync()
+    """
     def __init__(self):
         self.decoder = None
         self.prompt = None
