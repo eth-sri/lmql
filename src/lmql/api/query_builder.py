@@ -28,15 +28,17 @@ class QueryBuilder:
         self.decoder = (decoder, kwargs)
         return self
 
-    def set_prompt(self, prompt="What is the capital of France? [ANSWER]"):
+    def set_prompt(self, prompt: str):
+        if self.prompt is not None:
+            raise ValueError("You cannot set multiple prompt values. Please set the entire prompt with a single set_prompt call.")
         self.prompt = prompt
         return self
 
-    def set_model(self, model="gpt2"):
+    def set_model(self, model: str):
         self.model = model
         return self
 
-    def set_where(self, where="len(TOKENS(ANSWER)) < 10"):
+    def set_where(self, where: str):
         """
         Add a where clause to the query
         If a where clause already exists, the new clause is appended with an 'and'
@@ -46,7 +48,7 @@ class QueryBuilder:
         self.where = where if self.where is None else f"{self.where} and {where}"
         return self
 
-    def set_distribution(self, variable="ANSWER", expr='["A", "B"]'):
+    def set_distribution(self, variable: str, expr: str):
         self.distribution_expr = (variable, expr)
         return self
 

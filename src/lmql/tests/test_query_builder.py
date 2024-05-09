@@ -10,12 +10,12 @@ def test_query_builder():
     query = (lmql.QueryBuilder()
               .set_decoder('argmax')
               .set_prompt('What is the capital of France? [ANSWER]')
-              .set_model('gpt2')
+              .set_model('local:gpt2')
               .set_where('len(TOKENS(ANSWER)) < 10')
               .set_where('len(TOKENS(ANSWER)) > 2')
               .build())
 
-    expected = 'argmax "What is the capital of France? [ANSWER]" from "gpt2" where len(TOKENS(ANSWER)) < 10 and len(TOKENS(ANSWER)) > 2'
+    expected = 'argmax "What is the capital of France? [ANSWER]" from "local:gpt2" where len(TOKENS(ANSWER)) < 10 and len(TOKENS(ANSWER)) > 2'
 
     assert expected==query.query_string, f"Expected: {expected}, got: {query.query_string}"
     out = query.run_sync()
@@ -25,11 +25,11 @@ def test_query_builder_with_dist():
     query = (lmql.QueryBuilder()
               .set_decoder('argmax')
               .set_prompt('What is the capital of France? [ANSWER]')
-              .set_model('gpt2')
+              .set_model('local:gpt2')
               .set_distribution('ANSWER', '["Paris", "London"]')
               .build())
 
-    expected = 'argmax "What is the capital of France? [ANSWER]" from "gpt2" distribution ANSWER in ["Paris", "London"]'
+    expected = 'argmax "What is the capital of France? [ANSWER]" from "local:gpt2" distribution ANSWER in ["Paris", "London"]'
 
     assert expected==query.query_string, f"Expected: {expected}, got: {query.query_string}"
     out = query.run_sync()
