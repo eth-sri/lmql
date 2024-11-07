@@ -164,7 +164,7 @@ async def is_type(ty, description=False):
                 indent += ""
                 stack = [(k, "dict-item", key_type[k], existing_value.get(k)) for k in key_type.keys()] + ["DEDENT", f"}}{line_end}"] + stack
             elif type(key_type) is list:
-                "["
+                "[["
                 existing_value = existing_value or []
                 indent += ""
                 stack = [("", "list-item", key_type[0], (0, existing_value))] + ["DEDENT", f"]{line_end}"] + stack
