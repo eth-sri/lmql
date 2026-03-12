@@ -61,7 +61,7 @@ To better control LLM behavior, you can use the `where` keyword to specify const
 
 Beyond this linear form of scripting, LMQL also supports a number of decoding algorithms to execute your program, such as `argmax`, `sample` or even advanced branching decoders like [beam search and `best_k`](https://lmql.ai/docs/language/decoding.html). 
 
-Learn more about LMQL by exploring thne **[Example Showcase](https://lmql.ai)**, by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)** or by reading the **[documentation](https://lmql.ai/docs)**.
+Learn more about LMQL by exploring the **[Example Showcase](https://lmql.ai)**, by running your own programs in our **[browser-based Playground IDE](https://lmql.ai/playground)** or by reading the **[documentation](https://lmql.ai/docs)**.
 
 ## Feature Overview
 
