@@ -105,7 +105,7 @@ def cache(variable: TemplateVariable, context: ProgramState):
 """ where STOPS_BEFORE(ITEM0, "\n") and STOPS_BEFORE(ITEM1, "\n")
 ```
 
-Given a pre-determined list of fixed values per variable name like `ITEM0`, query execution only actually invokes the model for `ITEM1`. For all occurences of `ITEM0`, the cached value is used instead. 
+Given a pre-determined list of fixed values per variable name like `ITEM0`, query execution only actually invokes the model for `ITEM1`. For all occurrences of `ITEM0`, the cached value is used instead. 
 
 For this, a pre-processing decorator either returns the provided `variable: TemplateVariable` object to indicate that the variable should be generated as usual, or it returns a string value to indicate that the variable should be replaced by a fixed value instead.
 
