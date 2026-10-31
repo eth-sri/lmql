@@ -101,7 +101,8 @@ class LlamaCppModel(LMTPModel):
                 
                 return nputil.log_softmax(scores + bias_tensors, axis=-1).reshape(-1)
         
-        return BatchLogitsProcessor()
+        from llama_cpp import LogitsProcessorList
+        return LogitsProcessorList([BatchLogitsProcessor()])
 
 LMTPModel.registry["llama.cpp"] = LlamaCppModel
 
